@@ -15,6 +15,8 @@ import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.TradeId
+import com.moneymanager.domain.model.TransactionId
+import com.moneymanager.domain.model.TransactionKind
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
@@ -39,6 +41,7 @@ class CsvImportReadRepositoryImpl(
 ) : CsvImportReadRepository {
     private val csvImportSelectQueries = database.csvImportSelectQueries
     private val entitySourceSelectQueries = database.entitySourceSelectQueries
+    private val observationSelectQueries = database.observationSelectQueries
     private val tableManager = CsvTableManager(database)
 
     override fun getAllImports(): Flow<List<CsvImport>> =
@@ -139,6 +142,38 @@ class CsvImportReadRepositoryImpl(
                 .map { TradeId(it) }
                 .toSet()
         }
+
+    override suspend fun getTransactionsObservedByImport(id: CsvImportId): Set<TransactionId> =
+        withContext(coroutineContext) {
+            observationSelectQueries
+                .selectTransactionsObservedByCsvImport(id.id.toString())
+                .awaitAsList()
+                .mapTo(mutableSetOf()) {
+                    if (it.kind ==
+                        TransactionKind.TRADE.name
+                    ) {
+                        TradeId(it.transaction_id)
+                    } else {
+                        TransferId(it.transaction_id)
+                    }
+                }
+        }
+
+    override suspend fun getTransactionsObservedOutsideImports(
+        importIds: Collection<CsvImportId>,
+        transactionIds: Collection<TransactionId>,
+    ): Set<TransactionId> {
+        if (transactionIds.isEmpty()) return emptySet()
+        val observed =
+            withContext(coroutineContext) {
+                transactionIds.map { it.id }.distinct().chunked(OBSERVED_CHUNK).flatMapTo(mutableSetOf()) { chunk ->
+                    observationSelectQueries
+                        .selectTransactionsObservedOutsideCsvImports(chunk, importIds.map { it.id.toString() })
+                        .awaitAsList()
+                }
+            }
+        return transactionIds.filterTo(mutableSetOf()) { it.id in observed }
+    }
 
     override suspend fun findImportsByChecksum(checksum: String): List<CsvImport> =
         withContext(coroutineContext) {
@@ -358,3 +393,6 @@ class CsvImportReadRepositoryImpl(
 
 /** SQLite binds at most 999 variables; statement-account lookups bind one per transfer id. */
 private const val STATEMENT_ACCOUNT_CHUNK = 500
+
+/** Transaction ids per observation lookup, leaving room among the bound variables for the file ids. */
+private const val OBSERVED_CHUNK = 500

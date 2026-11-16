@@ -5,6 +5,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TradeId
+import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
@@ -40,7 +41,7 @@ data class CsvUnimportAffectedFile(
  */
 data class CsvUnimportPlan(
     val importId: CsvImportId,
-    /** Every transfer the file created (fee and pass-through legs included). */
+    /** The transfers the unimport deletes (fee and pass-through legs included): those nothing outside the file still observes. */
     val transferIds: Set<TransferId>,
     val tradeIds: Set<TradeId>,
     /** Accounts the file auto-created; those left with no activity are deleted afterwards. */
@@ -59,18 +60,35 @@ data class CsvUnimportResult(
 )
 
 /**
- * Works out what unimporting [importId] removes: only what the file itself CREATED (per
- * `entity_source`, first revision) — a transaction another source created and this file merely
- * matched or updated is left alone. Rows in other files that point at a transaction about to be deleted
- * are listed so they can be reset: their movement is gone with it until that file is re-imported.
+ * Works out what unimporting [importId] removes. Unimport is a sync of the file with no records: it withdraws the
+ * file's observations, and a transaction goes only once nothing else observes it. So it deletes the transactions the
+ * file created, or observes and another file or the match created, that no other file's or API session's record, no
+ * person and no leg group outside the file still observes. One still observed stays, rebuilt from what the others say,
+ * and their rows keep it. A transaction a person, an API session or a reconciliation copy created is never the file's.
+ * Rows in other files that point at a transaction about to be deleted without observing it are listed so they can be
+ * reset: their movement is gone with it until that file is re-imported.
  */
 suspend fun planCsvUnimport(
     importId: CsvImportId,
     csvImportRepository: CsvImportReadRepository,
     transferSourceRepository: TransferSourceReadRepository,
+): CsvUnimportPlan = planWithdrawal(importId, setOf(importId), emptySet(), csvImportRepository, transferSourceRepository)
+
+/** [planCsvUnimport] for [importId] withdrawn along with the files [withdrawing], leaving out the transactions in [claimed]. */
+private suspend fun planWithdrawal(
+    importId: CsvImportId,
+    withdrawing: Set<CsvImportId>,
+    claimed: Set<TransactionId>,
+    csvImportRepository: CsvImportReadRepository,
+    transferSourceRepository: TransferSourceReadRepository,
 ): CsvUnimportPlan {
-    val transferIds = csvImportRepository.getTransferIdsCreatedByImport(importId)
-    val tradeIds = csvImportRepository.getTradeIdsCreatedByImport(importId)
+    val candidates: Set<TransactionId> =
+        csvImportRepository.getTransferIdsCreatedByImport(importId) +
+            csvImportRepository.getTradeIdsCreatedByImport(importId) +
+            csvImportRepository.getTransactionsObservedByImport(importId) - claimed
+    val deleted = candidates - csvImportRepository.getTransactionsObservedOutsideImports(withdrawing, candidates)
+    val transferIds = deleted.filterIsInstanceTo(mutableSetOf<TransferId>())
+    val tradeIds = deleted.filterIsInstanceTo(mutableSetOf<TradeId>())
     val referencing =
         AffectedRecords
             .of(transferSourceRepository.getImportRecordsMatchedTo(transferIds, tradeIds), excluding = Source.Csv(importId))
@@ -96,11 +114,12 @@ suspend fun planCsvUnimport(
 }
 
 /**
- * Unimports a file per [plan]: deletes the transactions it created, returns it (and the rows of any
+ * Unimports a file per [plan]: deletes the transactions only it observed, returns it (and the rows of any
  * [CsvUnimportPlan.affectedFiles]) to the never-imported state, marks it ignored, un-hides transfers
  * from other sources that its transfers had reconciled away, and deletes the accounts it created that
  * are left empty. Its strategy applications are deleted too; the application audit trail keeps the
- * history, which is how the UI knows the file was unimported.
+ * history, which is how the UI knows the file was unimported. A transaction something else still observes loses only
+ * the file's observations, and is rebuilt from what is left.
  *
  * Account merges are not reversed: nothing ties a merge to a file, and one the user performed must not
  * be silently undone.
@@ -120,10 +139,10 @@ suspend fun executeCsvUnimport(
     val source = Source.Csv(plan.importId)
     val unhideUpdates = reconciledPartnerUnhideUpdates(plan.transferIds, relationshipRepository, transactionRepository)
 
-    // Every step before the final file reset can be re-derived from entity_source, so each batch leaves
-    // a state a repeated unimport recovers from; the file only reads as unimported once all of them
-    // succeeded. The un-hide updates share the delete batch (the engine applies updates before deletes),
-    // and so do the other files' row resets, which can't be found again once the transactions are gone.
+    // The deletes can be re-derived from entity_source, so a failure before the file reset leaves a state a repeated
+    // unimport recovers from; the file only reads as unimported once they succeeded. The un-hide updates share the delete
+    // batch (the engine applies updates before deletes), and so do the other files' row resets, which can't be found
+    // again once the transactions are gone.
     onProgress?.invoke(Progress("Removing the file's transactions"))
     importEngine.import(
         ImportBatch(
@@ -146,16 +165,6 @@ suspend fun executeCsvUnimport(
         ),
     )
 
-    onProgress?.invoke(Progress("Cleaning up empty accounts"))
-    val deletedEmptyAccounts =
-        importEngine.deleteEmptyImportCreatedAccounts(
-            createdAccountIds = plan.createdAccountIds,
-            source = source,
-            accountRepository = accountRepository,
-            tradeRepository = tradeRepository,
-            keyPrefix = "unimport-delete",
-        )
-
     importEngine.import(
         ImportBatch(
             csvImportMutations =
@@ -165,6 +174,18 @@ suspend fun executeCsvUnimport(
                 ),
         ),
     )
+
+    // Only once the file's observations are gone: a transfer another record still observes is rebuilt from that one, and
+    // may then leave an account the file created (its own end, standing in for the other record's placeholder) empty.
+    onProgress?.invoke(Progress("Cleaning up empty accounts"))
+    val deletedEmptyAccounts =
+        importEngine.deleteEmptyImportCreatedAccounts(
+            createdAccountIds = plan.createdAccountIds,
+            source = source,
+            accountRepository = accountRepository,
+            tradeRepository = tradeRepository,
+            keyPrefix = "unimport-delete",
+        )
 
     if (refreshViews) {
         onProgress?.invoke(Progress("Refreshing views"))
@@ -197,7 +218,16 @@ suspend fun planCsvBulkUnimport(
     csvImportRepository: CsvImportReadRepository,
     transferSourceRepository: TransferSourceReadRepository,
 ): CsvBulkUnimportPlan {
-    val plans = importIds.map { planCsvUnimport(it, csvImportRepository, transferSourceRepository) }
+    // Each transaction is counted once, against the first file that withdraws it, and survives only what outlives them all.
+    val withdrawing = importIds.toSet()
+    val claimed = mutableSetOf<TransactionId>()
+    val plans =
+        importIds.map { id ->
+            planWithdrawal(id, withdrawing, claimed.toSet(), csvImportRepository, transferSourceRepository).also {
+                claimed += it.transferIds
+                claimed += it.tradeIds
+            }
+        }
     return CsvBulkUnimportPlan(plans, mergeAffectedFiles(plans.flatMap { it.affectedFiles }, importIds.toSet()))
 }
 

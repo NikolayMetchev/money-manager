@@ -1283,7 +1283,7 @@ suspend fun runCsvImport(
                     fromAmount = assembled.fromAmount,
                     toAccountId = assembled.ownerAccountId,
                     toAmount = assembled.toAmount,
-                    owner = ObservationOwnerKey.Group(assembled.groupKey(strategy)),
+                    owner = ObservationOwnerKey.Group(assembled.groupKey(strategy), assembled.memberKeys(csvImport.id, foreignFiles)),
                 )
             } + placeholderTrades
     // A leg of a trade this file books (assembled, or a placeholder) is part of it, but the trade carries no fee, so its fee goes

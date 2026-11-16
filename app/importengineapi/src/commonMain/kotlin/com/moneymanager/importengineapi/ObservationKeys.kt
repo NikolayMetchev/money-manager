@@ -35,9 +35,13 @@ sealed interface ObservationOwnerKey {
         val key: ImportRecordKey,
     ) : ObservationOwnerKey
 
-    /** The records a `LegGroupRule` joins into one output (a trade assembled from legs, across files too). */
+    /**
+     * The records a `LegGroupRule` joins into one output (a trade assembled from legs, across files too): [members] are
+     * the records of its legs, which become the group's members.
+     */
     data class Group(
         val key: ImportGroupKey,
+        val members: Set<ImportRecordKey> = emptySet(),
     ) : ObservationOwnerKey
 
     /**

@@ -10,6 +10,7 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.LegAssembly
 import com.moneymanager.domain.model.csvstrategy.LegGroupRule
 import com.moneymanager.domain.model.observation.ImportGroupKey
+import com.moneymanager.domain.model.observation.ImportRecordKey
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.importengineapi.LocalTradeKey
 import kotlinx.coroutines.flow.first
@@ -72,6 +73,22 @@ data class AssembledTrade(
  */
 fun AssembledTrade.tradeKey(csvImportId: CsvImportId): LocalTradeKey =
     LocalTradeKey("$CSV_TRADE_KEY_PREFIX${csvImportId.id}-${group.ownRowIndexes.min()}")
+
+/**
+ * The staged rows of this trade's legs, [csvImportId]'s own and those of [foreignFiles] (as [crossFileLegRows] shifted
+ * them): the members of its group, which stops observing the trade once any of them is withdrawn.
+ */
+fun AssembledTrade.memberKeys(
+    csvImportId: CsvImportId,
+    foreignFiles: List<ForeignFile>,
+): Set<ImportRecordKey> =
+    group.rowIndexes.mapTo(mutableSetOf()) { index ->
+        if (isOwnRow(index)) {
+            ImportRecordKey.CsvRow(csvImportId, index)
+        } else {
+            ImportRecordKey.CsvRow(foreignFiles[(index / FOREIGN_ROW_INDEX_BASE).toInt() - 1].id, index % FOREIGN_ROW_INDEX_BASE)
+        }
+    }
 
 /**
  * The group that owns this assembled trade's observation: the rule's name and the legs' shared key, with the event's
@@ -175,6 +192,7 @@ fun LegGroupRule.isCrossFileTrade(): Boolean = (assembly as? LegAssembly.Trade)?
 
 /** Another staged file's rows, shifted out of this file's row range, with the name its `(file name)` column reads. */
 data class ForeignFile(
+    val id: CsvImportId,
     val fileName: String,
     val rows: List<CsvRow>,
 )
@@ -204,6 +222,7 @@ suspend fun crossFileLegRows(
         .mapIndexed { index, sibling ->
             val offset = (index + 1) * FOREIGN_ROW_INDEX_BASE
             ForeignFile(
+                sibling.id,
                 sibling.originalFileName,
                 csvImportRepository
                     .getImportRows(sibling.id, limit = sibling.rowCount.coerceAtLeast(1), offset = 0)

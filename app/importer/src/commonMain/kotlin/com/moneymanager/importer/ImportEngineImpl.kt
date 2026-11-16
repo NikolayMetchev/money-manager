@@ -792,7 +792,7 @@ class ImportEngineImpl(
                 }
 
                 key is ObservationOwnerKey.Group -> {
-                    group(key.key)
+                    group(key)
                 }
 
                 provenance == Source.Manual && (key == null || key is ObservationOwnerKey.Unrecorded) -> {
@@ -829,10 +829,15 @@ class ImportEngineImpl(
             return ObservationOwner.Record(id) to true
         }
 
-        // A group outlives each of its runs (its legs may come from several files), so it may already say a slot.
-        private suspend fun group(key: ImportGroupKey): Pair<ObservationOwner, Boolean>? {
+        // A group outlives each of its runs (its legs may come from several files), so it may already say a slot. Each run
+        // names every leg it joined, so its members are those of the latest run.
+        private suspend fun group(key: ObservationOwnerKey.Group): Pair<ObservationOwner, Boolean>? {
             val records = records ?: return null
-            val id = groups.getOrPut(key) { records.getOrCreateGroup(key) }
+            val id = groups.getOrPut(key.key) { records.getOrCreateGroup(key.key) }
+            if (key.members.isNotEmpty()) {
+                val members = key.members.mapNotNullTo(mutableSetOf()) { (record(it)?.first as? ObservationOwner.Record)?.recordId }
+                records.setGroupMembers(id, members)
+            }
             return ObservationOwner.Group(id) to false
         }
     }

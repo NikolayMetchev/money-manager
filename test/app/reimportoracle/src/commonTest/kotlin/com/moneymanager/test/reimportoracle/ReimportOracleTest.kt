@@ -117,6 +117,24 @@ class ReimportOracleTest {
             }
         }
 
+    /**
+     * Unimport is a sync of the file with no records: unimporting any one source leaves what a fresh import of the others
+     * holds. Unimporting one of two exports of one movement (Monzo's twins) keeps it, counted from the other export.
+     */
+    @Test
+    fun f_unimporting_a_source_leaves_what_a_fresh_import_of_the_others_holds() =
+        oracle(Assertion.UNIMPORT) { scenario ->
+            scenario.sources.firstNotNullOfOrNull { source ->
+                val others = scenario.sources - source
+                val expected = OracleDatabase.with(scenario) { importAndSnapshot(others) }
+                OracleDatabase.with(scenario) {
+                    import()
+                    unimport(source)
+                    difference(expected, db.canonicalSnapshot(), "unimporting ${source.file.fileName}")
+                }
+            }
+        }
+
     /** Fails unless the strategy change of (c) reached the database, so (c) can never hold vacuously. */
     private fun CanonicalSnapshot.expectStrategyChange() =
         check((transfers + trades).any { "$ORACLE_STRATEGY_ATTRIBUTE=v2" in it }) { "the strategy change tagged nothing" }
@@ -210,6 +228,7 @@ enum class Assertion {
     HAND_WORK_REIMPORT,
     HAND_WORK_STRATEGY_CHANGE,
     NO_AUDIT_WRITES,
+    UNIMPORT,
 }
 
 /**

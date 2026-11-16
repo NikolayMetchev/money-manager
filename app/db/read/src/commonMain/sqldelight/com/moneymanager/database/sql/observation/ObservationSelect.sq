@@ -92,3 +92,58 @@ FROM trade WHERE id = ?;
 
 selectMaterializedTradeAttributes:
 SELECT attribute_type_id, attribute_value FROM trade_attribute WHERE trade_id = ?;
+
+-- The transactions the records of one staged file observe, with each one's kind, that a staged file or the match
+-- created (source types 2 and 10): those unimporting the file withdraws its observations from, and deletes once nothing
+-- else observes them. One a person, an API session or a reconciliation copy created stays theirs.
+selectTransactionsObservedByCsvImport:
+SELECT DISTINCT observation.transaction_id, observation.kind
+FROM observation
+JOIN observation_owner ON observation_owner.observation_id = observation.id
+WHERE (
+    (
+      observation_owner.owner_kind = 'RECORD'
+      AND observation_owner.owner_id IN (SELECT record_id FROM csv_import_record WHERE csv_import_id = :csvImportId)
+    )
+    OR (
+      observation_owner.owner_kind = 'GROUP'
+      AND observation_owner.owner_id IN (
+        SELECT import_group_member.group_id FROM import_group_member
+        JOIN csv_import_record ON csv_import_record.record_id = import_group_member.record_id
+        WHERE csv_import_record.csv_import_id = :csvImportId
+      )
+    )
+  )
+  AND EXISTS (
+    SELECT 1 FROM entity_source
+    WHERE entity_source.entity_type_id = CASE observation.kind WHEN 'TRADE' THEN 11 ELSE 7 END
+      AND entity_source.entity_id = observation.transaction_id
+      AND entity_source.revision_id = 1
+      AND entity_source.matched = 0
+      AND entity_source.source_type_id IN (2, 10)
+  );
+
+-- Which of :transactionIds something other than the staged files :csvImportIds still observes: a record of another
+-- file or API session, a person (a transaction made by hand), or a leg group none of whose records those files hold: a
+-- group says what its records say together, so it stops saying it once one of them is withdrawn.
+selectTransactionsObservedOutsideCsvImports:
+SELECT DISTINCT observation.transaction_id
+FROM observation
+JOIN observation_owner ON observation_owner.observation_id = observation.id
+WHERE observation.transaction_id IN :transactionIds
+  AND (
+    observation_owner.owner_kind = 'MANUAL'
+    OR (
+      observation_owner.owner_kind = 'RECORD'
+      AND observation_owner.owner_id NOT IN (SELECT record_id FROM csv_import_record WHERE csv_import_id IN :csvImportIds)
+    )
+    OR (
+      observation_owner.owner_kind = 'GROUP'
+      AND EXISTS (SELECT 1 FROM import_group_member WHERE import_group_member.group_id = observation_owner.owner_id)
+      AND NOT EXISTS (
+        SELECT 1 FROM import_group_member
+        WHERE import_group_member.group_id = observation_owner.owner_id
+          AND import_group_member.record_id IN (SELECT record_id FROM csv_import_record WHERE csv_import_id IN :csvImportIds)
+      )
+    )
+  );

@@ -4,6 +4,8 @@ import com.moneymanager.cryptodata.BundledCryptoCatalog
 import com.moneymanager.csvimporter.AttributeAccountMatcher
 import com.moneymanager.csvimporter.BulkApplyResult
 import com.moneymanager.csvimporter.bulkApplyCsv
+import com.moneymanager.csvimporter.executeCsvUnimport
+import com.moneymanager.csvimporter.planCsvUnimport
 import com.moneymanager.csvimporter.stageQifImport
 import com.moneymanager.database.di.DatabaseComponent
 import com.moneymanager.database.di.openDatabaseComponent
@@ -87,6 +89,26 @@ class OracleDatabase private constructor(
             val result = reimports.reimportFile(requireNotNull(staged[source]) { "${source.file.fileName} was never imported" })
             check(result.filesFailed == 0) { "${source.file.fileName} did not re-import: $result" }
         }
+    }
+
+    /** Unimports [source], as the Unimport button does: its records are withdrawn and what nothing else observes goes. */
+    suspend fun unimport(source: OracleSource) {
+        val plan =
+            planCsvUnimport(
+                requireNotNull(staged[source]) { "${source.file.fileName} was never imported" },
+                db.csvImportRepository,
+                db.transferSourceRepository,
+            )
+        executeCsvUnimport(
+            plan = plan,
+            accountRepository = db.accountRepository,
+            transactionRepository = db.transactionRepository,
+            relationshipRepository = db.relationshipRepository,
+            tradeRepository = db.tradeRepository,
+            maintenance = db.maintenanceService,
+            importEngine = db.importEngine,
+            refreshViews = false,
+        )
     }
 
     /** Assertion (c)'s strategy change: [OracleScenario.changedStrategy] tags every record it imports. */

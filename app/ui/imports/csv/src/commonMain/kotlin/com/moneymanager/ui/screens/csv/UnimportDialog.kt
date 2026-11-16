@@ -305,7 +305,8 @@ private fun UnimportPlanPreview(
             buildString {
                 append("This deletes the $transferCount transaction(s)")
                 if (tradeCount > 0) append(" and $tradeCount trade(s)")
-                append(" $files created, plus any accounts they created that are left empty. ")
+                append(" only $files recorded, plus any accounts they created that are left empty. ")
+                append("A transaction another file or source also records stays, as that one records it. ")
                 append("The files are then moved to the Ignored tab; restore them there to import them again.")
             },
         style = MaterialTheme.typography.bodyMedium,
