@@ -30,7 +30,10 @@ kmp_library(
         "//app/importengineapi",
         "//app/model/observation",
     ],
-    deps = ["//app/model/core"],
+    deps = [
+        "//app/model/core",
+        "//utils/bigdecimal",
+    ],
 )
 
 kmp_test(

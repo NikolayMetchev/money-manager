@@ -33,6 +33,13 @@ sealed interface Source {
     data object Reconciliation : Source
 
     /**
+     * The observation matcher, which alone owns the exclusion links of shape-changing matches (a gross leg against a
+     * net leg and its fee, a conduit statement superseding a card chain's onward legs): relationships it recomputes on
+     * every sync. No import writes them.
+     */
+    data object Reconciler : Source
+
+    /**
      * Created during a CSV import (a QIF, OFX, Excel or PDF file is staged as one too); [rowIndex] is the originating row when
      * known. [statementAccountId] is the account whose statement the row is (see [Source.statementAccountId]), which the
      * engine sets from the transfer's `statementAccount`.
@@ -69,6 +76,7 @@ fun Source.toSourceType(): SourceType =
         Source.Merge -> SourceType.MERGE
         Source.Unmerge -> SourceType.MERGE_UNDO
         Source.Reconciliation -> SourceType.RECONCILIATION
+        Source.Reconciler -> SourceType.RECONCILER
         is Source.Csv -> SourceType.CSV_IMPORT
         is Source.Api -> SourceType.API
     }

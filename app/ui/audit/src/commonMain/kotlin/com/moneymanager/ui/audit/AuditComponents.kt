@@ -210,6 +210,11 @@ fun SourceInfoSection(
                 DeviceInfoRows(source.deviceInfo, labelWidth)
             }
 
+            Source.Reconciler -> {
+                FieldValueRow("Origin", "Reconciler$deviceSuffix", labelWidth = labelWidth)
+                DeviceInfoRows(source.deviceInfo, labelWidth)
+            }
+
             Source.Merge, Source.Unmerge -> {
                 val label = if (origin == Source.Merge) "Merge" else "Undo Merge"
                 FieldValueRow("Origin", "$label$deviceSuffix", labelWidth = labelWidth)
