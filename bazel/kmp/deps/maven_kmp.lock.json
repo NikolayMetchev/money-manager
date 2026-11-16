@@ -31,8 +31,8 @@
       "androidx-test-uiautomator": "androidx.test.uiautomator:uiautomator:2.4.1",
       "atomicfu": "org.jetbrains.kotlinx:atomicfu:0.33.0",
       "bignum": "com.ionspin.kotlin:bignum:0.4.0",
-      "clikt": "com.github.ajalt.clikt:clikt:5.1.0",
-      "clikt-core": "com.github.ajalt.clikt:clikt-core:5.1.0",
+      "clikt": "com.github.ajalt.clikt:clikt:5.2.0",
+      "clikt-core": "com.github.ajalt.clikt:clikt-core:5.2.0",
       "compose-animation-core-desktop": "org.jetbrains.compose.animation:animation-core-desktop:1.12.2",
       "compose-animation-desktop": "org.jetbrains.compose.animation:animation-desktop:1.12.2",
       "compose-charts": "io.github.ehsannarmani:compose-charts:1.0.0",
@@ -9813,12 +9813,12 @@
     },
     "com.github.ajalt.clikt:clikt": {
       "android": {
-        "version": "5.1.0",
+        "version": "5.2.0",
         "files": [
           {
-            "name": "clikt-mordant-jvm.jar",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-jvm/5.1.0/clikt-jvm-5.1.0.jar",
-            "sha256": "75c330967db15a5c591fba69fc3b18ffb68271d54f90f21c1c9c52e86faeb9d6"
+            "name": "clikt-mordant-jvm-5.2.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-jvm/5.2.0/clikt-jvm-5.2.0.jar",
+            "sha256": "7381e8313b52337f80dfff01dac82443ebaff232433f4b94f3cd28bb0865def7"
           }
         ],
         "deps": [
@@ -9827,12 +9827,12 @@
         ]
       },
       "js": {
-        "version": "5.1.0",
+        "version": "5.2.0",
         "files": [
           {
-            "name": "clikt-mordant-js.klib",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-js/5.1.0/clikt-js-5.1.0.klib",
-            "sha256": "34b74bac16ba80f1e0770f1111c1ef5a4a1c4096dbb4c931ea5f67c36268c54c"
+            "name": "clikt-mordant-js-5.2.0.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-js/5.2.0/clikt-js-5.2.0.klib",
+            "sha256": "5096c709c74310c7df459f50842ca853fc7c2a279a95c699037493996b05dc5c"
           }
         ],
         "deps": [
@@ -9842,12 +9842,12 @@
         ]
       },
       "jvm": {
-        "version": "5.1.0",
+        "version": "5.2.0",
         "files": [
           {
-            "name": "clikt-mordant-jvm.jar",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-jvm/5.1.0/clikt-jvm-5.1.0.jar",
-            "sha256": "75c330967db15a5c591fba69fc3b18ffb68271d54f90f21c1c9c52e86faeb9d6"
+            "name": "clikt-mordant-jvm-5.2.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-jvm/5.2.0/clikt-jvm-5.2.0.jar",
+            "sha256": "7381e8313b52337f80dfff01dac82443ebaff232433f4b94f3cd28bb0865def7"
           }
         ],
         "deps": [
@@ -9856,12 +9856,12 @@
         ]
       },
       "linuxArm64": {
-        "version": "5.1.0",
+        "version": "5.2.0",
         "files": [
           {
-            "name": "clikt-mordant-linuxArm64Main.klib",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-linuxarm64/5.1.0/clikt-linuxarm64-5.1.0.klib",
-            "sha256": "c18f7ec2aff426c5b7ef2d2244e6ddfed9284759c4aa65c260e7cf79d4a0aa58"
+            "name": "clikt-mordant-linuxArm64Main-5.2.0.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-linuxarm64/5.2.0/clikt-linuxarm64-5.2.0.klib",
+            "sha256": "a41046c6f451610630fa069ecbed1da1b9289949bae28d3b83e3852e46403a97"
           }
         ],
         "deps": [
@@ -9870,12 +9870,12 @@
         ]
       },
       "linuxX64": {
-        "version": "5.1.0",
+        "version": "5.2.0",
         "files": [
           {
-            "name": "clikt-mordant-linuxX64Main.klib",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-linuxx64/5.1.0/clikt-linuxx64-5.1.0.klib",
-            "sha256": "80c5854b674b38b7d315cb74430dc1c9b82d2ea3f547859aba5eb49bd4913610"
+            "name": "clikt-mordant-linuxX64Main-5.2.0.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-linuxx64/5.2.0/clikt-linuxx64-5.2.0.klib",
+            "sha256": "1e519347e8a6582b6ffd81711e1549a44e336485aaf169d2977c12d4da671d72"
           }
         ],
         "deps": [
@@ -9884,12 +9884,12 @@
         ]
       },
       "macosArm64": {
-        "version": "5.1.0",
+        "version": "5.2.0",
         "files": [
           {
-            "name": "clikt-mordant-macosArm64Main.klib",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-macosarm64/5.1.0/clikt-macosarm64-5.1.0.klib",
-            "sha256": "164bc1fe23e4a4b65333114baf095a20ca5eecc2fcd5c3cc2fba04f58fd033f5"
+            "name": "clikt-mordant-macosArm64Main-5.2.0.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-macosarm64/5.2.0/clikt-macosarm64-5.2.0.klib",
+            "sha256": "9ff43f0d6ab023ffe1b9e9292855691518100529827b0dd32c6879a960f6347e"
           }
         ],
         "deps": [
@@ -9898,12 +9898,12 @@
         ]
       },
       "metadata": {
-        "version": "5.1.0",
+        "version": "5.2.0",
         "files": [
           {
-            "name": "clikt-mordant-metadata.jar",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt/5.1.0/clikt-5.1.0.jar",
-            "sha256": "fa84a8d57b909921a1fd6719cf1714e4da85f143d478f623476bb361cc21abdc"
+            "name": "clikt-mordant-metadata-5.2.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt/5.2.0/clikt-5.2.0.jar",
+            "sha256": "e71ce3badc2cb02863708af77550a104063a65fff3863649dfe970062b6a0aba"
           }
         ],
         "deps": [
@@ -9915,12 +9915,12 @@
         ]
       },
       "metadataWeb": {
-        "version": "5.1.0",
+        "version": "5.2.0",
         "files": [
           {
-            "name": "clikt-mordant-metadata.jar",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt/5.1.0/clikt-5.1.0.jar",
-            "sha256": "fa84a8d57b909921a1fd6719cf1714e4da85f143d478f623476bb361cc21abdc"
+            "name": "clikt-mordant-metadata-5.2.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt/5.2.0/clikt-5.2.0.jar",
+            "sha256": "e71ce3badc2cb02863708af77550a104063a65fff3863649dfe970062b6a0aba"
           }
         ],
         "deps": [
@@ -9932,12 +9932,12 @@
         ]
       },
       "mingwX64": {
-        "version": "5.1.0",
+        "version": "5.2.0",
         "files": [
           {
-            "name": "clikt-mordant-mingwX64Main.klib",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-mingwx64/5.1.0/clikt-mingwx64-5.1.0.klib",
-            "sha256": "3dbae09f30c226fbddb4c3bf3f550e3c38830543263ec368becfee02661d5f17"
+            "name": "clikt-mordant-mingwX64Main-5.2.0.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-mingwx64/5.2.0/clikt-mingwx64-5.2.0.klib",
+            "sha256": "2320ba1e182439a7dfbc1492bb4ba0579d54c369eb4c85b80d2bb6879319369b"
           }
         ],
         "deps": [
@@ -9946,12 +9946,12 @@
         ]
       },
       "wasmJs": {
-        "version": "5.1.0",
+        "version": "5.2.0",
         "files": [
           {
-            "name": "clikt-mordant-wasm-js.klib",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-wasm-js/5.1.0/clikt-wasm-js-5.1.0.klib",
-            "sha256": "2e0e196538c6ba472e4b0881ce76d73a76874167d10aeb84404b26b0c42b659a"
+            "name": "clikt-mordant-wasm-js-5.2.0.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-wasm-js/5.2.0/clikt-wasm-js-5.2.0.klib",
+            "sha256": "0b5fee9b34c88a8954105b23512f5a7d868a930a2b129246290ace993249fff2"
           }
         ],
         "deps": [
@@ -9962,22 +9962,22 @@
     },
     "com.github.ajalt.clikt:clikt-core": {
       "android": {
-        "version": "5.1.0",
+        "version": "5.2.0",
         "files": [
           {
-            "name": "clikt-jvm.jar",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-jvm/5.1.0/clikt-core-jvm-5.1.0.jar",
-            "sha256": "7f78049fa8159bac05ce09ddef4313248d4cad0014a744214c1150d14e3661e7"
+            "name": "clikt-jvm-5.2.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-jvm/5.2.0/clikt-core-jvm-5.2.0.jar",
+            "sha256": "1c91a8b8b2467a7eef913f3746834b1b90fec7d5cef378ccdea373761fd55fa8"
           }
         ]
       },
       "js": {
-        "version": "5.1.0",
+        "version": "5.2.0",
         "files": [
           {
-            "name": "clikt-js.klib",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-js/5.1.0/clikt-core-js-5.1.0.klib",
-            "sha256": "f7782de5cb0b1fba28d90157f25fd5f3c01fa74aae873920a74282caf3156d30"
+            "name": "clikt-js-5.2.0.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-js/5.2.0/clikt-core-js-5.2.0.klib",
+            "sha256": "aa54114b9c063dc5d3c56e81965582a8899c185f61b207477cf93ee23a6b9dd7"
           }
         ],
         "deps": [
@@ -9985,52 +9985,52 @@
         ]
       },
       "jvm": {
-        "version": "5.1.0",
+        "version": "5.2.0",
         "files": [
           {
-            "name": "clikt-jvm.jar",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-jvm/5.1.0/clikt-core-jvm-5.1.0.jar",
-            "sha256": "7f78049fa8159bac05ce09ddef4313248d4cad0014a744214c1150d14e3661e7"
+            "name": "clikt-jvm-5.2.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-jvm/5.2.0/clikt-core-jvm-5.2.0.jar",
+            "sha256": "1c91a8b8b2467a7eef913f3746834b1b90fec7d5cef378ccdea373761fd55fa8"
           }
         ]
       },
       "linuxArm64": {
-        "version": "5.1.0",
+        "version": "5.2.0",
         "files": [
           {
-            "name": "clikt-linuxArm64Main.klib",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-linuxarm64/5.1.0/clikt-core-linuxarm64-5.1.0.klib",
-            "sha256": "4a7f7369212fe4d89aa6a05f7c3b7acc2abdf8a207dc75f5ee11d4101eab18bc"
+            "name": "clikt-linuxArm64Main-5.2.0.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-linuxarm64/5.2.0/clikt-core-linuxarm64-5.2.0.klib",
+            "sha256": "7e451d80ee263e8a8fea612cab8f86dc5cdaa52dab313e1fb11b1b76a2420525"
           }
         ]
       },
       "linuxX64": {
-        "version": "5.1.0",
+        "version": "5.2.0",
         "files": [
           {
-            "name": "clikt-linuxX64Main.klib",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-linuxx64/5.1.0/clikt-core-linuxx64-5.1.0.klib",
-            "sha256": "fc66659fc71f36f088ad146a008dfb6888df36d0717836e465292148653e5c4d"
+            "name": "clikt-linuxX64Main-5.2.0.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-linuxx64/5.2.0/clikt-core-linuxx64-5.2.0.klib",
+            "sha256": "dff4b7676ec44801d4b01791d2d2d738c0e9d555a0f6b17cd78ddc9ef7d96e66"
           }
         ]
       },
       "macosArm64": {
-        "version": "5.1.0",
+        "version": "5.2.0",
         "files": [
           {
-            "name": "clikt-macosArm64Main.klib",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-macosarm64/5.1.0/clikt-core-macosarm64-5.1.0.klib",
-            "sha256": "1e69c7471761b52ee50f4779d2b729fbcef11b93beb5f8c4319a2516a84a49b6"
+            "name": "clikt-macosArm64Main-5.2.0.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-macosarm64/5.2.0/clikt-core-macosarm64-5.2.0.klib",
+            "sha256": "7557f3399f960037656cf88855f96f5700ba27138fca0cbf4fe647580d8c6000"
           }
         ]
       },
       "metadata": {
-        "version": "5.1.0",
+        "version": "5.2.0",
         "files": [
           {
-            "name": "clikt-metadata.jar",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core/5.1.0/clikt-core-5.1.0.jar",
-            "sha256": "2eff59eb6f9ff5acd635246d66737d2586995b932a9eaad7e70b271122e37c04"
+            "name": "clikt-metadata-5.2.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core/5.2.0/clikt-core-5.2.0.jar",
+            "sha256": "6c52c18ed73696834ac4433d3d4e31359eb7ad889ff65d0b40ec7492f256dc6c"
           }
         ],
         "source_sets": [
@@ -10038,12 +10038,12 @@
         ]
       },
       "metadataWeb": {
-        "version": "5.1.0",
+        "version": "5.2.0",
         "files": [
           {
-            "name": "clikt-metadata.jar",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core/5.1.0/clikt-core-5.1.0.jar",
-            "sha256": "2eff59eb6f9ff5acd635246d66737d2586995b932a9eaad7e70b271122e37c04"
+            "name": "clikt-metadata-5.2.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core/5.2.0/clikt-core-5.2.0.jar",
+            "sha256": "6c52c18ed73696834ac4433d3d4e31359eb7ad889ff65d0b40ec7492f256dc6c"
           }
         ],
         "source_sets": [
@@ -10051,22 +10051,22 @@
         ]
       },
       "mingwX64": {
-        "version": "5.1.0",
+        "version": "5.2.0",
         "files": [
           {
-            "name": "clikt-mingwX64Main.klib",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-mingwx64/5.1.0/clikt-core-mingwx64-5.1.0.klib",
-            "sha256": "532b92307ac92f9b55cd463bbe447238aeff705870fc108f2a666774468213c4"
+            "name": "clikt-mingwX64Main-5.2.0.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-mingwx64/5.2.0/clikt-core-mingwx64-5.2.0.klib",
+            "sha256": "de97a65102b04c2409c0d9212010fedf7b3baf55da1d95649ac931ea74c7ba31"
           }
         ]
       },
       "wasmJs": {
-        "version": "5.1.0",
+        "version": "5.2.0",
         "files": [
           {
-            "name": "clikt-wasm-js.klib",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-wasm-js/5.1.0/clikt-core-wasm-js-5.1.0.klib",
-            "sha256": "b3a60e5ff1252e9b26dcfe465220d88d50a4e586cfbe6dc8c4c5a8e70ab7690d"
+            "name": "clikt-wasm-js-5.2.0.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-wasm-js/5.2.0/clikt-core-wasm-js-5.2.0.klib",
+            "sha256": "b16b0c1d4a84183f6208023e07244f96409f182f12c9d4550e289fff7e024171"
           }
         ]
       }
@@ -10184,12 +10184,12 @@
     },
     "com.github.ajalt.mordant:mordant": {
       "android": {
-        "version": "3.0.2",
+        "version": "3.1.1",
         "files": [
           {
-            "name": "mordant-omnibus-jvm.jar",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-jvm/3.0.2/mordant-jvm-3.0.2.jar",
-            "sha256": "9ed3b976fcccc78da746d49866fa8ebb8f10530a93c544ea0420259a607dd95e"
+            "name": "mordant-omnibus-jvm-3.1.1.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-jvm/3.1.1/mordant-jvm-3.1.1.jar",
+            "sha256": "9d1b4c0a8308add9e83ba275943921dccf96e855eec821d027ac62995db35705"
           }
         ],
         "deps": [
@@ -10202,12 +10202,12 @@
         ]
       },
       "js": {
-        "version": "3.0.2",
+        "version": "3.1.1",
         "files": [
           {
-            "name": "mordant-omnibus-js.klib",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-js/3.0.2/mordant-js-3.0.2.klib",
-            "sha256": "5aa23fb3a287eaccddf4e14d20fd26692756f7caf24eaf1caf58936e46533048"
+            "name": "mordant-omnibus-js-3.1.1.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-js/3.1.1/mordant-js-3.1.1.klib",
+            "sha256": "b06da974fad1377b7762ea6d63d194f6191a05305d21e2afa425c17ee67bad52"
           }
         ],
         "deps": [
@@ -10216,12 +10216,12 @@
         ]
       },
       "jvm": {
-        "version": "3.0.2",
+        "version": "3.1.1",
         "files": [
           {
-            "name": "mordant-omnibus-jvm.jar",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-jvm/3.0.2/mordant-jvm-3.0.2.jar",
-            "sha256": "9ed3b976fcccc78da746d49866fa8ebb8f10530a93c544ea0420259a607dd95e"
+            "name": "mordant-omnibus-jvm-3.1.1.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-jvm/3.1.1/mordant-jvm-3.1.1.jar",
+            "sha256": "9d1b4c0a8308add9e83ba275943921dccf96e855eec821d027ac62995db35705"
           }
         ],
         "deps": [
@@ -10234,12 +10234,12 @@
         ]
       },
       "linuxArm64": {
-        "version": "3.0.2",
+        "version": "3.1.1",
         "files": [
           {
-            "name": "mordant-omnibus.klib",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-linuxarm64/3.0.2/mordant-linuxarm64-3.0.2.klib",
-            "sha256": "ac5ebc4b9fa4d4f33e4b82d99e06e60522db44f21104c0ef1bee722f66fa9a2a"
+            "name": "mordant-omnibus-linuxArm64Main-3.1.1.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-linuxarm64/3.1.1/mordant-linuxarm64-3.1.1.klib",
+            "sha256": "4473a7bf269a73f98eb60cf8e4c372a93cac3193289e21df1862c9a4f25aadfa"
           }
         ],
         "deps": [
@@ -10247,12 +10247,12 @@
         ]
       },
       "linuxX64": {
-        "version": "3.0.2",
+        "version": "3.1.1",
         "files": [
           {
-            "name": "mordant-omnibus.klib",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-linuxx64/3.0.2/mordant-linuxx64-3.0.2.klib",
-            "sha256": "6a4b1dc22a538248ded2127488a5f12a57264564abe634d54a42536c8e9531e2"
+            "name": "mordant-omnibus-linuxX64Main-3.1.1.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-linuxx64/3.1.1/mordant-linuxx64-3.1.1.klib",
+            "sha256": "bb4e1b72f28a0d816ba80e3eef6a2839d8c46d4253e81478ed54a493ab96e703"
           }
         ],
         "deps": [
@@ -10260,12 +10260,12 @@
         ]
       },
       "macosArm64": {
-        "version": "3.0.2",
+        "version": "3.1.1",
         "files": [
           {
-            "name": "mordant-omnibus.klib",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-macosarm64/3.0.2/mordant-macosarm64-3.0.2.klib",
-            "sha256": "f8bcb2c0c5c386e705ec62e221b0820791456271951b5a96e9b0ba3e977a3c2e"
+            "name": "mordant-omnibus-macosArm64Main-3.1.1.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-macosarm64/3.1.1/mordant-macosarm64-3.1.1.klib",
+            "sha256": "025e66ae7b25dad3ded8185d636defebb79cab662b6e162187130411a417bd71"
           }
         ],
         "deps": [
@@ -10273,12 +10273,12 @@
         ]
       },
       "metadata": {
-        "version": "3.0.2",
+        "version": "3.1.1",
         "files": [
           {
-            "name": "mordant-omnibus-metadata.jar",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant/3.0.2/mordant-3.0.2.jar",
-            "sha256": "090984d202692ffef447e88dfe2c63693a5de29670da0831b863bc284da147e2"
+            "name": "mordant-omnibus-metadata-3.1.1.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant/3.1.1/mordant-3.1.1.jar",
+            "sha256": "85ba8af8e2b4c85c43715fa32c03636093d144715c60b0bf01c50ed9920d7565"
           }
         ],
         "deps": [
@@ -10289,12 +10289,12 @@
         ]
       },
       "metadataWeb": {
-        "version": "3.0.2",
+        "version": "3.1.1",
         "files": [
           {
-            "name": "mordant-omnibus-metadata.jar",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant/3.0.2/mordant-3.0.2.jar",
-            "sha256": "090984d202692ffef447e88dfe2c63693a5de29670da0831b863bc284da147e2"
+            "name": "mordant-omnibus-metadata-3.1.1.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant/3.1.1/mordant-3.1.1.jar",
+            "sha256": "85ba8af8e2b4c85c43715fa32c03636093d144715c60b0bf01c50ed9920d7565"
           }
         ],
         "deps": [
@@ -10305,12 +10305,12 @@
         ]
       },
       "mingwX64": {
-        "version": "3.0.2",
+        "version": "3.1.1",
         "files": [
           {
-            "name": "mordant-omnibus.klib",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-mingwx64/3.0.2/mordant-mingwx64-3.0.2.klib",
-            "sha256": "b98a2373565d73b01b280187901e453fbc43d646b576dd750f9a516991313524"
+            "name": "mordant-omnibus-mingwX64Main-3.1.1.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-mingwx64/3.1.1/mordant-mingwx64-3.1.1.klib",
+            "sha256": "6140235b3bfbd24e68193bbb90edef4357af8d546fe73177b277c63333805e6d"
           }
         ],
         "deps": [
@@ -10318,12 +10318,12 @@
         ]
       },
       "wasmJs": {
-        "version": "3.0.2",
+        "version": "3.1.1",
         "files": [
           {
-            "name": "mordant-omnibus-wasm-js.klib",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-wasm-js/3.0.2/mordant-wasm-js-3.0.2.klib",
-            "sha256": "4f41ff1c06054a84ab79869837fe5468fb76faac4459d882eb0917cf544792bd"
+            "name": "mordant-omnibus-wasm-js-3.1.1.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-wasm-js/3.1.1/mordant-wasm-js-3.1.1.klib",
+            "sha256": "5b7a5bb7491b01274160a299d9cee696cc8e7dfbcd7bfb1d0168f52cadc47b4d"
           }
         ],
         "deps": [
@@ -10472,12 +10472,12 @@
     },
     "com.github.ajalt.mordant:mordant-jvm-ffm": {
       "android": {
-        "version": "3.0.2",
+        "version": "3.1.1",
         "files": [
           {
-            "name": "mordant-jvm-ffm-jvm.jar",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-jvm-ffm-jvm/3.0.2/mordant-jvm-ffm-jvm-3.0.2.jar",
-            "sha256": "10224784125c9f1782c1d4f1d38f3d54236fcc55c030a2ad00cbe4306e162ba4"
+            "name": "mordant-jvm-ffm-jvm-3.1.1.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-jvm-ffm-jvm/3.1.1/mordant-jvm-ffm-jvm-3.1.1.jar",
+            "sha256": "6a06776f629c5ace84eaafa4d407edb80051c7225815ef8ed6840b40e6d51ff2"
           }
         ],
         "runtime_deps": [
@@ -10485,12 +10485,12 @@
         ]
       },
       "jvm": {
-        "version": "3.0.2",
+        "version": "3.1.1",
         "files": [
           {
-            "name": "mordant-jvm-ffm-jvm.jar",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-jvm-ffm-jvm/3.0.2/mordant-jvm-ffm-jvm-3.0.2.jar",
-            "sha256": "10224784125c9f1782c1d4f1d38f3d54236fcc55c030a2ad00cbe4306e162ba4"
+            "name": "mordant-jvm-ffm-jvm-3.1.1.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-jvm-ffm-jvm/3.1.1/mordant-jvm-ffm-jvm-3.1.1.jar",
+            "sha256": "6a06776f629c5ace84eaafa4d407edb80051c7225815ef8ed6840b40e6d51ff2"
           }
         ],
         "runtime_deps": [
@@ -10500,12 +10500,12 @@
     },
     "com.github.ajalt.mordant:mordant-jvm-graal-ffi": {
       "android": {
-        "version": "3.0.2",
+        "version": "3.1.1",
         "files": [
           {
-            "name": "mordant-jvm-graal-ffi-jvm.jar",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-jvm-graal-ffi-jvm/3.0.2/mordant-jvm-graal-ffi-jvm-3.0.2.jar",
-            "sha256": "6dd4bebc164aeacddacc8f98e8f871e00fd21ce7bc2eb0d18230ea83bddfc86a"
+            "name": "mordant-jvm-graal-ffi-jvm-3.1.1.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-jvm-graal-ffi-jvm/3.1.1/mordant-jvm-graal-ffi-jvm-3.1.1.jar",
+            "sha256": "9a50716bdefbad8c4f233aa682bf0f23f6fe28ddb48f9b1e8b9ddd436db2143d"
           }
         ],
         "runtime_deps": [
@@ -10513,12 +10513,12 @@
         ]
       },
       "jvm": {
-        "version": "3.0.2",
+        "version": "3.1.1",
         "files": [
           {
-            "name": "mordant-jvm-graal-ffi-jvm.jar",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-jvm-graal-ffi-jvm/3.0.2/mordant-jvm-graal-ffi-jvm-3.0.2.jar",
-            "sha256": "6dd4bebc164aeacddacc8f98e8f871e00fd21ce7bc2eb0d18230ea83bddfc86a"
+            "name": "mordant-jvm-graal-ffi-jvm-3.1.1.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-jvm-graal-ffi-jvm/3.1.1/mordant-jvm-graal-ffi-jvm-3.1.1.jar",
+            "sha256": "9a50716bdefbad8c4f233aa682bf0f23f6fe28ddb48f9b1e8b9ddd436db2143d"
           }
         ],
         "runtime_deps": [
@@ -10528,12 +10528,12 @@
     },
     "com.github.ajalt.mordant:mordant-jvm-jna": {
       "android": {
-        "version": "3.0.2",
+        "version": "3.1.1",
         "files": [
           {
-            "name": "mordant-jvm-jna-jvm.jar",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-jvm-jna-jvm/3.0.2/mordant-jvm-jna-jvm-3.0.2.jar",
-            "sha256": "41063442c8891b2774536a9b87a5062a7fd20e6f1949974c6da72f49472d6f4d"
+            "name": "mordant-jvm-jna-jvm-3.1.1.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-jvm-jna-jvm/3.1.1/mordant-jvm-jna-jvm-3.1.1.jar",
+            "sha256": "9ce824b0da0d28a2ffcd21802415782988aeed42deaee5c5909561cd76cb84ee"
           }
         ],
         "runtime_deps": [
@@ -10542,12 +10542,12 @@
         ]
       },
       "jvm": {
-        "version": "3.0.2",
+        "version": "3.1.1",
         "files": [
           {
-            "name": "mordant-jvm-jna-jvm.jar",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-jvm-jna-jvm/3.0.2/mordant-jvm-jna-jvm-3.0.2.jar",
-            "sha256": "41063442c8891b2774536a9b87a5062a7fd20e6f1949974c6da72f49472d6f4d"
+            "name": "mordant-jvm-jna-jvm-3.1.1.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/mordant/mordant-jvm-jna-jvm/3.1.1/mordant-jvm-jna-jvm-3.1.1.jar",
+            "sha256": "9ce824b0da0d28a2ffcd21802415782988aeed42deaee5c5909561cd76cb84ee"
           }
         ],
         "runtime_deps": [
@@ -16749,12 +16749,12 @@
         ]
       },
       "jvm": {
-        "version": "5.14.0",
+        "version": "5.19.1",
         "files": [
           {
-            "name": "jna-5.14.0.jar",
-            "url": "https://repo1.maven.org/maven2/net/java/dev/jna/jna/5.14.0/jna-5.14.0.jar",
-            "sha256": "34ed1e1f27fa896bca50dbc4e99cf3732967cec387a7a0d5e3486c09673fe8c6"
+            "name": "jna-5.19.1.jar",
+            "url": "https://repo1.maven.org/maven2/net/java/dev/jna/jna/5.19.1/jna-5.19.1.jar",
+            "sha256": "4fb141dd8ef6b0585ffceea4bc49602fbc6312fa977e2c488794ea3e6aafecae"
           }
         ]
       }
