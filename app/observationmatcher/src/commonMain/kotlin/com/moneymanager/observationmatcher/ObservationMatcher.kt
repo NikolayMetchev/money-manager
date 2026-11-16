@@ -138,7 +138,7 @@ class ObservationMatcher(
     private fun exclusionsOf(
         observations: List<MatchObservation>,
         assignments: Map<ObservationRef, TransactionTarget>,
-    ): List<StageExclusion> {
+    ): List<ExclusionLink> {
         if (stages.isEmpty()) return emptyList()
         val transactions =
             observations
@@ -149,7 +149,7 @@ class ObservationMatcher(
             stage.exclusions(transactions, claimed).map { match ->
                 claimed += match.targets
                 val excluded = match.excluded.flatMap { it.members }.mapTo(linkedSetOf()) { it.ref }
-                StageExclusion(stage.name, match.by.flatMap { it.members }.mapTo(linkedSetOf()) { it.ref } + excluded, excluded)
+                ExclusionLink(stage.reason, match.by.flatMap { it.members }.mapTo(linkedSetOf()) { it.ref } + excluded, excluded)
             }
         }
     }

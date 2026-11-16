@@ -17,8 +17,8 @@ data class MatchedTransaction(
  * deterministic: it sees the transactions in the matcher's order and must not depend on ids beyond that.
  */
 interface MatchStage {
-    /** Shown in [StageExclusion.rule]. */
-    val name: String
+    /** The kind of match it finds: every [ExclusionLink] it makes carries it. */
+    val reason: ShapeReason
 
     /**
      * Keys under which [observation] may take part in this stage: [ObservationMatcher.scopeOf] brings in every stored

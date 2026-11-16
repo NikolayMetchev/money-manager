@@ -50,19 +50,5 @@ data class MatchResult(
     val changes: List<AssignmentChange>,
     val released: Set<TransactionId>,
     val joins: List<Join>,
-    val exclusions: List<StageExclusion> = emptyList(),
-)
-
-/**
- * A [MatchStage]'s match: records of one movement that disagree on shape, so they stay separate transactions and the
- * observations [excluded] are left out of balances. [matched] is every observation the match pairs, [excluded] among
- * them (a gross trade's, while its fills' stay counted). It is the matcher's (`Source.Reconciler`), never an import's,
- * and it names observations, never ids, so recomputing an unchanged scope gives the same link.
- *
- * @property rule the [MatchStage] that found it.
- */
-data class StageExclusion(
-    val rule: String,
-    val matched: Set<ObservationRef>,
-    val excluded: Set<ObservationRef>,
+    val exclusions: List<ExclusionLink> = emptyList(),
 )

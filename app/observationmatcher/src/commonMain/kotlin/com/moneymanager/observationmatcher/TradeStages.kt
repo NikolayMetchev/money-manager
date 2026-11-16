@@ -54,12 +54,12 @@ internal class TradeAggregationStage(
     private val policies = policies.filterValues { it.allowAggregation }
     private val width = slotWidth(this.policies.values.map { it.window })
 
-    override val name = "trade aggregation"
+    override val reason = ShapeReason.TRADE_AGGREGATION
 
     override fun scopeKeys(observation: MatchObservation): Collection<Any> {
         if (policies.isEmpty()) return emptyList()
         val trade = observation.trade ?: return emptyList()
-        val pair = listOf(name, trade.fromAccountId, trade.toAccountId, trade.fromAssetId, trade.toAssetId)
+        val pair = listOf(reason, trade.fromAccountId, trade.toAccountId, trade.fromAssetId, trade.toAssetId)
         return slotsAround(trade.timestamp, width).map { pair + it }
     }
 
@@ -112,17 +112,17 @@ internal class ConversionGroupStage(
 ) : MatchStage {
     private val width = slotWidth(windows.values)
 
-    override val name = "conversion group"
+    override val reason = ShapeReason.CONVERSION_GROUP
 
     override fun scopeKeys(observation: MatchObservation): Collection<Any> {
         if (windows.isEmpty()) return emptyList()
-        observation.trade?.let { return debitKeys(name, it.fromAccountId, it.fromAssetId, it.fromAmount, it.timestamp, width) }
+        observation.trade?.let { return debitKeys(reason, it.fromAccountId, it.fromAssetId, it.fromAmount, it.timestamp, width) }
         val leg = observation.legGroup ?: return emptyList()
         if (LegGroupRuleRef(observation.family, leg.rule) !in windows) return emptyList()
-        val group = listOf(name, observation.family, leg.rule, leg.key)
+        val group = listOf(reason, observation.family, leg.rule, leg.key)
         val transfer = observation.transfer
         if (leg.side != LegGroupSide.DEBIT || transfer == null) return listOf(group)
-        return debitKeys(name, transfer.sourceAccountId, transfer.assetId, transfer.amount, transfer.timestamp, width) + listOf(group)
+        return debitKeys(reason, transfer.sourceAccountId, transfer.assetId, transfer.amount, transfer.timestamp, width) + listOf(group)
     }
 
     override fun exclusions(
@@ -169,20 +169,20 @@ internal class ConversionTradeStage(
     private val relationshipTypes = this.policies.values.mapNotNullTo(mutableSetOf()) { it.conversionRelationshipTypeName }
     private val width = slotWidth(this.policies.values.map { it.window })
 
-    override val name = "conversion trade"
+    override val reason = ShapeReason.CONVERSION_TRADE
 
     override fun scopeKeys(observation: MatchObservation): Collection<Any> {
         if (policies.isEmpty()) return emptyList()
         observation.trade?.let { trade ->
             if (observation.family !in policies || observation.orderLinked) return emptyList()
-            return debitKeys(name, trade.fromAccountId, trade.fromAssetId, trade.fromAmount, trade.timestamp, width)
+            return debitKeys(reason, trade.fromAccountId, trade.fromAssetId, trade.fromAmount, trade.timestamp, width)
         }
         val leg = observation.legGroup ?: return emptyList()
         if (leg.relationshipType !in relationshipTypes) return emptyList()
-        val group = listOf(name, observation.family, leg.rule, leg.key)
+        val group = listOf(reason, observation.family, leg.rule, leg.key)
         val transfer = observation.transfer
         if (leg.side != LegGroupSide.DEBIT || transfer == null) return listOf(group)
-        return debitKeys(name, transfer.sourceAccountId, transfer.assetId, transfer.amount, transfer.timestamp, width) + listOf(group)
+        return debitKeys(reason, transfer.sourceAccountId, transfer.assetId, transfer.amount, transfer.timestamp, width) + listOf(group)
     }
 
     override fun exclusions(
@@ -331,7 +331,7 @@ private fun slotsAround(
 }
 
 private fun debitKeys(
-    stage: String,
+    stage: ShapeReason,
     accountId: AccountId,
     assetId: ObservedAssetId,
     amount: BigInteger,

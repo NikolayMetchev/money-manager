@@ -36,7 +36,10 @@ class TradeStagesTest {
         val outcome = assertOrderFree(listOf(fill1, fill2), listOf(gross))
 
         assertEquals(setOf(setOf("f1"), setOf("f2"), setOf("gross")), outcome.transactions)
-        assertEquals(setOf(Excluded("trade aggregation", setOf(setOf("gross")), setOf(setOf("f1"), setOf("f2")))), outcome.exclusions)
+        assertEquals(
+            setOf(Excluded(ShapeReason.TRADE_AGGREGATION, setOf(setOf("gross")), setOf(setOf("f1"), setOf("f2")))),
+            outcome.exclusions,
+        )
     }
 
     @Test
@@ -77,7 +80,7 @@ class TradeStagesTest {
         assertEquals(
             setOf(
                 Excluded(
-                    "conversion group",
+                    ShapeReason.CONVERSION_GROUP,
                     setOf(setOf("doge-out"), setOf("shib-out"), setOf("bnb-in")),
                     setOf(setOf("doge-trade"), setOf("shib-trade")),
                 ),
@@ -96,7 +99,10 @@ class TradeStagesTest {
 
         val outcome = assertOrderFree(listOf(doge, shib, bnb), listOf(dogeTrade))
 
-        assertEquals(setOf(Excluded("conversion trade", setOf(setOf("doge-trade")), setOf(setOf("doge-out")))), outcome.exclusions)
+        assertEquals(
+            setOf(Excluded(ShapeReason.CONVERSION_TRADE, setOf(setOf("doge-trade")), setOf(setOf("doge-out")))),
+            outcome.exclusions,
+        )
         assertEquals(setOf(setOf("doge-out"), setOf("shib-out"), setOf("bnb-in")), outcome.counted)
     }
 
@@ -180,7 +186,7 @@ class TradeStagesTest {
     }
 
     private data class Excluded(
-        val rule: String,
+        val reason: ShapeReason,
         val excluded: Set<Set<String>>,
         val by: Set<Set<String>>,
     )
@@ -203,7 +209,7 @@ class TradeStagesTest {
     private fun importInTurn(batches: List<List<MatchObservation>>): Outcome {
         val matcher = matcher()
         val stored = linkedMapOf<ObservationRef, MatchObservation>()
-        val links = mutableListOf<StageExclusion>()
+        val links = mutableListOf<ExclusionLink>()
         val rules = mutableListOf<String>()
         var nextObservation = 1L
         var nextTransaction = 1_000L
@@ -251,7 +257,7 @@ class TradeStagesTest {
             exclusions =
                 links.mapTo(mutableSetOf()) {
                     Excluded(
-                        it.rule,
+                        it.reason,
                         transactionsOf(it.excluded),
                         transactionsOf(it.matched - it.excluded),
                     )
