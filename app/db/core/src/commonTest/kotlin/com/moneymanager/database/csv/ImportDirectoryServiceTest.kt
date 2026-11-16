@@ -131,6 +131,7 @@ class ImportDirectoryServiceTest : DbTest() {
         importEngine = repositories.importEngine,
         fileSourceFactory = factory,
         deviceId = deviceId,
+        importRecordRepository = repositories.importRecordRepository,
     )
 
     private suspend fun directory(

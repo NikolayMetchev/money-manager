@@ -15,8 +15,10 @@ import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
+import com.moneymanager.domain.repository.ImportRecordReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
+import com.moneymanager.domain.repository.assetAliasMap
 import com.moneymanager.importengineapi.CascadeRerunner
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
@@ -112,6 +114,8 @@ class Reimports(
     private val passThroughAccountRepository: PassThroughAccountReadRepository,
     private val maintenance: Maintenance,
     private val importEngine: ImportEngine,
+    /** The import records a file's last import left, so a run can skip picked files nothing changed for; null always runs them. */
+    private val importRecords: ImportRecordReadRepository? = null,
     private val writeLock: Mutex = Mutex(),
 ) : CascadeRerunner {
     /** Runs [block] holding the session's write lock, for the re-imports that run outside this class (API sessions). */
@@ -251,6 +255,19 @@ class Reimports(
         val run = plan.runFiles()
         checkReimportable(plan, accountId, currencyId)
         val skipped = plan.files.count { it.rowCount > 0 && plan.strategies[it.source] == null && it !in run }
+        val picked = run.filterNot { it.source in plan.cascaded }
+        if (picked.isNotEmpty() && picked.all { isUnchanged(it, plan, accountId, currencyId) }) {
+            // Nothing any picked file reads changed, so importing them again would book what they booked: the run
+            // writes nothing, and nothing that depends on them needs re-importing either.
+            return BulkReimportResult(
+                filesImported = 0,
+                transfersCreated = 0,
+                duplicatesSkipped = 0,
+                filesSkippedNoStrategy = skipped,
+                filesFailed = 0,
+                filesUnchanged = picked.size,
+            )
+        }
         val rerun = mutableSetOf<Source>()
         val reimported = mutableSetOf<Source>()
         // Three phases, each filling the bar from empty: the one delete batch, then runBulkReimport's two (preparing
@@ -312,7 +329,16 @@ class Reimports(
                         else -> {
                             val imported = plan.imported.getValue(file.source)
                             val settings = ImportedSettings(imported.accountId ?: accountId, imported.currencyId ?: currencyId)
-                            val result = runStaged(file, strategy, settings, currencies, onFileProgress)
+                            val result =
+                                runStaged(
+                                    file,
+                                    strategy,
+                                    settings,
+                                    currencies,
+                                    onFileProgress,
+                                    settled =
+                                        file.source !in plan.cascaded,
+                                )
                             rerun += file.source
                             reimported += file.source
                             BulkReimportFileOutcome.Reimported(
@@ -357,7 +383,7 @@ class Reimports(
                 // along, whose own work is already done.
                 try {
                     if (strategy != null) {
-                        runStaged(file, strategy, file.importedSettings, currencies, onProgress)
+                        runStaged(file, strategy, file.importedSettings, currencies, onProgress, settled = false)
                         notRerun -= file.source
                     }
                 } catch (expected: CancellationException) {
@@ -399,13 +425,14 @@ class Reimports(
         file.lastAppliedStrategyId?.let { id -> strategies.find { it.id == id } }
             ?: strategies.selectForImport(file, reads.csvImportRepository)
 
-    // Runs [strategy] over the file's records that are not yet imported or errored.
+    // Runs [strategy] over the file's records that are not yet imported or errored; [settled] as [applyStagedCsv] takes it.
     private suspend fun runStaged(
         file: CsvImport,
         strategy: CsvImportStrategy,
         settings: ImportedSettings,
         currencies: List<Currency>,
         onProgress: (suspend (Progress) -> Unit)?,
+        settled: Boolean,
     ): CsvImportResult? =
         applyStagedCsv(
             csvImport = file,
@@ -424,7 +451,36 @@ class Reimports(
             cryptoRepository = cryptoRepository,
             attributeAccountMatchers = AttributeAccountMatcher.registry(accountAttributeRepository.getAll().first()),
             tradeRepository = reads.tradeRepository,
+            settled = settled,
         )
+
+    /**
+     * Whether re-importing [file] as [plan] would run it would change nothing: its rows and every input its import
+     * reads ([stagedInputsHash]) hash to what its import records hold. A file without records always runs.
+     */
+    private suspend fun isUnchanged(
+        file: CsvImport,
+        plan: ReimportAllPlan,
+        accountId: AccountId?,
+        currencyId: CurrencyId?,
+    ): Boolean {
+        val records = importRecords ?: return false
+        val strategy = plan.strategies[file.source] ?: return false
+        val imported = plan.imported.getValue(file.source)
+        val settings = ImportedSettings(imported.accountId ?: accountId, imported.currencyId ?: currencyId)
+        val effective = strategy.withCurrency(settings.currencyId.takeIf { strategy.needsCurrencyOverride() })
+        val inputsHash =
+            stagedInputsHash(
+                strategy = effective,
+                sourceAccount = effectiveSourceFor(effective, settings.accountId),
+                mappings = accountMappingRepository.getAllMappings().first(),
+                assetAliases = cryptoRepository.assetAliasMap(),
+                attributeAccountMatchers = AttributeAccountMatcher.registry(accountAttributeRepository.getAll().first()),
+                passThroughAccounts = passThroughAccountRepository.getAll().first(),
+            )
+        val rows = reads.csvImportRepository.getImportRows(file.id, limit = file.rowCount.coerceAtLeast(1), offset = 0)
+        return isUnchanged(file, rows, records.getCsvImportRecords(file.id), inputsHash)
+    }
 
     private suspend fun currencies(): List<Currency> = currencyRepository.getAllCurrencies().first()
 }

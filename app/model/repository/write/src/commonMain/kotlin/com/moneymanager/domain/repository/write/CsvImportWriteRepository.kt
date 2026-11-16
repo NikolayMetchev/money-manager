@@ -82,7 +82,7 @@ interface CsvImportWriteRepository : CsvImportReadRepository {
     /**
      * Returns an import to the never-applied state: every row's status and transaction link are
      * cleared, its errors are dropped and its strategy applications are deleted (the application audit
-     * trail keeps the history). The caller deletes the transactions themselves.
+     * trail keeps the history). Its import records go too. The caller deletes the transactions themselves.
      */
     suspend fun resetToUnimported(id: CsvImportId)
 
@@ -113,6 +113,7 @@ interface CsvImportWriteRepository : CsvImportReadRepository {
     /**
      * Clears the import status and transfer link for the given rows so a re-run of the strategy picks
      * them up again (used after their previously-imported transfers were deleted).
+     * The file's import records go too, so its next re-import runs rather than finding it unchanged.
      *
      * @param id The import ID
      * @param rowIndexes The row indexes to reset, or null for every row

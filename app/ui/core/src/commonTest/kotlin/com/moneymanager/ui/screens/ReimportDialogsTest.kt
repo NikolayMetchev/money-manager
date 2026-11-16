@@ -139,7 +139,7 @@ class ReimportDialogsTest {
                 ProvideSchemaAwareScope {
                     ReimportDialog(
                         files = listOf(fixture.csvImport),
-                        reimports = fixture.dc.reimports(),
+                        reimports = fixture.dc.reimports(skipUnchanged = false),
                         repositories = fixture.repositories,
                         onDismiss = { },
                         onComplete = { },

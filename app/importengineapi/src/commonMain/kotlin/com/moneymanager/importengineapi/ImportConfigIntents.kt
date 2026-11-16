@@ -321,6 +321,16 @@ sealed interface CsvImportMutation {
         /** The currency the run used, so a re-import uses it again; null when the strategy reads it per row. */
         val currencyId: CurrencyId? = null,
     ) : CsvImportMutation
+
+    /**
+     * Records each row's content hash ([contentHashes]: row index to hash) as the file's import records, which a re-import
+     * compares to tell an unchanged file from a changed one: a row with a record has its hash replaced, a row without
+     * one gains a record.
+     */
+    data class RecordRows(
+        val id: CsvImportId,
+        val contentHashes: Map<Long, String>,
+    ) : CsvImportMutation
 }
 
 /** A write on the import-directory config + its per-file change-detection cursor. */

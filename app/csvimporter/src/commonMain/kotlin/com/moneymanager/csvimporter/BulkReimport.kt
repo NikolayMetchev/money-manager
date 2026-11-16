@@ -29,11 +29,14 @@ data class BulkReimportResult(
     val unmatchedEdits: List<ManualEdit> = emptyList(),
     val reappliedLinks: ReappliedLinks = ReappliedLinks(),
     override val filesNotStarted: Int = 0,
+    /** Picked files the run left alone: nothing they read changed since they were last imported. */
+    val filesUnchanged: Int = 0,
 ) : BulkImportResult {
     override fun toSummary(): String =
         buildString {
             append("Re-imported $filesImported file${if (filesImported == 1) "" else "s"}")
             append(" · $transfersCreated imported")
+            if (filesUnchanged > 0) append(" · $filesUnchanged unchanged")
             if (reappliedEdits > 0) append(" · $reappliedEdits manual edit${if (reappliedEdits == 1) "" else "s"} re-applied")
             if (unmatchedEdits.isNotEmpty()) append(" · ${unmatchedEdits.size} manual edits not re-applied")
             append(reappliedLinks.summary(" · "))

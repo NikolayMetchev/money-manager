@@ -79,6 +79,7 @@ kmp_library(
         "@maven_kmp//:cryptography_core",
         "@maven_kmp//:kermit",
         "@maven_kmp//:kotlinx_datetime",
+        "@maven_kmp//:kotlinx_serialization_core",
         "@maven_kmp//:kotlinx_serialization_json",
     ],
 )

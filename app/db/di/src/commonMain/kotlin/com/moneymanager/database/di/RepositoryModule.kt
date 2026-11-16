@@ -619,6 +619,7 @@ object RepositoryModule {
         reconciliationLinkRepository: ReconciliationLinkWriteRepository,
         observationRepository: ObservationWriteRepository,
         personOverrideRepository: PersonOverrideWriteRepository,
+        importRecordRepository: ImportRecordWriteRepository,
     ): ImportEngine =
         ImportEngineImpl(
             transactionRepository = transactionRepository,
@@ -647,5 +648,6 @@ object RepositoryModule {
             reconciliationLinkRepository = reconciliationLinkRepository,
             observationRepository = observationRepository,
             personOverrideRepository = personOverrideRepository,
+            importRecordRepository = importRecordRepository,
         )
 }

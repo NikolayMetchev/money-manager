@@ -244,6 +244,9 @@ class CsvImportWriteRepositoryImpl(
                 tableManager.resetAllRowStatuses(import.table_name)
                 csvImportWriteQueries.deleteErrorsByImportId(id.id.toString())
                 csvImportWriteQueries.deleteApplicationsByImportId(id.id.toString())
+                // Unimporting is a sync with no records: the file reports nothing until its next import records it again.
+                csvImportWriteQueries.deleteImportRecordObservations(id.id.toString())
+                csvImportWriteQueries.deleteImportRecords(id.id.toString())
             }
         }
 
@@ -291,6 +294,10 @@ class CsvImportWriteRepositoryImpl(
 
             database.transaction {
                 database.forgetMatchedSources(id, rowIndexes)
+                // The file now waits for a run that may never finish (a stopped or failed re-import), so nothing it
+                // recorded may say it is up to date: its import records go, and its next re-import runs.
+                csvImportWriteQueries.deleteImportRecordObservations(id.id.toString())
+                csvImportWriteQueries.deleteImportRecords(id.id.toString())
                 if (rowIndexes == null) {
                     tableManager.resetAllRowStatuses(import.table_name)
                 } else {

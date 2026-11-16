@@ -39,4 +39,5 @@ fun DatabaseComponent.createImportEngine(editGate: EditGate): ImportEngine =
         reconciliationLinkRepository = reconciliationLinkRepository,
         observationRepository = observationRepository,
         personOverrideRepository = personOverrideRepository,
+        importRecordRepository = importRecordRepository,
     )
