@@ -14,6 +14,12 @@ interface ObservationReadRepository {
     /** Every observation [owner] owns, by slot. */
     suspend fun getObservationsOf(owner: ObservationOwner): List<Observation>
 
+    /**
+     * The provenance row that created [transactionId] (its first revision's writer): a hand-made transaction's
+     * observations are owned by it (`ObservationOwner.Manual`).
+     */
+    suspend fun getCreationSourceId(transactionId: TransactionId): Long?
+
     /** Every observation assigned to [transactionId], by id. */
     suspend fun getObservationsOfTransaction(transactionId: TransactionId): List<Observation>
 

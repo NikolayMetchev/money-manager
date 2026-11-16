@@ -170,6 +170,13 @@ class ObservationWriteRepositoryImpl(
         withContext(coroutineContext) { queries.deleteObservation(id.id) }
     }
 
+    override suspend fun deleteObservationsOfTransactions(transactionIds: Collection<TransactionId>) {
+        if (transactionIds.isEmpty()) return
+        withContext(coroutineContext) {
+            queries.transaction { transactionIds.forEach { queries.deleteObservationsOfTransaction(it.id) } }
+        }
+    }
+
     override suspend fun moveAccountReferences(
         mergeId: MergeId,
         deletedAccountId: AccountId,
