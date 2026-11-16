@@ -51,7 +51,7 @@ class ShapeMatcherTest {
     }
 
     @Test
-    fun `a chain funded by a placeholder is never a card's route through the conduit`() {
+    fun `a chain funded by a placeholder is never the route of a card through the conduit`() {
         val a = record("curve-a", "curve-export-1", chain(PLACEHOLDER, CURVE, MERCHANT, 30, placeholderFunded = true))
         val b = record("curve-b", "curve-export-2", chain(PLACEHOLDER, CURVE, MERCHANT, 30, placeholderFunded = true))
 
@@ -97,7 +97,7 @@ class ShapeMatcherTest {
     }
 
     @Test
-    fun `a gross leg is excluded against another source's net leg and its fee`() {
+    fun `a gross leg is excluded against the net leg and fee of another source`() {
         val api = record("api-withdrawal", "api-session", leg(MAIN, EXCHANGE, WALLET, 99), leg(FEE, EXCHANGE, EXCHANGE_FEES, 1))
         val csv = record("csv-withdrawal", "csv-export", leg(MAIN, EXCHANGE, PLACEHOLDER, 100, placeholder = ObservationEnd.TARGET))
         val records = listOf(api, csv)
@@ -111,7 +111,7 @@ class ShapeMatcherTest {
     }
 
     @Test
-    fun `a gross leg naming the same far end matches too, but not one naming another`() {
+    fun `a gross leg naming the same far end matches but not one naming another`() {
         val api = record("api", "api-session", leg(MAIN, EXCHANGE, WALLET, 99), leg(FEE, EXCHANGE, EXCHANGE_FEES, 1))
         val same = record("same", "csv-1", leg(MAIN, EXCHANGE, WALLET, 100))
         val other = record("other", "csv-2", leg(MAIN, EXCHANGE, MERCHANT, 100, hour = 1))
@@ -128,7 +128,7 @@ class ShapeMatcherTest {
     }
 
     @Test
-    fun `a gross leg that doesn't add up stays counted`() {
+    fun `a gross leg that does not add up stays counted`() {
         val api = record("api", "api-session", leg(MAIN, EXCHANGE, WALLET, 99), leg(FEE, EXCHANGE, EXCHANGE_FEES, 2))
         val csv = record("csv", "csv-export", leg(MAIN, EXCHANGE, PLACEHOLDER, 100, placeholder = ObservationEnd.TARGET))
 
@@ -187,7 +187,7 @@ class ShapeMatcherTest {
     }
 
     @Test
-    fun `each placeholder takes the nearest chain movement, and each movement one placeholder`() {
+    fun `each placeholder takes the nearest chain movement and each movement one placeholder`() {
         val early = record("card-early", "card-statement", chain(CARD, PAYPAL, MERCHANT, 30))
         val late = record("card-late", "card-statement", chain(CARD, PAYPAL, MERCHANT, 30, hour = 30))
         val first = record("paypal-1", "paypal-export", leg(MAIN, PLACEHOLDER, PAYPAL, 30, placeholder = ObservationEnd.SOURCE, hour = 26))
@@ -211,7 +211,7 @@ class ShapeMatcherTest {
     }
 
     @Test
-    fun `records a source excluded, or outside the window, or of one file, never match`() {
+    fun `records a source excluded or outside the window or of one file never match`() {
         val card = record("card", "card-statement", chain(CARD, PAYPAL, MERCHANT, 30))
         val excluded =
             record("excluded", "paypal-export", leg(MAIN, PLACEHOLDER, PAYPAL, 30, placeholder = ObservationEnd.SOURCE, excluded = true))
@@ -222,7 +222,7 @@ class ShapeMatcherTest {
     }
 
     @Test
-    fun `an excluded placeholder's own fee is excluded with it`() {
+    fun `the own fee of an excluded placeholder is excluded with it`() {
         val card = record("card", "card-statement", chain(CARD, PAYPAL, MERCHANT, 30))
         val deposit =
             record(
