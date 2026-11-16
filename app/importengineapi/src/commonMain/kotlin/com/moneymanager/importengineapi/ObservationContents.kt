@@ -50,7 +50,7 @@ fun ExpandedTransfer.observationContent(
 fun ExpandedTrade.observationContent(): ObservationContent =
     tradeContent(timestamp, description, accountId, fromAmount, accountId, toAmount, attributes, provenance)
 
-/** What a trade a batch books says, as an observation's content; [intent] must carry every field of a create. */
+/** What a trade a batch books says, as an observation's content; the intent must carry every field of a create. */
 fun ImportTradeIntent.observationContent(): ObservationContent =
     tradeContent(
         timestamp = requireNotNull(timestamp),
