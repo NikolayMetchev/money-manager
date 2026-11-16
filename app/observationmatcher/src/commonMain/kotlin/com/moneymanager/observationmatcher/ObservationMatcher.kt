@@ -20,10 +20,14 @@ import com.moneymanager.domain.model.observation.ObservationSplit
  * chaining near neighbours), never two rows of one container that only a rule [PairRule.joinsSameContainer] would
  * join, never across a person's split, and never two different pinned transactions.
  *
+ * Then [stages] look at the transactions as a whole, for movements two sources record in different shapes, and link
+ * one to be excluded from balances by the other ([MatchResult.exclusions]).
+ *
  * Pure and DB-free: the caller loads the scope ([scopeOf]) and writes the [MatchResult].
  */
 class ObservationMatcher(
     private val rules: List<PairRule>,
+    private val stages: List<MatchStage> = emptyList(),
 ) {
     /**
      * Assigns every observation of [scope]. [pins] fix an observation to a transaction and [splits] keep two apart:
@@ -84,7 +88,7 @@ class ObservationMatcher(
                 .map { it.id }
                 .toSet()
         val released = observations.mapNotNullTo(mutableSetOf()) { it.current }.filterNotTo(mutableSetOf()) { it in kept }
-        return MatchResult(assignments, changes, released, joins)
+        return MatchResult(assignments, changes, released, joins, exclusionsOf(observations, assignments))
     }
 
     /**
@@ -102,6 +106,8 @@ class ObservationMatcher(
         val pool = stored.filter { it.ref !in gone }
         val byTransaction = pool.filter { it.current != null }.groupBy { it.current }
         val byBucket = rules.map { rule -> pool.mapNotNull { o -> rule.bucket(o)?.let { it to o } }.groupBy({ it.first }, { it.second }) }
+        val byStageKey =
+            stages.map { stage -> pool.flatMap { o -> stage.scopeKeys(o).map { it to o } }.groupBy({ it.first }, { it.second }) }
 
         val inScope = linkedMapOf<ObservationRef, MatchObservation>()
         val queue = ArrayDeque<MatchObservation>()
@@ -118,8 +124,34 @@ class ObservationMatcher(
                 val bucket = rule.bucket(next) ?: return@forEachIndexed
                 byBucket[rank][bucket].orEmpty().filter { rule.distance(next, it) != null }.forEach(::add)
             }
+            stages.forEachIndexed { index, stage ->
+                stage.scopeKeys(next).forEach { key -> byStageKey[index][key].orEmpty().forEach(::add) }
+            }
         }
         return inScope.values.toList()
+    }
+
+    /**
+     * Runs [stages] over the transactions of [assignments], each transaction's members in the matcher's order and the
+     * transactions in the order of their first members.
+     */
+    private fun exclusionsOf(
+        observations: List<MatchObservation>,
+        assignments: Map<ObservationRef, TransactionTarget>,
+    ): List<StageExclusion> {
+        if (stages.isEmpty()) return emptyList()
+        val transactions =
+            observations
+                .groupBy { assignments.getValue(it.ref) }
+                .map { (target, members) -> MatchedTransaction(target, members) }
+        val claimed = mutableSetOf<TransactionTarget>()
+        return stages.flatMap { stage ->
+            stage.exclusions(transactions, claimed).map { match ->
+                claimed += match.targets
+                val excluded = match.excluded.flatMap { it.members }.mapTo(linkedSetOf()) { it.ref }
+                StageExclusion(stage.name, match.by.flatMap { it.members }.mapTo(linkedSetOf()) { it.ref } + excluded, excluded)
+            }
+        }
     }
 
     private data class Candidate(

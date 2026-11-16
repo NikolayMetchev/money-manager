@@ -43,10 +43,26 @@ data class Join(
  * @property changes the assignments that differ from the observations' current ones, in the matcher's order.
  * @property released transactions some observation of the scope was assigned to and none is now: nothing backs them.
  * @property joins the pairs that put two observations in one transaction, in the order they were taken.
+ * @property exclusions what the matcher's stages leave out of balances, in the order they were found.
  */
 data class MatchResult(
     val assignments: Map<ObservationRef, TransactionTarget>,
     val changes: List<AssignmentChange>,
     val released: Set<TransactionId>,
     val joins: List<Join>,
+    val exclusions: List<StageExclusion> = emptyList(),
+)
+
+/**
+ * A [MatchStage]'s match: records of one movement that disagree on shape, so they stay separate transactions and the
+ * observations [excluded] are left out of balances. [matched] is every observation the match pairs, [excluded] among
+ * them (a gross trade's, while its fills' stay counted). It is the matcher's (`Source.Reconciler`), never an import's,
+ * and it names observations, never ids, so recomputing an unchanged scope gives the same link.
+ *
+ * @property rule the [MatchStage] that found it.
+ */
+data class StageExclusion(
+    val rule: String,
+    val matched: Set<ObservationRef>,
+    val excluded: Set<ObservationRef>,
 )
