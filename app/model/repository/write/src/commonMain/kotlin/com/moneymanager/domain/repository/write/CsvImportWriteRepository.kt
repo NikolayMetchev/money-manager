@@ -124,6 +124,16 @@ interface CsvImportWriteRepository : CsvImportReadRepository {
     )
 
     /**
+     * Gets [id] ready to re-run in place (#1430): every row's status and link are cleared and the matched sources its rows
+     * recorded go, like [resetRowStatuses], but its import records stay, their content hashes set to [unhashed] so the file
+     * never looks up to date until the run completes, and so do their observations, reserved for the run to say again.
+     */
+    suspend fun reserveForRerun(
+        id: CsvImportId,
+        unhashed: String,
+    )
+
+    /**
      * Saves an error message per row of [errors] (row index to message) in a single database transaction,
      * replacing any existing error for the same row.
      */

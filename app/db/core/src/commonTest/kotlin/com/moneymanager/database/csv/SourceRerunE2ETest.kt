@@ -36,7 +36,6 @@ import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
@@ -242,22 +241,25 @@ class SourceRerunE2ETest : DbTest() {
             val result = reimports.runPlan(plan)
 
             assertEquals(3, result.transfersCreated, "the first file's two and the second file's own one")
-            assertEquals(1, result.reappliedEdits)
+            assertEquals(0, result.reappliedEdits, "nothing is replayed: the edit is an override on the kept id")
             assertTrue(result.unmatchedEdits.isEmpty())
             assertEquals(1, result.cascadedFiles)
             assertEquals(0, result.cascadedFilesNotRerun)
             val after = transfersOn(monzo)
             assertEquals(3, after.size, "the duplicate row matched the re-created transaction again: $after")
             val recreated = after.single { it.description == "Flat white" }
-            assertNotEquals(coffee.id, recreated.id, "the edit is on the replacement")
+            assertEquals(coffee.id, recreated.id, "the re-import gave the transaction its id back")
             assertEquals(listOf("work trip"), recreated.attributes.filter { it.attributeType.name == "note" }.map { it.value })
             val secondRow = repositories.csvImportRepository.getImportRows(second.id, limit = 10, offset = 0).first()
             assertEquals(recreated.id, secondRow.transferId, "the other file's row points at the replacement")
 
-            // The edit is re-applied as a hand edit, so the next re-import keeps it too.
+            // The edit is an override on the kept id, so the next re-import keeps it too.
             val again = reimports.planFile(first.id)
-            assertEquals("Flat white", again.manualEdits.single().description)
-            assertEquals(1, again.cascaded.size, "the re-run duplicate is recorded against the replacement")
+            assertEquals(1, again.cascaded.size, "the re-run duplicate is recorded against the kept transaction")
+            reimports.runPlan(again)
+            val twice = transfersOn(monzo).single { it.id == coffee.id }
+            assertEquals("Flat white", twice.description)
+            assertEquals(listOf("work trip"), twice.attributes.filter { it.attributeType.name == "note" }.map { it.value })
         }
 
     @Test

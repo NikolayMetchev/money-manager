@@ -101,3 +101,20 @@ DELETE FROM account_merge_observation WHERE merge_id = ?;
 
 deleteObservationsOfTransaction:
 DELETE FROM observation WHERE transaction_id = ?;
+
+-- Reserves every observation :csvImportId's records (and the groups they belong to) own, for its re-run (#1430).
+reserveCsvImport:
+INSERT OR IGNORE INTO observation_reserved (observation_id, csv_import_id)
+SELECT observation_record.observation_id, :csvImportId
+FROM observation_record
+JOIN csv_import_record ON csv_import_record.record_id = observation_record.record_id
+WHERE csv_import_record.csv_import_id = :csvImportId
+UNION
+SELECT observation_group.observation_id, :csvImportId
+FROM observation_group
+JOIN import_group_member ON import_group_member.group_id = observation_group.group_id
+JOIN csv_import_record ON csv_import_record.record_id = import_group_member.record_id
+WHERE csv_import_record.csv_import_id = :csvImportId;
+
+unreserve:
+DELETE FROM observation_reserved WHERE observation_id = ?;

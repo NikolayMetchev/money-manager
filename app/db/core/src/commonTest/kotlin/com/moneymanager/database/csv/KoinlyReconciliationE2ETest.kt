@@ -42,7 +42,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
-import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -437,9 +436,9 @@ class KoinlyReconciliationE2ETest : DbTest() {
             assertEquals(1, plan.rerunFiles.sumOf { it.tradeIds.size })
             val result = reimports.runPlan(plan)
 
-            assertEquals(1, result.reappliedLinks.reapplied)
+            assertEquals(0, result.reappliedLinks.reapplied, "nothing is replayed: the exclusion is an override on the kept id")
             val recreated = koinlyTrade()
-            assertNotEquals(trade.id, recreated.id, "the re-import made the trade again")
+            assertEquals(trade.id, recreated.id, "the re-import gave the trade its id back")
             assertEquals("duplicate of another wallet", excludedReason(recreated.id))
             assertNull(balanceOf("Koinly · Coinbase", "KNC"))
 
@@ -508,10 +507,11 @@ class KoinlyReconciliationE2ETest : DbTest() {
 
             val result = reimport(file)
 
-            assertEquals(1, result.reappliedLinks.reapplied, "${result.reappliedLinks}")
+            assertEquals(0, result.reappliedLinks.reapplied, "${result.reappliedLinks}")
             val newTrade = koinlyTrade()
             val newTransfer = koinlyDeposit()
-            assertNotEquals(koinlyTransfer.id, newTransfer.id)
+            assertEquals(koinlyTransfer.id, newTransfer.id, "the re-import gave the transfer its id back")
+            assertEquals(trade.id, newTrade.id, "the re-import gave the trade its id back")
             val rebuilt = repositories.relationshipRepository.getHandMadeByTransactions(listOf(realTransfer)).single()
             assertEquals(typeId, rebuilt.relationshipType.id)
             assertEquals(

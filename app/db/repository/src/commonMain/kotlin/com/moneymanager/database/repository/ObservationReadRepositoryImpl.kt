@@ -181,6 +181,12 @@ class ObservationReadRepositoryImpl(
             queries.selectAccountsWithObservations(accountIds.map { it.id }).awaitAsList().mapTo(mutableSetOf(), ::AccountId)
         }
 
+    override suspend fun getVacantReserved(): List<Observation> = queries.selectVacantReserved(::Header).awaitAsList().map { load(it) }
+
+    override suspend fun getReserved(): List<Observation> = queries.selectReserved(::Header).awaitAsList().map { load(it) }
+
+    override suspend fun isReserved(id: ObservationId): Boolean = queries.isReserved(id.id).awaitAsOne() > 0
+
     private class Header(
         val id: Long,
         val transactionId: Long,

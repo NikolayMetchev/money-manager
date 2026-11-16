@@ -28,6 +28,8 @@ WHERE observation.id IN (
   UNION
   SELECT observation_id FROM trade_observation WHERE from_account_id IN :accountIds OR to_account_id IN :accountIds
 )
+-- A reserved observation waits for its file's re-run to say it again (#1430): until then nothing matches against it.
+AND observation.id NOT IN (SELECT observation_id FROM observation_reserved)
 ORDER BY observation.id;
 
 selectTransferValues:
@@ -200,3 +202,25 @@ WHERE observation_id IN (
   UNION
   SELECT observation_id FROM trade_observation WHERE from_account_id IN :accountIds OR to_account_id IN :accountIds
 );
+
+-- The reserved observations whose transaction has no row yet (#1430): the ids a re-run's rows may take back, by the
+-- owner and slot that said them. Reservations only exist while a re-run is under way.
+selectVacantReserved:
+SELECT observation.id, observation.transaction_id, observation.kind, observation_owner.owner_kind, observation_owner.owner_id, observation_owner.slot
+FROM observation_reserved
+JOIN observation ON observation.id = observation_reserved.observation_id
+JOIN observation_owner ON observation_owner.observation_id = observation.id
+WHERE NOT EXISTS (SELECT 1 FROM transfer WHERE transfer.id = observation.transaction_id)
+  AND NOT EXISTS (SELECT 1 FROM trade WHERE trade.id = observation.transaction_id)
+ORDER BY observation.id;
+
+-- Every observation still reserved, with its transaction: what settling a re-run resolves.
+selectReserved:
+SELECT observation.id, observation.transaction_id, observation.kind, observation_owner.owner_kind, observation_owner.owner_id, observation_owner.slot
+FROM observation_reserved
+JOIN observation ON observation.id = observation_reserved.observation_id
+JOIN observation_owner ON observation_owner.observation_id = observation.id
+ORDER BY observation.id;
+
+isReserved:
+SELECT COUNT(*) FROM observation_reserved WHERE observation_id = ?;

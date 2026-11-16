@@ -48,6 +48,8 @@ interface TransactionWriteRepository : TransactionReadRepository {
      * @param sources Per-new-transfer [Source]s aligned 1:1 with [transfers].
      * @param updates Existing transfers to update, each with attributes to add.
      * @param updateSources Per-update [Source]s aligned 1:1 with [updates].
+     * @param reusedIds New transfers (by placeholder id) to insert under an id they had before (#1430): a re-import gives a
+     *   row's transaction back the id it had, so what a person decided about it still applies.
      * @return Generated transaction ids in the same order as [transfers].
      */
     suspend fun importTransfers(
@@ -57,7 +59,9 @@ interface TransactionWriteRepository : TransactionReadRepository {
         sources: List<Source>,
         updates: List<TransferUpdate>,
         updateSources: List<Source>,
+        reusedIds: Map<TransferId, TransferId> = emptyMap(),
     ): List<TransferId> {
+        require(reusedIds.isEmpty()) { "Default importTransfers cannot reuse ids; override importTransfers in this implementation." }
         // The default path delegates to createTransfers, which has no way to persist relationships.
         // Fail loudly rather than silently dropping them; the real DB impl overrides this method.
         require(newRelationships.isEmpty()) {

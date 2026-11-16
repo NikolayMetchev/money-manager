@@ -279,3 +279,8 @@ closure AS (
       AND e.matched = 0
 )
 SELECT import_id FROM closure;
+
+-- The revision after every write recorded against an entity: a re-run inserting a row back under the id it took back
+-- (#1430) continues its history rather than writing over its first revision, which still says who created it.
+selectNextRevision:
+SELECT COALESCE(MAX(revision_id), 0) + 1 FROM entity_source WHERE entity_type_id = ? AND entity_id = ? AND matched = 0;

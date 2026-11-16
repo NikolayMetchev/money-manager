@@ -20,6 +20,7 @@ import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
+import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.reconciliation.IGNORED_IN_RECONCILIATION
@@ -140,9 +141,9 @@ class OracleDatabase private constructor(
      * Assertion (d)'s hand work, chosen by value so it lands on the same records in any database holding the same
      * money: a hand edit (new description and a note), a hand-made match of two records (a reconciliation source's
      * row and a real one when the scenario has a source), an Ignore of a reconciliation source's row, and the
-     * scenario's Manual Entries.
+     * scenario's Manual Entries. Returns the transfers it edited or matched, which a re-import must keep under their ids (#1430).
      */
-    suspend fun doHandWork() {
+    suspend fun doHandWork(): Set<TransferId> {
         val accounts = db.accountRepository.getAllAccounts().first()
         val shadowIds =
             db.accountAttributeRepository
@@ -195,6 +196,7 @@ class OracleDatabase private constructor(
                 excludedFromBalances = entry.excludedFromBalances,
             )
         }
+        return setOf(edited.id) + matched.map { it.id }
     }
 
     private fun byValue(transfers: List<Transfer>): List<Transfer> =
