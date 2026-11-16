@@ -33,6 +33,11 @@ data class RecordIdentity(
  * @property recordKey an order-free key of its record, such as the record's content hash: ties between equally good
  *   pairs are broken by it. It must not come from database ids or import order (a staged file's id is both), or the
  *   assignment would depend on the order files were imported in.
+ * @property crossSource what only the cross-source rules read about its record.
+ * @property orderLinked whether an exchange order its source reports claims it (a trade). A trade an order claims is never
+ *   matched against a conversion booked as transfers: the order would have no trade to point at.
+ * @property legGroup the leg group a transfer is a leg of, when its strategy assembles one (a conversion through an
+ *   account).
  */
 data class MatchObservation(
     val ref: ObservationRef,
@@ -44,6 +49,8 @@ data class MatchObservation(
     val content: ObservationContent,
     val identity: RecordIdentity = RecordIdentity(),
     val crossSource: CrossSourceFacts = CrossSourceFacts(),
+    val orderLinked: Boolean = false,
+    val legGroup: LegGroupMembership? = null,
 ) {
     /** Whether its source excluded it from balances (a declined payment, a row the source marks deleted). */
     val excluded: Boolean get() = content.attributes.any { it.typeId.id == WellKnownIds.EXCLUDED_ATTR_TYPE_ID }
@@ -61,4 +68,22 @@ data class CrossSourceFacts(
     val approximateUntil: Instant? = null,
     val shadow: Boolean = false,
     val passThrough: Boolean = false,
+)
+
+/** Which side of a leg group a leg is on: the asset leaves the owner's account, or arrives in it. */
+enum class LegGroupSide {
+    DEBIT,
+    CREDIT,
+}
+
+/**
+ * A transfer's place in a leg group (a `LegGroupRule` with `ThroughAccount` assembly): [rule] is the rule's name,
+ * [key] the key the group's legs share and [relationshipType] the name of the relationship type that links them
+ * (`conversion` for a conversion whose credits can't be attributed to its debits).
+ */
+data class LegGroupMembership(
+    val rule: String,
+    val key: String,
+    val side: LegGroupSide,
+    val relationshipType: String,
 )

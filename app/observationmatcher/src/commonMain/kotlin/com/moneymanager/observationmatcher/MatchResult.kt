@@ -43,10 +43,12 @@ data class Join(
  * @property changes the assignments that differ from the observations' current ones, in the matcher's order.
  * @property released transactions some observation of the scope was assigned to and none is now: nothing backs them.
  * @property joins the pairs that put two observations in one transaction, in the order they were taken.
+ * @property exclusions what the matcher's stages leave out of balances, in the order they were found.
  */
 data class MatchResult(
     val assignments: Map<ObservationRef, TransactionTarget>,
     val changes: List<AssignmentChange>,
     val released: Set<TransactionId>,
     val joins: List<Join>,
+    val exclusions: List<ExclusionLink> = emptyList(),
 )

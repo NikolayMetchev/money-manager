@@ -20,6 +20,18 @@ enum class ShapeReason {
      * to it (Uber authorises £21.58 and tops up £0.27; PayPal records £21.85).
      */
     SPLIT_CONDUIT,
+
+    /** A gross trade one source reports, against the fills another reports for it: the gross trade is excluded. */
+    TRADE_AGGREGATION,
+
+    /**
+     * A conversion booked as a leg group through an account (Binance's dust sweep), against the trades another source
+     * reports for each of its debits: the leg group is excluded.
+     */
+    CONVERSION_GROUP,
+
+    /** A conversion trade against one debit leg of a leg group that records it: the trade is excluded. */
+    CONVERSION_TRADE,
 }
 
 /**
