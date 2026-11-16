@@ -226,9 +226,17 @@ class TradeStagesTest {
             for (observation in scope) {
                 val target = result.assignments.getValue(observation.ref)
                 stored[observation.ref] =
-                    observation.copy(
+                    MatchObservation(
+                        ref = observation.ref,
                         storedId = observation.storedId ?: ObservationId(nextObservation++),
                         current = idOf(target, observation.trade != null),
+                        family = observation.family,
+                        container = observation.container,
+                        recordKey = observation.recordKey,
+                        content = observation.content,
+                        identity = observation.identity,
+                        orderLinked = observation.orderLinked,
+                        legGroup = observation.legGroup,
                     )
             }
             val covered = scope.mapTo(mutableSetOf()) { it.ref }
