@@ -3,7 +3,9 @@ package com.moneymanager.test.reimportoracle
 /**
  * What a fresh import of each [OracleCorpus] scenario wrote before the engine handed its fee, pass-through and
  * conversion expansion to `ObservationExpander` (#1422), captured from the engine as it was. [ExpansionGoldenTest]
- * holds the expander to it: every transfer, trade, relationship and attribute must come out exactly as before.
+ * holds the expander to it: every transfer, trade, relationship and attribute must come out exactly as before. Since
+ * staged files match on import (#1428), two records of one event are one transaction carrying both, where the
+ * deduper booked two and excluded one as reconciled; balances are the same.
  */
 internal val FRESH_IMPORT_GOLDENS: Map<String, String> =
     mapOf(
@@ -14,14 +16,12 @@ internal val FRESH_IMPORT_GOLDENS: Map<String, String> =
             Monzo
             Monzo Joint
             Tesco
-            == transfers (4)
-            2023-11-19T21:15:00Z | Monzo -> Monzo Joint | 1000 GBP | From personal [Monzo Category=Transfers, Monzo Transaction ID=tx_joint_1, Type=Faster payment, excluded=reconciled]
-            2023-11-19T21:15:00Z | Monzo -> Monzo Joint | 1000 GBP | To joint [Monzo Category=Transfers, Monzo Transaction ID=tx_personal_1, Type=Faster payment]
+            == transfers (3)
+            2023-11-19T21:15:00Z | Monzo -> Monzo Joint | 1000 GBP | From personal [Monzo Category=Transfers, Monzo Transaction ID=tx_joint_1, Type=Faster payment]
             2023-11-20T08:01:00Z | Monzo -> Tesco | 12.4 GBP | TESCO STORES [Monzo Category=Transfers, Monzo Transaction ID=tx_personal_2, Type=Faster payment]
             2023-11-21T18:30:00Z | Monzo Joint -> Landlord | 900 GBP | RENT [Monzo Category=Transfers, Monzo Transaction ID=tx_joint_2, Type=Faster payment]
             == trades (0)
-            == relationships (1)
-            reconciled: PRIMARY {2023-11-19T21:15:00Z | Monzo -> Monzo Joint | 1000 GBP | From personal [Monzo Category=Transfers, Monzo Transaction ID=tx_joint_1, Type=Faster payment, excluded=reconciled]} & RELATED {2023-11-19T21:15:00Z | Monzo -> Monzo Joint | 1000 GBP | To joint [Monzo Category=Transfers, Monzo Transaction ID=tx_personal_1, Type=Faster payment]}
+            == relationships (0)
             == daily balances (6)
             Landlord | 2023-11-21 | GBP | 900
             Monzo Joint | 2023-11-19 | GBP | 1000
@@ -39,22 +39,19 @@ internal val FRESH_IMPORT_GOLDENS: Map<String, String> =
             Freetrade Top Ups
             Landlord
             Monzo
-            == transfers (4)
+            == transfers (3)
             2026-02-16T00:00:00Z | Freetrade Interest -> Freetrade ISA | 0.02 GBP | Interest [freetrade-type=INTEREST_FROM_CASH]
             2026-02-28T09:00:00Z | Monzo -> Landlord | 1000 GBP | RENT [Monzo Category=Transfers, Monzo Transaction ID=tx_ft_2, Type=Faster payment]
-            2026-03-01T09:00:00Z | Monzo -> Freetrade ISA | 1000 GBP | FREETRADE [Monzo Category=Transfers, Monzo Transaction ID=tx_ft_1, Type=Faster payment]
-            2026-03-01T10:28:23.178Z | Freetrade Top Ups -> Freetrade ISA | 1000 GBP | Top up [excluded=reconciled, freetrade-type=TOP_UP, unidentified-counterparty=source]
+            2026-03-01T09:00:00Z | Monzo -> Freetrade ISA | 1000 GBP | FREETRADE [Monzo Category=Transfers, Monzo Transaction ID=tx_ft_1, Type=Faster payment, freetrade-type=TOP_UP]
             == trades (1)
             2026-03-02T08:49:09.042Z | Freetrade ISA 998.64 GBP -> Freetrade ISA 202 EXFD | Example Fund
-            == relationships (1)
-            reconciled: PRIMARY {2026-03-01T09:00:00Z | Monzo -> Freetrade ISA | 1000 GBP | FREETRADE [Monzo Category=Transfers, Monzo Transaction ID=tx_ft_1, Type=Faster payment]} & RELATED {2026-03-01T10:28:23.178Z | Freetrade Top Ups -> Freetrade ISA | 1000 GBP | Top up [excluded=reconciled, freetrade-type=TOP_UP, unidentified-counterparty=source]}
-            == daily balances (9)
+            == relationships (0)
+            == daily balances (8)
             Freetrade ISA | 2026-02-16 | GBP | 0.02
             Freetrade ISA | 2026-03-01 | GBP | 1000.02
             Freetrade ISA | 2026-03-02 | EXFD | 202
             Freetrade ISA | 2026-03-02 | GBP | 1.38
             Freetrade Interest | 2026-02-16 | GBP | -0.02
-            Freetrade Top Ups | 2026-03-01 | GBP | 0
             Landlord | 2026-02-28 | GBP | 1000
             Monzo | 2026-02-28 | GBP | -1000
             Monzo | 2026-03-01 | GBP | -2000
@@ -66,34 +63,20 @@ internal val FRESH_IMPORT_GOLDENS: Map<String, String> =
             PAYMENT RECEIVED - THANK YOU
             SAINSBURY'S
             Santander
-            == transfers (9)
-            2020-02-02T12:00:00Z | PAYMENT RECEIVED - THANK YOU -> AMERICAN EXPRESS | 1239.68 GBP | PAYMENT RECEIVED - THANK YOU [amex-process-date=02/02/2020, amex-reference=9936180, excluded=reconciled, unidentified-counterparty=source]
-            2020-02-04T12:00:00Z | Santander -> AMERICAN EXPRESS | 1239.68 GBP | DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 3746-935125-04002, MANDATE NO 0013 [santander-mandate=0013, santander-reference=3746-935125-04002, santander-transaction-type=DIRECT_DEBIT]
-            2020-03-04T12:00:00Z | PAYMENT RECEIVED - THANK YOU -> AMERICAN EXPRESS | 738.42 GBP | PAYMENT RECEIVED - THANK YOU [amex-process-date=04/03/2020, amex-reference=9936181, excluded=reconciled, unidentified-counterparty=source]
-            2020-03-04T12:00:00Z | Santander -> AMERICAN EXPRESS | 738.42 GBP | DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 3746-935125-04002, MANDATE NO 0013 [santander-mandate=0013, santander-reference=3746-935125-04002, santander-transaction-type=DIRECT_DEBIT]
+            == transfers (5)
+            2020-02-04T12:00:00Z | Santander -> AMERICAN EXPRESS | 1239.68 GBP | DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 3746-935125-04002, MANDATE NO 0013 [amex-process-date=02/02/2020, amex-reference=9936180, santander-mandate=0013, santander-reference=3746-935125-04002, santander-transaction-type=DIRECT_DEBIT]
+            2020-03-04T12:00:00Z | Santander -> AMERICAN EXPRESS | 738.42 GBP | DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 3746-935125-04002, MANDATE NO 0013 [amex-process-date=04/03/2020, amex-reference=9936181, santander-mandate=0013, santander-reference=3746-935125-04002, santander-transaction-type=DIRECT_DEBIT]
             2020-03-19T12:00:00Z | AMERICAN EXPRESS -> SAINSBURY'S | 16.1 GBP | SAINSBURY'S [amex-merchant-type=GOODS, amex-process-date=19/03/2020, amex-reference=9936189]
-            2020-04-02T12:00:00Z | PAYMENT RECEIVED - THANK YOU -> AMERICAN EXPRESS | 1574.62 GBP | PAYMENT RECEIVED - THANK YOU [amex-process-date=02/04/2020, amex-reference=9936182, excluded=reconciled, unidentified-counterparty=source]
-            2020-04-02T12:00:00Z | Santander -> AMERICAN EXPRESS | 1574.62 GBP | DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 3746-935125-04002, MANDATE NO 0013 [santander-mandate=0013, santander-reference=3746-935125-04002, santander-transaction-type=DIRECT_DEBIT]
-            2020-05-03T12:00:00Z | PAYMENT RECEIVED - THANK YOU -> AMERICAN EXPRESS | 1801.13 GBP | PAYMENT RECEIVED - THANK YOU [amex-process-date=03/05/2020, amex-reference=9936183, excluded=reconciled, unidentified-counterparty=source]
-            2020-05-06T12:00:00Z | Santander -> AMERICAN EXPRESS | 1801.13 GBP | DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 3746-935125-04002, MANDATE NO 0013 [santander-mandate=0013, santander-reference=3746-935125-04002, santander-transaction-type=DIRECT_DEBIT]
+            2020-04-02T12:00:00Z | Santander -> AMERICAN EXPRESS | 1574.62 GBP | DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 3746-935125-04002, MANDATE NO 0013 [amex-process-date=02/04/2020, amex-reference=9936182, santander-mandate=0013, santander-reference=3746-935125-04002, santander-transaction-type=DIRECT_DEBIT]
+            2020-05-06T12:00:00Z | Santander -> AMERICAN EXPRESS | 1801.13 GBP | DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 3746-935125-04002, MANDATE NO 0013 [amex-process-date=03/05/2020, amex-reference=9936183, santander-mandate=0013, santander-reference=3746-935125-04002, santander-transaction-type=DIRECT_DEBIT]
             == trades (0)
-            == relationships (4)
-            reconciled: PRIMARY {2020-02-04T12:00:00Z | Santander -> AMERICAN EXPRESS | 1239.68 GBP | DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 3746-935125-04002, MANDATE NO 0013 [santander-mandate=0013, santander-reference=3746-935125-04002, santander-transaction-type=DIRECT_DEBIT]} & RELATED {2020-02-02T12:00:00Z | PAYMENT RECEIVED - THANK YOU -> AMERICAN EXPRESS | 1239.68 GBP | PAYMENT RECEIVED - THANK YOU [amex-process-date=02/02/2020, amex-reference=9936180, excluded=reconciled, unidentified-counterparty=source]}
-            reconciled: PRIMARY {2020-03-04T12:00:00Z | Santander -> AMERICAN EXPRESS | 738.42 GBP | DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 3746-935125-04002, MANDATE NO 0013 [santander-mandate=0013, santander-reference=3746-935125-04002, santander-transaction-type=DIRECT_DEBIT]} & RELATED {2020-03-04T12:00:00Z | PAYMENT RECEIVED - THANK YOU -> AMERICAN EXPRESS | 738.42 GBP | PAYMENT RECEIVED - THANK YOU [amex-process-date=04/03/2020, amex-reference=9936181, excluded=reconciled, unidentified-counterparty=source]}
-            reconciled: PRIMARY {2020-04-02T12:00:00Z | Santander -> AMERICAN EXPRESS | 1574.62 GBP | DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 3746-935125-04002, MANDATE NO 0013 [santander-mandate=0013, santander-reference=3746-935125-04002, santander-transaction-type=DIRECT_DEBIT]} & RELATED {2020-04-02T12:00:00Z | PAYMENT RECEIVED - THANK YOU -> AMERICAN EXPRESS | 1574.62 GBP | PAYMENT RECEIVED - THANK YOU [amex-process-date=02/04/2020, amex-reference=9936182, excluded=reconciled, unidentified-counterparty=source]}
-            reconciled: PRIMARY {2020-05-06T12:00:00Z | Santander -> AMERICAN EXPRESS | 1801.13 GBP | DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 3746-935125-04002, MANDATE NO 0013 [santander-mandate=0013, santander-reference=3746-935125-04002, santander-transaction-type=DIRECT_DEBIT]} & RELATED {2020-05-03T12:00:00Z | PAYMENT RECEIVED - THANK YOU -> AMERICAN EXPRESS | 1801.13 GBP | PAYMENT RECEIVED - THANK YOU [amex-process-date=03/05/2020, amex-reference=9936183, excluded=reconciled, unidentified-counterparty=source]}
-            == daily balances (16)
-            AMERICAN EXPRESS | 2020-02-02 | GBP | 0
+            == relationships (0)
+            == daily balances (10)
             AMERICAN EXPRESS | 2020-02-04 | GBP | 1239.68
             AMERICAN EXPRESS | 2020-03-04 | GBP | 1978.1
             AMERICAN EXPRESS | 2020-03-19 | GBP | 1962
             AMERICAN EXPRESS | 2020-04-02 | GBP | 3536.62
-            AMERICAN EXPRESS | 2020-05-03 | GBP | 3536.62
             AMERICAN EXPRESS | 2020-05-06 | GBP | 5337.75
-            PAYMENT RECEIVED - THANK YOU | 2020-02-02 | GBP | 0
-            PAYMENT RECEIVED - THANK YOU | 2020-03-04 | GBP | 0
-            PAYMENT RECEIVED - THANK YOU | 2020-04-02 | GBP | 0
-            PAYMENT RECEIVED - THANK YOU | 2020-05-03 | GBP | 0
             SAINSBURY'S | 2020-03-19 | GBP | 16.1
             Santander | 2020-02-04 | GBP | -1239.68
             Santander | 2020-03-04 | GBP | -1978.1
@@ -126,14 +109,13 @@ internal val FRESH_IMPORT_GOLDENS: Map<String, String> =
             """.trimIndent(),
         "Crypto.com card + PayPal CSV (conduit)" to
             """
-            == accounts (13)
+            == accounts (12)
             Crypto.com Card
             Curve
             Frank Frumento
             PayPal
             PayPal Bank Transfers
             PayPal Card Funding
-            PayPal Conversions
             Pret-a-Portrait Ltd
             Pretportrai
             UBER PAYMENTS UK LIMITED

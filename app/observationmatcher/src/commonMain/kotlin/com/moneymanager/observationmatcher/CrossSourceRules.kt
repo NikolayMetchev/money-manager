@@ -87,7 +87,8 @@ data class CrossSourcePolicy(
  *
  * Each rule is asked both ways round, each record in the incoming role under its own family's policy, so a pair
  * found in one import order is found in the other. Every rule pairs only:
- * - records of two families (a source never reconciles with itself: that is [SameFamilyRules]),
+ * - records of two families (a source never reconciles with itself: that is [SameFamilyRules]), or one family's
+ *   statements of two accounts ([SameAccountsRule]),
  * - of two containers,
  * - main transfers (never a fee or another derived slot),
  * - that both count (a record its source excluded stands for no movement),
@@ -218,9 +219,15 @@ internal abstract class CrossSourceRule(
         a: MatchObservation,
         b: MatchObservation,
     ): Long? {
-        if (a.family == b.family) return null
+        if (a.family == b.family && !joinsOwnStatements(a, b)) return null
         return nearest(oneWay(a, b), oneWay(b, a))
     }
+
+    /** Whether this rule pairs two records of one family, because each is the statement of its own account. */
+    protected open fun joinsOwnStatements(
+        a: MatchObservation,
+        b: MatchObservation,
+    ): Boolean = false
 
     /** The distance when [incoming], under its own family's policy, pairs with [existing]. */
     protected abstract fun oneWay(
@@ -266,11 +273,24 @@ internal class ApproximateTwinRule(
     private fun MatchObservation.isApproximate(): Boolean = content.facts.approximateTime || crossSource.approximateUntil != null
 }
 
-/** Two sources' records of the same amount from the same account to the same account (`ImportDeduper`'s sameAccounts). */
+/**
+ * Two sources' records of the same amount from the same account to the same account (`ImportDeduper`'s sameAccounts).
+ * One strategy's exports of two accounts are two sources here: a transfer between them is on both statements, one
+ * at each end (Monzo's personal and joint accounts).
+ */
 internal class SameAccountsRule(
     context: Context,
 ) : CrossSourceRule(context) {
     override val name = "same accounts"
+
+    override fun joinsOwnStatements(
+        a: MatchObservation,
+        b: MatchObservation,
+    ): Boolean {
+        val endA = a.content.facts.ownEnd ?: return false
+        val endB = b.content.facts.ownEnd ?: return false
+        return endA != endB
+    }
 
     override fun bucket(observation: MatchObservation): Any? {
         val values = context.eligible(observation) ?: return null
@@ -375,6 +395,24 @@ internal class OtherSideRule(
     context: Context,
 ) : CrossSourceRule(context) {
     override val name = "other side"
+
+    /**
+     * A movement two sources already record end to end (a bank line and the savings account's own line) has both its
+     * ends: it is nobody's other side (`ImportDeduper` never offered a record another row had reconciled against).
+     */
+    override fun joinsGroups(
+        x: List<MatchObservation>,
+        y: List<MatchObservation>,
+    ): Boolean =
+        listOf(x, y).none { group ->
+            // One statement's re-exports are one source: only a second statement attests the far end.
+            group
+                .filter {
+                    it.content.facts.placeholderEnds
+                        .isEmpty()
+                }.distinctBy { it.family to it.content.facts.ownEnd }
+                .size > 1
+        }
 
     override fun oneWay(
         incoming: MatchObservation,

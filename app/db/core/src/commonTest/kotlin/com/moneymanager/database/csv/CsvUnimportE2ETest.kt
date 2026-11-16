@@ -1,5 +1,6 @@
 package com.moneymanager.database.csv
 
+import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.csvimporter.AttributeAccountMatcher
 import com.moneymanager.csvimporter.BulkApplyResult
 import com.moneymanager.csvimporter.CsvUnimportResult
@@ -19,7 +20,6 @@ import com.moneymanager.domain.model.csv.CsvImportHistoryEvent
 import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.importengineapi.setCsvImportIgnored
 import com.moneymanager.test.database.DbTest
-import com.moneymanager.test.database.reimports
 import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
@@ -32,8 +32,7 @@ import kotlin.time.Clock
 import kotlin.time.Duration
 
 /**
- * Unimporting a CSV file deletes everything it created, resets it (and any other file's rows that were
- * matched against its transactions), moves it to the Ignored tab and leaves an "unimported" entry in its
+ * Unimporting a CSV file withdraws its records: it deletes what nothing else still observes, resets it, moves it to the Ignored tab and leaves an "unimported" entry in its
  * application audit trail.
  */
 class CsvUnimportE2ETest : DbTest() {
@@ -158,6 +157,16 @@ class CsvUnimportE2ETest : DbTest() {
     private suspend fun transfersOn(accountId: AccountId): List<Transfer> =
         repositories.transactionRepository.getTransactionsByAccount(accountId).first()
 
+    private suspend fun balanceOf(accountId: AccountId): BigDecimal {
+        repositories.maintenanceService.refreshMaterializedViews()
+        return repositories.transactionRepository
+            .getAccountBalances()
+            .first()
+            .single { it.accountId == accountId }
+            .balance
+            .toDisplayValue()
+    }
+
     private fun Transfer.isReconcileExcluded(): Boolean = attributes.any { it.attributeType.name == "excluded" && it.value == "reconciled" }
 
     @Test
@@ -205,8 +214,10 @@ class CsvUnimportE2ETest : DbTest() {
             assertEquals(2, transfersOn(monzo).size)
         }
 
+    // Unimport withdraws only the file's own observations: a transfer another file's row still records stays, counted
+    // from that file, and nothing of that file is reset.
     @Test
-    fun unimport_resetsOtherFilesRowsMatchedAgainstItsTransfers() =
+    fun unimport_keepsATransferAnotherFileStillRecords() =
         runDbTest {
             repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
             val monzo = createAccount("Monzo")
@@ -214,29 +225,26 @@ class CsvUnimportE2ETest : DbTest() {
             assertEquals(1, apply(first, monzo).transfersCreated)
             val second = stage("MonzoDataExport-again.csv", listOf(row("tx_1", "Coffee Shop", "-3.50", "Coffee")))
             assertEquals(1, apply(second, monzo).duplicatesSkipped, "the second file's row is a duplicate of the first's")
+            val secondRowsBefore = repositories.csvImportRepository.getImportRows(second.id, limit = 10, offset = 0)
 
             val plan = planCsvUnimport(first.id, repositories.csvImportRepository, repositories.transferSourceRepository)
-            assertEquals(listOf(second.id), plan.affectedFiles.map { it.importId })
+            assertTrue(plan.transferIds.isEmpty() && plan.affectedFiles.isEmpty(), "$plan")
+            assertEquals(0, unimport(reload(first.id)).deletedTransfers)
 
-            unimport(reload(first.id))
-
-            assertTrue(transfersOn(monzo).isEmpty())
+            assertEquals(1, transfersOn(monzo).size, "the second file still records the transfer")
+            assertEquals(0, balanceOf(monzo).compareTo(BigDecimal("-3.50")))
             val secondRows = repositories.csvImportRepository.getImportRows(second.id, limit = 10, offset = 0)
-            assertTrue(secondRows.all { it.importStatus == null && it.transferId == null }, "the dependent row is reset")
+            assertEquals(secondRowsBefore, secondRows, "nothing of the second file is reset")
 
-            // Re-importing the surviving file restores its movement.
-            val reimports = repositories.reimports(maintenance)
-            reimports.reimportAll(
-                reimports.planAll(listOf(reload(second.id))),
-                accountId = monzo,
-                currencyId = null,
-                onProgress = { },
-            )
-            assertEquals(1, transfersOn(monzo).size)
+            // Once its last record goes, so does the transfer.
+            assertEquals(1, unimport(reload(second.id)).deletedTransfers)
+            assertTrue(transfersOn(monzo).isEmpty())
         }
 
+    // Unimporting one of two exports of one movement leaves it counted from the other export, as a fresh import of only
+    // that export would; unimporting that one too removes it.
     @Test
-    fun unimport_unhidesTheOtherSourcesLegItHadReconciledAway() =
+    fun unimport_keepsTheMovementTheOtherExportRecords() =
         runDbTest {
             repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
             val personal = createAccount("Monzo")
@@ -245,14 +253,23 @@ class CsvUnimportE2ETest : DbTest() {
             apply(personalExport, personal)
             val jointExport = stage("MonzoDataExport_joint.csv", listOf(row("tx_joint_1", "Monzo", "1000.00", "From Monzo")))
             apply(jointExport, joint)
-            assertEquals(1, transfersOn(personal).count { it.isReconcileExcluded() }, "precondition: one leg reconciled away")
+            assertTrue(transfersOn(personal).single().let { !it.isReconcileExcluded() }, "precondition: one counted transfer")
+            val jointRowsBefore = repositories.csvImportRepository.getImportRows(jointExport.id, limit = 10, offset = 0)
 
-            val result = unimport(reload(personalExport.id))
+            val plan = planCsvUnimport(personalExport.id, repositories.csvImportRepository, repositories.transferSourceRepository)
+            assertTrue(plan.transferIds.isEmpty() && plan.affectedFiles.isEmpty(), "$plan")
+            unimport(reload(personalExport.id))
 
-            val remaining = transfersOn(personal)
-            assertEquals(1, remaining.size, "only the joint export's leg is left")
-            assertTrue(remaining.none { it.isReconcileExcluded() }, "with its partner gone it must count again: $remaining")
-            assertEquals(1, result.unhiddenTransfers)
+            val kept = transfersOn(joint)
+            assertEquals(1, kept.size, "$kept")
+            assertTrue(kept.none { it.isReconcileExcluded() } && kept.single().sourceAccountId == personal, "$kept")
+            assertEquals(0, balanceOf(personal).compareTo(BigDecimal("-1000")))
+            assertEquals(0, balanceOf(joint).compareTo(BigDecimal("1000")))
+            val jointRows = repositories.csvImportRepository.getImportRows(jointExport.id, limit = 10, offset = 0)
+            assertEquals(jointRowsBefore, jointRows, "the joint export's row is untouched")
+
+            assertEquals(1, unimport(reload(jointExport.id)).deletedTransfers)
+            assertTrue(transfersOn(joint).isEmpty() && transfersOn(personal).isEmpty())
         }
 
     @Test

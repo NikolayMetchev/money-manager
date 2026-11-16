@@ -342,7 +342,7 @@ module that only reads never even has the write interfaces on its compile classp
 inject the write repositories (`# gazelle:kmp_visibility` in its BUILD file): `app/db/core` + `app/db/write` (impls),
 `app/di/core` + `app/db/di` (wiring), `app/importer` (the engine) and `test/app/db` (fixtures), so any other module
 that depends on it fails analysis. Within `app/importer`, `kmp_forbid_reference` keeps `*WriteRepository` to
-`ImportEngineImpl.kt`.
+`ImportEngineImpl.kt` and its match and materialize steps (`MatchSync.kt`, `ObservationMaterialization.kt`).
 
 **The one exception:** `openDatabaseComponent` (`app/db/di`) records this device with `DeviceWriteRepositoryImpl`
 before it builds the graph, and passes the `DeviceId` to `DatabaseComponent.Factory.create`. Every write-repo impl,

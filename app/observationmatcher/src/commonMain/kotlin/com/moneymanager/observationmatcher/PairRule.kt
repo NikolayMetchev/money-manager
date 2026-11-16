@@ -34,6 +34,15 @@ interface PairRule {
         a: MatchObservation,
         b: MatchObservation,
     ): Long?
+
+    /**
+     * Whether the rule may join the groups [x] and [y], once every pair across them pairs: a rule that pairs single
+     * records can refuse a group that already says more than either record does.
+     */
+    fun joinsGroups(
+        x: List<MatchObservation>,
+        y: List<MatchObservation>,
+    ): Boolean = true
 }
 
 /**

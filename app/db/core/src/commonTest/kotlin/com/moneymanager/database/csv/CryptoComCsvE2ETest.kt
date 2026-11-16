@@ -223,31 +223,23 @@ class CryptoComCsvE2ETest : DbTest() {
             )
 
             // The shared top-up: the fiat export names both ends (Cash -> Card), the card export only
-            // that £400 arrived (placeholder -> Card). Both records are kept...
-            val topUpPlaceholderId = accounts.first { it.name == "Crypto.com Card Top Up" }.id
+            // that £400 arrived (placeholder -> Card). Both are records of one movement: one transfer, off the
+            // real wallet, observed by each file's row, so it counts once.
             val topUps =
                 repositories.transactionRepository
                     .getTransactionsByAccount(cardId)
                     .first()
                     .filter { it.targetAccountId == cardId && it.amount.toDisplayValue().compareTo(BigDecimal("400.00")) == 0 }
-            assertEquals(2, topUps.size, "both files' top-up records are kept")
-            val fiatRecord = topUps.single { it.sourceAccountId == cashId }
-            val cardRecord = topUps.single { it.sourceAccountId == topUpPlaceholderId }
-
-            // ...but the placeholder one — the record that cannot say where the money came from — is the
-            // excluded one, linked to the fiat record, so the movement counts once and off the real wallet.
-            assertTrue(
-                cardRecord.attributes.any { it.attributeType.name == "excluded" && it.value == "reconciled" },
-                "the placeholder record is excluded as reconciled",
+            val topUp = topUps.single()
+            assertEquals(cashId, topUp.sourceAccountId, "the record naming both ends says where the money came from")
+            assertTrue(topUp.attributes.none { it.attributeType.name == "excluded" }, "the top-up is counted")
+            assertEquals(
+                2,
+                repositories.observationRepository
+                    .getObservationsOfTransaction(topUp.id)
+                    .size,
+                "both files' top-up records observe it",
             )
-            assertTrue(
-                fiatRecord.attributes.none { it.attributeType.name == "excluded" },
-                "the record naming both ends stays counted",
-            )
-            val relationships = repositories.relationshipRepository.getByTransaction(fiatRecord.id).first()
-            val reconciledLink = relationships.single { it.relationshipType.name == "reconciled" }
-            assertEquals(fiatRecord.id, reconciledLink.primary)
-            assertEquals(cardRecord.id, reconciledLink.related)
         }
 
     /** Re-imports an already-imported Crypto.com Fiat file with its built-in strategy. */

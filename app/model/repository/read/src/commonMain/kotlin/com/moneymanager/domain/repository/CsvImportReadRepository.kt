@@ -3,6 +3,7 @@ package com.moneymanager.domain.repository
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.TradeId
+import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvRow
@@ -52,6 +53,21 @@ interface CsvImportReadRepository {
 
     /** Ids of the still-existing trades this import created. See [getTransferIdsCreatedByImport]. */
     suspend fun getTradeIdsCreatedByImport(id: CsvImportId): Set<TradeId>
+
+    /**
+     * The transfers and trades the records of [id] observe that a staged file or the match created, whichever file that
+     * was. One a person, an API session or a reconciliation copy created is not the file's to delete.
+     */
+    suspend fun getTransactionsObservedByImport(id: CsvImportId): Set<TransactionId>
+
+    /**
+     * Which of [transactionIds] something other than the files [importIds] still observes: another file's or an API
+     * session's record, a person, or a leg group none of whose records those files hold. Unimporting the files leaves these.
+     */
+    suspend fun getTransactionsObservedOutsideImports(
+        importIds: Collection<CsvImportId>,
+        transactionIds: Collection<TransactionId>,
+    ): Set<TransactionId>
 
     /**
      * Finds imports that match the given file checksum.

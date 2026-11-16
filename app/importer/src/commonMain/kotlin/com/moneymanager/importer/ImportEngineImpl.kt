@@ -253,6 +253,8 @@ class ImportEngineImpl(
         val relationshipTypeIds = batch.relationshipTypeNames.associateWith { relationshipTypeRepository.getOrCreate(it) }
 
         // ----- Config / staging / session / settings / device mutations -----
+        // Read before a reset drops its file's observations: the transactions they shared with other records.
+        val sharedByResets = transactionsObservedByResets(batch)
         val config = applyConfigMutations(batch)
 
         // ----- CREATE phase (first, so batch-local keys resolve for dependents) -----
@@ -545,17 +547,39 @@ class ImportEngineImpl(
             )
         }
 
-        transferDeletes.map { requireNotNull(it.existingId) }.chunked(DELETE_CHUNK_ROWS).forEach { chunk ->
+        // A transaction another record still observes (a joined twin) outlives its creator: it is rebuilt from what is
+        // left, as is one that only lost a reset file's observations.
+        val transferDeleteIds = transferDeletes.map { requireNotNull(it.existingId) }
+        val tradeDeleteIds = tradeDeletes.map { requireNotNull(it.existingId) }
+        val stillObserved =
+            stillObserved(
+                // A person deleting a transaction deletes it; only a source withdrawing its records leaves the others standing.
+                transferDeletes.filter { it.source.isImport() }.map { requireNotNull(it.existingId) } +
+                    tradeDeletes.filter { it.source.isImport() }.map { requireNotNull(it.existingId) },
+                (transferDeletes.map { it.source } + tradeDeletes.map { it.source }).toSet(),
+            )
+        transferDeleteIds.filterNot { it in stillObserved }.chunked(DELETE_CHUNK_ROWS).forEach { chunk ->
             observationRepository?.deleteObservationsOfTransactions(chunk)
             transactionRepository.deleteTransactions(chunk)
             reportDeleted(chunk.size)
         }
-        tradeDeletes.map { requireNotNull(it.existingId) }.chunked(DELETE_CHUNK_ROWS).forEach { chunk ->
+        tradeDeleteIds.filterNot { it in stillObserved }.chunked(DELETE_CHUNK_ROWS).forEach { chunk ->
             observationRepository?.deleteObservationsOfTransactions(chunk)
             tradeRepository.deleteTrades(chunk)
             reportDeleted(chunk.size)
         }
-        accountRepository.deleteAccounts(batch.accountsToCreate.deletes().map { requireNotNull(it.existingId) })
+        // A transaction the reset left with no observation at all stays as its import booked it until the file's re-import:
+        // rebuilding it from nothing would delete what the reset file's other rows still report.
+        val rebuilt =
+            (sharedByResets - (transferDeleteIds + tradeDeleteIds).toSet()).filterTo(mutableSetOf()) {
+                observationRepository?.getObservationsOfTransaction(it)?.isNotEmpty() == true
+            } + stillObserved
+        if (rebuilt.isNotEmpty()) materialize(emptyList(), MaterializationRequest(Source.Reconciler, rebuilt))
+        // An account an observation still names isn't empty, even when no transaction shows it: a joined twin's
+        // other record keeps its own account (a placeholder) while the merge books the real one.
+        val accountDeletes = batch.accountsToCreate.deletes().map { requireNotNull(it.existingId) }
+        val observed = observationRepository?.getAccountsWithObservations(accountDeletes).orEmpty()
+        accountRepository.deleteAccounts(accountDeletes.filter { it !in observed })
         batch.categories.deletes().forEach { categoryRepository.deleteCategory(requireNotNull(it.existingId)) }
         batch.currencies.deletes().forEach { currencyRepository.deleteCurrency(requireNotNull(it.existingId)) }
         batch.cryptoAssets.deletes().forEach { cryptoRepository.deleteCryptoAsset(requireNotNull(it.existingId)) }
@@ -563,6 +587,12 @@ class ImportEngineImpl(
 
         // ----- OBSERVATIONS (last: they name the accounts and assets the batch created) -----
         val materialization = batch.materialization?.let { materialize(batch.observationMutations, it) } ?: MaterializationReport()
+        // A duplicate row joins its observation to a transaction another source materialized: bring that transaction to
+        // the merge of both, so it says what both records say.
+        if (transfers.observedDuplicates.isNotEmpty()) {
+            materialize(emptyList(), MaterializationRequest(Source.Reconciler, transfers.observedDuplicates))
+        }
+        val matchSync = batch.takeIf { it.syncMatches }?.let { matchSync()?.run() } ?: MaterializationReport()
 
         return ImportResult(
             accountsCreated = accountResolution.created,
@@ -593,6 +623,7 @@ class ImportEngineImpl(
             apiRequestIds = config.apiRequestIds,
             apiResponseIds = config.apiResponseIds,
             materialization = materialization,
+            matchSync = matchSync,
         )
     }
 
@@ -606,7 +637,92 @@ class ImportEngineImpl(
             accounts = accountRepository,
             trades = tradeRepository,
             relationships = relationshipRepository,
+            placeholderTypeId = attributeTypeRepository.getByName(WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME).first()?.id,
         ).run(mutations, request)
+
+    /** The transactions the records of the files [batch] resets observe, read before the reset drops them. */
+    private suspend fun transactionsObservedByResets(batch: ImportBatch): Set<TransactionId> {
+        val observations = observationRepository ?: return emptySet()
+        val records = importRecordRepository ?: return emptySet()
+        val resetIds =
+            batch.csvImportMutations.mapNotNullTo(mutableSetOf()) {
+                when (it) {
+                    is CsvImportMutation.ResetRowStatuses -> it.id
+                    is CsvImportMutation.ResetToUnimported -> it.id
+                    else -> null
+                }
+            }
+        return resetIds
+            .flatMap { records.getCsvImportRecords(it) }
+            .flatMap { observations.getObservationsOf(ObservationOwner.Record(it.id)) }
+            .mapTo(mutableSetOf()) { it.transactionId }
+    }
+
+    /**
+     * Which of [ids] another source's record still observes, once the batch's resets dropped its own sources'. The
+     * deleting sources' own records don't count: a file being unimported still has its records until a later reset.
+     */
+    private suspend fun stillObserved(
+        ids: List<TransactionId>,
+        deletingSources: Set<Source>,
+    ): Set<TransactionId> {
+        val observations = observationRepository ?: return emptySet()
+        val records = importRecordRepository ?: return emptySet()
+        val own =
+            (
+                deletingSources
+                    .filterIsInstance<Source.Csv>()
+                    .map { it.importId }
+                    .distinct()
+                    .flatMap { records.getCsvImportRecords(it) } +
+                    deletingSources.filterIsInstance<Source.Api>().map { it.sessionId }.distinct().flatMap {
+                        records.getApiSessionRecords(
+                            it,
+                        )
+                    }
+            ).mapTo(mutableSetOf()) { it.id }
+        return ids.filterTo(mutableSetOf()) { id ->
+            observations.getObservationsOfTransaction(id).any {
+                val owner = it.owner
+                owner is ObservationOwner.Record &&
+                    owner.recordId !in own
+            }
+        }
+    }
+
+    /** The match sync, or null on an engine without observations (the hand-built ones tests use). */
+    private suspend fun matchSync(): MatchSync? {
+        val observations = observationRepository ?: return null
+        val importRecords = importRecordRepository ?: return null
+        val calendars =
+            holidayCalendarRepository?.let { repository ->
+                val locations =
+                    accountAttributeRepository
+                        .getByType(AttributeTypeId(WellKnownIds.ACCOUNT_LOCATION_ATTR_TYPE_ID))
+                        .first()
+                        .associate { it.accountId to it.value }
+                SettlementCalendars(locations, settingsRepository.getDefaultLocation().first(), repository.getAll().first())
+            } ?: SettlementCalendars.WEEKENDS_ONLY
+        return MatchSync(
+            loader =
+                MatchScopeLoader(
+                    observations,
+                    importRecords,
+                    csvImportRepository,
+                    apiSessionRepository,
+                    accountAttributeRepository,
+                    attributeTypeRepository,
+                ),
+            strategies = csvImportStrategyRepository,
+            attributeTypes = attributeTypeRepository,
+            accounts = accountRepository,
+            records = importRecords,
+            csvImports = csvImportRepository,
+            relationships = relationshipRepository,
+            calendarFor = calendars::forAccounts,
+            materialize = ::materialize,
+        )
+    }
 
     /**
      * Records what API items and hand entries say about the transactions this batch books, beside the rows themselves
@@ -676,7 +792,7 @@ class ImportEngineImpl(
                 }
 
                 key is ObservationOwnerKey.Group -> {
-                    group(key.key)
+                    group(key)
                 }
 
                 provenance == Source.Manual && (key == null || key is ObservationOwnerKey.Unrecorded) -> {
@@ -713,10 +829,15 @@ class ImportEngineImpl(
             return ObservationOwner.Record(id) to true
         }
 
-        // A group outlives each of its runs (its legs may come from several files), so it may already say a slot.
-        private suspend fun group(key: ImportGroupKey): Pair<ObservationOwner, Boolean>? {
+        // A group outlives each of its runs (its legs may come from several files), so it may already say a slot. Each run
+        // names every leg it joined, so its members are those of the latest run.
+        private suspend fun group(key: ObservationOwnerKey.Group): Pair<ObservationOwner, Boolean>? {
             val records = records ?: return null
-            val id = groups.getOrPut(key) { records.getOrCreateGroup(key) }
+            val id = groups.getOrPut(key.key) { records.getOrCreateGroup(key.key) }
+            if (key.members.isNotEmpty()) {
+                val members = key.members.mapNotNullTo(mutableSetOf()) { (record(it)?.first as? ObservationOwner.Record)?.recordId }
+                records.setGroupMembers(id, members)
+            }
             return ObservationOwner.Group(id) to false
         }
     }
@@ -869,6 +990,8 @@ class ImportEngineImpl(
         val createdTransferIds: Map<ImportRowKey, TransferId>,
         val rowOutcomes: Map<ImportRowKey, RowOutcome>,
         val orderedRowOutcomes: List<RowOutcome>,
+        /** The existing transactions this batch's duplicate rows now also observe, which their merge must take in. */
+        val observedDuplicates: Set<TransactionId> = emptySet(),
     )
 
     /**
@@ -960,8 +1083,10 @@ class ImportEngineImpl(
                 toImport.mapNotNullTo(
                     mutableSetOf(),
                 ) { c -> c.transfer.takeIf { it.approximateUntil != null }?.observationKey() }
+            val rewritten = toImport.mapNotNull { c -> c.observed?.let { c.transfer.observationKey() to it } }.toMap()
             for ((leg, id) in createdLegs) {
-                observer.record(leg.key, leg.provenance, id) { observer.transferContent(leg, leg.key in approximate) }
+                val said = rewritten[leg.key]?.let { row -> leg.asSaidBy(row) } ?: leg
+                observer.record(leg.key, leg.provenance, id) { observer.transferContent(said, leg.key in approximate) }
             }
         }
         writeConversionTrades(toImport, observer)
@@ -987,7 +1112,8 @@ class ImportEngineImpl(
             }
         val rowOutcomes =
             classified.zip(orderedRowOutcomes).associate { (c, outcome) -> requireNotNull(c.transfer.rowKey) to outcome }
-        if (observer != null) observeDuplicates(classified, orderedRowOutcomes, existingRelationships, observer)
+        val observedDuplicates =
+            if (observer != null) observeDuplicates(classified, orderedRowOutcomes, existingRelationships, observer) else emptySet()
 
         return TransferOutcome(
             imported = toImport.size,
@@ -997,6 +1123,7 @@ class ImportEngineImpl(
             createdTransferIds = createdTransferIds,
             rowOutcomes = rowOutcomes,
             orderedRowOutcomes = orderedRowOutcomes,
+            observedDuplicates = observedDuplicates,
         )
     }
 
@@ -1010,12 +1137,13 @@ class ImportEngineImpl(
         outcomes: List<RowOutcome>,
         existingRelationships: List<Relationship>,
         observer: SourceObservations,
-    ) {
+    ): Set<TransactionId> {
         val duplicates =
             classified.zip(outcomes).mapNotNull { (c, outcome) ->
                 outcome.transferId?.takeIf { c.status == ImportStatus.DUPLICATE }?.let { c to it }
             }
-        if (duplicates.isEmpty()) return
+        if (duplicates.isEmpty()) return emptySet()
+        val observed = mutableSetOf<TransactionId>()
         val feeLegs =
             existingRelationships
                 .mapNotNull { relationship ->
@@ -1026,12 +1154,15 @@ class ImportEngineImpl(
             val (c, id) = duplicate
             val approximate = c.transfer.approximateUntil != null
             observer.record(row.main.key, row.main.provenance, id) { observer.transferContent(row.main, approximate) }
+            observed += id
             val feeLeg = row.legs.firstOrNull { it.key.slot == ObservationSlot.FEE }
             val feeId = c.transfer.fee?.let { feeLegs[id to it.relationshipTypeId] }
             if (feeLeg != null && feeId != null) {
                 observer.record(feeLeg.key, feeLeg.provenance, feeId) { observer.transferContent(feeLeg, approximate) }
+                observed += feeId
             }
         }
+        return observed
     }
 
     /**
@@ -2493,6 +2624,14 @@ class ImportEngineImpl(
             }
         }
 
+    /** This main leg as [row] said it, before the deduper rewrote it: its own ends, and the attributes the rewrite dropped. */
+    private fun ExpandedTransfer.asSaidBy(row: ImportTransfer): ExpandedTransfer =
+        copy(
+            sourceAccountId = requireId(row.fromAccount),
+            targetAccountId = requireId(row.toAccount),
+            attributes = attributes + row.attributes.filter { said -> attributes.none { it.typeId == said.typeId } },
+        )
+
     private fun requireId(ref: AccountRef?): AccountId =
         when (ref) {
             is AccountRef.Existing -> ref.id
@@ -2982,3 +3121,5 @@ private suspend fun PersonOverrideWriteRepository.recordTransferEdit(
 
 private fun AttributeTypeId.tradeOverride(value: String?): AttributeOverride =
     if (value == null) AttributeOverride.Removed(this, "") else AttributeOverride.Set(this, "", value)
+
+private fun Source.isImport(): Boolean = this is Source.Csv || this is Source.Api

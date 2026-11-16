@@ -160,18 +160,16 @@ class AmexSantanderQifReconcileE2ETest : DbTest() {
                 .first()
                 .filter { it.targetAccountId == amexId }
         for ((_, _, amount) in payments) {
-            // Each record of the payment, as (payer account, excluded?).
-            val forPayment =
-                intoCard
-                    .filter { it.amount.toDisplayValue().compareTo(BigDecimal(amount)) == 0 }
-                    .map { transfer ->
-                        names.getValue(transfer.sourceAccountId) to transfer.attributes.any { it.attributeType.name == "excluded" }
-                    }
-            assertEquals(1 + cardRecords, forPayment.size, "$step£$amount: every statement's record is kept: $forPayment")
+            val forPayment = intoCard.filter { it.amount.toDisplayValue().compareTo(BigDecimal(amount)) == 0 }
+            // Every statement's record of the payment is kept, as an observation of the transfer it joined.
+            val records = forPayment.sumOf { repositories.observationRepository.getObservationsOfTransaction(it.id).size }
+            assertEquals(1 + cardRecords, records, "$step£$amount: every statement's record is kept: $forPayment")
             assertEquals(
                 listOf(SANTANDER),
-                forPayment.filterNot { it.second }.map { it.first },
-                "$step£$amount: only the bank's record, which names the payer, is counted: $forPayment",
+                forPayment
+                    .filterNot { transfer -> transfer.attributes.any { it.attributeType.name == "excluded" } }
+                    .map { names.getValue(it.sourceAccountId) },
+                "$step£$amount: the payment counts once, from the bank, which names the payer: $forPayment",
             )
         }
     }

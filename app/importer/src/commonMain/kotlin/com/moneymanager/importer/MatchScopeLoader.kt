@@ -14,6 +14,7 @@ import com.moneymanager.domain.model.observation.Observation
 import com.moneymanager.domain.model.observation.ObservationEnd
 import com.moneymanager.domain.model.observation.ObservationOwner
 import com.moneymanager.domain.model.observation.ObservedValues
+import com.moneymanager.domain.model.rules.meets
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.domain.repository.AttributeTypeReadRepository
@@ -23,6 +24,7 @@ import com.moneymanager.domain.repository.ObservationReadRepository
 import com.moneymanager.importengineapi.MatchFamily
 import com.moneymanager.importengineapi.TradeDedupePolicy
 import com.moneymanager.observationmatcher.CrossSourceFacts
+import com.moneymanager.observationmatcher.CrossSourcePolicy
 import com.moneymanager.observationmatcher.CrossSourceRules
 import com.moneymanager.observationmatcher.LegGroupRuleRef
 import com.moneymanager.observationmatcher.MatchObservation
@@ -30,6 +32,7 @@ import com.moneymanager.observationmatcher.ObservationMatcher
 import com.moneymanager.observationmatcher.ObservationRef
 import com.moneymanager.observationmatcher.RecordIdentity
 import com.moneymanager.observationmatcher.SameFamilyRules
+import com.moneymanager.observationmatcher.ShapeMatcher
 import com.moneymanager.observationmatcher.TradeRules
 import com.moneymanager.observationmatcher.TradeStages
 import kotlinx.coroutines.flow.first
@@ -189,6 +192,28 @@ class MatchScopeLoader(
                     TradeRules.forPolicies(tradePolicies),
                 TradeStages.forPolicies(tradePolicies, conversionWindows),
             )
+        }
+
+        /**
+         * The shape matcher over [families]: two records of one movement are close enough when either family's
+         * placeholder or reconcile window has them meet, on the business days of every account they touch.
+         */
+        fun shapeMatcherFor(
+            families: Map<String, MatchFamily>,
+            calendarFor: (List<AccountId>) -> BusinessDayCalendar = { WeekendOnlyCalendar },
+        ): ShapeMatcher {
+            val policies = families.mapValues { CrossSourcePolicy.of(it.value.dedupePolicy) }
+            return ShapeMatcher { a, b ->
+                val x = a.content.values as ObservedValues.Transfer
+                val y = b.content.values as ObservedValues.Transfer
+                val calendar = calendarFor(listOf(x.sourceAccountId, x.targetAccountId, y.sourceAccountId, y.targetAccountId).distinct())
+                listOf(a, b).any { o ->
+                    val policy = policies[o.family] ?: return@any false
+                    listOfNotNull(policy.placeholderWindow, policy.reconcileWindow).any { window ->
+                        window.meets(x.timestamp, a.crossSource.approximateUntil, y.timestamp, b.crossSource.approximateUntil, calendar)
+                    }
+                }
+            }
         }
 
         /**

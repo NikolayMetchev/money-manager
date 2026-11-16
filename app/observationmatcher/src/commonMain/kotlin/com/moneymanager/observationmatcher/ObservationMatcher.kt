@@ -69,7 +69,9 @@ class ObservationMatcher(
         for (candidate in candidatePairs(observations)) {
             val x = groups.find(candidate.a)
             val y = groups.find(candidate.b)
-            if (x != y && canJoin(observations, groups.members(x), groups.members(y), pinned, apart)) {
+            if (x != y && canJoin(observations, groups.members(x), groups.members(y), pinned, apart) &&
+                rules[candidate.rank].joinsGroups(groups.members(x).map { observations[it] }, groups.members(y).map { observations[it] })
+            ) {
                 groups.union(x, y)
                 joins += Join(observations[candidate.a].ref, observations[candidate.b].ref, rules[candidate.rank].name)
             }
