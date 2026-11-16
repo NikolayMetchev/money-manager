@@ -395,9 +395,10 @@ class CryptoComCryptoE2ETest : DbTest() {
                     .importStatus,
             )
 
-            // A second re-import deletes and re-creates the one trade.
+            // A second re-import finds the file unchanged and writes nothing; the one trade stays.
             val again = reimportAll(repositories.csvImportRepository.getAllImports().first())
-            assertEquals(1, again.filesImported)
+            assertEquals(0, again.filesImported)
+            assertEquals(1, again.filesUnchanged)
             assertEquals(
                 1,
                 repositories.tradeRepository

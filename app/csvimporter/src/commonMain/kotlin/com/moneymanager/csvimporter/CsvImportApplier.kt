@@ -526,6 +526,7 @@ suspend fun bulkApplyCsv(
  * not auto-matched — used by re-import and by [bulkApplyCsv] itself after it selects one.
  * [refreshViews] = false lets a caller batch many files and refresh once at the end.
  * [onProgress]/[engineBatchSize] are forwarded to the engine so a caller can show per-chunk progress.
+ * [settled] = false records the rows as not settled ([recordRowsMutation]), so the file's own re-import still runs.
  */
 @Suppress("LongParameterList")
 suspend fun applyStagedCsv(
@@ -545,6 +546,7 @@ suspend fun applyStagedCsv(
     cryptoRepository: CryptoReadRepository? = null,
     attributeAccountMatchers: Map<String, AttributeAccountMatcher> = emptyMap(),
     tradeRepository: TradeReadRepository? = null,
+    settled: Boolean = true,
 ): CsvImportResult? {
     // The staged rows must be the ones the strategy reads: an Excel import is initially staged from the workbook's
     // FIRST worksheet, but the strategy may target a different sheet, and a PDF import's rows are whatever its
@@ -606,32 +608,45 @@ suspend fun applyStagedCsv(
             accountRepository.getAccountOwnerNames(),
         ).prepareImport(rows)
 
-    return runCsvImport(
-        cryptoAssets = cryptoAssets,
-        assetAliases = assetAliases,
-        csvImport = stagedImport,
-        rows = rows,
-        columns = stagedImport.columns,
-        strategy = strategy,
-        basePrep = basePrep,
-        selectedExistingAccounts = emptyMap(),
-        selectedNewAccountNames = emptyMap(),
-        selectedSourceAccountId = effectiveSource,
-        currencies = currencies,
-        accountMappingRepository = accountMappingRepository,
-        accountRepository = accountRepository,
-        maintenance = maintenance,
-        importEngine = importEngine,
-        refreshViews = refreshViews,
-        passThroughAccounts = passThroughAccounts,
-        onProgress = onProgress,
-        engineBatchSize = engineBatchSize,
-        attributeAccountMatchers = attributeAccountMatchers,
-        unprocessedRowIndexes = unprocessedRowIndexes,
-        tradeRepository = tradeRepository,
-        visibleAccounts = accounts,
-        foreignFiles = crossFileLegRows(stagedImport, strategy, csvImportRepository),
-    )
+    val result =
+        runCsvImport(
+            cryptoAssets = cryptoAssets,
+            assetAliases = assetAliases,
+            csvImport = stagedImport,
+            rows = rows,
+            columns = stagedImport.columns,
+            strategy = strategy,
+            basePrep = basePrep,
+            selectedExistingAccounts = emptyMap(),
+            selectedNewAccountNames = emptyMap(),
+            selectedSourceAccountId = effectiveSource,
+            currencies = currencies,
+            accountMappingRepository = accountMappingRepository,
+            accountRepository = accountRepository,
+            maintenance = maintenance,
+            importEngine = importEngine,
+            refreshViews = refreshViews,
+            passThroughAccounts = passThroughAccounts,
+            onProgress = onProgress,
+            engineBatchSize = engineBatchSize,
+            attributeAccountMatchers = attributeAccountMatchers,
+            unprocessedRowIndexes = unprocessedRowIndexes,
+            tradeRepository = tradeRepository,
+            visibleAccounts = accounts,
+            foreignFiles = crossFileLegRows(stagedImport, strategy, csvImportRepository),
+        )
+    // Read after the run, which may have saved mappings: a re-import compares against what this run leaves.
+    val inputsHash =
+        stagedInputsHash(
+            strategy = strategy,
+            sourceAccount = effectiveSource,
+            mappings = accountMappingRepository.getAllMappings().first(),
+            assetAliases = cryptoRepository?.assetAliasMap().orEmpty(),
+            attributeAccountMatchers = attributeAccountMatchers,
+            passThroughAccounts = passThroughAccounts,
+        )
+    importEngine.applyCsvImportMutations(listOf(recordRowsMutation(stagedImport, allRows, inputsHash, settled)))
+    return result
 }
 
 /**

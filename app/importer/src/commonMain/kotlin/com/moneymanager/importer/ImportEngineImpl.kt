@@ -30,6 +30,7 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.calendar.BusinessDayCalendar
 import com.moneymanager.domain.model.csv.ImportStatus
+import com.moneymanager.domain.model.observation.ImportRecordKey
 import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.domain.model.rules.widen
 import com.moneymanager.domain.model.withStatementAccount
@@ -48,6 +49,7 @@ import com.moneymanager.domain.repository.write.CurrencyWriteRepository
 import com.moneymanager.domain.repository.write.ExchangeOrderWriteRepository
 import com.moneymanager.domain.repository.write.HolidayCalendarWriteRepository
 import com.moneymanager.domain.repository.write.ImportDirectoryWriteRepository
+import com.moneymanager.domain.repository.write.ImportRecordWriteRepository
 import com.moneymanager.domain.repository.write.NewCryptoAsset
 import com.moneymanager.domain.repository.write.NewTrade
 import com.moneymanager.domain.repository.write.ObservationWriteRepository
@@ -200,6 +202,11 @@ class ImportEngineImpl(
      */
     private val observationRepository: ObservationWriteRepository? = null,
     private val personOverrideRepository: PersonOverrideReadRepository? = null,
+    /**
+     * Staged files' import records. Optional: without it a batch's [CsvImportMutation.RecordRows] are dropped, which
+     * only costs a later re-import its fast path. DI supplies it.
+     */
+    private val importRecordRepository: ImportRecordWriteRepository? = null,
 ) : ImportEngine {
     private val writes = MutableStateFlow(0L)
     override val writeVersion: StateFlow<Long> = writes.asStateFlow()
@@ -2410,6 +2417,21 @@ class ImportEngineImpl(
         }
     }
 
+    /** Brings the file's import records to [mutation]'s hashes, writing only the rows whose hash is new or changed. */
+    private suspend fun recordRows(
+        records: ImportRecordWriteRepository,
+        mutation: CsvImportMutation.RecordRows,
+    ) {
+        val stored = records.getCsvImportRecords(mutation.id).associateBy { (it.key as ImportRecordKey.CsvRow).rowIndex }
+        for ((rowIndex, hash) in mutation.contentHashes) {
+            val record = stored[rowIndex]
+            when {
+                record == null -> records.insertRecord(ImportRecordKey.CsvRow(mutation.id, rowIndex), hash)
+                record.contentHash != hash -> records.updateContentHash(record.id, hash)
+            }
+        }
+    }
+
     private suspend fun applyConfigMutations(batch: ImportBatch): ConfigOutcome {
         if (batch.reconciliationLinkMutations.isNotEmpty()) applyReconciliationLinkMutations(batch.reconciliationLinkMutations)
         for (m in batch.tradeAttributeMutations) {
@@ -2574,6 +2596,10 @@ class ImportEngineImpl(
                         m.accountId,
                         m.currencyId,
                     )
+                }
+
+                is CsvImportMutation.RecordRows -> {
+                    importRecordRepository?.let { recordRows(it, m) }
                 }
             }
         }

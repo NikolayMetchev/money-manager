@@ -12,8 +12,14 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.importengineapi.RerunReads
 import kotlinx.coroutines.flow.first
 
-/** The session's [Reimports], as `ImportDirectoryService` builds it, over this test database. */
-fun DatabaseComponent.reimports(maintenance: Maintenance = maintenanceService): Reimports =
+/**
+ * The session's [Reimports], as `ImportDirectoryService` builds it, over this test database. Unless [skipUnchanged],
+ * it reads no import records, so even an unchanged file is deleted and re-run (the legacy re-run's mechanics).
+ */
+fun DatabaseComponent.reimports(
+    maintenance: Maintenance = maintenanceService,
+    skipUnchanged: Boolean = true,
+): Reimports =
     Reimports(
         reads =
             RerunReads(
@@ -33,6 +39,7 @@ fun DatabaseComponent.reimports(maintenance: Maintenance = maintenanceService): 
         passThroughAccountRepository = passThroughAccountRepository,
         maintenance = maintenance,
         importEngine = importEngine,
+        importRecords = if (skipUnchanged) importRecordRepository else null,
     )
 
 /**

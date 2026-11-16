@@ -224,7 +224,11 @@ val BASELINE: Map<Pair<String, Assertion>, Int> =
         put("Freetrade ISA + Monzo (placeholder other side)" to Assertion.FILE_ORDER, 1425)
         put("Crypto.com card + PayPal CSV (conduit)" to Assertion.FILE_ORDER, 1425)
         put("Crypto.com card + Curve export" to Assertion.FILE_ORDER, 1425)
-        // Re-import is delete + re-run + replay, so even an unchanged file rewrites (and audits) everything it made:
-        // the plan/apply sync for staged files.
-        for (scenario in OracleCorpus.ALL) put(scenario.name to Assertion.NO_AUDIT_WRITES, 1428)
+        // The same order dependence after a strategy change: the unchanged file's re-import is skipped, so only the
+        // changed one runs, and its delete + re-run books the pair in the other order. (A redundant re-run of the
+        // unchanged file used to put the first order back.)
+        for (assertion in listOf(Assertion.STRATEGY_CHANGE, Assertion.HAND_WORK_STRATEGY_CHANGE)) {
+            put("Freetrade ISA + Monzo (placeholder other side)" to assertion, 1425)
+            put("Crypto.com card + PayPal CSV (conduit)" to assertion, 1425)
+        }
     }

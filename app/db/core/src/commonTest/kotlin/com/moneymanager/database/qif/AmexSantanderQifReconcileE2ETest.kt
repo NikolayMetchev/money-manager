@@ -210,7 +210,7 @@ class AmexSantanderQifReconcileE2ETest : DbTest() {
     }
 
     private suspend fun reimport(file: CsvImport): BulkReimportResult =
-        repositories.reimports(maintenance).reimportFile(file.id, accountId = accountId(AMEX))
+        repositories.reimports(maintenance, skipUnchanged = false).reimportFile(file.id, accountId = accountId(AMEX))
 
     // Two equal purchases from one shop two days apart, the earlier posted onto the next month's statement: two lines
     // of the card's statements, each with its own reference, never two sources' records of one purchase.

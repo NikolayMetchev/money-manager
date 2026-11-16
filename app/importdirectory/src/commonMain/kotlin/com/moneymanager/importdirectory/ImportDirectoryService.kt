@@ -33,6 +33,7 @@ import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.ImportDirectoryReadRepository
+import com.moneymanager.domain.repository.ImportRecordReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.RelationshipReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
@@ -96,6 +97,7 @@ class ImportDirectoryService(
     private val fileSourceFactory: ImportFileSourceFactory?,
     private val deviceId: DeviceId,
     private val writeLock: Mutex = Mutex(),
+    importRecordRepository: ImportRecordReadRepository? = null,
 ) {
     /** Re-imports this session's staged files; see [Reimports]. */
     val reimports =
@@ -118,6 +120,7 @@ class ImportDirectoryService(
             passThroughAccountRepository = passThroughAccountRepository,
             maintenance = maintenance,
             importEngine = importEngine,
+            importRecords = importRecordRepository,
             writeLock = writeLock,
         )
 

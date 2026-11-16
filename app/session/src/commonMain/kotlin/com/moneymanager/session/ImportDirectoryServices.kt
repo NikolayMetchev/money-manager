@@ -34,4 +34,5 @@ fun AppServices.importDirectoryService(
         fileSourceFactory = fileSourceFactory,
         deviceId = deviceId,
         writeLock = writeLock,
+        importRecordRepository = imports.importRecordRepository,
     )

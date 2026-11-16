@@ -277,8 +277,10 @@ class CsvReimportE2ETest {
                 amounts.toSet(),
             )
 
-            // Re-importing again with the same strategy re-creates the same values.
-            assertEquals(2, fixture.reimport(changedStrategy).transfersCreated)
+            // Re-importing again with the same strategy finds the file unchanged and writes nothing.
+            val again = fixture.reimport(changedStrategy)
+            assertEquals(1, again.filesUnchanged)
+            assertEquals(0, again.transfersCreated)
         }
 
     private fun createImportEngine(dc: DatabaseComponent): ImportEngine =

@@ -26,6 +26,12 @@ class AttributeAccountMatcher private constructor(
     private val patterns: List<Pair<PortableRegex, AccountId>>,
     private val tokens: Map<AccountId, Set<String>>,
 ) {
+    /** Every account's tokens in one canonical string: equal exactly when two matchers match alike. */
+    val fingerprint: String =
+        tokens.entries
+            .sortedBy { it.key.id }
+            .joinToString(";") { (accountId, values) -> "${accountId.id}=${values.sorted().joinToString(",")}" }
+
     /** The single account whose pattern matches [value], or null when none or more than one does. */
     fun match(value: String): AccountId? = matchingAccounts(value).singleOrNull()
 

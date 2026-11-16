@@ -20,6 +20,7 @@ import com.moneymanager.domain.repository.DeviceReadRepository
 import com.moneymanager.domain.repository.ExchangeOrderReadRepository
 import com.moneymanager.domain.repository.HolidayCalendarReadRepository
 import com.moneymanager.domain.repository.ImportDirectoryReadRepository
+import com.moneymanager.domain.repository.ImportRecordReadRepository
 import com.moneymanager.domain.repository.ImportTimelineReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
@@ -73,6 +74,7 @@ data class ImportsDomain(
     val importTimelineRepository: ImportTimelineReadRepository,
     val reconciliationRepository: ReconciliationReadRepository,
     val passThroughAccountRepository: PassThroughAccountReadRepository,
+    val importRecordRepository: ImportRecordReadRepository,
     val maintenance: Maintenance,
 )
 
@@ -131,6 +133,7 @@ fun DatabaseComponent.toAppServices(importEngine: ImportEngine) =
                 importTimelineRepository = importTimelineRepository,
                 reconciliationRepository = reconciliationLinkRepository,
                 passThroughAccountRepository = passThroughAccountRepository,
+                importRecordRepository = importRecordRepository,
                 maintenance = maintenanceService,
             ),
         transactions =

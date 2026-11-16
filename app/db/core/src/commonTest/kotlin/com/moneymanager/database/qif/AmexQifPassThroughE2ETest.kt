@@ -121,7 +121,7 @@ class AmexQifPassThroughE2ETest : DbTest() {
             repositories.installBuiltInPassThroughs()
             val statement = amexStatement()
             apply(statement)
-            val reimports = repositories.reimports(maintenance)
+            val reimports = repositories.reimports(maintenance, skipUnchanged = false)
             val plan = reimports.planFile(statement.id)
             // The chain's two legs and the ordinary row went, and both rows were imported again.
             assertEquals(3, plan.rerunFiles.sumOf { it.createdTransfers.size })
