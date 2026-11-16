@@ -57,6 +57,13 @@ class ObservationReadRepositoryImpl(
             .awaitAsList()
             .map { load(it) }
 
+    override suspend fun getObservationsOnAccounts(accountIds: Collection<AccountId>): List<Observation> =
+        if (accountIds.isEmpty()) {
+            emptyList()
+        } else {
+            queries.selectHeadersOnAccounts(accountIds.map { it.id }, ::Header).awaitAsList().map { load(it) }
+        }
+
     override suspend fun getMaterialized(transactionId: TransactionId): MaterializedTransaction? =
         when (transactionId) {
             is TransferId -> {

@@ -29,6 +29,9 @@ ORDER BY api_import_record.api_request_id, api_import_record.json_path;
 selectGroupIdByKey:
 SELECT id FROM import_group WHERE strategy_id = ? AND group_name = ? AND key_value = ?;
 
+selectGroupById:
+SELECT strategy_id, group_name, key_value FROM import_group WHERE id = ?;
+
 selectGroupsByStrategy:
 SELECT id, group_name, key_value FROM import_group WHERE strategy_id = ? ORDER BY group_name, key_value;
 
