@@ -15,6 +15,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.CryptoRegistry
 import com.moneymanager.domain.model.CsvImportId
+import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Source
@@ -46,6 +47,7 @@ import com.moneymanager.test.database.installBuiltInCsvStrategies
 import com.moneymanager.test.database.installBuiltInPassThroughs
 import com.moneymanager.test.database.reimportFile
 import com.moneymanager.test.database.reimports
+import com.moneymanager.test.database.runPlan
 import kotlinx.coroutines.flow.first
 import kotlin.time.Instant
 
@@ -89,6 +91,18 @@ class OracleDatabase private constructor(
             val result = reimports.reimportFile(requireNotNull(staged[source]) { "${source.file.fileName} was never imported" })
             check(result.filesFailed == 0) { "${source.file.fileName} did not re-import: $result" }
         }
+    }
+
+    /** Re-imports every one of [sources] in one run, as "Re-import all" does. */
+    suspend fun reimportAll(sources: List<OracleSource> = scenario.sources) {
+        val reimports = db.reimports()
+        val files =
+            sources.map { source ->
+                val id = requireNotNull(staged[source]) { "${source.file.fileName} was never imported" }
+                requireNotNull(db.csvImportRepository.getImport(id).first())
+            }
+        val result = reimports.runPlan(reimports.planAll(files))
+        check(result.filesFailed == 0) { "re-import all failed: $result" }
     }
 
     /** Unimports [source], as the Unimport button does: its records are withdrawn and what nothing else observes goes. */
@@ -254,12 +268,15 @@ class OracleDatabase private constructor(
     }
 
     companion object {
-        /** Runs [block] on a fresh database set up for [scenario], deleted afterwards. */
+        /**
+         * Runs [block] on the database at [location] (a fresh one unless given, such as a copy of a benchmark's) set up
+         * for [scenario], deleted afterwards.
+         */
         suspend fun <T> with(
             scenario: OracleScenario,
+            location: DbLocation = createTestDatabaseLocation(),
             block: suspend OracleDatabase.() -> T,
         ): T {
-            val location = createTestDatabaseLocation()
             val wrapper = createTestDatabaseManager().openDatabase(location)
             try {
                 val db = openDatabaseComponent(wrapper)

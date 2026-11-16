@@ -20,21 +20,10 @@ class ImportRecordReadRepositoryImpl(
 ) : ImportRecordReadRepository {
     private val queries = database.importRecordSelectQueries
 
-    override suspend fun getRecord(id: ImportRecordId): ImportRecord? =
-        queries
-            .selectRecordById(id.id) { recordId, contentHash, csvImportId, rowIndex, sessionId, requestId, jsonPath ->
-                val key =
-                    if (csvImportId != null && rowIndex != null) {
-                        ImportRecordKey.CsvRow(CsvImportId(Uuid.parse(csvImportId)), rowIndex)
-                    } else {
-                        ImportRecordKey.ApiItem(
-                            ApiSessionId(checkNotNull(sessionId) { "import record $recordId has no kind" }),
-                            ApiRequestId(checkNotNull(requestId)),
-                            checkNotNull(jsonPath),
-                        )
-                    }
-                ImportRecord(ImportRecordId(recordId), key, contentHash)
-            }.awaitAsOneOrNull()
+    override suspend fun getRecord(id: ImportRecordId): ImportRecord? = queries.selectRecordById(id.id, ::toRecord).awaitAsOneOrNull()
+
+    override suspend fun getRecords(ids: Collection<ImportRecordId>): List<ImportRecord> =
+        ids.distinct().chunked(ID_CHUNK).flatMap { chunk -> queries.selectRecordsByIds(chunk.map { it.id }, ::toRecord).awaitAsList() }
 
     override suspend fun getCsvImportRecords(csvImportId: CsvImportId): List<ImportRecord> =
         queries
@@ -70,6 +59,49 @@ class ImportRecordReadRepositoryImpl(
             .awaitAsList()
             .map { ImportGroup(ImportGroupId(it.id), ImportGroupKey(strategyId, it.group_name, it.key_value), members(it.id)) }
 
+    override suspend fun getGroupsById(ids: Collection<ImportGroupId>): List<ImportGroup> =
+        ids.distinct().chunked(ID_CHUNK).flatMap { chunk ->
+            val idValues = chunk.map { it.id }
+            val members =
+                queries
+                    .selectMembersOfGroups(idValues)
+                    .awaitAsList()
+                    .groupBy({ it.group_id }, { ImportRecordId(it.record_id) })
+            queries.selectGroupsByIds(idValues).awaitAsList().map { group ->
+                ImportGroup(
+                    ImportGroupId(group.id),
+                    ImportGroupKey(group.strategy_id, group.group_name, group.key_value),
+                    members[group.id].orEmpty().toCollection(LinkedHashSet()),
+                )
+            }
+        }
+
     private suspend fun members(groupId: Long): Set<ImportRecordId> =
         queries.selectGroupMembers(groupId).awaitAsList().mapTo(LinkedHashSet(), ::ImportRecordId)
+}
+
+/** Ids per `IN` list: well under SQLite's bound-variable limit on every platform. */
+private const val ID_CHUNK = 500
+
+@Suppress("LongParameterList")
+private fun toRecord(
+    recordId: Long,
+    contentHash: String,
+    csvImportId: String?,
+    rowIndex: Long?,
+    sessionId: Long?,
+    requestId: Long?,
+    jsonPath: String?,
+): ImportRecord {
+    val key =
+        if (csvImportId != null && rowIndex != null) {
+            ImportRecordKey.CsvRow(CsvImportId(Uuid.parse(csvImportId)), rowIndex)
+        } else {
+            ImportRecordKey.ApiItem(
+                ApiSessionId(checkNotNull(sessionId) { "import record $recordId has no kind" }),
+                ApiRequestId(checkNotNull(requestId)),
+                checkNotNull(jsonPath),
+            )
+        }
+    return ImportRecord(ImportRecordId(recordId), key, contentHash)
 }

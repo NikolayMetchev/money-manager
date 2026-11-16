@@ -12,6 +12,9 @@ import com.moneymanager.domain.model.observation.ImportRecordId
 interface ImportRecordReadRepository {
     suspend fun getRecord(id: ImportRecordId): ImportRecord?
 
+    /** The records of [ids] that exist, in no particular order, in a few queries however many there are. */
+    suspend fun getRecords(ids: Collection<ImportRecordId>): List<ImportRecord>
+
     /** Every record of a staged file, by row. */
     suspend fun getCsvImportRecords(csvImportId: CsvImportId): List<ImportRecord>
 
@@ -21,6 +24,9 @@ interface ImportRecordReadRepository {
     suspend fun getGroup(key: ImportGroupKey): ImportGroup?
 
     suspend fun getGroupById(id: ImportGroupId): ImportGroup?
+
+    /** The groups of [ids] that exist, with their members, in no particular order, in a few queries however many there are. */
+    suspend fun getGroupsById(ids: Collection<ImportGroupId>): List<ImportGroup>
 
     /** Every group of a strategy, by name and key. */
     suspend fun getGroupsOfStrategy(strategyId: String): List<ImportGroup>

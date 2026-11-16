@@ -213,12 +213,18 @@ internal class MatchSync(
         changes: List<AssignmentChange>,
         resolved: Map<TransactionId, TransactionId>,
     ) {
+        val relinked =
+            changes.mapNotNull { change ->
+                val to = change.from?.let { resolved[it] } as? TransferId
+                val owner = change.ref.owner as? ObservationOwner.Record
+                if (to != null && owner != null) owner.recordId to to else null
+            }
+        if (relinked.isEmpty()) return
+        val keys = records.getRecords(relinked.map { it.first }).associate { it.id to it.key }
         val links = mutableMapOf<CsvImportId, MutableMap<Long, TransferId?>>()
-        for (change in changes) {
-            val to = change.from?.let { resolved[it] } as? TransferId
-            val owner = change.ref.owner as? ObservationOwner.Record
-            val key = owner?.takeIf { to != null }?.let { records.getRecord(it.recordId)?.key } as? ImportRecordKey.CsvRow
-            if (to != null && key != null) links.getOrPut(key.csvImportId) { mutableMapOf() }[key.rowIndex] = to
+        for ((recordId, to) in relinked) {
+            val key = keys[recordId] as? ImportRecordKey.CsvRow
+            if (key != null) links.getOrPut(key.csvImportId) { mutableMapOf() }[key.rowIndex] = to
         }
         links.forEach { (csvImportId, rows) -> csvImports.updateRowStatusesBatch(csvImportId, ImportStatus.DUPLICATE.name, rows) }
     }
