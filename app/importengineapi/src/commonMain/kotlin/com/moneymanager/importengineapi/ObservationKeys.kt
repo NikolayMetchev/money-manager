@@ -76,6 +76,7 @@ fun Source.recordKey(rowKey: ImportRowKey): ImportRecordKey? =
         Source.Merge,
         Source.Unmerge,
         Source.Reconciliation,
+        Source.Reconciler,
         -> {
             null
         }
