@@ -218,7 +218,7 @@ object Materializer {
         }
 
     /** [field] as its `transfer` column stores it; null on a trade, which has no field overrides. */
-    private fun ObservedValues.column(field: TransferField): String? =
+    fun ObservedValues.column(field: TransferField): String? =
         (this as? ObservedValues.Transfer)?.let {
             when (field) {
                 TransferField.TIMESTAMP -> it.timestamp.toEpochMilliseconds().toString()

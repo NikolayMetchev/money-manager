@@ -33,12 +33,12 @@ import com.moneymanager.domain.model.calendar.BusinessDayCalendar
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.observation.ImportRecordId
 import com.moneymanager.domain.model.observation.ImportRecordKey
+import com.moneymanager.domain.model.observation.MaterializedTransaction
 import com.moneymanager.domain.model.observation.ObservationContent
 import com.moneymanager.domain.model.observation.ObservationOwner
 import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.domain.model.rules.widen
 import com.moneymanager.domain.model.withStatementAccount
-import com.moneymanager.domain.repository.PersonOverrideReadRepository
 import com.moneymanager.domain.repository.write.AccountAttributeWriteRepository
 import com.moneymanager.domain.repository.write.AccountMappingWriteRepository
 import com.moneymanager.domain.repository.write.AccountWriteRepository
@@ -60,6 +60,7 @@ import com.moneymanager.domain.repository.write.ObservationWriteRepository
 import com.moneymanager.domain.repository.write.PassThroughAccountWriteRepository
 import com.moneymanager.domain.repository.write.PersonAccountOwnershipWriteRepository
 import com.moneymanager.domain.repository.write.PersonAttributeWriteRepository
+import com.moneymanager.domain.repository.write.PersonOverrideWriteRepository
 import com.moneymanager.domain.repository.write.PersonWriteRepository
 import com.moneymanager.domain.repository.write.ReconciliationLinkWriteRepository
 import com.moneymanager.domain.repository.write.RelationshipTypeWriteRepository
@@ -212,7 +213,7 @@ class ImportEngineImpl(
      * Optional like [relationshipRepository]: a batch with observation mutations fails without them. DI supplies both.
      */
     private val observationRepository: ObservationWriteRepository? = null,
-    private val personOverrideRepository: PersonOverrideReadRepository? = null,
+    private val personOverrideRepository: PersonOverrideWriteRepository? = null,
     /**
      * Staged files' import records. Optional: without it a batch's [CsvImportMutation.RecordRows] are dropped, which
      * only costs a later re-import its fast path. DI supplies it.
@@ -438,6 +439,8 @@ class ImportEngineImpl(
         val transfers = importTransferCreates(batch.transfers.creates(), batch, accountResolution.keyToId, batchSize, onProgress)
 
         // ----- UPDATE phase -----
+        // A person's edits become their overrides as well, so a rebuild from the observations keeps them.
+        val handEdits = handEditSnapshots(batch.transfers.updates())
         transactionRepository.updateTransfers(
             batch.transfers.updates().map { intent ->
                 TransferEdit(
@@ -450,6 +453,7 @@ class ImportEngineImpl(
                 )
             },
         )
+        recordHandEdits(handEdits)
         tradeRepository.updateTrades(
             batch.trades.updates().map { intent ->
                 TradeEdit(
@@ -2567,6 +2571,24 @@ class ImportEngineImpl(
         }
     }
 
+    // What each transfer a person edits holds before the edit; none without the repositories to record overrides in.
+    private suspend fun handEditSnapshots(updates: List<ImportTransfer>): Map<TransferId, MaterializedTransaction> {
+        val observations = observationRepository ?: return emptyMap()
+        if (personOverrideRepository == null) return emptyMap()
+        return updates
+            .filter { it.source == Source.Manual }
+            .mapNotNull { intent -> requireNotNull(intent.existingId).let { id -> observations.getMaterialized(id)?.let { id to it } } }
+            .toMap()
+    }
+
+    private suspend fun recordHandEdits(before: Map<TransferId, MaterializedTransaction>) {
+        val overrides = personOverrideRepository ?: return
+        for ((id, was) in before) {
+            val now = checkNotNull(observationRepository).getMaterialized(id) ?: continue
+            overrides.recordTransferEdit(id, was, now)
+        }
+    }
+
     private suspend fun applyConfigMutations(batch: ImportBatch): ConfigOutcome {
         if (batch.reconciliationLinkMutations.isNotEmpty()) applyReconciliationLinkMutations(batch.reconciliationLinkMutations)
         for (m in batch.tradeAttributeMutations) {
@@ -2574,6 +2596,8 @@ class ImportEngineImpl(
                 is TradeAttributeMutation.Set -> tradeRepository.setAttributeByHand(m.tradeId, m.typeId, m.value, Source.Manual)
                 is TradeAttributeMutation.Remove -> tradeRepository.setAttributeByHand(m.tradeId, m.typeId, null, Source.Manual)
             }
+            val value = (m as? TradeAttributeMutation.Set)?.value
+            personOverrideRepository?.setTradeAttributeOverride(m.tradeId, m.typeId.tradeOverride(value))
         }
         for (m in batch.passThroughMutations) {
             when (m) {

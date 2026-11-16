@@ -75,3 +75,16 @@ CREATE TABLE observation_split (
 );
 
 CREATE INDEX idx_observation_split_b ON observation_split(observation_b_id);
+
+-- The account overrides (a transfer's source/target a person set by hand) that named the deleted account, which the merge
+-- moved to the survivor, so unmerge moves back exactly those.
+CREATE TABLE account_merge_transfer_override (
+    merge_id INTEGER NOT NULL,
+    transaction_id INTEGER NOT NULL,
+    field TEXT NOT NULL,
+    PRIMARY KEY (merge_id, transaction_id, field),
+    FOREIGN KEY (merge_id) REFERENCES account_merge(id) ON DELETE CASCADE,
+    FOREIGN KEY (transaction_id, field) REFERENCES transfer_override(transaction_id, field) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_account_merge_transfer_override_override ON account_merge_transfer_override(transaction_id, field);

@@ -40,3 +40,19 @@ INSERT OR IGNORE INTO observation_split (observation_a_id, observation_b_id) VAL
 
 deleteSplit:
 DELETE FROM observation_split WHERE observation_a_id = ? AND observation_b_id = ?;
+
+recordMergeOverrideMoves:
+INSERT INTO account_merge_transfer_override (merge_id, transaction_id, field)
+SELECT :mergeId, transaction_id, field
+FROM transfer_override
+WHERE field IN ('source_account_id', 'target_account_id') AND value = :deletedAccountId;
+
+moveMergedOverrides:
+UPDATE transfer_override SET value = :accountId
+WHERE EXISTS (
+    SELECT 1 FROM account_merge_transfer_override m
+    WHERE m.merge_id = :mergeId AND m.transaction_id = transfer_override.transaction_id AND m.field = transfer_override.field
+);
+
+deleteMergeOverrideMoves:
+DELETE FROM account_merge_transfer_override WHERE merge_id = ?;
