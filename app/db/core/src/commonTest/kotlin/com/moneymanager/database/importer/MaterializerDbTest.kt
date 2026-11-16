@@ -53,8 +53,8 @@ class MaterializerDbTest : DbTest() {
     private suspend fun account(name: String): AccountId =
         repositories.accountRepository.createAccount(Account(id = AccountId(0), name = name, openingDate = now), Source.SampleGenerator)
 
-    private suspend fun currency(code: String): Currency {
-        val id = repositories.currencyRepository.upsertCurrencyByCode(code, code)
+    private suspend fun gbp(): Currency {
+        val id = repositories.currencyRepository.upsertCurrencyByCode("GBP", "GBP")
         return repositories.currencyRepository.getCurrencyById(id).first()!!
     }
 
@@ -118,7 +118,7 @@ class MaterializerDbTest : DbTest() {
     @Test
     fun `materializing twice writes nothing and keeps the id`() =
         runDbTest {
-            val gbp = currency("GBP")
+            val gbp = gbp()
             val bank = account("Bank")
             val shop = account("Shop")
             val (record) = records(1)
@@ -137,7 +137,7 @@ class MaterializerDbTest : DbTest() {
     @Test
     fun `a changed observation updates the row in place as a new revision`() =
         runDbTest {
-            val gbp = currency("GBP")
+            val gbp = gbp()
             val bank = account("Bank")
             val shop = account("Shop")
             val type = repositories.attributeTypeRepository.getOrCreate("reference")
@@ -170,7 +170,7 @@ class MaterializerDbTest : DbTest() {
     @Test
     fun `an override wins and a changed import value under it is reported`() =
         runDbTest {
-            val gbp = currency("GBP")
+            val gbp = gbp()
             val bank = account("Bank")
             val shop = account("Shop")
             val type = repositories.attributeTypeRepository.getOrCreate("category")
@@ -210,7 +210,7 @@ class MaterializerDbTest : DbTest() {
     @Test
     fun `a transaction without observations goes and what pointed at it is reported`() =
         runDbTest {
-            val gbp = currency("GBP")
+            val gbp = gbp()
             val bank = account("Bank")
             val shop = account("Shop")
             val shopFees = account("Shop Fees")
@@ -266,7 +266,7 @@ class MaterializerDbTest : DbTest() {
     @Test
     fun `merge and unmerge move observation ends`() =
         runDbTest {
-            val gbp = currency("GBP")
+            val gbp = gbp()
             val bank = account("Bank")
             val shop = account("Shop")
             val store = account("Store")
@@ -289,7 +289,7 @@ class MaterializerDbTest : DbTest() {
     @Test
     fun `the merge does not depend on the order of the observations`() =
         runDbTest {
-            val gbp = currency("GBP")
+            val gbp = gbp()
             val bank = AccountId(1)
             val shop = AccountId(2)
             val placeholder = AccountId(3)
