@@ -149,12 +149,9 @@ class CsvImportReadRepositoryImpl(
                 .selectTransactionsObservedByCsvImport(id.id.toString())
                 .awaitAsList()
                 .mapTo(mutableSetOf()) {
-                    if (it.kind ==
-                        TransactionKind.TRADE.name
-                    ) {
-                        TradeId(it.transaction_id)
-                    } else {
-                        TransferId(it.transaction_id)
+                    when (TransactionKind.valueOf(it.kind)) {
+                        TransactionKind.TRADE -> TradeId(it.transaction_id)
+                        TransactionKind.TRANSFER -> TransferId(it.transaction_id)
                     }
                 }
         }

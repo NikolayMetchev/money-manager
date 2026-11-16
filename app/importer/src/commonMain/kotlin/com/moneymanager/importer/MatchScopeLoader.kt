@@ -33,7 +33,6 @@ import com.moneymanager.observationmatcher.ObservationRef
 import com.moneymanager.observationmatcher.RecordIdentity
 import com.moneymanager.observationmatcher.SameFamilyRules
 import com.moneymanager.observationmatcher.ShapeMatcher
-import com.moneymanager.observationmatcher.ShapeWindow
 import com.moneymanager.observationmatcher.TradeRules
 import com.moneymanager.observationmatcher.TradeStages
 import kotlinx.coroutines.flow.first

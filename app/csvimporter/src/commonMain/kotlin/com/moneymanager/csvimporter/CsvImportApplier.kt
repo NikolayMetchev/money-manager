@@ -58,7 +58,6 @@ import com.moneymanager.importengineapi.ImportTradeIntent
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalPersonKey
 import com.moneymanager.importengineapi.LocalTradeKey
-import com.moneymanager.importengineapi.MatchFamily
 import com.moneymanager.importengineapi.ObservationOwnerKey
 import com.moneymanager.importengineapi.ObservationSlot
 import com.moneymanager.importengineapi.PassThroughDetector

@@ -75,7 +75,7 @@ data class Classified(
     /** Set when this pass-through row's chain runs through a conduit whose own statement is already imported. */
     val conduitStatement: ConduitStatementMatch? = null,
     /**
-     * What the row itself said, when [transfer] is the deduper's rewrite of it (the whole transfer [otherSideOf] builds
+     * What the row itself said, when [transfer] is the deduper's rewrite of it (the whole transfer `otherSideOf` builds
      * from two records): its observation records this, so the matcher sees each source's own record in either order.
      */
     val observed: ImportTransfer? = null,
