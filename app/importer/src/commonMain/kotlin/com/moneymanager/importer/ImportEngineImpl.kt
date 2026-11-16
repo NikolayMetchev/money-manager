@@ -640,7 +640,7 @@ class ImportEngineImpl(
             placeholderTypeId = attributeTypeRepository.getByName(WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME).first()?.id,
         ).run(mutations, request)
 
-    /** The transactions the records of the files [batch] resets observe, read before the reset drops them. */
+    /** The transactions the records of the files and API sessions [batch] resets observe, read before the reset drops them. */
     private suspend fun transactionsObservedByResets(batch: ImportBatch): Set<TransactionId> {
         val observations = observationRepository ?: return emptySet()
         val records = importRecordRepository ?: return emptySet()
@@ -652,8 +652,9 @@ class ImportEngineImpl(
                     else -> null
                 }
             }
-        return resetIds
-            .flatMap { records.getCsvImportRecords(it) }
+        val resetSessions =
+            batch.apiSessionMutations.mapNotNullTo(mutableSetOf()) { (it as? ApiSessionMutation.ResetToUnimported)?.sessionId }
+        return (resetIds.flatMap { records.getCsvImportRecords(it) } + resetSessions.flatMap { records.getApiSessionRecords(it) })
             .flatMap { observations.getObservationsOf(ObservationOwner.Record(it.id)) }
             .mapTo(mutableSetOf()) { it.transactionId }
     }
@@ -714,6 +715,7 @@ class ImportEngineImpl(
                     attributeTypeRepository,
                 ),
             strategies = csvImportStrategyRepository,
+            apiStrategies = apiImportStrategyRepository,
             attributeTypes = attributeTypeRepository,
             accounts = accountRepository,
             records = importRecords,
@@ -2775,6 +2777,14 @@ class ImportEngineImpl(
         }
     }
 
+    // Without the records repository there are no records to hash, so the session is never unchanged and its re-import runs.
+    private suspend fun recordItems(mutation: ApiSessionMutation.RecordItems) {
+        val records = importRecordRepository ?: return
+        for (record in records.getApiSessionRecords(mutation.sessionId)) {
+            if (record.contentHash != mutation.contentHash) records.updateContentHash(record.id, mutation.contentHash)
+        }
+    }
+
     // What each transfer a person edits holds before the edit; none without the repositories to record overrides in.
     private suspend fun handEditSnapshots(updates: List<ImportTransfer>): Map<TransferId, MaterializedTransaction> {
         val observations = observationRepository ?: return emptyMap()
@@ -3065,6 +3075,16 @@ class ImportEngineImpl(
 
                 is ApiSessionMutation.DeleteResponseTransactionsBySession -> {
                     apiSessionRepository.deleteResponseTransactionsBySession(m.sessionId)
+                }
+
+                is ApiSessionMutation.RecordItems -> {
+                    recordItems(m)
+                }
+
+                is ApiSessionMutation.ResetToUnimported -> {
+                    deleteSessionRecords(m.sessionId)
+                    apiSessionRepository.deleteResponseTransactionsBySession(m.sessionId)
+                    apiSessionRepository.deleteSessionImports(m.sessionId)
                 }
 
                 is ApiSessionMutation.MarkSessionImported -> {

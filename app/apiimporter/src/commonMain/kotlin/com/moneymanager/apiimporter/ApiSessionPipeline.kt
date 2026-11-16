@@ -10,7 +10,10 @@ import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
+import com.moneymanager.domain.repository.ImportRecordReadRepository
 import com.moneymanager.domain.repository.assetAliasMap
+import com.moneymanager.importengineapi.ApiSessionMutation
+import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.rest.ApiClient
 import com.moneymanager.rest.ApiRequestSigner
@@ -166,6 +169,7 @@ class ApiImportReads(
     val accountAttributeRepository: AccountAttributeReadRepository,
     val currencyRepository: CurrencyReadRepository,
     val cryptoRepository: CryptoReadRepository,
+    val importRecordRepository: ImportRecordReadRepository,
 )
 
 /**
@@ -183,6 +187,24 @@ suspend fun importApiSession(
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
     onProgress: (suspend (Progress) -> Unit)? = null,
     engineBatchSize: Int = Int.MAX_VALUE,
+): ApiSessionImportOutcome {
+    val outcome =
+        importByShape(reads, sessionId, strategy, importEngine, counterpartyAccountNames, passThroughAccounts, onProgress, engineBatchSize)
+    // Recorded only once the whole session imported, so a stopped import never looks unchanged.
+    val inputsHash = apiSessionInputsHash(strategy, counterpartyAccountNames, passThroughAccounts, reads.cryptoRepository.assetAliasMap())
+    importEngine.import(ImportBatch(apiSessionMutations = listOf(ApiSessionMutation.RecordItems(sessionId, inputsHash))))
+    return outcome
+}
+
+private suspend fun importByShape(
+    reads: ApiImportReads,
+    sessionId: ApiSessionId,
+    strategy: ApiImportStrategy,
+    importEngine: ImportEngine,
+    counterpartyAccountNames: Map<String, String>,
+    passThroughAccounts: List<PassThroughAccount>,
+    onProgress: (suspend (Progress) -> Unit)?,
+    engineBatchSize: Int,
 ): ApiSessionImportOutcome =
     when (strategy.config.accounts) {
         is ApiAccountsSource.Single -> {

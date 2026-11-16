@@ -29,6 +29,7 @@ import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
 import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
+import com.moneymanager.domain.repository.ImportRecordReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.createApiSession
@@ -173,6 +174,7 @@ class ApiImportService(
     private val accountAttributeRepository: AccountAttributeReadRepository,
     private val currencyRepository: CurrencyReadRepository,
     private val cryptoRepository: CryptoReadRepository,
+    private val importRecordRepository: ImportRecordReadRepository,
     private val passThroughAccountRepository: PassThroughAccountReadRepository,
     private val maintenance: Maintenance,
     private val importEngine: ImportEngine,
@@ -332,6 +334,7 @@ class ApiImportService(
                         accountAttributeRepository = accountAttributeRepository,
                         currencyRepository = currencyRepository,
                         cryptoRepository = cryptoRepository,
+                        importRecordRepository = importRecordRepository,
                     ),
                 sessionId = sessionId,
                 strategy = strategy,

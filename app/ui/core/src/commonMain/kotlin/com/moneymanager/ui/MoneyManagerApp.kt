@@ -695,6 +695,7 @@ fun MoneyManagerApp(
                                                 accountRepository = services.accounts.accountRepository,
                                                 currencyRepository = services.accounts.currencyRepository,
                                                 cryptoRepository = services.accounts.cryptoRepository,
+                                                importRecordRepository = services.imports.importRecordRepository,
                                                 transactionRepository = services.transactions.transactionRepository,
                                                 relationshipRepository = services.transactions.relationshipRepository,
                                                 tradeRepository = services.transactions.tradeRepository,

@@ -200,4 +200,9 @@ class ApiSessionWriteRepositoryImpl(
                     import_duration_millis = importDurationMillis,
                 )
         }
+
+    override suspend fun deleteSessionImports(id: ApiSessionId): Unit =
+        withContext(Dispatchers.Default) {
+            writeQueries.deleteSessionImports(id.id)
+        }
 }

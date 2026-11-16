@@ -165,7 +165,7 @@ class CsvImportReadRepositoryImpl(
             withContext(coroutineContext) {
                 transactionIds.map { it.id }.distinct().chunked(OBSERVED_CHUNK).flatMapTo(mutableSetOf()) { chunk ->
                     observationSelectQueries
-                        .selectTransactionsObservedOutsideCsvImports(chunk, importIds.map { it.id.toString() })
+                        .selectTransactionsObservedOutsideSources(chunk, importIds.map { it.id.toString() }, emptyList())
                         .awaitAsList()
                 }
             }

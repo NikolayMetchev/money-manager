@@ -1,5 +1,11 @@
 package com.moneymanager.test.reimportoracle
 
+import com.moneymanager.apiimporter.ApiImportReads
+import com.moneymanager.apiimporter.executeApiReimport
+import com.moneymanager.apiimporter.executeApiUnimport
+import com.moneymanager.apiimporter.importApiSession
+import com.moneymanager.apiimporter.planApiReimport
+import com.moneymanager.apiimporter.planApiUnimport
 import com.moneymanager.cryptodata.BundledCryptoCatalog
 import com.moneymanager.csvimporter.AttributeAccountMatcher
 import com.moneymanager.csvimporter.BulkApplyResult
@@ -12,6 +18,7 @@ import com.moneymanager.database.di.openDatabaseComponent
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.CryptoRegistry
 import com.moneymanager.domain.model.CsvImportId
@@ -20,6 +27,7 @@ import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.WellKnownIds
+import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.reconciliation.IGNORED_IN_RECONCILIATION
 import com.moneymanager.domain.model.rules.RuleAction
@@ -32,9 +40,14 @@ import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.ManualEntryInput
 import com.moneymanager.importengineapi.createAccount
+import com.moneymanager.importengineapi.createApiSession
 import com.moneymanager.importengineapi.createManualEntries
 import com.moneymanager.importengineapi.createReconciliationMatch
+import com.moneymanager.importengineapi.ensureApiCredential
 import com.moneymanager.importengineapi.getOrCreateAttributeType
+import com.moneymanager.importengineapi.insertApiRequest
+import com.moneymanager.importengineapi.insertApiResponse
+import com.moneymanager.importengineapi.markApiSessionImported
 import com.moneymanager.importengineapi.setAccountAttributeValues
 import com.moneymanager.importengineapi.setTransferExcluded
 import com.moneymanager.importengineapi.updateCsvStrategy
@@ -47,6 +60,7 @@ import com.moneymanager.test.database.installBuiltInPassThroughs
 import com.moneymanager.test.database.reimportFile
 import com.moneymanager.test.database.reimports
 import kotlinx.coroutines.flow.first
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 /** Every file of the corpus claims this modification time, so nothing a run writes depends on the clock. */
@@ -70,10 +84,18 @@ class OracleDatabase private constructor(
     val scenario: OracleScenario,
 ) {
     private val staged = mutableMapOf<OracleSource, CsvImportId>()
+    private val sessions = mutableMapOf<OracleSource, ApiSessionId>()
+
+    // Each session needs its own creation time: the engine keys a new session by it.
+    private var sessionsCreated = 0
 
     /** Stages and applies each of [sources], one file at a time in the order given, as the import folders do. */
     suspend fun import(sources: List<OracleSource> = scenario.sources) {
         for (source in sources) {
+            if (source.file is OracleFile.Api) {
+                importSession(source, source.file)
+                continue
+            }
             val id = stage(source.file)
             staged[source] = id
             val file = requireNotNull(db.csvImportRepository.getImport(id).first())
@@ -86,6 +108,10 @@ class OracleDatabase private constructor(
     suspend fun reimport(sources: List<OracleSource>) {
         val reimports = db.reimports()
         for (source in sources) {
+            if (source.file is OracleFile.Api) {
+                reimportSession(source, source.file)
+                continue
+            }
             val result = reimports.reimportFile(requireNotNull(staged[source]) { "${source.file.fileName} was never imported" })
             check(result.filesFailed == 0) { "${source.file.fileName} did not re-import: $result" }
         }
@@ -93,6 +119,23 @@ class OracleDatabase private constructor(
 
     /** Unimports [source], as the Unimport button does: its records are withdrawn and what nothing else observes goes. */
     suspend fun unimport(source: OracleSource) {
+        if (source.file is OracleFile.Api) {
+            executeApiUnimport(
+                plan =
+                    planApiUnimport(
+                        requireNotNull(sessions[source]) { "${source.file.fileName} was never imported" },
+                        db.apiSessionRepository,
+                    ),
+                accountRepository = db.accountRepository,
+                transactionRepository = db.transactionRepository,
+                relationshipRepository = db.relationshipRepository,
+                tradeRepository = db.tradeRepository,
+                maintenance = db.maintenanceService,
+                importEngine = db.importEngine,
+                refreshViews = false,
+            )
+            return
+        }
         val plan =
             planCsvUnimport(
                 requireNotNull(staged[source]) { "${source.file.fileName} was never imported" },
@@ -203,7 +246,68 @@ class OracleDatabase private constructor(
             is OracleFile.Qif -> {
                 db.importEngine.stageQifImport(file.fileName, file.content, "checksum-${file.fileName}", FILE_TIME)
             }
+
+            is OracleFile.Api -> {
+                error("an API session is not a staged file")
+            }
         }
+
+    /** Downloads [file] as a new session of its strategy's connection (its responses as given) and imports it. */
+    private suspend fun importSession(
+        source: OracleSource,
+        file: OracleFile.Api,
+    ) {
+        val strategy = apiStrategy(file)
+        val credential = db.importEngine.ensureApiCredential(strategy.id, FILE_TIME)
+        val sessionId = db.importEngine.createApiSession(db.deviceId, FILE_TIME + (++sessionsCreated).seconds, credential)
+        for ((url, json) in file.responses) {
+            val request = db.importEngine.insertApiRequest(sessionId, "GET", url, emptyMap())
+            db.importEngine.insertApiResponse(request, sessionId, json)
+        }
+        importApiSession(
+            apiReads(),
+            sessionId,
+            strategy,
+            db.importEngine,
+            passThroughAccounts = db.passThroughAccountRepository.getAll().first(),
+        )
+        db.importEngine.markApiSessionImported(sessionId, strategy.revisionId, FILE_TIME)
+        sessions[source] = sessionId
+    }
+
+    /** Re-imports [file]'s session, as the API screen's Re-import does. */
+    private suspend fun reimportSession(
+        source: OracleSource,
+        file: OracleFile.Api,
+    ) {
+        val sessionId = requireNotNull(sessions[source]) { "${file.fileName} was never imported" }
+        val reimports = db.reimports()
+        executeApiReimport(
+            plan = planApiReimport(sessionId, db.apiSessionRepository, reimports.reads),
+            session = requireNotNull(db.apiSessionRepository.getSessionById(sessionId)),
+            strategy = apiStrategy(file),
+            apiReads = apiReads(),
+            reads = reimports.reads,
+            maintenance = db.maintenanceService,
+            importEngine = db.importEngine,
+            cascadeRerunner = reimports,
+            passThroughAccounts = db.passThroughAccountRepository.getAll().first(),
+            refreshViews = false,
+        )
+    }
+
+    private suspend fun apiStrategy(file: OracleFile.Api): ApiImportStrategy =
+        requireNotNull(db.apiImportStrategyRepository.getStrategyByName(file.strategyName).first()) { "No ${file.strategyName} strategy" }
+
+    private fun apiReads(): ApiImportReads =
+        ApiImportReads(
+            apiSessionRepository = db.apiSessionRepository,
+            accountRepository = db.accountRepository,
+            accountAttributeRepository = db.accountAttributeRepository,
+            currencyRepository = db.currencyRepository,
+            cryptoRepository = db.cryptoRepository,
+            importRecordRepository = db.importRecordRepository,
+        )
 
     /** One `bulkApplyCsv` call with every argument the import folders pass it. */
     private suspend fun apply(

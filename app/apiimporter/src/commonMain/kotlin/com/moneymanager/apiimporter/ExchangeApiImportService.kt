@@ -12,7 +12,6 @@ import com.moneymanager.domain.model.CryptoRegistry
 import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
-import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.apistrategy.ApiAccountsSource
@@ -45,10 +44,9 @@ import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.assetAliasMap
-import com.moneymanager.importengineapi.AccountBridge
 import com.moneymanager.importengineapi.AccountMatchKey
 import com.moneymanager.importengineapi.AccountRef
-import com.moneymanager.importengineapi.DedupePolicy
+import com.moneymanager.importengineapi.EXCHANGE_TXN_ID_ATTR
 import com.moneymanager.importengineapi.ExistingApiIdExtractor
 import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
@@ -62,10 +60,12 @@ import com.moneymanager.importengineapi.LocalOrderKey
 import com.moneymanager.importengineapi.LocalTradeKey
 import com.moneymanager.importengineapi.ObservationOwnerKey
 import com.moneymanager.importengineapi.ObservationSlot
-import com.moneymanager.importengineapi.TradeDedupePolicy
 import com.moneymanager.importengineapi.createCrypto
+import com.moneymanager.importengineapi.dedupePolicy
 import com.moneymanager.importengineapi.getOrCreateAttributeType
+import com.moneymanager.importengineapi.internalTransferBridges
 import com.moneymanager.importengineapi.recordApiDownloadCoverage
+import com.moneymanager.importengineapi.tradeDedupePolicy
 import com.moneymanager.rest.ApiClient
 import com.moneymanager.rest.ApiRequestSigner
 import com.moneymanager.tasks.PhasedProgress
@@ -82,7 +82,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 private val logger = Logger.withTag("ExchangeApiImportService")
@@ -97,23 +96,11 @@ private val logger = Logger.withTag("ExchangeApiImportService")
 /** The external-id attribute type name used to match the single exchange account across re-imports. */
 private const val EXCHANGE_ACCOUNT_EXTERNAL_ID_ATTR = "exchange-account-external-id"
 
-/** Attribute type storing an exchange transfer's provider id (deposit/withdraw id) for de-duplication. */
-private const val EXCHANGE_TXN_ID_ATTR = "exchange.txn_id"
-
 /** External-id attribute keying a blockchain-wallet counterparty account by its address. */
 private const val WALLET_ADDRESS_ATTR = "blockchain-wallet-address"
 
 /** Cross-source unique-id attribute holding a transfer's on-chain transaction id. */
 private const val BLOCKCHAIN_TXID_ATTR = "blockchain-txid"
-
-/**
- * Trade reconciliation window. Far tighter than the transfer windows (`ApiReconcileWindows`): two sources agree about a
- * conversion's instant to the second and differ only in sub-second rounding (an export stamps the
- * second, the API the millisecond), while matching aggregates against fill sets means a wide window
- * would drag a later order's fills in and stop the sums agreeing at all. Matches the Binance CSV
- * strategy's own trade window.
- */
-private val TRADE_RECONCILE_WINDOW = 5.seconds
 
 /** Upper bound on exponential rate-limit backoff, so a misconfigured base delay can't stall for hours. */
 private const val MAX_RATE_LIMIT_BACKOFF_MILLIS = 60_000L
@@ -969,16 +956,16 @@ suspend fun importApiSessionExchange(
             ImportBatch(
                 accountsToCreate =
                     listOf(
-                        // Match by name so the single Exchange account unifies with the one the CSV export
-                        // routes App<->Exchange transfers to (both use "Crypto.com Exchange"), regardless of
-                        // which strategy imports first; the external-id attribute is kept for reference.
+                        // Found by its external id, else it adopts the same-named account a CSV export created (both
+                        // name it "Crypto.com Exchange") and tags it, so the account is the same whichever imports first.
                         ImportAccountIntent(
                             key = syntheticKey,
                             source = source,
-                            match = AccountMatchKey.ByName(synthetic.name),
+                            match = AccountMatchKey.ByExternalId(exchangeAcctAttr, synthetic.externalId),
                             name = synthetic.name,
                             openingDate = openingDate,
                             attributes = listOf(NewAttribute(exchangeAcctAttr, synthetic.externalId)),
+                            adoptOnBankMatch = true,
                         ),
                         ImportAccountIntent(
                             key = feeKey,
@@ -1221,16 +1208,15 @@ suspend fun importApiSessionExchange(
 
     // Internal-transfer reconciliation: bridge the exchange account to any configured app account
     // (e.g. the CSV "Crypto.com" App account) so App<->Exchange transfers collapse into one movement.
-    val reconcile = strategy.config.internalTransferReconcile
-    val existingAccounts = accountRepository.getAllAccounts().first()
     val bridges =
-        reconcile
-            ?.bridges
-            ?.mapNotNull { bridge ->
-                existingAccounts
-                    .firstOrNull { it.name == bridge.otherAccountName }
-                    ?.let { AccountBridge(exchangeAccountId = syntheticId, appAccountId = it.id) }
-            }.orEmpty()
+        strategy.internalTransferBridges(
+            syntheticId,
+            accountRepository
+                .getAllAccounts()
+                .first()
+                .reversed()
+                .associate { it.name to it.id },
+        )
 
     val orderIntents =
         orders.map { o ->
@@ -1260,32 +1246,14 @@ suspend fun importApiSessionExchange(
                 trades = tradeIntents,
                 orders = orderIntents,
                 accountsToCreate = counterpartyIntents,
-                dedupePolicy =
-                    DedupePolicy.ApiMultiKey(
-                        // Cross-source reconciliation is unconditional, NOT derived from
-                        // internalTransferReconcile: that config only says which app account this
-                        // exchange bridges to, while every exchange's statement export re-records the
-                        // movements its API returns. Tying the two together left Binance and Kraken —
-                        // which declare no bridge — importing every CSV-covered movement a second time.
-                        reconcileWindow = strategy.config.reconcileWindows.crossSource,
-                        reconciledExclusionAttributeTypeId = AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID),
-                        reconciledRelationshipTypeId = RelationshipTypeId(WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID),
-                        // The export cannot name the far end of a deposit or withdrawal, so it leaves a
-                        // placeholder leg; this feed knows the address and supersedes it.
-                        unidentifiedCounterpartyAttributeTypeId = unidentifiedCounterpartyAttr,
-                        unidentifiedCounterpartyWindow = strategy.config.reconcileWindows.placeholder,
-                        internalTransferBridges = bridges,
-                        internalTransferWindow = reconcile?.window,
-                        internalTransferAmountTolerance =
-                            reconcile?.amountTolerancePercent?.let { runCatching { BigDecimal(it) }.getOrNull() } ?: BigDecimal.ZERO,
-                    ),
+                dedupePolicy = strategy.dedupePolicy(unidentifiedCounterpartyAttr, bridges),
                 // An export folds an order's partial fills into one row; this feed reports them one by
                 // one. Without a fuzzy trade policy every fill of an already-imported order is booked
                 // again (see TradeReconciler's fan-in matching).
                 // (Its conversionRelationshipTypeName default also lets a trade match the transfer
                 // legs an export books for a conversion it cannot attribute - a dust sweep this feed
                 // reports as trades would otherwise be booked a second time.)
-                tradeDedupePolicy = TradeDedupePolicy.Fuzzy(window = TRADE_RECONCILE_WINDOW),
+                tradeDedupePolicy = strategy.tradeDedupePolicy(),
                 apiIdExtractor =
                     ExistingApiIdExtractor { transfer ->
                         transfer.attributes.firstOrNull { it.attributeType.id == txnIdAttr }?.value
@@ -1294,10 +1262,11 @@ suspend fun importApiSessionExchange(
             onProgress = bar.sink(base = WRITE_BASE, span = WRITE_SPAN),
             batchSize = engineBatchSize,
         )
+    val folded = importEngine.syncSessionMatches(apiSessionRepository, sessionId)
     return ExchangeImportResult(
-        tradesImported = tradeIntents.size,
-        transfersImported = result.transfersImported,
-        duplicatesSkipped = result.duplicates,
+        tradesImported = tradeIntents.size - folded.trades,
+        transfersImported = result.transfersImported - folded.transfers,
+        duplicatesSkipped = result.duplicates + folded.total,
     )
 }
 
