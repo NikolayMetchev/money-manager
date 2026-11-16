@@ -4,6 +4,7 @@ import app.cash.sqldelight.async.coroutines.awaitAsList
 import com.moneymanager.database.sql.read.MoneyManagerDatabase
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.TradeId
+import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.TransactionKind
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.observation.AttributeOverride
@@ -56,6 +57,16 @@ class PersonOverrideReadRepositoryImpl(
             .selectPins(observationIds.map { it.id }) { observationId, transactionId, kind ->
                 ObservationPin(ObservationId(observationId), transactionIdOf(TransactionKind.valueOf(kind), transactionId))
             }.awaitAsList()
+
+    override suspend fun getPinsOnTransactions(transactionIds: Collection<TransactionId>): List<ObservationPin> =
+        if (transactionIds.isEmpty()) {
+            emptyList()
+        } else {
+            queries
+                .selectPinsOnTransactions(transactionIds.map { it.id }) { observationId, transactionId, kind ->
+                    ObservationPin(ObservationId(observationId), transactionIdOf(TransactionKind.valueOf(kind), transactionId))
+                }.awaitAsList()
+        }
 
     override suspend fun getSplits(observationIds: Collection<ObservationId>): Set<ObservationSplit> =
         queries

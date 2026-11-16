@@ -636,6 +636,10 @@ data class ImportBatch(
     val reconciliationLinkMutations: List<ReconciliationLinkMutation> = emptyList(),
     /** Relationships written or deleted directly, in order, after the batch's transfers and trades. */
     val relationshipMutations: List<RelationshipMutation> = emptyList(),
+    /** Changes to what import records, groups and manual entries say, applied after everything else in the batch. */
+    val observationMutations: List<ObservationMutation> = emptyList(),
+    /** Rematerializes what [observationMutations] touched; required whenever there are any. */
+    val materialization: MaterializationRequest? = null,
 ) {
     companion object {
         /**

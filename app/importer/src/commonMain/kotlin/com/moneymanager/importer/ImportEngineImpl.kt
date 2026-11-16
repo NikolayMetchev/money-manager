@@ -33,6 +33,7 @@ import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.domain.model.rules.widen
 import com.moneymanager.domain.model.withStatementAccount
+import com.moneymanager.domain.repository.PersonOverrideReadRepository
 import com.moneymanager.domain.repository.write.AccountAttributeWriteRepository
 import com.moneymanager.domain.repository.write.AccountMappingWriteRepository
 import com.moneymanager.domain.repository.write.AccountWriteRepository
@@ -49,6 +50,7 @@ import com.moneymanager.domain.repository.write.HolidayCalendarWriteRepository
 import com.moneymanager.domain.repository.write.ImportDirectoryWriteRepository
 import com.moneymanager.domain.repository.write.NewCryptoAsset
 import com.moneymanager.domain.repository.write.NewTrade
+import com.moneymanager.domain.repository.write.ObservationWriteRepository
 import com.moneymanager.domain.repository.write.PassThroughAccountWriteRepository
 import com.moneymanager.domain.repository.write.PersonAccountOwnershipWriteRepository
 import com.moneymanager.domain.repository.write.PersonAttributeWriteRepository
@@ -91,6 +93,9 @@ import com.moneymanager.importengineapi.LocalCryptoKey
 import com.moneymanager.importengineapi.LocalCurrencyKey
 import com.moneymanager.importengineapi.LocalPersonKey
 import com.moneymanager.importengineapi.LocalTradeKey
+import com.moneymanager.importengineapi.MaterializationReport
+import com.moneymanager.importengineapi.MaterializationRequest
+import com.moneymanager.importengineapi.ObservationMutation
 import com.moneymanager.importengineapi.PassThroughMutation
 import com.moneymanager.importengineapi.PersonMatchKey
 import com.moneymanager.importengineapi.ReconciliationLinkMutation
@@ -181,6 +186,12 @@ class ImportEngineImpl(
     private val editGate: EditGate = EditGate.AlwaysWritable,
     /** Writes shadow→real reconciliation links. Optional like [relationshipRepository]; DI supplies it. */
     private val reconciliationLinkRepository: ReconciliationLinkWriteRepository? = null,
+    /**
+     * Observations and the materialized rows built from them, with [personOverrideRepository] the overrides on top.
+     * Optional like [relationshipRepository]: a batch with observation mutations fails without them. DI supplies both.
+     */
+    private val observationRepository: ObservationWriteRepository? = null,
+    private val personOverrideRepository: PersonOverrideReadRepository? = null,
 ) : ImportEngine {
     private val writes = MutableStateFlow(0L)
     override val writeVersion: StateFlow<Long> = writes.asStateFlow()
@@ -503,6 +514,9 @@ class ImportEngineImpl(
         batch.cryptoAssets.deletes().forEach { cryptoRepository.deleteCryptoAsset(requireNotNull(it.existingId)) }
         batch.peopleToCreate.deletes().forEach { personRepository.deletePerson(requireNotNull(it.existingId)) }
 
+        // ----- OBSERVATIONS (last: they name the accounts and assets the batch created) -----
+        val materialization = batch.materialization?.let { materialize(batch.observationMutations, it) } ?: MaterializationReport()
+
         return ImportResult(
             accountsCreated = accountResolution.created,
             peopleCreated = personResolution.createdCount,
@@ -531,8 +545,21 @@ class ImportEngineImpl(
             apiSessionIds = config.apiSessionIds,
             apiRequestIds = config.apiRequestIds,
             apiResponseIds = config.apiResponseIds,
+            materialization = materialization,
         )
     }
+
+    private suspend fun materialize(
+        mutations: List<ObservationMutation>,
+        request: MaterializationRequest,
+    ): MaterializationReport =
+        ObservationMaterialization(
+            observations = checkNotNull(observationRepository) { "This engine has no observation repository" },
+            overrides = checkNotNull(personOverrideRepository) { "This engine has no person override repository" },
+            accounts = accountRepository,
+            trades = tradeRepository,
+            relationships = relationshipRepository,
+        ).run(mutations, request)
 
     // region Operation dispatch
 
@@ -544,6 +571,9 @@ class ImportEngineImpl(
 
     /** Fails loudly when an intent omits the fields its [ImportOperation] requires (nullable-by-design). */
     private fun validate(batch: ImportBatch) {
+        require(batch.observationMutations.isEmpty() || batch.materialization != null) {
+            "observation mutations need a materialization request"
+        }
         batch.transfers.forEach {
             when (it.operation) {
                 ImportOperation.CREATE -> {

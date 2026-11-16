@@ -2,11 +2,17 @@ package com.moneymanager.database.repository.write
 
 import app.cash.sqldelight.async.coroutines.awaitAsOne
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
+import com.moneymanager.database.write.recordSource
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.DeviceId
+import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.MergeId
+import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.TransactionKind
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.observation.MaterializedWrite
+import com.moneymanager.domain.model.observation.ObservationAttribute
 import com.moneymanager.domain.model.observation.ObservationContent
 import com.moneymanager.domain.model.observation.ObservationId
 import com.moneymanager.domain.model.observation.ObservationOwner
@@ -18,13 +24,28 @@ import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
 
 class ObservationWriteRepositoryImpl(
-    database: MoneyManagerDatabaseWrapper,
+    private val database: MoneyManagerDatabaseWrapper,
+    private val deviceId: DeviceId,
     reader: ObservationReadRepository,
     private val coroutineContext: CoroutineContext = Dispatchers.Default,
 ) : ObservationWriteRepository,
     ObservationReadRepository by reader {
     private val queries = database.observationWriteQueries
     private val selectQueries = database.observationSelectQueries
+
+    override suspend fun allocateTransactionId(kind: TransactionKind): TransactionId =
+        withContext(coroutineContext) {
+            val transactionIds = database.transactionIdWriteQueries
+            val id =
+                transactionIds.transactionWithResult {
+                    transactionIds.insert()
+                    transactionIds.lastInsertedId().awaitAsOne()
+                }
+            when (kind) {
+                TransactionKind.TRANSFER -> TransferId(id)
+                TransactionKind.TRADE -> TradeId(id)
+            }
+        }
 
     override suspend fun insertObservation(
         owner: ObservationOwner,
@@ -173,6 +194,155 @@ class ObservationWriteRepositoryImpl(
         }
     }
 
+    override suspend fun applyMaterialization(writes: List<MaterializedWrite>) {
+        if (writes.isEmpty()) return
+        withContext(coroutineContext) {
+            queries.transaction {
+                writes.forEach { write ->
+                    when (write) {
+                        is MaterializedWrite.Insert -> insertRow(write)
+                        is MaterializedWrite.Update -> updateRow(write)
+                        is MaterializedWrite.Delete -> deleteRow(write)
+                    }
+                }
+            }
+        }
+    }
+
+    private suspend fun insertRow(write: MaterializedWrite.Insert) {
+        val id = write.transactionId
+        when (val values = write.row.values) {
+            is ObservedValues.Transfer -> {
+                database.transferWriteQueries.insert(
+                    id = id,
+                    revision_id = FIRST_REVISION,
+                    timestamp = values.timestamp.toEpochMilliseconds(),
+                    description = values.description,
+                    source_account_id = values.sourceAccountId.id,
+                    target_account_id = values.targetAccountId.id,
+                    asset_id = values.assetId.id,
+                    amount = values.amount.toString(),
+                )
+                inCreationMode {
+                    write.row.attributes.forEach { insertTransferAttribute(id, it) }
+                }
+                database.recordSource(deviceId, EntityType.TRANSFER, id, FIRST_REVISION, write.source)
+            }
+
+            is ObservedValues.Trade -> {
+                database.tradeWriteQueries.insert(
+                    id,
+                    FIRST_REVISION,
+                    values.timestamp.toEpochMilliseconds(),
+                    values.description,
+                    values.fromAccountId.id,
+                    values.fromAssetId.id,
+                    values.fromAmount.toString(),
+                    values.toAccountId.id,
+                    values.toAssetId.id,
+                    values.toAmount.toString(),
+                )
+                write.row.attributes.forEach { database.tradeWriteQueries.upsertAttribute(id, it.typeId.id, it.value) }
+                database.recordSource(deviceId, EntityType.TRADE, id, FIRST_REVISION, write.source)
+            }
+        }
+    }
+
+    private suspend fun updateRow(write: MaterializedWrite.Update) {
+        val id = write.transactionId
+        val before = write.before.attributes.associateBy { it.typeId to it.groupKey }
+        val after = write.after.attributes.associateBy { it.typeId to it.groupKey }
+        val removed = before.keys - after.keys
+        val changed = after.values.filter { before[it.typeId to it.groupKey] != it }
+        when (val values = write.after.values) {
+            is ObservedValues.Transfer -> {
+                // One revision for the whole write: the row update bumps it (or a bare bump when only attributes
+                // change), and the attributes follow in creation mode so they don't bump it again.
+                if (values != write.before.values) {
+                    database.transferWriteQueries.update(
+                        timestamp = values.timestamp.toEpochMilliseconds(),
+                        description = values.description,
+                        source_account_id = values.sourceAccountId.id,
+                        target_account_id = values.targetAccountId.id,
+                        asset_id = values.assetId.id,
+                        amount = values.amount.toString(),
+                        id = id,
+                    )
+                } else {
+                    database.transferWriteQueries.bumpRevisionOnly(id)
+                }
+                inCreationMode {
+                    removed.forEach { (typeId, groupKey) ->
+                        database.transferAttributeWriteQueries.deleteBySlot(id, typeId.id, groupKey)
+                    }
+                    changed.forEach { attribute ->
+                        if (attribute.typeId to attribute.groupKey in before) {
+                            database.transferAttributeWriteQueries.updateValueBySlot(
+                                attribute.value,
+                                id,
+                                attribute.typeId.id,
+                                attribute.groupKey,
+                            )
+                        } else {
+                            insertTransferAttribute(id, attribute)
+                        }
+                    }
+                }
+                val revision = database.transferSelectQueries.selectRevisionById(id).awaitAsOne()
+                database.recordSource(deviceId, EntityType.TRANSFER, id, revision, write.source)
+            }
+
+            is ObservedValues.Trade -> {
+                if (values != write.before.values) {
+                    database.tradeWriteQueries.update(
+                        values.timestamp.toEpochMilliseconds(),
+                        values.description,
+                        values.fromAccountId.id,
+                        values.fromAssetId.id,
+                        values.fromAmount.toString(),
+                        values.toAccountId.id,
+                        values.toAssetId.id,
+                        values.toAmount.toString(),
+                        id,
+                    )
+                }
+                database.tradeWriteQueries.bumpRevision(id)
+                removed.forEach { (typeId, _) -> database.tradeWriteQueries.deleteAttribute(id, typeId.id) }
+                changed.forEach { database.tradeWriteQueries.upsertAttribute(id, it.typeId.id, it.value) }
+                val revision = database.tradeSelectQueries.selectRevision(id).awaitAsOne()
+                database.recordSource(deviceId, EntityType.TRADE, id, revision, write.source)
+            }
+        }
+    }
+
+    private suspend fun deleteRow(write: MaterializedWrite.Delete) {
+        when (write.kind) {
+            TransactionKind.TRANSFER -> database.transferWriteQueries.delete(write.transactionId)
+            TransactionKind.TRADE -> database.tradeWriteQueries.delete(write.transactionId)
+        }
+    }
+
+    private suspend fun insertTransferAttribute(
+        transactionId: Long,
+        attribute: ObservationAttribute,
+    ) {
+        database.transferAttributeWriteQueries.insert(
+            transaction_id = transactionId,
+            attribute_type_id = attribute.typeId.id,
+            attribute_value = attribute.value,
+            group_key = attribute.groupKey,
+        )
+    }
+
+    private suspend fun inCreationMode(block: suspend () -> Unit) {
+        database.beginCreationMode()
+        try {
+            block()
+        } finally {
+            database.endCreationMode()
+        }
+    }
+
     private suspend fun moveRecorded(
         mergeId: MergeId,
         accountId: AccountId,
@@ -183,5 +353,7 @@ class ObservationWriteRepositoryImpl(
         queries.moveMergedTos(accountId.id, mergeId.id)
     }
 }
+
+private const val FIRST_REVISION = 1L
 
 private fun TransactionId.kind(): TransactionKind = if (this is TransferId) TransactionKind.TRANSFER else TransactionKind.TRADE

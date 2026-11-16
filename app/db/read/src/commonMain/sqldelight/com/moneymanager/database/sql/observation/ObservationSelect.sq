@@ -41,3 +41,39 @@ SELECT COUNT(*) FROM observation_gross_amount WHERE observation_id = ?;
 
 selectKind:
 SELECT kind FROM observation WHERE id = ?;
+
+-- Observations that would join an account to itself once one of the two is merged into the other: a transfer
+-- between them, or a trade between them in one asset.
+countObservationsBetweenAccounts:
+SELECT
+  (SELECT COUNT(*) FROM transfer_observation
+   WHERE (source_account_id = :accountA AND target_account_id = :accountB)
+      OR (source_account_id = :accountB AND target_account_id = :accountA))
+  + (SELECT COUNT(*) FROM trade_observation
+     WHERE from_asset_id = to_asset_id
+       AND ((from_account_id = :accountA AND to_account_id = :accountB)
+         OR (from_account_id = :accountB AND to_account_id = :accountA)));
+
+-- The accounts among :accountIds that some observation names.
+selectAccountsWithObservations:
+SELECT source_account_id AS account_id FROM transfer_observation WHERE source_account_id IN :accountIds
+UNION
+SELECT target_account_id FROM transfer_observation WHERE target_account_id IN :accountIds
+UNION
+SELECT from_account_id FROM trade_observation WHERE from_account_id IN :accountIds
+UNION
+SELECT to_account_id FROM trade_observation WHERE to_account_id IN :accountIds;
+
+-- A transaction's materialized row and attributes, as the materializer compares them with its observations' merge.
+selectMaterializedTransfer:
+SELECT timestamp, description, source_account_id, target_account_id, asset_id, amount FROM transfer WHERE id = ?;
+
+selectMaterializedTransferAttributes:
+SELECT attribute_type_id, group_key, attribute_value FROM transfer_attribute WHERE transaction_id = ?;
+
+selectMaterializedTrade:
+SELECT timestamp, description, from_account_id, from_asset_id, from_amount, to_account_id, to_asset_id, to_amount
+FROM trade WHERE id = ?;
+
+selectMaterializedTradeAttributes:
+SELECT attribute_type_id, attribute_value FROM trade_attribute WHERE trade_id = ?;
