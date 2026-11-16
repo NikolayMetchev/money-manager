@@ -336,8 +336,9 @@ object RepositoryModule {
     @SingleIn(DatabaseScope::class)
     fun provideObservationWriteRepository(
         database: MoneyManagerDatabaseWrapper,
+        deviceId: DeviceId,
         reader: ObservationReadRepository,
-    ): ObservationWriteRepository = ObservationWriteRepositoryImpl(database, reader)
+    ): ObservationWriteRepository = ObservationWriteRepositoryImpl(database, deviceId, reader)
 
     @Provides
     @SingleIn(DatabaseScope::class)
@@ -616,6 +617,8 @@ object RepositoryModule {
         holidayCalendarRepository: HolidayCalendarWriteRepository,
         relationshipRepository: RelationshipWriteRepository,
         reconciliationLinkRepository: ReconciliationLinkWriteRepository,
+        observationRepository: ObservationWriteRepository,
+        personOverrideRepository: PersonOverrideWriteRepository,
     ): ImportEngine =
         ImportEngineImpl(
             transactionRepository = transactionRepository,
@@ -642,5 +645,7 @@ object RepositoryModule {
             holidayCalendarRepository = holidayCalendarRepository,
             relationshipRepository = relationshipRepository,
             reconciliationLinkRepository = reconciliationLinkRepository,
+            observationRepository = observationRepository,
+            personOverrideRepository = personOverrideRepository,
         )
 }

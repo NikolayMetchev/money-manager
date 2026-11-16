@@ -77,4 +77,6 @@ data class ImportResult(
     val apiSessionIds: Map<String, ApiSessionId> = emptyMap(),
     val apiRequestIds: Map<String, ApiRequestId> = emptyMap(),
     val apiResponseIds: Map<String, ApiResponseId> = emptyMap(),
+    /** What [ImportBatch.materialization] wrote and left for a person; empty when the batch had none. */
+    val materialization: MaterializationReport = MaterializationReport(),
 )

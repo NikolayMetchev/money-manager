@@ -1,6 +1,7 @@
 package com.moneymanager.domain.repository
 
 import com.moneymanager.domain.model.TradeId
+import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.observation.AttributeOverride
 import com.moneymanager.domain.model.observation.ObservationId
@@ -21,6 +22,9 @@ interface PersonOverrideReadRepository {
 
     /** The pins among [observationIds]. */
     suspend fun getPins(observationIds: Collection<ObservationId>): List<ObservationPin>
+
+    /** The pins fixing an observation to any of [transactionIds]. */
+    suspend fun getPinsOnTransactions(transactionIds: Collection<TransactionId>): List<ObservationPin>
 
     /** The splits naming any of [observationIds]. */
     suspend fun getSplits(observationIds: Collection<ObservationId>): Set<ObservationSplit>

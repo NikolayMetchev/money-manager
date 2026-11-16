@@ -1,6 +1,8 @@
 package com.moneymanager.domain.repository
 
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.TransactionId
+import com.moneymanager.domain.model.observation.MaterializedTransaction
 import com.moneymanager.domain.model.observation.Observation
 import com.moneymanager.domain.model.observation.ObservationId
 import com.moneymanager.domain.model.observation.ObservationOwner
@@ -14,4 +16,10 @@ interface ObservationReadRepository {
 
     /** Every observation assigned to [transactionId], by id. */
     suspend fun getObservationsOfTransaction(transactionId: TransactionId): List<Observation>
+
+    /** The `transfer` or `trade` row [transactionId] has, with its attributes, or null when it has none. */
+    suspend fun getMaterialized(transactionId: TransactionId): MaterializedTransaction?
+
+    /** The accounts among [accountIds] that some observation names. */
+    suspend fun getAccountsWithObservations(accountIds: Collection<AccountId>): Set<AccountId>
 }

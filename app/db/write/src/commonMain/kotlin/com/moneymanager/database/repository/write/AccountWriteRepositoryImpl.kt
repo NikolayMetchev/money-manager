@@ -38,6 +38,7 @@ class AccountWriteRepositoryImpl(
     private val mergeWriteQueries = database.accountMergeWriteQueries
     private val personWriteQueries = database.personWriteQueries
     private val auditQueries = database.auditSelectQueries
+    private val observationWriteQueries = database.observationWriteQueries
 
     override suspend fun createAccount(
         account: Account,
@@ -220,6 +221,15 @@ class AccountWriteRepositoryImpl(
         require(between.isEmpty()) {
             "Cannot merge: ${between.size} transaction(s) exist between the accounts"
         }
+        // The same for observations: a transfer observation between the two, or a same-asset trade observation, would
+        // break its own CHECK once its end moves.
+        val observationsBetween =
+            database.observationSelectQueries
+                .countObservationsBetweenAccounts(deletedAccount.id, survivingAccount.id)
+                .awaitAsOne()
+        require(observationsBetween == 0L) {
+            "Cannot merge: $observationsBetween observation(s) exist between the accounts"
+        }
 
         // Snapshot only the deleted account's core fields (name/opening date/category/revision),
         // which the cascade delete leaves no trace of. Attributes and ownerships are NOT
@@ -282,6 +292,12 @@ class AccountWriteRepositoryImpl(
         carryAttributeGroups(deletedAccount, survivingAccount, mergeId)
         // Before the delete clears it: a file imported onto the deleted account re-imports onto the survivor.
         mergeWriteQueries.moveImportApplications(survivingAccount = survivingAccount.id, deletedAccount = deletedAccount.id)
+
+        // Observations RESTRICT the account's delete: move their ends to the survivor first, recording which, so the
+        // unmerge moves exactly those back and the next materialization writes the survivor too.
+        observationWriteQueries.recordTransferMergeMoves(mergeId, deletedAccount.id)
+        observationWriteQueries.recordTradeMergeMoves(mergeId, deletedAccount.id)
+        moveMergedObservations(mergeId, survivingAccount.id)
 
         writeQueries.delete(deletedAccount.id)
         // Source the deleted account's DELETE audit entry (recorded at revision_id + 1 by the
@@ -364,6 +380,16 @@ class AccountWriteRepositoryImpl(
             database.transaction { unmerge(mergeId) }
         }
 
+    private suspend fun moveMergedObservations(
+        mergeId: Long,
+        accountId: Long,
+    ) {
+        observationWriteQueries.moveMergedSources(accountId, mergeId)
+        observationWriteQueries.moveMergedTargets(accountId, mergeId)
+        observationWriteQueries.moveMergedFroms(accountId, mergeId)
+        observationWriteQueries.moveMergedTos(accountId, mergeId)
+    }
+
     /** Undoes [mergeId] inside the caller's transaction, after the fee accounts' merges it made. */
     private suspend fun unmerge(mergeId: MergeId) {
         val merge = mergeSelectQueries.selectById(mergeId.id).awaitAsOneOrNull() ?: return
@@ -393,6 +419,9 @@ class AccountWriteRepositoryImpl(
             opening_date = merge.deleted_account_opening_date,
             category_id = merge.deleted_account_category_id,
         )
+        // The observations the merge moved name the restored account again.
+        moveMergedObservations(mergeId.id, merge.deleted_account_id)
+        observationWriteQueries.deleteMergeMoves(mergeId.id)
         // Source the recreated account's INSERT audit entry as a merge-undo so the trail shows
         // where it came from (rather than "source data missing").
         database.recordSource(

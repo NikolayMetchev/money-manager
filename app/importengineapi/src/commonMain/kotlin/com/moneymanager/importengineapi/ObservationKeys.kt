@@ -21,9 +21,6 @@ object ObservationSlot {
      */
     fun conduit(index: Int): String = "conduit/$index"
 
-    /** A movement booked to undo another; reserved for the matcher's reversal pairing (#1423). */
-    const val REVERSAL = "reversal"
-
     /** The trade the record or group reports, or the conversion its own account settled the movement with. */
     const val TRADE = "trade"
 

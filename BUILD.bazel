@@ -225,6 +225,8 @@ kmp_modules(
         "//test/app/reimportoracle:reimportoracle_module",
         "//test/app/reimportoracle:test_module",
         "//app/model/observation:observation_module",
+        "//app/observationmatcher:observationmatcher_module",
+        "//app/observationmatcher:test_module",
         "//app/importengineapi:test_module",
     ],
     visibility = ["//visibility:public"],

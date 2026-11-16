@@ -15,3 +15,13 @@ WHERE id = ?;
 
 deleteById:
 DELETE FROM transfer_attribute WHERE id = ?;
+
+-- The materializer addresses a transfer's attributes by slot (type, group), as its observations do.
+updateValueBySlot:
+UPDATE transfer_attribute
+SET attribute_value = :value
+WHERE transaction_id = :transactionId AND attribute_type_id = :typeId AND group_key = :groupKey;
+
+deleteBySlot:
+DELETE FROM transfer_attribute
+WHERE transaction_id = :transactionId AND attribute_type_id = :typeId AND group_key = :groupKey;
