@@ -31,7 +31,7 @@ class TradeStagesTest {
         // The API reports the order as two fills to the millisecond; the export as one trade to the second.
         val fill1 = trade(1, API_SESSION, "f1", API, millis = 120, fromAmount = 4, toAmount = 20_000)
         val fill2 = trade(2, API_SESSION, "f2", API, millis = 462, fromAmount = 6, toAmount = 30_000)
-        val gross = trade(3, CSV_FILE, "gross", CSV, fromAmount = 10, toAmount = 50_000)
+        val gross = trade(3, CSV_FILE, "gross", CSV, toAmount = 50_000)
 
         val outcome = assertOrderFree(listOf(fill1, fill2), listOf(gross))
 
@@ -151,7 +151,7 @@ class TradeStagesTest {
             listOf(
                 trade(1, API_SESSION, "f1", API, millis = 120, fromAmount = 4, toAmount = 20_000),
                 trade(2, API_SESSION, "f2", API, millis = 462, fromAmount = 6, toAmount = 30_000),
-                trade(3, CSV_FILE, "gross", CSV, fromAmount = 10, toAmount = 50_000),
+                trade(3, CSV_FILE, "gross", CSV, toAmount = 50_000),
                 leg(4, "doge-out", DOGE, 5, LegGroupSide.DEBIT),
                 leg(5, "shib-out", SHIB, 7, LegGroupSide.DEBIT),
                 leg(6, "bnb-in", BNB, 3, LegGroupSide.CREDIT),

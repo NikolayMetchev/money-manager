@@ -202,12 +202,14 @@ internal class ConversionTradeStage(
                 }.groupBy({ it.first }, { it.second })
         val trades =
             transactions
+                .asSequence()
                 .filter { transaction -> transaction.members.none { it.orderLinked } }
                 .mapNotNull(::tradeOf)
                 .filter { it.family in policies }
                 .withIndex()
                 .sortedWith(compareBy({ it.value.values.timestamp }, { it.index }))
                 .map { it.value }
+                .toList()
         return linkEach(trades, claimed) { trade, taken ->
             val policy = policies.getValue(trade.family)
             val relationshipType = policy.conversionRelationshipTypeName
