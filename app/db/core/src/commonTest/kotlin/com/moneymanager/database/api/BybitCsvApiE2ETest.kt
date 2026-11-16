@@ -6,11 +6,15 @@ import com.moneymanager.csvimporter.bulkApplyCsv
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.WellKnownIds
+import com.moneymanager.domain.model.observation.ImportRecordKey
+import com.moneymanager.domain.model.observation.ObservationOwner
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration
 
@@ -294,5 +298,27 @@ class BybitCsvApiE2ETest : DbTest() {
                 "the export's precise deposit supersedes the API's window-start placeholder",
             )
             assertEquals(2, reconciledLinkCount(), "the deposit and the withdrawal are each linked once")
+        }
+
+    @Test
+    fun everyBookedRowIsObservedByItsRowOrItsTrade() =
+        runDbTest {
+            importCsv()
+
+            val bybit = assertNotNull(bybitAccount())
+            val transfers = repositories.transactionRepository.getTransactionsByAccount(bybit.id).first()
+            val trades = repositories.tradeRepository.getTradesByAccount(bybit.id).first()
+            val owners =
+                (transfers.map { it.id } + trades.map { it.id })
+                    .map { id ->
+                        val observations = repositories.observationRepository.getObservationsOfTransaction(id)
+                        assertTrue(observations.isNotEmpty(), "$id has no observation")
+                        observations.map { it.owner }
+                    }.flatten()
+            for (owner in owners.filterIsInstance<ObservationOwner.Record>()) {
+                assertIs<ImportRecordKey.CsvRow>(repositories.importRecordRepository.getRecord(owner.recordId)?.key)
+            }
+            assertTrue(owners.all { it is ObservationOwner.Record || it is ObservationOwner.Group })
+            assertTrue(owners.any { it is ObservationOwner.Group }, "the fills of the 2022 order are one group")
         }
 }

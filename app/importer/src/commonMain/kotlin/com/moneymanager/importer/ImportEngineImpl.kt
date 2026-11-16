@@ -32,6 +32,8 @@ import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.calendar.BusinessDayCalendar
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.observation.AttributeOverride
+import com.moneymanager.domain.model.observation.ImportGroupId
+import com.moneymanager.domain.model.observation.ImportGroupKey
 import com.moneymanager.domain.model.observation.ImportRecordId
 import com.moneymanager.domain.model.observation.ImportRecordKey
 import com.moneymanager.domain.model.observation.MaterializedTransaction
@@ -147,7 +149,7 @@ import kotlin.uuid.Uuid
 private const val DELETE_CHUNK_ROWS = 500
 
 /** The content hash of an API item's import record until the API sync (#1429) hashes what each item says. */
-private const val API_ITEM_UNHASHED = "unhashed"
+private const val RECORD_UNHASHED = "unhashed"
 
 /** Upper bound on the legs walked along one pass-through chain; real chains are a few hops (card → Curve → PayPal → merchant). */
 private const val MAX_PASS_THROUGH_CHAIN_LEGS = 16
@@ -638,7 +640,9 @@ class ImportEngineImpl(
         private val records: ImportRecordWriteRepository?,
         private val unidentifiedCounterpartyTypeId: AttributeTypeId?,
     ) {
-        private val sessionRecords = mutableMapOf<ApiSessionId, MutableMap<ImportRecordKey, ImportRecordId>>()
+        // Each staged file's or API session's records, read once per batch: the container they belong to, then their keys.
+        private val containerRecords = mutableMapOf<Any, MutableMap<ImportRecordKey, ImportRecordId>>()
+        private val groups = mutableMapOf<ImportGroupKey, ImportGroupId>()
 
         fun transferContent(
             leg: ExpandedTransfer,
@@ -667,8 +671,12 @@ class ImportEngineImpl(
         ): Pair<ObservationOwner, Boolean>? {
             val recordKey = (key as? ObservationOwnerKey.Record)?.key
             return when {
-                recordKey is ImportRecordKey.ApiItem -> {
-                    apiRecord(recordKey)
+                recordKey != null -> {
+                    record(recordKey)
+                }
+
+                key is ObservationOwnerKey.Group -> {
+                    group(key.key)
                 }
 
                 provenance == Source.Manual && (key == null || key is ObservationOwnerKey.Unrecorded) -> {
@@ -681,16 +689,35 @@ class ImportEngineImpl(
             }
         }
 
-        private suspend fun apiRecord(key: ImportRecordKey.ApiItem): Pair<ObservationOwner, Boolean>? {
+        // A staged row's record is normally written once its run completes (with its content hash), so one met first here gets
+        // a hash that matches nothing, which that write then replaces: until it does, the file never looks unchanged.
+        private suspend fun record(key: ImportRecordKey): Pair<ObservationOwner, Boolean>? {
             val records = records ?: return null
             val known =
-                sessionRecords.getOrPut(key.sessionId) {
-                    records.getApiSessionRecords(key.sessionId).associateTo(mutableMapOf()) { it.key to it.id }
+                when (key) {
+                    is ImportRecordKey.ApiItem -> {
+                        containerRecords.getOrPut(key.sessionId) {
+                            records.getApiSessionRecords(key.sessionId).associateTo(mutableMapOf()) { it.key to it.id }
+                        }
+                    }
+
+                    is ImportRecordKey.CsvRow -> {
+                        containerRecords.getOrPut(key.csvImportId) {
+                            records.getCsvImportRecords(key.csvImportId).associateTo(mutableMapOf()) { it.key to it.id }
+                        }
+                    }
                 }
             known[key]?.let { return ObservationOwner.Record(it) to false }
-            val id = records.insertRecord(key, API_ITEM_UNHASHED)
+            val id = records.insertRecord(key, RECORD_UNHASHED)
             known[key] = id
             return ObservationOwner.Record(id) to true
+        }
+
+        // A group outlives each of its runs (its legs may come from several files), so it may already say a slot.
+        private suspend fun group(key: ImportGroupKey): Pair<ObservationOwner, Boolean>? {
+            val records = records ?: return null
+            val id = groups.getOrPut(key) { records.getOrCreateGroup(key) }
+            return ObservationOwner.Group(id) to false
         }
     }
 
