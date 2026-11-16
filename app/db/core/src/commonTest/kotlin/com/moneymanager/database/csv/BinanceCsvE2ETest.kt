@@ -304,10 +304,9 @@ class BinanceCsvE2ETest : DbTest() {
             assertEquals("0.00090052", balanceOf("Binance Fees", "BNB"))
 
             // The suspense account is created while the legs are being mapped (assembly happens after),
-            // but every leg became the trade, so it holds nothing. A non-zero balance here would mean a
-            // group failed to resolve.
-            assertNull(balanceOf("Binance Trading", "BTC"), "no leg fell through to the suspense account")
-            assertNull(balanceOf("Binance Trading", "GBP"), "no leg fell through to the suspense account")
+            // but every leg became the trade, so it holds nothing and the import deletes it. An account
+            // left here would mean a group failed to resolve.
+            assertNull(accountByName("Binance Trading"), "no leg fell through to the suspense account, so the emptied account went")
         }
 
     @Test
@@ -503,8 +502,7 @@ class BinanceCsvE2ETest : DbTest() {
             applyAll(listOf(file))
 
             assertEquals(reefBefore, balanceOf("Binance", "REEF"), "the sweep was already recorded; nothing moved")
-            assertNull(balanceOf("Binance Conversions", "REEF"), "and nothing was stranded in the conversion account")
-            assertNull(balanceOf("Binance Conversions", "BNB"))
+            assertNull(accountByName("Binance Conversions"), "and nothing was stranded in the conversion account, so it went")
         }
 
     @Test

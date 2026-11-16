@@ -30,9 +30,10 @@ kmp_test(
     associate = ":reimportoracle",
     common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
     deps = [
-        "//app/csvimporter",
         "//app/db/di",  # keep
+        "//app/importengineapi",
         "//app/importer",
+        "//app/model/core",
         "//app/observationmatcher",
         "//bazel/kmp/deps:kotlin_test",
         "//test/app/db/read:read_for_tests",

@@ -57,7 +57,10 @@ data class MaterializationConflict(
  */
 object Materializer {
     /** The merge of [observations] (all of one kind), or null when there are none. */
-    fun merge(observations: Collection<ObservationContent>): MaterializedTransaction? {
+    fun merge(
+        observations: Collection<ObservationContent>,
+        placeholderTypeId: AttributeTypeId? = null,
+    ): MaterializedTransaction? {
         if (observations.isEmpty()) return null
         val kinds = observations.mapTo(mutableSetOf()) { it.values.kind }
         require(kinds.size == 1) { "a transaction's observations must all be of one kind, not $kinds" }
@@ -67,7 +70,7 @@ object Materializer {
                 TransactionKind.TRANSFER -> mergeTransfer(ranked)
                 TransactionKind.TRADE -> ranked.first().values
             }
-        return MaterializedTransaction(values, mergeAttributes(ranked, kinds.single()))
+        return MaterializedTransaction(values, mergeAttributes(ranked, kinds.single()).withoutNamedPlaceholders(ranked, placeholderTypeId))
     }
 
     /** [merged] with [overrides] on top. */
@@ -202,6 +205,19 @@ object Materializer {
             }
         }
         return bySlot.values.toSet()
+    }
+
+    /**
+     * Without the `unidentified-counterparty` marker ([placeholderTypeId]) of an end another observation names: the
+     * merged transfer takes that end from it, so it is no placeholder any more.
+     */
+    private fun Set<ObservationAttribute>.withoutNamedPlaceholders(
+        ranked: List<ObservationContent>,
+        placeholderTypeId: AttributeTypeId?,
+    ): Set<ObservationAttribute> {
+        if (placeholderTypeId == null) return this
+        val named = ObservationEnd.entries.filterTo(mutableSetOf()) { end -> ranked.any { end !in it.facts.placeholderEnds } }
+        return filterNotTo(LinkedHashSet()) { it.typeId == placeholderTypeId && it.value.placeholderEnd() in named }
     }
 
     private fun ObservedValues.Transfer.with(

@@ -511,7 +511,17 @@ suspend fun <R> ImportEngine.executeRerun(
     onProgress?.invoke(Progress("Removed what the import created", fraction = 1f))
 
     onProgress?.invoke(Progress("Re-importing"))
+    // Applying a staged file deletes the accounts it left empty itself, so those the run removed count as cleaned up too.
+    val created = files.flatMap { it.createdAccountIds }.distinct()
+    val createdNames =
+        created.mapNotNull { id ->
+            reads.accountRepository
+                .getAccountById(id)
+                .first()
+                ?.let { id to it.name }
+        }
     val result = run()
+    val emptiedByRun = createdNames.filter { (id, _) -> reads.accountRepository.getAccountById(id).first() == null }.map { it.second }
 
     onProgress?.invoke(Progress("Re-applying manual edits"))
     val deletedIds = deletedTransfers.mapTo(mutableSetOf()) { it.id } + deletedTrades.map { it.id }
@@ -535,7 +545,7 @@ suspend fun <R> ImportEngine.executeRerun(
                     accountRepository = reads.accountRepository,
                     tradeRepository = reads.tradeRepository,
                 )
-            }.orEmpty()
+            }.orEmpty() + emptiedByRun
 
     if (refreshViews) {
         onProgress?.invoke(Progress("Refreshing views"))

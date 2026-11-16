@@ -79,4 +79,6 @@ data class ImportResult(
     val apiResponseIds: Map<String, ApiResponseId> = emptyMap(),
     /** What [ImportBatch.materialization] wrote and left for a person; empty when the batch had none. */
     val materialization: MaterializationReport = MaterializationReport(),
+    /** What [ImportBatch.syncMatches] moved and rewrote. */
+    val matchSync: MaterializationReport = MaterializationReport(),
 )

@@ -37,7 +37,6 @@ import com.moneymanager.domain.model.rules.EXCLUDED_ATTRIBUTE_TYPE_NAME
 import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.RuleEngine
 import com.moneymanager.domain.model.rules.RuleEvaluator
-import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CryptoReadRepository
@@ -47,7 +46,6 @@ import com.moneymanager.domain.repository.assetAliasMap
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.BatchRelationship
 import com.moneymanager.importengineapi.CsvImportMutation
-import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ExistingUniqueKeyExtractor
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
@@ -65,18 +63,20 @@ import com.moneymanager.importengineapi.ObservationOwnerKey
 import com.moneymanager.importengineapi.ObservationSlot
 import com.moneymanager.importengineapi.PassThroughDetector
 import com.moneymanager.importengineapi.PersonMatchKey
-import com.moneymanager.importengineapi.TradeDedupePolicy
 import com.moneymanager.importengineapi.applyCsvImportMutations
 import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.importengineapi.createAccountMapping
 import com.moneymanager.importengineapi.createAccountMappings
 import com.moneymanager.importengineapi.createAccounts
 import com.moneymanager.importengineapi.createCrypto
+import com.moneymanager.importengineapi.dedupePolicy
+import com.moneymanager.importengineapi.deleteEmptyImportCreatedAccounts
 import com.moneymanager.importengineapi.feeAccounts
 import com.moneymanager.importengineapi.getOrCreateAttributeTypes
 import com.moneymanager.importengineapi.normalizeNameKey
 import com.moneymanager.importengineapi.restagePdfImport
 import com.moneymanager.importengineapi.restageXlsxImport
+import com.moneymanager.importengineapi.tradeDedupePolicy
 import com.moneymanager.tasks.Progress
 import com.moneymanager.tasks.WeightedProgress
 import com.moneymanager.xlsx.createXlsxParser
@@ -438,6 +438,8 @@ suspend fun bulkApplyCsv(
     stopRequested: () -> Boolean = { false },
 ): BulkApplyResult {
     val outcomes = mutableListOf<BulkFileOutcome>()
+    // Each imported file's result by its outcome's index, to fold once the match sync has run.
+    val results = mutableMapOf<Int, CsvImportResult>()
     var filesNotStarted = 0
 
     // Preparing a file reads every one of its rows (a PDF's lines, until they're assembled), so they weigh it.
@@ -507,14 +509,27 @@ suspend fun bulkApplyCsv(
                     cryptoRepository = cryptoRepository,
                     attributeAccountMatchers = attributeAccountMatchers,
                     tradeRepository = tradeRepository,
+                    syncMatches = false,
                 )
-            if (result == null) outcome(BulkFileStatus.NOTHING_TO_IMPORT) else outcome(BulkFileStatus.IMPORTED, result)
+            if (result == null) {
+                outcome(BulkFileStatus.NOTHING_TO_IMPORT)
+            } else {
+                results[outcomes.size] = result
+                outcome(BulkFileStatus.IMPORTED, result)
+            }
         } catch (expected: Exception) {
             logger.e(expected) { "Bulk CSV import failed for ${csvImport.originalFileName}: ${expected.message}" }
             outcome(BulkFileStatus.FAILED, error = expected.message ?: expected::class.simpleName)
         }
     }
 
+    if (results.isNotEmpty()) {
+        val gone = importEngine.import(ImportBatch(syncMatches = true)).matchSync.deleted
+        results.forEach { (index, result) ->
+            val folded = result.foldedInto(gone)
+            outcomes[index] = outcomes[index].copy(transfersCreated = folded.successCount, duplicatesSkipped = folded.duplicateCount)
+        }
+    }
     tracker.done(imports.size - filesNotStarted)
     if (refreshViews) maintenance.refreshMaterializedViews()
 
@@ -528,6 +543,8 @@ suspend fun bulkApplyCsv(
  * [refreshViews] = false lets a caller batch many files and refresh once at the end.
  * [onProgress]/[engineBatchSize] are forwarded to the engine so a caller can show per-chunk progress.
  * [settled] = false records the rows as not settled ([recordRowsMutation]), so the file's own re-import still runs.
+ * [syncMatches] = false leaves re-matching the stored observations ([ImportBatch.syncMatches]) to the caller, which
+ * runs it once after many files.
  */
 @Suppress("LongParameterList")
 suspend fun applyStagedCsv(
@@ -548,6 +565,7 @@ suspend fun applyStagedCsv(
     attributeAccountMatchers: Map<String, AttributeAccountMatcher> = emptyMap(),
     tradeRepository: TradeReadRepository? = null,
     settled: Boolean = true,
+    syncMatches: Boolean = true,
 ): CsvImportResult? {
     // The staged rows must be the ones the strategy reads: an Excel import is initially staged from the workbook's
     // FIRST worksheet, but the strategy may target a different sheet, and a PDF import's rows are whatever its
@@ -647,7 +665,22 @@ suspend fun applyStagedCsv(
             passThroughAccounts = passThroughAccounts,
         )
     importEngine.applyCsvImportMutations(listOf(recordRowsMutation(stagedImport, allRows, inputsHash, settled)))
-    return result
+    // An account the file's rules named that nothing ended up on (a conversion counterparty whose legs paired into a
+    // trade) goes, as a re-run of the file removes it: a fresh import and a re-import then hold the same accounts.
+    importEngine.deleteEmptyImportCreatedAccounts(
+        createdAccountIds = csvImportRepository.getAccountsCreatedByImport(stagedImport.id),
+        source = Source.Csv(stagedImport.id),
+        accountRepository = accountRepository,
+        tradeRepository = tradeRepository,
+    )
+    val created =
+        csvImportRepository
+            .getImportRows(stagedImport.id, limit = stagedImport.rowCount.coerceAtLeast(1), offset = 0)
+            .filter { it.rowIndex in unprocessedRowIndexes && it.importStatus == ImportStatus.IMPORTED }
+            .mapNotNullTo(mutableSetOf()) { it.transferId }
+    val booked = result.copy(createdTransferIds = created)
+    if (!syncMatches) return booked
+    return booked.foldedInto(importEngine.import(ImportBatch(syncMatches = true)).matchSync.deleted)
 }
 
 /**
@@ -792,79 +825,6 @@ fun effectiveSourceFor(
         null -> override
         else -> null
     }
-
-/**
- * The fuzzy dedupe policy for this strategy's rows, which CSV and QIF imports share. Cross-source
- * reconciliation is opt-in per strategy (`CsvStrategyConfig.crossSourceReconcileWindow`):
- * a row recording a movement another export already imported (same accounts + amount within that window,
- * or, when one side's counterparty is only a placeholder marked by [unidentifiedCounterpartyTypeId], the
- * same owned account + direction + amount within the placeholder window) is kept but excluded and
- * linked instead of double-counting. Mirrors the API importer.
- */
-fun CsvImportStrategy.fuzzyDedupePolicy(unidentifiedCounterpartyTypeId: AttributeTypeId?): DedupePolicy.FuzzyAllFields {
-    val reconcileWindow = config.crossSourceReconcileWindow
-    return DedupePolicy.FuzzyAllFields(
-        dateTolerance = config.duplicateDateTolerance?.duration ?: DedupePolicy.FuzzyAllFields().dateTolerance,
-        reconcileWindow = reconcileWindow,
-        reconciledExclusionAttributeTypeId = reconcileWindow?.let { AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID) },
-        reconciledRelationshipTypeId = reconcileWindow?.let { RelationshipTypeId(WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID) },
-        unidentifiedCounterpartyAttributeTypeId = reconcileWindow?.let { unidentifiedCounterpartyTypeId },
-        unidentifiedCounterpartyWindow = reconcileWindow?.let { placeholderWindow() },
-    )
-}
-
-/**
- * The dedupe policy for this strategy's rows: by their unique-identifier columns when it declares any, else fuzzy
- * ([fuzzyDedupePolicy]).
- */
-fun CsvImportStrategy.dedupePolicy(unidentifiedCounterpartyTypeId: AttributeTypeId?): DedupePolicy {
-    if (config.uniqueIdentifierAttributeTypes().isEmpty()) return fuzzyDedupePolicy(unidentifiedCounterpartyTypeId)
-    // Cross-source reconciliation for unique-id strategies whose sources issue a different id per side of the same
-    // movement (e.g. Monzo's own- and joint-account exports each carry their own Transaction ID for one transfer).
-    val reconcileWindow = config.crossSourceReconcileWindow
-    return DedupePolicy.UniqueIdentifier(
-        reconcileWindow = reconcileWindow,
-        reconciledExclusionAttributeTypeId = reconcileWindow?.let { AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID) },
-        reconciledRelationshipTypeId = reconcileWindow?.let { RelationshipTypeId(WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID) },
-        unidentifiedCounterpartyAttributeTypeId = reconcileWindow?.let { unidentifiedCounterpartyTypeId },
-        // A placeholder match has only account, direction and amount to go on, so it has its own, wider window rather
-        // than this strategy's exact-pair one.
-        unidentifiedCounterpartyWindow = reconcileWindow?.let { placeholderWindow() },
-    )
-}
-
-/**
- * The trade dedupe policy for this strategy's assembled trades. Trades get their own, much tighter window than the
- * transfer reconcile: aggregation matches a group against the WHOLE in-window candidate set, so a wide window would
- * drag a later order's fills in and stop the sums matching at all.
- */
-fun CsvImportStrategy.tradeDedupePolicy(): TradeDedupePolicy =
-    config.legGroups
-        .filter { it.assembly is LegAssembly.Trade }
-        .mapNotNull { it.reconcileWindowSeconds }
-        .maxOrNull()
-        ?.let { TradeDedupePolicy.Fuzzy(window = it.seconds) }
-        ?: TradeDedupePolicy.ExactTupleOnly
-
-/**
- * What the observation matcher needs to know about this strategy's records ([MatchFamily]), with attribute types
- * resolved through [attributeTypeIdByName] (a type no record carries yet has no id, and so identifies nothing).
- */
-fun CsvImportStrategy.matchFamily(attributeTypeIdByName: Map<String, AttributeTypeId>): MatchFamily =
-    MatchFamily(
-        dedupePolicy = dedupePolicy(attributeTypeIdByName[WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME]),
-        tradePolicy = tradeDedupePolicy(),
-        uniqueIdAttributeTypes = config.uniqueIdentifierAttributeTypes().mapNotNullTo(mutableSetOf()) { attributeTypeIdByName[it] },
-        conversionWindows =
-            config.legGroups
-                .filter { it.assembly is LegAssembly.ThroughAccount }
-                .mapNotNull { rule -> rule.reconcileWindowSeconds?.let { rule.name to it.seconds } }
-                .toMap(),
-    )
-
-/** How far a placeholder leg may sit from the record naming its far end: three days unless the strategy says. */
-private fun CsvImportStrategy.placeholderWindow(): SettlementWindow =
-    config.placeholderReconcileWindow ?: SettlementWindow.Elapsed(DedupePolicy.FuzzyAllFields().dateTolerance.inWholeSeconds)
 
 /** True when `strategy` needs a user-chosen source account (no SOURCE_ACCOUNT mapping of its own). */
 fun CsvImportStrategy.needsSourceAccountOverride(): Boolean = config.fieldMappings[TransferField.SOURCE_ACCOUNT] == null

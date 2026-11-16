@@ -1,9 +1,11 @@
 package com.moneymanager.test.reimportoracle
 
-import com.moneymanager.csvimporter.matchFamily
+import com.moneymanager.domain.model.Source
+import com.moneymanager.importengineapi.ImportBatch
+import com.moneymanager.importengineapi.MaterializationRequest
+import com.moneymanager.importengineapi.matchFamily
 import com.moneymanager.importer.MatchScopeLoader
-import com.moneymanager.observationmatcher.AssignmentChange
-import com.moneymanager.observationmatcher.TransactionTarget
+import com.moneymanager.observationmatcher.ObservationRef
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -12,14 +14,13 @@ import kotlin.test.fail
 import kotlin.time.Duration.Companion.minutes
 
 /**
- * The observation matcher, run over what a fresh import of each scenario stored, keeps every observation on the
- * transaction it already observes, but for one difference the switch (#1428) makes on purpose: two records today's
- * deduper books as two transactions and reconciles (one excluded, linked to the other) are one transaction to the
- * matcher. So each change it makes must join two transactions a relationship already links.
+ * Staged files derive, match and materialize (#1428), so what a fresh import stores is already the observation
+ * matcher's answer: run again over it, the matcher moves nothing. Two records of one event (a bank's and a card's
+ * line of one payment) are one transaction carrying both observations.
  */
 class MatcherAgreementTest {
     @Test
-    fun the_matcher_keeps_every_observation_where_a_fresh_import_put_it_but_joins_reconciled_twins() =
+    fun the_matcher_moves_nothing_a_fresh_import_stored() =
         runTest(timeout = 10.minutes) {
             val problems = mutableListOf<String>()
             var twins = 0
@@ -27,20 +28,53 @@ class MatcherAgreementTest {
                 OracleDatabase.with(scenario) {
                     import()
                     val outcome = matchStored()
-                    twins += outcome.twins
-                    if (outcome.disagreement.isNotEmpty()) problems += "${scenario.name}:\n${outcome.disagreement}"
+                    twins += joinedTwins()
+                    if (outcome.isNotEmpty()) problems += "${scenario.name}:\n$outcome"
                 }
             }
             if (problems.isNotEmpty()) fail(problems.joinToString("\n\n"))
-            assertTrue(twins > 0, "no scenario has reconciled twins, so the test would hold vacuously")
+            assertTrue(twins > 0, "no scenario joins two records into one transaction, so the test would hold vacuously")
         }
 
-    private class Outcome(
-        val twins: Int,
-        val disagreement: String,
-    )
+    @Test
+    fun materializing_a_fresh_import_writes_nothing() =
+        runTest(timeout = 10.minutes) {
+            val problems = mutableListOf<String>()
+            for (scenario in OracleCorpus.ALL) {
+                OracleDatabase.with(scenario) {
+                    import()
+                    val before = db.canonicalSnapshot().render().lines()
+                    val accounts =
+                        db.accountRepository
+                            .getAllAccounts()
+                            .first()
+                            .map { it.id }
+                    val ids =
+                        db.observationRepository
+                            .getObservationsOnAccounts(accounts)
+                            .mapTo(mutableSetOf()) { it.transactionId }
+                    val report =
+                        db.importEngine
+                            .import(
+                                ImportBatch(
+                                    transfers = emptyList(),
+                                    materialization = MaterializationRequest(Source.SampleGenerator, ids),
+                                ),
+                            ).materialization
+                    if (report.inserted.isNotEmpty() || report.updated.isNotEmpty() || report.deleted.isNotEmpty()) {
+                        val after = db.canonicalSnapshot().render().lines()
+                        problems +=
+                            "${scenario.name}: inserted ${report.inserted}, updated ${report.updated}, deleted ${report.deleted}\n" +
+                            (before - after.toSet()).joinToString("") { "  - $it\n" } +
+                            (after - before.toSet()).joinToString("") { "  + $it\n" }
+                    }
+                }
+            }
+            if (problems.isNotEmpty()) fail(problems.joinToString("\n"))
+        }
 
-    private suspend fun OracleDatabase.matchStored(): Outcome {
+    /** What the matcher would change in what is stored, one line each; empty when it agrees. */
+    private suspend fun OracleDatabase.matchStored(): String {
         val attributeTypes =
             db.attributeTypeRepository
                 .getAll()
@@ -66,26 +100,32 @@ class MatcherAgreementTest {
                 .first()
                 .map { it.id }
         val scope = loader.load(accounts, families)
-        val result = MatchScopeLoader.matcherFor(families, MatchScopeLoader.containerAccounts(scope)).match(scope)
-        val (twins, others) = result.changes.partition { isReconciledTwin(it) }
+        // As the import runs it: a shape match (a placeholder's other side, a conduit's chain) keeps its records apart.
+        val involved: Set<ObservationRef> = MatchScopeLoader.shapeMatcherFor(families).match(scope).involved
+        val result =
+            MatchScopeLoader
+                .matcherFor(families, MatchScopeLoader.containerAccounts(scope))
+                .match(scope.filter { it.ref !in involved })
         val byRef = scope.associateBy { it.ref }
-        val disagreement =
-            buildString {
-                for (change in others) {
-                    val o = byRef.getValue(change.ref)
-                    append("  ${o.container} ${change.ref.slot} ${o.content.values}: ${change.from} -> ${change.to}\n")
-                }
-                for (exclusion in result.exclusions) append("  exclusion $exclusion\n")
+        return buildString {
+            for (change in result.changes) {
+                val o = byRef.getValue(change.ref)
+                append("  ${o.container} ${change.ref.slot} ${o.content.values}: ${change.from} -> ${change.to}\n")
             }
-        return Outcome(twins.size, disagreement)
+            for (exclusion in result.exclusions) append("  exclusion $exclusion\n")
+        }
     }
 
-    /** True when [change] moves an observation onto a transaction its own is already linked to. */
-    private suspend fun OracleDatabase.isReconciledTwin(change: AssignmentChange): Boolean {
-        val from = change.from ?: return false
-        val to = (change.to as? TransactionTarget.Existing)?.id ?: return false
-        return db.relationshipRepository
-            .getByTransactions(listOf(from))
-            .any { relationship -> relationship.members.any { it.transactionId == to } }
+    /** Transactions that carry observations of more than one record: twins the matcher joined. */
+    private suspend fun OracleDatabase.joinedTwins(): Int {
+        val accounts =
+            db.accountRepository
+                .getAllAccounts()
+                .first()
+                .map { it.id }
+        return db.observationRepository
+            .getObservationsOnAccounts(accounts)
+            .groupBy { it.transactionId }
+            .count { (_, observations) -> observations.map { it.owner }.distinct().size > 1 }
     }
 }

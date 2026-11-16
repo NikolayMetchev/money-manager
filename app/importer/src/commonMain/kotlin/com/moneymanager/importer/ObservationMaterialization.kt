@@ -1,6 +1,7 @@
 package com.moneymanager.importer
 
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.TransactionKind
@@ -9,6 +10,7 @@ import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.observation.MaterializedTransaction
 import com.moneymanager.domain.model.observation.MaterializedWrite
 import com.moneymanager.domain.model.observation.Observation
+import com.moneymanager.domain.model.observation.ObservationAttribute
 import com.moneymanager.domain.model.observation.ObservationOwner
 import com.moneymanager.domain.repository.PersonOverrideReadRepository
 import com.moneymanager.domain.repository.RelationshipReadRepository
@@ -24,6 +26,11 @@ import com.moneymanager.importengineapi.ObservationMutation
 import com.moneymanager.importengineapi.ObservationTransaction
 import com.moneymanager.importengineapi.TransactionOverrides
 
+private val EXCLUDED_TYPE = AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID)
+
+/** The exclusion reason a reconciled link gives its related end, as the deduper writes it. */
+private const val RECONCILED_EXCLUSION = "reconciled"
+
 /**
  * The materializer's database half, run by [ImportEngineImpl]: applies a batch's observation mutations, then brings
  * every transaction they touched to the rank-merge of its observations with the person's overrides on top, writing
@@ -37,6 +44,7 @@ internal class ObservationMaterialization(
     private val accounts: AccountWriteRepository,
     private val trades: TradeReadRepository,
     private val relationships: RelationshipReadRepository?,
+    private val placeholderTypeId: AttributeTypeId?,
 ) {
     suspend fun run(
         mutations: List<ObservationMutation>,
@@ -97,13 +105,17 @@ internal class ObservationMaterialization(
             }
         }
 
+        val mergedByKey = affected.mapValues { (_, id) -> mergeOf(id) }
+        val gone = mergedByKey.filterValues { it == null }.keys
+        val linked = reconciledLinked(affected.filterKeys { it !in gone }.values, gone)
         val writes = mutableListOf<MaterializedWrite>()
         val conflicts = mutableListOf<MaterializationConflict>()
         for ((key, id) in affected) {
-            val merged = mergeOf(id)
+            val current = observations.getMaterialized(id)
+            val merged = mergedByKey[key]?.let { if (key in linked && current.isReconciledExclusion()) it.excludedAsReconciled() else it }
             val personal = overridesOf(id)
             val effective = merged?.let { Materializer.applyOverrides(it, personal) }
-            Materializer.write(key, id.kind(), observations.getMaterialized(id), effective, request.source)?.let(writes::add)
+            Materializer.write(key, id.kind(), current, effective, request.source)?.let(writes::add)
             conflicts += Materializer.conflicts(key, before[key], merged, personal)
         }
 
@@ -129,8 +141,43 @@ internal class ObservationMaterialization(
         )
     }
 
+    /**
+     * The ids of [live] transactions in a `reconciled` relationship with another transaction that outlives this run
+     * ([gone] are those it deletes). Today's dedupe excludes one end of such a link, and no observation says so (each
+     * record reports only itself), so a linked row keeps the exclusion it has until the link or its other end goes.
+     * The link's roles don't say which end that is, so only the row does.
+     */
+    private suspend fun reconciledLinked(
+        live: Collection<TransactionId>,
+        gone: Set<Long>,
+    ): Set<Long> {
+        if (live.isEmpty()) return emptySet()
+        val liveIds = live.mapTo(mutableSetOf()) { it.id }
+        return relationships
+            ?.getByTransactions(live)
+            .orEmpty()
+            .filter { it.relationshipType.id.id == WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID }
+            .flatMap { link ->
+                val ends = link.members.map { it.transactionId.id }.filter { it !in gone }
+                if (ends.size < 2) emptyList() else ends
+            }.filterTo(mutableSetOf()) { it in liveIds }
+    }
+
+    private fun MaterializedTransaction?.isReconciledExclusion(): Boolean =
+        this != null && attributes.any { it.typeId == EXCLUDED_TYPE && it.value == RECONCILED_EXCLUSION }
+
+    private fun MaterializedTransaction.excludedAsReconciled(): MaterializedTransaction =
+        if (attributes.any { it.typeId == EXCLUDED_TYPE }) {
+            this
+        } else {
+            copy(
+                attributes =
+                    attributes + ObservationAttribute(EXCLUDED_TYPE, "", RECONCILED_EXCLUSION),
+            )
+        }
+
     private suspend fun mergeOf(id: TransactionId): MaterializedTransaction? =
-        Materializer.merge(observations.getObservationsOfTransaction(id).map { it.content })
+        Materializer.merge(observations.getObservationsOfTransaction(id).map { it.content }, placeholderTypeId)
 
     private suspend fun overridesOf(id: TransactionId): TransactionOverrides =
         when (id) {

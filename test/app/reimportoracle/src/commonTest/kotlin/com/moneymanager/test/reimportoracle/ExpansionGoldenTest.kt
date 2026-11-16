@@ -6,8 +6,8 @@ import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.minutes
 
 /**
- * Every oracle scenario imports exactly as it did before `ObservationExpander` took over expanding fees, pass-through
- * chains and conversions (#1422): the expander's output, written by the engine, is today's transfer and trade set.
+ * Every oracle scenario imports exactly as [FRESH_IMPORT_GOLDENS] records: the expander's fees, pass-through chains and
+ * conversions (#1422), and the twins the matcher joins (#1428).
  */
 class ExpansionGoldenTest {
     @Test

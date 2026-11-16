@@ -320,4 +320,28 @@ class MaterializerDbTest : DbTest() {
             assertEquals(BigInteger("3500000000000000000"), values.amount)
             assertEquals("Coffee", values.description)
         }
+
+    @Test
+    fun `a placeholder marker goes once another observation names its end`() =
+        runDbTest {
+            val gbp = gbp()
+            val bank = AccountId(1)
+            val card = AccountId(2)
+            val placeholder = AccountId(3)
+            val marker = AttributeTypeId(99)
+            // The card statement's "PAYMENT RECEIVED": its source is a placeholder, which the bank's own record names.
+            val statement =
+                content(
+                    placeholder,
+                    card,
+                    gbp,
+                    attributes = setOf(ObservationAttribute(marker, "", WellKnownIds.UNIDENTIFIED_SOURCE)),
+                    facts = ObservationFacts(placeholderEnds = setOf(ObservationEnd.SOURCE)),
+                )
+            val payment = content(bank, card, gbp)
+
+            assertEquals(emptySet(), assertNotNull(Materializer.merge(listOf(statement, payment), marker)).attributes)
+            // Alone, the statement still says its source is unknown.
+            assertEquals(statement.attributes, assertNotNull(Materializer.merge(listOf(statement), marker)).attributes)
+        }
 }

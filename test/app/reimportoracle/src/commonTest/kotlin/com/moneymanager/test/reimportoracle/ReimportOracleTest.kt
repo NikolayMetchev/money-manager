@@ -212,23 +212,8 @@ enum class Assertion {
     NO_AUDIT_WRITES,
 }
 
-/** The cases that fail today, by (scenario, assertion), each with the epic #1419 subtask that should fix it. */
-val BASELINE: Map<Pair<String, Assertion>, Int> =
-    buildMap {
-        // Which twin stays counted (the primary of a "reconciled" pair) is whichever was imported first: the ranking
-        // of cross-source twins as observation assignment + rank-merge.
-        put("Monzo personal + joint" to Assertion.FILE_ORDER, 1424)
-        put("American Express QIF + Santander QIF" to Assertion.FILE_ORDER, 1424)
-        // A shape-changing match (the placeholder's other side, a conduit superseding a card chain's legs) books
-        // different accounts or a different primary in the other order: Reconciler-owned exclusion links.
-        put("Freetrade ISA + Monzo (placeholder other side)" to Assertion.FILE_ORDER, 1425)
-        put("Crypto.com card + PayPal CSV (conduit)" to Assertion.FILE_ORDER, 1425)
-        put("Crypto.com card + Curve export" to Assertion.FILE_ORDER, 1425)
-        // The same order dependence after a strategy change: the unchanged file's re-import is skipped, so only the
-        // changed one runs, and its delete + re-run books the pair in the other order. (A redundant re-run of the
-        // unchanged file used to put the first order back.)
-        for (assertion in listOf(Assertion.STRATEGY_CHANGE, Assertion.HAND_WORK_STRATEGY_CHANGE)) {
-            put("Freetrade ISA + Monzo (placeholder other side)" to assertion, 1425)
-            put("Crypto.com card + PayPal CSV (conduit)" to assertion, 1425)
-        }
-    }
+/**
+ * The cases that fail today, by (scenario, assertion), each with the epic #1419 subtask that should fix it. Empty since
+ * staged files derive, match and materialize (#1428): every scenario converges.
+ */
+val BASELINE: Map<Pair<String, Assertion>, Int> = emptyMap()

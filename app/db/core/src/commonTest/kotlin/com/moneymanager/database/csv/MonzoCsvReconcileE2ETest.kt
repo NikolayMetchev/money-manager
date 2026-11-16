@@ -1,5 +1,6 @@
 package com.moneymanager.database.csv
 
+import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.csvimporter.AttributeAccountMatcher
 import com.moneymanager.csvimporter.BulkApplyResult
 import com.moneymanager.csvimporter.bulkApplyCsv
@@ -17,6 +18,7 @@ import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration
 
@@ -175,27 +177,30 @@ class MonzoCsvReconcileE2ETest : DbTest() {
 
             repositories.maintenanceService.refreshMaterializedViews()
 
-            // Both rows are kept (each is its own legitimate record of what its account saw), but exactly
-            // one carries the reconciled-exclusion so the transfer counts once, not twice.
+            // The two rows are records of one movement: one transfer, observed by each export's row, so it counts once.
             val legs = transfersBetween(personalId, jointId)
-            assertEquals(2, legs.size, "both the personal- and joint-side rows are kept")
-            val excluded = legs.filter { t -> t.attributes.any { it.attributeType.name == "excluded" && it.value == "reconciled" } }
-            assertEquals(1, excluded.size, "exactly one leg is excluded as a cross-source reconciliation")
-            val original = legs.single { it.id != excluded.single().id }
-
-            val reconciledLink =
-                repositories.relationshipRepository
-                    .getByTransaction(excluded.single().id)
+            assertEquals(1, legs.size, "the personal- and joint-side rows are one transfer")
+            val transfer = legs.single()
+            assertTrue(transfer.attributes.none { it.attributeType.name == "excluded" }, "nothing is excluded")
+            val balances =
+                repositories.transactionRepository
+                    .getAccountBalances()
                     .first()
-                    .single { it.relationshipType.name == "reconciled" }
-            assertEquals(excluded.single().id, reconciledLink.primary)
-            assertEquals(original.id, reconciledLink.related)
+                    .associate { it.accountId to it.balance.toDisplayValue() }
+            assertEquals(0, balances.getValue(personalId).compareTo(BigDecimal("-1000")), "the personal account paid once")
+            assertEquals(0, balances.getValue(jointId).compareTo(BigDecimal("1000")), "the joint account received once")
 
-            // Each leg keeps its own Transaction ID attribute — the reconcile never merges the two rows.
+            // Each row keeps its own Transaction ID on its own observation: the match never rewrites a record.
+            val idType =
+                repositories.attributeTypeRepository
+                    .getByName("Monzo Transaction ID")
+                    .first()!!
+                    .id
             val txnIds =
-                legs
-                    .flatMap { it.attributes }
-                    .filter { it.attributeType.name == "Monzo Transaction ID" }
+                repositories.observationRepository
+                    .getObservationsOfTransaction(transfer.id)
+                    .flatMap { it.content.attributes }
+                    .filter { it.typeId == idType }
                     .map { it.value }
                     .toSet()
             assertEquals(setOf("tx_personal_1", "tx_joint_1"), txnIds)

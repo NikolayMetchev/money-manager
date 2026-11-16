@@ -655,6 +655,12 @@ data class ImportBatch(
     val observationMutations: List<ObservationMutation> = emptyList(),
     /** Rematerializes what [observationMutations] touched; required whenever there are any. */
     val materialization: MaterializationRequest? = null,
+    /**
+     * Re-matches every stored observation after the rest of the batch (#1428): records of one movement that today's
+     * dedupe booked as a reconciled pair become one transaction with both observations, and the rows that observed the
+     * transaction that goes are linked to the one that stays. Run once after a staged file's import (or a bulk run's).
+     */
+    val syncMatches: Boolean = false,
 ) {
     companion object {
         /**

@@ -90,12 +90,17 @@ private fun tradeContent(
     )
 
 // Keyed like transfer_attribute: one value per (type, group), the last a batch names winning, as the writer's upsert does.
+// The deduper's `excluded=reconciled` is its verdict on two records, not what either says, so no observation carries it:
+// otherwise a record booked as the twin of an earlier one would read as excluded by its own source, and never be matched.
 private fun List<NewAttribute>.observed(): Set<ObservationAttribute> =
-    associateBy { it.typeId to it.groupKey }
+    filterNot { it.typeId.id == WellKnownIds.EXCLUDED_ATTR_TYPE_ID && it.value == RECONCILED_EXCLUSION }
+        .associateBy { it.typeId to it.groupKey }
         .values
         .mapTo(mutableSetOf()) { ObservationAttribute(it.typeId, it.groupKey, it.value) }
 
-private fun String.placeholderEnd(): ObservationEnd? =
+private const val RECONCILED_EXCLUSION = "reconciled"
+
+internal fun String.placeholderEnd(): ObservationEnd? =
     when (this) {
         WellKnownIds.UNIDENTIFIED_SOURCE -> ObservationEnd.SOURCE
         WellKnownIds.UNIDENTIFIED_TARGET -> ObservationEnd.TARGET

@@ -235,8 +235,10 @@ class CsvUnimportE2ETest : DbTest() {
             assertEquals(1, transfersOn(monzo).size)
         }
 
+    // The two exports' rows are one transfer: unimporting either withdraws it and resets the other's row, as for any
+    // duplicate, and re-importing the other export brings the movement back, counted once.
     @Test
-    fun unimport_unhidesTheOtherSourcesLegItHadReconciledAway() =
+    fun unimport_resetsTheOtherExportThatRecordsTheSameTransfer() =
         runDbTest {
             repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
             val personal = createAccount("Monzo")
@@ -245,14 +247,21 @@ class CsvUnimportE2ETest : DbTest() {
             apply(personalExport, personal)
             val jointExport = stage("MonzoDataExport_joint.csv", listOf(row("tx_joint_1", "Monzo", "1000.00", "From Monzo")))
             apply(jointExport, joint)
-            assertEquals(1, transfersOn(personal).count { it.isReconcileExcluded() }, "precondition: one leg reconciled away")
+            assertTrue(transfersOn(personal).single().let { !it.isReconcileExcluded() }, "precondition: one counted transfer")
 
-            val result = unimport(reload(personalExport.id))
+            val plan = planCsvUnimport(personalExport.id, repositories.csvImportRepository, repositories.transferSourceRepository)
+            assertEquals(listOf(jointExport.id), plan.affectedFiles.map { it.importId })
+            unimport(reload(personalExport.id))
 
-            val remaining = transfersOn(personal)
-            assertEquals(1, remaining.size, "only the joint export's leg is left")
-            assertTrue(remaining.none { it.isReconcileExcluded() }, "with its partner gone it must count again: $remaining")
-            assertEquals(1, result.unhiddenTransfers)
+            assertTrue(transfersOn(personal).isEmpty(), "${transfersOn(personal)}")
+            val jointRows = repositories.csvImportRepository.getImportRows(jointExport.id, limit = 10, offset = 0)
+            assertTrue(jointRows.all { it.importStatus == null && it.transferId == null }, "the joint export's row is reset")
+
+            val reimports = repositories.reimports(maintenance)
+            reimports.reimportAll(reimports.planAll(listOf(reload(jointExport.id))), accountId = joint, currencyId = null, onProgress = { })
+            val restored = transfersOn(joint)
+            assertEquals(1, restored.size, "$restored")
+            assertTrue(restored.none { it.isReconcileExcluded() } && restored.single().sourceAccountId == personal, "$restored")
         }
 
     @Test
