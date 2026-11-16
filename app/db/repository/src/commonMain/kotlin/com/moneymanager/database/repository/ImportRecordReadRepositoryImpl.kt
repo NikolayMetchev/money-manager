@@ -58,6 +58,12 @@ class ImportRecordReadRepositoryImpl(
             .awaitAsOneOrNull()
             ?.let { ImportGroup(ImportGroupId(it), key, members(it)) }
 
+    override suspend fun getGroupById(id: ImportGroupId): ImportGroup? =
+        queries
+            .selectGroupById(id.id)
+            .awaitAsOneOrNull()
+            ?.let { ImportGroup(id, ImportGroupKey(it.strategy_id, it.group_name, it.key_value), members(id.id)) }
+
     override suspend fun getGroupsOfStrategy(strategyId: String): List<ImportGroup> =
         queries
             .selectGroupsByStrategy(strategyId)

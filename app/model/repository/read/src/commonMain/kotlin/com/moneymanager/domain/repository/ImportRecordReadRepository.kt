@@ -3,6 +3,7 @@ package com.moneymanager.domain.repository
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.observation.ImportGroup
+import com.moneymanager.domain.model.observation.ImportGroupId
 import com.moneymanager.domain.model.observation.ImportGroupKey
 import com.moneymanager.domain.model.observation.ImportRecord
 import com.moneymanager.domain.model.observation.ImportRecordId
@@ -18,6 +19,8 @@ interface ImportRecordReadRepository {
     suspend fun getApiSessionRecords(sessionId: ApiSessionId): List<ImportRecord>
 
     suspend fun getGroup(key: ImportGroupKey): ImportGroup?
+
+    suspend fun getGroupById(id: ImportGroupId): ImportGroup?
 
     /** Every group of a strategy, by name and key. */
     suspend fun getGroupsOfStrategy(strategyId: String): List<ImportGroup>

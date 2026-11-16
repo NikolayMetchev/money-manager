@@ -23,6 +23,9 @@ interface ObservationReadRepository {
     /** Every observation assigned to [transactionId], by id. */
     suspend fun getObservationsOfTransaction(transactionId: TransactionId): List<Observation>
 
+    /** Every observation naming one of [accountIds] (either end of a transfer, either side of a trade), by id. */
+    suspend fun getObservationsOnAccounts(accountIds: Collection<AccountId>): List<Observation>
+
     /** The `transfer` or `trade` row [transactionId] has, with its attributes, or null when it has none. */
     suspend fun getMaterialized(transactionId: TransactionId): MaterializedTransaction?
 

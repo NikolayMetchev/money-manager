@@ -60,6 +60,7 @@ import com.moneymanager.importengineapi.ImportTradeIntent
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalPersonKey
 import com.moneymanager.importengineapi.LocalTradeKey
+import com.moneymanager.importengineapi.MatchFamily
 import com.moneymanager.importengineapi.ObservationOwnerKey
 import com.moneymanager.importengineapi.ObservationSlot
 import com.moneymanager.importengineapi.PassThroughDetector
@@ -812,6 +813,55 @@ fun CsvImportStrategy.fuzzyDedupePolicy(unidentifiedCounterpartyTypeId: Attribut
     )
 }
 
+/**
+ * The dedupe policy for this strategy's rows: by their unique-identifier columns when it declares any, else fuzzy
+ * ([fuzzyDedupePolicy]).
+ */
+fun CsvImportStrategy.dedupePolicy(unidentifiedCounterpartyTypeId: AttributeTypeId?): DedupePolicy {
+    if (config.uniqueIdentifierAttributeTypes().isEmpty()) return fuzzyDedupePolicy(unidentifiedCounterpartyTypeId)
+    // Cross-source reconciliation for unique-id strategies whose sources issue a different id per side of the same
+    // movement (e.g. Monzo's own- and joint-account exports each carry their own Transaction ID for one transfer).
+    val reconcileWindow = config.crossSourceReconcileWindow
+    return DedupePolicy.UniqueIdentifier(
+        reconcileWindow = reconcileWindow,
+        reconciledExclusionAttributeTypeId = reconcileWindow?.let { AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID) },
+        reconciledRelationshipTypeId = reconcileWindow?.let { RelationshipTypeId(WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID) },
+        unidentifiedCounterpartyAttributeTypeId = reconcileWindow?.let { unidentifiedCounterpartyTypeId },
+        // A placeholder match has only account, direction and amount to go on, so it has its own, wider window rather
+        // than this strategy's exact-pair one.
+        unidentifiedCounterpartyWindow = reconcileWindow?.let { placeholderWindow() },
+    )
+}
+
+/**
+ * The trade dedupe policy for this strategy's assembled trades. Trades get their own, much tighter window than the
+ * transfer reconcile: aggregation matches a group against the WHOLE in-window candidate set, so a wide window would
+ * drag a later order's fills in and stop the sums matching at all.
+ */
+fun CsvImportStrategy.tradeDedupePolicy(): TradeDedupePolicy =
+    config.legGroups
+        .filter { it.assembly is LegAssembly.Trade }
+        .mapNotNull { it.reconcileWindowSeconds }
+        .maxOrNull()
+        ?.let { TradeDedupePolicy.Fuzzy(window = it.seconds) }
+        ?: TradeDedupePolicy.ExactTupleOnly
+
+/**
+ * What the observation matcher needs to know about this strategy's records ([MatchFamily]), with attribute types
+ * resolved through [attributeTypeIdByName] (a type no record carries yet has no id, and so identifies nothing).
+ */
+fun CsvImportStrategy.matchFamily(attributeTypeIdByName: Map<String, AttributeTypeId>): MatchFamily =
+    MatchFamily(
+        dedupePolicy = dedupePolicy(attributeTypeIdByName[WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME]),
+        tradePolicy = tradeDedupePolicy(),
+        uniqueIdAttributeTypes = config.uniqueIdentifierAttributeTypes().mapNotNullTo(mutableSetOf()) { attributeTypeIdByName[it] },
+        conversionWindows =
+            config.legGroups
+                .filter { it.assembly is LegAssembly.ThroughAccount }
+                .mapNotNull { rule -> rule.reconcileWindowSeconds?.let { rule.name to it.seconds } }
+                .toMap(),
+    )
+
 /** How far a placeholder leg may sit from the record naming its far end: three days unless the strategy says. */
 private fun CsvImportStrategy.placeholderWindow(): SettlementWindow =
     config.placeholderReconcileWindow ?: SettlementWindow.Elapsed(DedupePolicy.FuzzyAllFields().dateTolerance.inWholeSeconds)
@@ -1479,36 +1529,8 @@ suspend fun runCsvImport(
             peopleToCreate = peopleToCreate,
             ownerships = personOwnerships,
             trades = importTrades,
-            // Trades get their own, much tighter window than the transfer reconcile below: aggregation
-            // matches a group against the WHOLE in-window candidate set, so a wide window would drag a
-            // later order's fills in and stop the sums matching at all.
-            tradeDedupePolicy =
-                strategy.config.legGroups
-                    .filter { it.assembly is LegAssembly.Trade }
-                    .mapNotNull { it.reconcileWindowSeconds }
-                    .maxOrNull()
-                    ?.let { TradeDedupePolicy.Fuzzy(window = it.seconds) }
-                    ?: TradeDedupePolicy.ExactTupleOnly,
-            dedupePolicy =
-                if (uniqueIdTypeNames.isEmpty()) {
-                    strategy.fuzzyDedupePolicy(unidentifiedCounterpartyTypeId)
-                } else {
-                    // Cross-source reconciliation for unique-id strategies whose sources issue a
-                    // different id per side of the same movement (e.g. Monzo's own- and joint-account
-                    // exports each carry their own Transaction ID for one transfer).
-                    val reconcileWindow = strategy.config.crossSourceReconcileWindow
-                    DedupePolicy.UniqueIdentifier(
-                        reconcileWindow = reconcileWindow,
-                        reconciledExclusionAttributeTypeId =
-                            reconcileWindow?.let { AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID) },
-                        reconciledRelationshipTypeId =
-                            reconcileWindow?.let { RelationshipTypeId(WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID) },
-                        unidentifiedCounterpartyAttributeTypeId = reconcileWindow?.let { unidentifiedCounterpartyTypeId },
-                        // A placeholder match has only account, direction and amount to go on, so it has its own,
-                        // wider window rather than this strategy's exact-pair one.
-                        unidentifiedCounterpartyWindow = reconcileWindow?.let { strategy.placeholderWindow() },
-                    )
-                },
+            tradeDedupePolicy = strategy.tradeDedupePolicy(),
+            dedupePolicy = strategy.dedupePolicy(unidentifiedCounterpartyTypeId),
             uniqueKeyExtractor =
                 if (uniqueIdTypeNames.isEmpty()) {
                     null

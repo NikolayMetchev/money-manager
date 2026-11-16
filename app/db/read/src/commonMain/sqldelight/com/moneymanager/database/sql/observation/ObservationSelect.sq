@@ -18,6 +18,18 @@ JOIN observation_owner ON observation_owner.observation_id = observation.id
 WHERE observation.transaction_id = ?
 ORDER BY observation.id;
 
+-- Every observation naming one of :accountIds, by id: the stored observations a match over those accounts may pair.
+selectHeadersOnAccounts:
+SELECT observation.id, observation.transaction_id, observation.kind, observation_owner.owner_kind, observation_owner.owner_id, observation_owner.slot
+FROM observation
+JOIN observation_owner ON observation_owner.observation_id = observation.id
+WHERE observation.id IN (
+  SELECT observation_id FROM transfer_observation WHERE source_account_id IN :accountIds OR target_account_id IN :accountIds
+  UNION
+  SELECT observation_id FROM trade_observation WHERE from_account_id IN :accountIds OR to_account_id IN :accountIds
+)
+ORDER BY observation.id;
+
 selectTransferValues:
 SELECT * FROM transfer_observation WHERE observation_id = ?;
 
