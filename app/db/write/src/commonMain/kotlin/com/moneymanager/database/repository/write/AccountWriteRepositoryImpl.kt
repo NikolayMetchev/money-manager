@@ -39,6 +39,7 @@ class AccountWriteRepositoryImpl(
     private val personWriteQueries = database.personWriteQueries
     private val auditQueries = database.auditSelectQueries
     private val observationWriteQueries = database.observationWriteQueries
+    private val personOverrideWriteQueries = database.personOverrideWriteQueries
 
     override suspend fun createAccount(
         account: Account,
@@ -298,6 +299,9 @@ class AccountWriteRepositoryImpl(
         observationWriteQueries.recordTransferMergeMoves(mergeId, deletedAccount.id)
         observationWriteQueries.recordTradeMergeMoves(mergeId, deletedAccount.id)
         moveMergedObservations(mergeId, survivingAccount.id)
+        // Likewise a source or target a person set by hand on the deleted account, which nothing RESTRICTs.
+        personOverrideWriteQueries.recordMergeOverrideMoves(mergeId, deletedAccount.id.toString())
+        personOverrideWriteQueries.moveMergedOverrides(survivingAccount.id.toString(), mergeId)
 
         writeQueries.delete(deletedAccount.id)
         // Source the deleted account's DELETE audit entry (recorded at revision_id + 1 by the
@@ -422,6 +426,8 @@ class AccountWriteRepositoryImpl(
         // The observations the merge moved name the restored account again.
         moveMergedObservations(mergeId.id, merge.deleted_account_id)
         observationWriteQueries.deleteMergeMoves(mergeId.id)
+        personOverrideWriteQueries.moveMergedOverrides(merge.deleted_account_id.toString(), mergeId.id)
+        personOverrideWriteQueries.deleteMergeOverrideMoves(mergeId.id)
         // Source the recreated account's INSERT audit entry as a merge-undo so the trail shows
         // where it came from (rather than "source data missing").
         database.recordSource(

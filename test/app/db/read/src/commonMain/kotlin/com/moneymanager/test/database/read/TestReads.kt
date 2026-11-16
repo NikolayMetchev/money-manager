@@ -131,6 +131,7 @@ private val EXCLUDED_FROM_AUDIT =
         "observation_pin",
         "observation_split",
         "account_merge_observation",
+        "account_merge_transfer_override",
     )
 
 /** Whether a table is outside the audit trail. */
