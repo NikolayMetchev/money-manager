@@ -93,12 +93,17 @@ enum class ObservationEnd(
 
 /**
  * The facts the rank-merge reads: precise beats [approximateTime], named beats a [placeholderEnds] end, itemised
- * beats [grossAmount].
+ * beats [grossAmount], and a source's own account beats what it says about the other end ([ownEnd]).
+ *
+ * @property ownEnd the end that is the record's own statement account (the account whose statement or API session
+ *   the record comes from), when it is one of the two: a bank says for certain which of its own accounts moved, and
+ *   only guesses the counterparty's.
  */
 data class ObservationFacts(
     val approximateTime: Boolean = false,
     val placeholderEnds: Set<ObservationEnd> = emptySet(),
     val grossAmount: Boolean = false,
+    val ownEnd: ObservationEnd? = null,
 )
 
 /** What an owner says about one slot. */

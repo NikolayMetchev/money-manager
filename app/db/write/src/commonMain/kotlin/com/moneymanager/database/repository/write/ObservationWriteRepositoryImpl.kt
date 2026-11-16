@@ -136,6 +136,7 @@ class ObservationWriteRepositoryImpl(
                 queries.deleteApproximateTime(id.id)
                 queries.deletePlaceholderEnds(id.id)
                 queries.deleteGrossAmount(id.id)
+                queries.deleteOwnEnd(id.id)
                 writeDetails(id.id, content)
             }
         }
@@ -149,6 +150,7 @@ class ObservationWriteRepositoryImpl(
         if (content.facts.approximateTime) queries.insertApproximateTime(id)
         content.facts.placeholderEnds.forEach { queries.insertPlaceholderEnd(id, it.dbName) }
         if (content.facts.grossAmount) queries.insertGrossAmount(id)
+        content.facts.ownEnd?.let { queries.insertOwnEnd(id, it.dbName) }
     }
 
     override suspend fun assignTransaction(

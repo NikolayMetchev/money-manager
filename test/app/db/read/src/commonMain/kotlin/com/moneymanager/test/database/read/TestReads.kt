@@ -122,6 +122,7 @@ private val EXCLUDED_FROM_AUDIT =
         "observation_approximate_time",
         "observation_placeholder_end",
         "observation_gross_amount",
+        "observation_own_end",
         "transfer_override",
         "transfer_attribute_override",
         "transfer_attribute_removal",

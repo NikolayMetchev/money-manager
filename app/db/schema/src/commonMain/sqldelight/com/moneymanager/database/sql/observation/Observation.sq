@@ -164,6 +164,14 @@ CREATE TABLE observation_gross_amount (
     FOREIGN KEY (observation_id) REFERENCES observation(id) ON DELETE CASCADE
 );
 
+-- The end that is the record's own statement account: 'source' or 'target'. A source is certain of its own account
+-- and only guesses the other end, so the merge takes each end from a record whose own account it is.
+CREATE TABLE observation_own_end (
+    observation_id INTEGER PRIMARY KEY NOT NULL,
+    end_name TEXT NOT NULL CHECK (end_name IN ('source', 'target')),
+    FOREIGN KEY (observation_id) REFERENCES observation(id) ON DELETE CASCADE
+);
+
 -- Each observation with its owner, whichever table holds it: owner_kind RECORD, GROUP or MANUAL, and owner_id the
 -- record, group or entity_source id.
 CREATE VIEW observation_owner AS

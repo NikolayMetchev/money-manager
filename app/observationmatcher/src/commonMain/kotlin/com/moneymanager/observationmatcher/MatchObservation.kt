@@ -5,6 +5,7 @@ import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.observation.ObservationContent
 import com.moneymanager.domain.model.observation.ObservationId
 import com.moneymanager.domain.model.observation.ObservationOwner
+import kotlin.time.Instant
 
 /** An observation by what makes it unique, `UNIQUE(owner, slot)`: a new one has no id yet. */
 data class ObservationRef(
@@ -32,6 +33,7 @@ data class RecordIdentity(
  * @property recordKey an order-free key of its record, such as the record's content hash: ties between equally good
  *   pairs are broken by it. It must not come from database ids or import order (a staged file's id is both), or the
  *   assignment would depend on the order files were imported in.
+ * @property crossSource what only the cross-source rules read about its record.
  * @property orderLinked whether an exchange order its source reports claims it (a trade). A trade an order claims is never
  *   matched against a conversion booked as transfers: the order would have no trade to point at.
  * @property legGroup the leg group a transfer is a leg of, when its strategy assembles one (a conversion through an
@@ -46,12 +48,27 @@ data class MatchObservation(
     val recordKey: String,
     val content: ObservationContent,
     val identity: RecordIdentity = RecordIdentity(),
+    val crossSource: CrossSourceFacts = CrossSourceFacts(),
     val orderLinked: Boolean = false,
     val legGroup: LegGroupMembership? = null,
 ) {
     /** Whether its source excluded it from balances (a declined payment, a row the source marks deleted). */
     val excluded: Boolean get() = content.attributes.any { it.typeId.id == WellKnownIds.EXCLUDED_ATTR_TYPE_ID }
 }
+
+/**
+ * What only the cross-source rules ([CrossSourceRules]) read about an observation's record.
+ *
+ * @property approximateUntil the latest instant an approximately-dated record could stand for: its time is anywhere
+ *   from the observed timestamp to this.
+ * @property shadow the record is a reconciliation source's (Koinly's): its shadow accounts never meet a real record.
+ * @property passThrough the record is a leg of a pass-through chain or a conversion: those are matched by their own rules.
+ */
+data class CrossSourceFacts(
+    val approximateUntil: Instant? = null,
+    val shadow: Boolean = false,
+    val passThrough: Boolean = false,
+)
 
 /** Which side of a leg group a leg is on: the asset leaves the owner's account, or arrives in it. */
 enum class LegGroupSide {
