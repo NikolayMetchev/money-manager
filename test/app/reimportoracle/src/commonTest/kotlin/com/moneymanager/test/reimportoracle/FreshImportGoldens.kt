@@ -1,0 +1,261 @@
+package com.moneymanager.test.reimportoracle
+
+/**
+ * What a fresh import of each [OracleCorpus] scenario wrote before the engine handed its fee, pass-through and
+ * conversion expansion to `ObservationExpander` (#1422), captured from the engine as it was. [ExpansionGoldenTest]
+ * holds the expander to it: every transfer, trade, relationship and attribute must come out exactly as before.
+ */
+internal val FRESH_IMPORT_GOLDENS: Map<String, String> =
+    mapOf(
+        "Monzo personal + joint" to
+            """
+            == accounts (4)
+            Landlord
+            Monzo
+            Monzo Joint
+            Tesco
+            == transfers (4)
+            2023-11-19T21:15:00Z | Monzo -> Monzo Joint | 1000 GBP | From personal [Monzo Category=Transfers, Monzo Transaction ID=tx_joint_1, Type=Faster payment, excluded=reconciled]
+            2023-11-19T21:15:00Z | Monzo -> Monzo Joint | 1000 GBP | To joint [Monzo Category=Transfers, Monzo Transaction ID=tx_personal_1, Type=Faster payment]
+            2023-11-20T08:01:00Z | Monzo -> Tesco | 12.4 GBP | TESCO STORES [Monzo Category=Transfers, Monzo Transaction ID=tx_personal_2, Type=Faster payment]
+            2023-11-21T18:30:00Z | Monzo Joint -> Landlord | 900 GBP | RENT [Monzo Category=Transfers, Monzo Transaction ID=tx_joint_2, Type=Faster payment]
+            == trades (0)
+            == relationships (1)
+            reconciled: PRIMARY {2023-11-19T21:15:00Z | Monzo -> Monzo Joint | 1000 GBP | From personal [Monzo Category=Transfers, Monzo Transaction ID=tx_joint_1, Type=Faster payment, excluded=reconciled]} & RELATED {2023-11-19T21:15:00Z | Monzo -> Monzo Joint | 1000 GBP | To joint [Monzo Category=Transfers, Monzo Transaction ID=tx_personal_1, Type=Faster payment]}
+            == daily balances (6)
+            Landlord | 2023-11-21 | GBP | 900
+            Monzo Joint | 2023-11-19 | GBP | 1000
+            Monzo Joint | 2023-11-21 | GBP | 100
+            Monzo | 2023-11-19 | GBP | -1000
+            Monzo | 2023-11-20 | GBP | -1012.4
+            Tesco | 2023-11-20 | GBP | 12.4
+            """.trimIndent(),
+        "Freetrade ISA + Monzo (placeholder other side)" to
+            """
+            == accounts (6)
+            Freetrade ISA
+            Freetrade Interest
+            Freetrade Limited
+            Freetrade Top Ups
+            Landlord
+            Monzo
+            == transfers (4)
+            2026-02-16T00:00:00Z | Freetrade Interest -> Freetrade ISA | 0.02 GBP | Interest [freetrade-type=INTEREST_FROM_CASH]
+            2026-02-28T09:00:00Z | Monzo -> Landlord | 1000 GBP | RENT [Monzo Category=Transfers, Monzo Transaction ID=tx_ft_2, Type=Faster payment]
+            2026-03-01T09:00:00Z | Monzo -> Freetrade ISA | 1000 GBP | FREETRADE [Monzo Category=Transfers, Monzo Transaction ID=tx_ft_1, Type=Faster payment]
+            2026-03-01T10:28:23.178Z | Freetrade Top Ups -> Freetrade ISA | 1000 GBP | Top up [excluded=reconciled, freetrade-type=TOP_UP, unidentified-counterparty=source]
+            == trades (1)
+            2026-03-02T08:49:09.042Z | Freetrade ISA 998.64 GBP -> Freetrade ISA 202 EXFD | Example Fund
+            == relationships (1)
+            reconciled: PRIMARY {2026-03-01T09:00:00Z | Monzo -> Freetrade ISA | 1000 GBP | FREETRADE [Monzo Category=Transfers, Monzo Transaction ID=tx_ft_1, Type=Faster payment]} & RELATED {2026-03-01T10:28:23.178Z | Freetrade Top Ups -> Freetrade ISA | 1000 GBP | Top up [excluded=reconciled, freetrade-type=TOP_UP, unidentified-counterparty=source]}
+            == daily balances (9)
+            Freetrade ISA | 2026-02-16 | GBP | 0.02
+            Freetrade ISA | 2026-03-01 | GBP | 1000.02
+            Freetrade ISA | 2026-03-02 | EXFD | 202
+            Freetrade ISA | 2026-03-02 | GBP | 1.38
+            Freetrade Interest | 2026-02-16 | GBP | -0.02
+            Freetrade Top Ups | 2026-03-01 | GBP | 0
+            Landlord | 2026-02-28 | GBP | 1000
+            Monzo | 2026-02-28 | GBP | -1000
+            Monzo | 2026-03-01 | GBP | -2000
+            """.trimIndent(),
+        "American Express QIF + Santander QIF" to
+            """
+            == accounts (4)
+            AMERICAN EXPRESS
+            PAYMENT RECEIVED - THANK YOU
+            SAINSBURY'S
+            Santander
+            == transfers (9)
+            2020-02-02T12:00:00Z | PAYMENT RECEIVED - THANK YOU -> AMERICAN EXPRESS | 1239.68 GBP | PAYMENT RECEIVED - THANK YOU [amex-process-date=02/02/2020, amex-reference=9936180, excluded=reconciled, unidentified-counterparty=source]
+            2020-02-04T12:00:00Z | Santander -> AMERICAN EXPRESS | 1239.68 GBP | DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 3746-935125-04002, MANDATE NO 0013 [santander-mandate=0013, santander-reference=3746-935125-04002, santander-transaction-type=DIRECT_DEBIT]
+            2020-03-04T12:00:00Z | PAYMENT RECEIVED - THANK YOU -> AMERICAN EXPRESS | 738.42 GBP | PAYMENT RECEIVED - THANK YOU [amex-process-date=04/03/2020, amex-reference=9936181, excluded=reconciled, unidentified-counterparty=source]
+            2020-03-04T12:00:00Z | Santander -> AMERICAN EXPRESS | 738.42 GBP | DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 3746-935125-04002, MANDATE NO 0013 [santander-mandate=0013, santander-reference=3746-935125-04002, santander-transaction-type=DIRECT_DEBIT]
+            2020-03-19T12:00:00Z | AMERICAN EXPRESS -> SAINSBURY'S | 16.1 GBP | SAINSBURY'S [amex-merchant-type=GOODS, amex-process-date=19/03/2020, amex-reference=9936189]
+            2020-04-02T12:00:00Z | PAYMENT RECEIVED - THANK YOU -> AMERICAN EXPRESS | 1574.62 GBP | PAYMENT RECEIVED - THANK YOU [amex-process-date=02/04/2020, amex-reference=9936182, excluded=reconciled, unidentified-counterparty=source]
+            2020-04-02T12:00:00Z | Santander -> AMERICAN EXPRESS | 1574.62 GBP | DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 3746-935125-04002, MANDATE NO 0013 [santander-mandate=0013, santander-reference=3746-935125-04002, santander-transaction-type=DIRECT_DEBIT]
+            2020-05-03T12:00:00Z | PAYMENT RECEIVED - THANK YOU -> AMERICAN EXPRESS | 1801.13 GBP | PAYMENT RECEIVED - THANK YOU [amex-process-date=03/05/2020, amex-reference=9936183, excluded=reconciled, unidentified-counterparty=source]
+            2020-05-06T12:00:00Z | Santander -> AMERICAN EXPRESS | 1801.13 GBP | DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 3746-935125-04002, MANDATE NO 0013 [santander-mandate=0013, santander-reference=3746-935125-04002, santander-transaction-type=DIRECT_DEBIT]
+            == trades (0)
+            == relationships (4)
+            reconciled: PRIMARY {2020-02-04T12:00:00Z | Santander -> AMERICAN EXPRESS | 1239.68 GBP | DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 3746-935125-04002, MANDATE NO 0013 [santander-mandate=0013, santander-reference=3746-935125-04002, santander-transaction-type=DIRECT_DEBIT]} & RELATED {2020-02-02T12:00:00Z | PAYMENT RECEIVED - THANK YOU -> AMERICAN EXPRESS | 1239.68 GBP | PAYMENT RECEIVED - THANK YOU [amex-process-date=02/02/2020, amex-reference=9936180, excluded=reconciled, unidentified-counterparty=source]}
+            reconciled: PRIMARY {2020-03-04T12:00:00Z | Santander -> AMERICAN EXPRESS | 738.42 GBP | DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 3746-935125-04002, MANDATE NO 0013 [santander-mandate=0013, santander-reference=3746-935125-04002, santander-transaction-type=DIRECT_DEBIT]} & RELATED {2020-03-04T12:00:00Z | PAYMENT RECEIVED - THANK YOU -> AMERICAN EXPRESS | 738.42 GBP | PAYMENT RECEIVED - THANK YOU [amex-process-date=04/03/2020, amex-reference=9936181, excluded=reconciled, unidentified-counterparty=source]}
+            reconciled: PRIMARY {2020-04-02T12:00:00Z | Santander -> AMERICAN EXPRESS | 1574.62 GBP | DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 3746-935125-04002, MANDATE NO 0013 [santander-mandate=0013, santander-reference=3746-935125-04002, santander-transaction-type=DIRECT_DEBIT]} & RELATED {2020-04-02T12:00:00Z | PAYMENT RECEIVED - THANK YOU -> AMERICAN EXPRESS | 1574.62 GBP | PAYMENT RECEIVED - THANK YOU [amex-process-date=02/04/2020, amex-reference=9936182, excluded=reconciled, unidentified-counterparty=source]}
+            reconciled: PRIMARY {2020-05-06T12:00:00Z | Santander -> AMERICAN EXPRESS | 1801.13 GBP | DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 3746-935125-04002, MANDATE NO 0013 [santander-mandate=0013, santander-reference=3746-935125-04002, santander-transaction-type=DIRECT_DEBIT]} & RELATED {2020-05-03T12:00:00Z | PAYMENT RECEIVED - THANK YOU -> AMERICAN EXPRESS | 1801.13 GBP | PAYMENT RECEIVED - THANK YOU [amex-process-date=03/05/2020, amex-reference=9936183, excluded=reconciled, unidentified-counterparty=source]}
+            == daily balances (16)
+            AMERICAN EXPRESS | 2020-02-02 | GBP | 0
+            AMERICAN EXPRESS | 2020-02-04 | GBP | 1239.68
+            AMERICAN EXPRESS | 2020-03-04 | GBP | 1978.1
+            AMERICAN EXPRESS | 2020-03-19 | GBP | 1962
+            AMERICAN EXPRESS | 2020-04-02 | GBP | 3536.62
+            AMERICAN EXPRESS | 2020-05-03 | GBP | 3536.62
+            AMERICAN EXPRESS | 2020-05-06 | GBP | 5337.75
+            PAYMENT RECEIVED - THANK YOU | 2020-02-02 | GBP | 0
+            PAYMENT RECEIVED - THANK YOU | 2020-03-04 | GBP | 0
+            PAYMENT RECEIVED - THANK YOU | 2020-04-02 | GBP | 0
+            PAYMENT RECEIVED - THANK YOU | 2020-05-03 | GBP | 0
+            SAINSBURY'S | 2020-03-19 | GBP | 16.1
+            Santander | 2020-02-04 | GBP | -1239.68
+            Santander | 2020-03-04 | GBP | -1978.1
+            Santander | 2020-04-02 | GBP | -3552.72
+            Santander | 2020-05-06 | GBP | -5353.85
+            """.trimIndent(),
+        "Revolut EUR + USD statements (acrossFiles)" to
+            """
+            == accounts (4)
+            ATM
+            Deichmann
+            Revolut
+            Revolut Fees [fee-account-for=Revolut]
+            == transfers (3)
+            2020-05-30T15:23:24Z | Revolut -> Deichmann | 22.35 EUR | Deichmann [revolut-row-id=Current 2020-05-30 15:23:24 Card Payment Deichmann EUR -22.35 977.65, revolut-type=Card Payment]
+            2020-06-02T10:00:00Z | Revolut -> ATM | 50 USD | Cash withdrawal at Atm [revolut-row-id=Current 2020-06-02 10:00:00 ATM Cash withdrawal at Atm USD -50.00 180.00, revolut-type=ATM]
+            2020-06-02T10:00:00Z | Revolut -> Revolut Fees | 1.5 USD | Fee
+            == trades (1)
+            2020-06-01T09:07:19Z | Revolut 200 EUR -> Revolut 230 USD | Exchange EUR to USD
+            == relationships (1)
+            fee: PRIMARY {2020-06-02T10:00:00Z | Revolut -> ATM | 50 USD | Cash withdrawal at Atm [revolut-row-id=Current 2020-06-02 10:00:00 ATM Cash withdrawal at Atm USD -50.00 180.00, revolut-type=ATM]} & RELATED {2020-06-02T10:00:00Z | Revolut -> Revolut Fees | 1.5 USD | Fee}
+            == daily balances (7)
+            ATM | 2020-06-02 | USD | 50
+            Deichmann | 2020-05-30 | EUR | 22.35
+            Revolut Fees | 2020-06-02 | USD | 1.5
+            Revolut | 2020-05-30 | EUR | -22.35
+            Revolut | 2020-06-01 | EUR | -222.35
+            Revolut | 2020-06-01 | USD | 230
+            Revolut | 2020-06-02 | USD | 178.5
+            """.trimIndent(),
+        "Crypto.com card + PayPal CSV (conduit)" to
+            """
+            == accounts (13)
+            Crypto.com Card
+            Curve
+            Frank Frumento
+            PayPal
+            PayPal Bank Transfers
+            PayPal Card Funding
+            PayPal Conversions
+            Pret-a-Portrait Ltd
+            Pretportrai
+            UBER PAYMENTS UK LIMITED
+            Uber 40293
+            Uber Technologies, Inc
+            Ubertrip 3
+            == transfers (16)
+            2025-10-10T06:34:03Z | Frank Frumento -> PayPal | 8 GBP | Frank Frumento [paypal-status=Completed, paypal-transaction-id=9, paypal-type=Mobile Payment]
+            2025-10-10T07:32:34Z | PayPal -> PayPal Bank Transfers | 8 GBP | General Withdrawal [paypal-status=Processing, paypal-transaction-id=10, paypal-type=General Withdrawal, unidentified-counterparty=target]
+            2025-10-17T08:57:28Z | Crypto.com Card -> PayPal | 17.39 GBP | Paypal *Pretportrai [cryptocom-txn-amount=-17.39, cryptocom-txn-currency=GBP, cryptocom-usd-amount=0.0]
+            2025-10-17T08:57:28Z | PayPal -> Pretportrai | 17.39 GBP | Pretportrai [excluded=reconciled]
+            2025-10-17T08:57:32Z | PayPal -> Pret-a-Portrait Ltd | 17.39 GBP | Pret-a-Portrait Ltd [paypal-status=Completed, paypal-transaction-id=7, paypal-type=Express Checkout Payment]
+            2025-10-17T08:57:32Z | PayPal Card Funding -> PayPal | 17.39 GBP | General Credit Card Deposit [excluded=reconciled, paypal-status=Completed, paypal-transaction-id=8, paypal-type=General Credit Card Deposit, unidentified-counterparty=source]
+            2025-10-20T20:15:01Z | PayPal -> Uber Technologies, Inc | 4.04 USD | Uber Technologies, Inc [paypal-status=Completed, paypal-transaction-id=3, paypal-type=Pre-approved Payment Bill User Payment]
+            2025-10-20T20:15:01Z | PayPal Card Funding -> PayPal | 3.14 GBP | General Credit Card Deposit [excluded=reconciled, paypal-status=Completed, paypal-transaction-id=4, paypal-type=General Credit Card Deposit, unidentified-counterparty=source]
+            2025-10-20T20:15:04Z | Crypto.com Card -> Curve | 3.14 GBP | Crv*Paypal *Uber 40293 [cryptocom-txn-amount=-3.14, cryptocom-txn-currency=GBP, cryptocom-usd-amount=0.0]
+            2025-10-20T20:15:04Z | Curve -> PayPal | 3.14 GBP | Paypal *Uber 40293
+            2025-10-20T20:15:04Z | PayPal -> Uber 40293 | 3.14 GBP | Uber 40293 [excluded=reconciled]
+            2025-11-02T11:02:33Z | Crypto.com Card -> Curve | 21.92 GBP | Crv*Paypal *Ubertrip 3 [cryptocom-txn-amount=-21.92, cryptocom-txn-currency=GBP, cryptocom-usd-amount=0.0]
+            2025-11-02T11:02:33Z | Curve -> PayPal | 21.92 GBP | Paypal *Ubertrip 3
+            2025-11-02T11:02:33Z | PayPal -> Ubertrip 3 | 21.92 GBP | Ubertrip 3 [excluded=reconciled]
+            2025-11-02T11:55:15Z | PayPal -> UBER PAYMENTS UK LIMITED | 21.92 GBP | UBER PAYMENTS UK LIMITED [paypal-status=Completed, paypal-transaction-id=1, paypal-type=Pre-approved Payment Bill User Payment]
+            2025-11-02T11:55:15Z | PayPal Card Funding -> PayPal | 21.92 GBP | General Credit Card Deposit [excluded=reconciled, paypal-status=Completed, paypal-transaction-id=2, paypal-type=General Credit Card Deposit, unidentified-counterparty=source]
+            == trades (1)
+            2025-10-20T20:15:01Z | PayPal 3.14 GBP -> PayPal 4.04 USD | Convert GBP to USD
+            == relationships (13)
+            pass-through: PRIMARY {2025-10-17T08:57:28Z | Crypto.com Card -> PayPal | 17.39 GBP | Paypal *Pretportrai [cryptocom-txn-amount=-17.39, cryptocom-txn-currency=GBP, cryptocom-usd-amount=0.0]} & RELATED {2025-10-17T08:57:28Z | PayPal -> Pretportrai | 17.39 GBP | Pretportrai [excluded=reconciled]}
+            pass-through: PRIMARY {2025-10-17T08:57:32Z | PayPal Card Funding -> PayPal | 17.39 GBP | General Credit Card Deposit [excluded=reconciled, paypal-status=Completed, paypal-transaction-id=8, paypal-type=General Credit Card Deposit, unidentified-counterparty=source]} & RELATED {2025-10-17T08:57:32Z | PayPal -> Pret-a-Portrait Ltd | 17.39 GBP | Pret-a-Portrait Ltd [paypal-status=Completed, paypal-transaction-id=7, paypal-type=Express Checkout Payment]}
+            pass-through: PRIMARY {2025-10-20T20:15:04Z | Crypto.com Card -> Curve | 3.14 GBP | Crv*Paypal *Uber 40293 [cryptocom-txn-amount=-3.14, cryptocom-txn-currency=GBP, cryptocom-usd-amount=0.0]} & RELATED {2025-10-20T20:15:04Z | Curve -> PayPal | 3.14 GBP | Paypal *Uber 40293}
+            pass-through: PRIMARY {2025-10-20T20:15:04Z | Curve -> PayPal | 3.14 GBP | Paypal *Uber 40293} & RELATED {2025-10-20T20:15:04Z | PayPal -> Uber 40293 | 3.14 GBP | Uber 40293 [excluded=reconciled]}
+            pass-through: PRIMARY {2025-11-02T11:02:33Z | Crypto.com Card -> Curve | 21.92 GBP | Crv*Paypal *Ubertrip 3 [cryptocom-txn-amount=-21.92, cryptocom-txn-currency=GBP, cryptocom-usd-amount=0.0]} & RELATED {2025-11-02T11:02:33Z | Curve -> PayPal | 21.92 GBP | Paypal *Ubertrip 3}
+            pass-through: PRIMARY {2025-11-02T11:02:33Z | Curve -> PayPal | 21.92 GBP | Paypal *Ubertrip 3} & RELATED {2025-11-02T11:02:33Z | PayPal -> Ubertrip 3 | 21.92 GBP | Ubertrip 3 [excluded=reconciled]}
+            pass-through: PRIMARY {2025-11-02T11:55:15Z | PayPal Card Funding -> PayPal | 21.92 GBP | General Credit Card Deposit [excluded=reconciled, paypal-status=Completed, paypal-transaction-id=2, paypal-type=General Credit Card Deposit, unidentified-counterparty=source]} & RELATED {2025-11-02T11:55:15Z | PayPal -> UBER PAYMENTS UK LIMITED | 21.92 GBP | UBER PAYMENTS UK LIMITED [paypal-status=Completed, paypal-transaction-id=1, paypal-type=Pre-approved Payment Bill User Payment]}
+            reconciled: PRIMARY {2025-10-17T08:57:32Z | PayPal Card Funding -> PayPal | 17.39 GBP | General Credit Card Deposit [excluded=reconciled, paypal-status=Completed, paypal-transaction-id=8, paypal-type=General Credit Card Deposit, unidentified-counterparty=source]} & RELATED {2025-10-17T08:57:28Z | Crypto.com Card -> PayPal | 17.39 GBP | Paypal *Pretportrai [cryptocom-txn-amount=-17.39, cryptocom-txn-currency=GBP, cryptocom-usd-amount=0.0]}
+            reconciled: PRIMARY {2025-10-17T08:57:32Z | PayPal Card Funding -> PayPal | 17.39 GBP | General Credit Card Deposit [excluded=reconciled, paypal-status=Completed, paypal-transaction-id=8, paypal-type=General Credit Card Deposit, unidentified-counterparty=source]} & RELATED {2025-10-17T08:57:28Z | PayPal -> Pretportrai | 17.39 GBP | Pretportrai [excluded=reconciled]}
+            reconciled: PRIMARY {2025-10-20T20:15:01Z | PayPal Card Funding -> PayPal | 3.14 GBP | General Credit Card Deposit [excluded=reconciled, paypal-status=Completed, paypal-transaction-id=4, paypal-type=General Credit Card Deposit, unidentified-counterparty=source]} & RELATED {2025-10-20T20:15:04Z | Curve -> PayPal | 3.14 GBP | Paypal *Uber 40293}
+            reconciled: PRIMARY {2025-10-20T20:15:01Z | PayPal Card Funding -> PayPal | 3.14 GBP | General Credit Card Deposit [excluded=reconciled, paypal-status=Completed, paypal-transaction-id=4, paypal-type=General Credit Card Deposit, unidentified-counterparty=source]} & RELATED {2025-10-20T20:15:04Z | PayPal -> Uber 40293 | 3.14 GBP | Uber 40293 [excluded=reconciled]}
+            reconciled: PRIMARY {2025-11-02T11:55:15Z | PayPal Card Funding -> PayPal | 21.92 GBP | General Credit Card Deposit [excluded=reconciled, paypal-status=Completed, paypal-transaction-id=2, paypal-type=General Credit Card Deposit, unidentified-counterparty=source]} & RELATED {2025-11-02T11:02:33Z | Curve -> PayPal | 21.92 GBP | Paypal *Ubertrip 3}
+            reconciled: PRIMARY {2025-11-02T11:55:15Z | PayPal Card Funding -> PayPal | 21.92 GBP | General Credit Card Deposit [excluded=reconciled, paypal-status=Completed, paypal-transaction-id=2, paypal-type=General Credit Card Deposit, unidentified-counterparty=source]} & RELATED {2025-11-02T11:02:33Z | PayPal -> Ubertrip 3 | 21.92 GBP | Ubertrip 3 [excluded=reconciled]}
+            == daily balances (21)
+            Crypto.com Card | 2025-10-17 | GBP | -17.39
+            Crypto.com Card | 2025-10-20 | GBP | -20.53
+            Crypto.com Card | 2025-11-02 | GBP | -42.45
+            Curve | 2025-10-20 | GBP | 0
+            Curve | 2025-11-02 | GBP | 0
+            Frank Frumento | 2025-10-10 | GBP | -8
+            PayPal Bank Transfers | 2025-10-10 | GBP | 8
+            PayPal Card Funding | 2025-10-17 | GBP | 0
+            PayPal Card Funding | 2025-10-20 | GBP | 0
+            PayPal Card Funding | 2025-11-02 | GBP | 0
+            PayPal | 2025-10-10 | GBP | 0
+            PayPal | 2025-10-17 | GBP | 0
+            PayPal | 2025-10-20 | GBP | 0
+            PayPal | 2025-10-20 | USD | 0
+            PayPal | 2025-11-02 | GBP | 0
+            Pret-a-Portrait Ltd | 2025-10-17 | GBP | 17.39
+            Pretportrai | 2025-10-17 | GBP | 0
+            UBER PAYMENTS UK LIMITED | 2025-11-02 | GBP | 21.92
+            Uber 40293 | 2025-10-20 | GBP | 0
+            Uber Technologies, Inc | 2025-10-20 | USD | 4.04
+            Ubertrip 3 | 2025-11-02 | GBP | 0
+            """.trimIndent(),
+        "Crypto.com card + Curve export" to
+            """
+            == accounts (6)
+            AMZN Mktp UK
+            Amazon
+            Crypto.com Card [card-last4=7721]
+            Curve
+            Curve card 7721
+            Mavroni
+            == transfers (6)
+            2023-11-18T12:00:00Z | Curve -> Mavroni | 50 EUR | Mavroni
+            2023-11-18T12:00:00Z | Curve card 7721 -> Curve | 50 EUR | Mavroni [curve-funding-card=7721, curve-mcc=5999, unidentified-counterparty=source]
+            2023-11-19T12:00:00Z | Curve -> AMZN Mktp UK | 12.99 GBP | AMZN Mktp UK
+            2023-11-19T12:00:00Z | Curve card 7721 -> Curve | 12.99 GBP | AMZN Mktp UK [curve-funding-card=7721, curve-mcc=5999, excluded=reconciled, unidentified-counterparty=source]
+            2023-11-19T21:15:00Z | Crypto.com Card -> Curve | 12.99 GBP | Crv*Amazon [cryptocom-txn-amount=-12.99, cryptocom-txn-currency=GBP, cryptocom-usd-amount=0.0]
+            2023-11-19T21:15:00Z | Curve -> Amazon | 12.99 GBP | Amazon [excluded=reconciled]
+            == trades (0)
+            == relationships (5)
+            pass-through: PRIMARY {2023-11-18T12:00:00Z | Curve card 7721 -> Curve | 50 EUR | Mavroni [curve-funding-card=7721, curve-mcc=5999, unidentified-counterparty=source]} & RELATED {2023-11-18T12:00:00Z | Curve -> Mavroni | 50 EUR | Mavroni}
+            pass-through: PRIMARY {2023-11-19T12:00:00Z | Curve card 7721 -> Curve | 12.99 GBP | AMZN Mktp UK [curve-funding-card=7721, curve-mcc=5999, excluded=reconciled, unidentified-counterparty=source]} & RELATED {2023-11-19T12:00:00Z | Curve -> AMZN Mktp UK | 12.99 GBP | AMZN Mktp UK}
+            pass-through: PRIMARY {2023-11-19T21:15:00Z | Crypto.com Card -> Curve | 12.99 GBP | Crv*Amazon [cryptocom-txn-amount=-12.99, cryptocom-txn-currency=GBP, cryptocom-usd-amount=0.0]} & RELATED {2023-11-19T21:15:00Z | Curve -> Amazon | 12.99 GBP | Amazon [excluded=reconciled]}
+            reconciled: PRIMARY {2023-11-19T12:00:00Z | Curve card 7721 -> Curve | 12.99 GBP | AMZN Mktp UK [curve-funding-card=7721, curve-mcc=5999, excluded=reconciled, unidentified-counterparty=source]} & RELATED {2023-11-19T21:15:00Z | Crypto.com Card -> Curve | 12.99 GBP | Crv*Amazon [cryptocom-txn-amount=-12.99, cryptocom-txn-currency=GBP, cryptocom-usd-amount=0.0]}
+            reconciled: PRIMARY {2023-11-19T12:00:00Z | Curve card 7721 -> Curve | 12.99 GBP | AMZN Mktp UK [curve-funding-card=7721, curve-mcc=5999, excluded=reconciled, unidentified-counterparty=source]} & RELATED {2023-11-19T21:15:00Z | Curve -> Amazon | 12.99 GBP | Amazon [excluded=reconciled]}
+            == daily balances (8)
+            AMZN Mktp UK | 2023-11-19 | GBP | 12.99
+            Amazon | 2023-11-19 | GBP | 0
+            Crypto.com Card | 2023-11-19 | GBP | -12.99
+            Curve card 7721 | 2023-11-18 | EUR | -50
+            Curve card 7721 | 2023-11-19 | GBP | 0
+            Curve | 2023-11-18 | EUR | 0
+            Curve | 2023-11-19 | GBP | 0
+            Mavroni | 2023-11-18 | EUR | 50
+            """.trimIndent(),
+        "Binance CSV + Koinly (reconciliation source)" to
+            """
+            == accounts (6)
+            Binance
+            Binance Funding
+            Koinly · Binance Fees [fee-account-for=Koinly · Binance, reconciliation-source=Koinly]
+            Koinly · Binance [reconciliation-source=Koinly]
+            Koinly · Nexo [reconciliation-source=Koinly]
+            Koinly: External [reconciliation-source=Koinly]
+            == transfers (5)
+            2021-05-20T10:00:00Z | Binance Funding -> Binance | 0.5 BTC | Deposit [binance-operation=Deposit, binance-user-id=53064551, unidentified-counterparty=source]
+            2021-05-20T10:00:00Z | Koinly: External -> Koinly · Binance | 0.5 BTC | deposit [koinly-id=K0, koinly-type=deposit]
+            2021-05-26T19:48:36Z | Koinly · Binance -> Koinly · Binance Fees | 0.00055 BTC | Fee
+            2021-05-26T19:48:36Z | Koinly · Binance -> Koinly · Nexo | 0.27931608 BTC | transfer [koinly-id=K1, koinly-type=transfer]
+            2021-05-26T19:49:05Z | Binance -> Binance Funding | 0.27986608 BTC | Withdraw [binance-operation=Withdraw, binance-remark=Withdraw fee is included, binance-user-id=53064551, manual-entry=Withdrawal fee, unidentified-counterparty=target]
+            == trades (0)
+            == relationships (1)
+            fee: PRIMARY {2021-05-26T19:48:36Z | Koinly · Binance -> Koinly · Nexo | 0.27931608 BTC | transfer [koinly-id=K1, koinly-type=transfer]} & RELATED {2021-05-26T19:48:36Z | Koinly · Binance -> Koinly · Binance Fees | 0.00055 BTC | Fee}
+            == daily balances (9)
+            Binance Funding | 2021-05-20 | BTC | -0.5
+            Binance Funding | 2021-05-26 | BTC | -0.22013392
+            Binance | 2021-05-20 | BTC | 0.5
+            Binance | 2021-05-26 | BTC | 0.22013392
+            Koinly · Binance Fees | 2021-05-26 | BTC | 0.00055
+            Koinly · Binance | 2021-05-20 | BTC | 0.5
+            Koinly · Binance | 2021-05-26 | BTC | 0.22013392
+            Koinly · Nexo | 2021-05-26 | BTC | 0.27931608
+            Koinly: External | 2021-05-20 | BTC | -0.5
+            """.trimIndent(),
+    )

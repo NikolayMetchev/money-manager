@@ -30,6 +30,9 @@ enum class SourceType(
 
     /** Copied from a reconciliation source onto real accounts */
     RECONCILIATION(9),
+
+    /** Written by the observation matcher: the exclusion links of shape-changing matches */
+    RECONCILER(10),
     ;
 
     companion object {

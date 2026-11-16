@@ -19,6 +19,7 @@ import com.moneymanager.domain.model.rules.contains
 import com.moneymanager.domain.model.rules.meets
 import com.moneymanager.domain.model.statementAccountId
 import com.moneymanager.importengineapi.AccountRef
+import com.moneymanager.importengineapi.ConduitStatementMatch
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.StringSimilarity
@@ -73,22 +74,6 @@ data class Classified(
     val supersededLegs: List<ExcludeExistingLeg> = emptyList(),
     /** Set when this pass-through row's chain runs through a conduit whose own statement is already imported. */
     val conduitStatement: ConduitStatementMatch? = null,
-)
-
-/**
- * A pass-through chain whose conduit [conduitIndex] already has its own statement imported: an existing
- * placeholder leg ([statementLegId], e.g. a PayPal export's "General Credit Card Deposit", which cannot
- * name the card) records the same money arriving in (or, for a refund, leaving) the conduit as the chain's
- * movement into it — the main transfer for conduit 0, spend leg `conduitIndex - 1` otherwise. The engine
- * links that movement to [statementLegId] (`reconciled`), and creates every spend leg from the conduit
- * onward excluded: those legs are the card statement's guess at what the conduit did with the money, and
- * the conduit's statement records what it actually did (the real payee, a currency conversion first, …).
- */
-data class ConduitStatementMatch(
-    val conduitIndex: Int,
-    val statementLegId: TransferId,
-    val relationshipTypeId: RelationshipTypeId,
-    val exclusionTypeId: AttributeTypeId,
 )
 
 /** An existing transfer to tag excluded (its [transfer] carries the real id + fields to preserve). */
