@@ -36,6 +36,9 @@ interface ObservationWriteRepository : ObservationReadRepository {
 
     suspend fun deleteObservation(id: ObservationId)
 
+    /** Deletes every observation on [transactionIds], whoever owns it: the transactions are being deleted. */
+    suspend fun deleteObservationsOfTransactions(transactionIds: Collection<TransactionId>)
+
     /**
      * Moves every observation end on [deletedAccountId] to [survivingAccountId] and records which, under [mergeId],
      * so [restoreAccountReferences] can move exactly those back.

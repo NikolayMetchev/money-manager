@@ -7,6 +7,7 @@ import com.moneymanager.bigdecimal.BigInteger
 import com.moneymanager.database.sql.read.MoneyManagerDatabase
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
+import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.TransactionKind
@@ -30,6 +31,7 @@ class ObservationReadRepositoryImpl(
     database: MoneyManagerDatabase,
 ) : ObservationReadRepository {
     private val queries = database.observationSelectQueries
+    private val entitySources = database.entitySourceSelectQueries
 
     override suspend fun getObservation(id: ObservationId): Observation? =
         queries.selectHeaderById(id.id, ::Header).awaitAsOneOrNull()?.let { load(it) }
@@ -39,6 +41,15 @@ class ObservationReadRepositoryImpl(
             .selectHeadersByOwner(owner.kindName(), owner.ownerId(), ::Header)
             .awaitAsList()
             .map { load(it) }
+
+    override suspend fun getCreationSourceId(transactionId: TransactionId): Long? =
+        entitySources
+            .selectEntitySourceForRevision(
+                if (transactionId is TransferId) EntityType.TRANSFER.id else EntityType.TRADE.id,
+                transactionId.id,
+                1L,
+            ).awaitAsOneOrNull()
+            ?.id
 
     override suspend fun getObservationsOfTransaction(transactionId: TransactionId): List<Observation> =
         queries

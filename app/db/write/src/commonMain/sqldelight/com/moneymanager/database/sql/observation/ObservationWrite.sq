@@ -98,3 +98,6 @@ WHERE observation_id IN (SELECT observation_id FROM account_merge_observation WH
 
 deleteMergeMoves:
 DELETE FROM account_merge_observation WHERE merge_id = ?;
+
+deleteObservationsOfTransaction:
+DELETE FROM observation WHERE transaction_id = ?;

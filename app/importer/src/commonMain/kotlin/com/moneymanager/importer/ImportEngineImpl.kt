@@ -25,12 +25,16 @@ import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Trade
 import com.moneymanager.domain.model.TradeId
+import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.calendar.BusinessDayCalendar
 import com.moneymanager.domain.model.csv.ImportStatus
+import com.moneymanager.domain.model.observation.ImportRecordId
 import com.moneymanager.domain.model.observation.ImportRecordKey
+import com.moneymanager.domain.model.observation.ObservationContent
+import com.moneymanager.domain.model.observation.ObservationOwner
 import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.domain.model.rules.widen
 import com.moneymanager.domain.model.withStatementAccount
@@ -79,6 +83,7 @@ import com.moneymanager.importengineapi.CsvStrategyMutation
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.EditGate
 import com.moneymanager.importengineapi.ExpandedRow
+import com.moneymanager.importengineapi.ExpandedTransfer
 import com.moneymanager.importengineapi.ExpansionRow
 import com.moneymanager.importengineapi.HolidayCalendarMutation
 import com.moneymanager.importengineapi.ImportAccountIntent
@@ -104,6 +109,7 @@ import com.moneymanager.importengineapi.MaterializationRequest
 import com.moneymanager.importengineapi.ObservationExpander
 import com.moneymanager.importengineapi.ObservationKey
 import com.moneymanager.importengineapi.ObservationMutation
+import com.moneymanager.importengineapi.ObservationOwnerKey
 import com.moneymanager.importengineapi.ObservationSlot
 import com.moneymanager.importengineapi.PassThroughMutation
 import com.moneymanager.importengineapi.PersonMatchKey
@@ -117,6 +123,8 @@ import com.moneymanager.importengineapi.bankKeyFromExternalId
 import com.moneymanager.importengineapi.bankKeysFrom
 import com.moneymanager.importengineapi.forRow
 import com.moneymanager.importengineapi.normalizeNameKey
+import com.moneymanager.importengineapi.observationContent
+import com.moneymanager.importengineapi.observationKey
 import com.moneymanager.importengineapi.observationOwner
 import com.moneymanager.tasks.Progress
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -133,6 +141,9 @@ import kotlin.uuid.Uuid
  * ~8x slower than its deletes.
  */
 private const val DELETE_CHUNK_ROWS = 500
+
+/** The content hash of an API item's import record until the API sync (#1429) hashes what each item says. */
+private const val API_ITEM_UNHASHED = "unhashed"
 
 /** Upper bound on the legs walked along one pass-through chain; real chains are a few hops (card → Curve → PayPal → merchant). */
 private const val MAX_PASS_THROUGH_CHAIN_LEGS = 16
@@ -360,6 +371,16 @@ class ImportEngineImpl(
             createdTradeIds[intent.key] = tradeResult.id
             if (!tradeResult.created) dedupedTradeKeys += intent.key
         }
+        val observer = sourceObservations()
+        for ((intent, tradeResult) in tradesToWrite.map { it.first }.zip(tradeResults)) {
+            if (tradeResult.created) {
+                observer?.record(
+                    intent.observationKey(),
+                    intent.source,
+                    tradeResult.id,
+                ) { intent.observationContent() }
+            }
+        }
         for (intent in batch.orders) {
             val orderResult =
                 exchangeOrderRepository.upsertOrder(
@@ -516,10 +537,12 @@ class ImportEngineImpl(
         }
 
         transferDeletes.map { requireNotNull(it.existingId) }.chunked(DELETE_CHUNK_ROWS).forEach { chunk ->
+            observationRepository?.deleteObservationsOfTransactions(chunk)
             transactionRepository.deleteTransactions(chunk)
             reportDeleted(chunk.size)
         }
         tradeDeletes.map { requireNotNull(it.existingId) }.chunked(DELETE_CHUNK_ROWS).forEach { chunk ->
+            observationRepository?.deleteObservationsOfTransactions(chunk)
             tradeRepository.deleteTrades(chunk)
             reportDeleted(chunk.size)
         }
@@ -575,6 +598,94 @@ class ImportEngineImpl(
             trades = tradeRepository,
             relationships = relationshipRepository,
         ).run(mutations, request)
+
+    /**
+     * Records what API items and hand entries say about the transactions this batch books, beside the rows themselves
+     * (#1429, #1430): the observations staged files will be matched against once they sync (#1428). Null without the
+     * repositories it writes to.
+     */
+    private suspend fun sourceObservations(): SourceObservations? {
+        val observations = observationRepository ?: return null
+        val unidentified =
+            attributeTypeRepository.getByName(WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME).first()?.id
+        return SourceObservations(observations, importRecordRepository, unidentified)
+    }
+
+    /** Deletes [sessionId]'s import records, which restrict the session's deletion, and their observations first. */
+    private suspend fun deleteSessionRecords(sessionId: ApiSessionId) {
+        val records = importRecordRepository ?: return
+        val observations = observationRepository
+        for (record in records.getApiSessionRecords(sessionId)) {
+            observations?.getObservationsOf(ObservationOwner.Record(record.id))?.forEach { observations.deleteObservation(it.id) }
+            records.deleteRecord(record.id)
+        }
+    }
+
+    /**
+     * Writes one observation per transaction an API item or a person booked. An API item owns its observations through
+     * its import record (created on first sight, its content not hashed until the API sync, #1429, hashes it); a hand
+     * entry through the provenance row that created the transaction. Other sources' bookings are left to their sync.
+     */
+    private class SourceObservations(
+        private val observations: ObservationWriteRepository,
+        private val records: ImportRecordWriteRepository?,
+        private val unidentifiedCounterpartyTypeId: AttributeTypeId?,
+    ) {
+        private val sessionRecords = mutableMapOf<ApiSessionId, MutableMap<ImportRecordKey, ImportRecordId>>()
+
+        fun transferContent(
+            leg: ExpandedTransfer,
+            approximateTime: Boolean,
+        ): ObservationContent = leg.observationContent(approximateTime, unidentifiedCounterpartyTypeId)
+
+        /** Records [content] for [key] (null: a trade no record backs) on [transactionId], when [provenance] says whose. */
+        suspend fun record(
+            key: ObservationKey?,
+            provenance: Source,
+            transactionId: TransactionId,
+            content: () -> ObservationContent,
+        ) {
+            val slot = key?.slot ?: ObservationSlot.TRADE
+            val (owner, fresh) = owner(key?.owner, provenance, transactionId) ?: return
+            // A record seen before may already say this slot (a trade its re-import found again): it keeps what it said.
+            if (!fresh && observations.getObservationsOf(owner).any { it.slot == slot }) return
+            observations.insertObservation(owner, slot, transactionId, content())
+        }
+
+        /** The owner, and whether it is new (so says nothing yet); null for a booking no API item or person made. */
+        private suspend fun owner(
+            key: ObservationOwnerKey?,
+            provenance: Source,
+            transactionId: TransactionId,
+        ): Pair<ObservationOwner, Boolean>? {
+            val recordKey = (key as? ObservationOwnerKey.Record)?.key
+            return when {
+                recordKey is ImportRecordKey.ApiItem -> {
+                    apiRecord(recordKey)
+                }
+
+                provenance == Source.Manual && (key == null || key is ObservationOwnerKey.Unrecorded) -> {
+                    observations.getCreationSourceId(transactionId)?.let { ObservationOwner.Manual(it) to true }
+                }
+
+                else -> {
+                    null
+                }
+            }
+        }
+
+        private suspend fun apiRecord(key: ImportRecordKey.ApiItem): Pair<ObservationOwner, Boolean>? {
+            val records = records ?: return null
+            val known =
+                sessionRecords.getOrPut(key.sessionId) {
+                    records.getApiSessionRecords(key.sessionId).associateTo(mutableMapOf()) { it.key to it.id }
+                }
+            known[key]?.let { return ObservationOwner.Record(it) to false }
+            val id = records.insertRecord(key, API_ITEM_UNHASHED)
+            known[key] = id
+            return ObservationOwner.Record(id) to true
+        }
+    }
 
     // region Operation dispatch
 
@@ -807,8 +918,19 @@ class ImportEngineImpl(
                 is DedupePolicy.ApiMultiKey -> policy.reconciledExclusionAttributeTypeId
                 else -> null
             }
-        val createdIds = writeTransfers(toImport, toUpdate, batchSize, onProgress, engineOwnedTypeId)
-        writeConversionTrades(toImport)
+        val createdLegs = mutableListOf<Pair<ExpandedTransfer, TransferId>>()
+        val createdIds = writeTransfers(toImport, toUpdate, batchSize, onProgress, engineOwnedTypeId, createdLegs)
+        val observer = sourceObservations()
+        if (observer != null) {
+            val approximate =
+                toImport.mapNotNullTo(
+                    mutableSetOf(),
+                ) { c -> c.transfer.takeIf { it.approximateUntil != null }?.observationKey() }
+            for ((leg, id) in createdLegs) {
+                observer.record(leg.key, leg.provenance, id) { observer.transferContent(leg, leg.key in approximate) }
+            }
+        }
+        writeConversionTrades(toImport, observer)
 
         val createdTransferIds = toImport.zip(createdIds).associate { (c, id) -> requireNotNull(c.transfer.rowKey) to id }
 
@@ -850,10 +972,14 @@ class ImportEngineImpl(
      * reconcile did — otherwise the conversion of money that was never spent would still move balances.
      * Identical conversions within the batch get distinct occurrences, as the trade writer requires.
      */
-    private suspend fun writeConversionTrades(toImport: List<Classified>) {
+    private suspend fun writeConversionTrades(
+        toImport: List<Classified>,
+        observer: SourceObservations?,
+    ) {
         val occurrences = mutableMapOf<List<Any>, Int>()
+        val expanded = toImport.mapNotNull { ObservationExpander.expandConversion(it.transfer) }
         val trades =
-            toImport.mapNotNull { ObservationExpander.expandConversion(it.transfer) }.map { trade ->
+            expanded.map { trade ->
                 // Keyed on the persisted millisecond, as createTrades matches on it (see the leg-group trade loop).
                 val key = listOf(trade.timestamp.toEpochMilliseconds(), trade.accountId, trade.fromAmount, trade.toAmount)
                 val occurrence = occurrences[key] ?: 0
@@ -870,7 +996,12 @@ class ImportEngineImpl(
                     attributes = trade.attributes,
                 )
             }
-        if (trades.isNotEmpty()) tradeRepository.createTrades(trades)
+        if (trades.isEmpty()) return
+        val results = tradeRepository.createTrades(trades)
+        if (observer == null) return
+        for ((trade, result) in expanded.zip(results)) {
+            if (result.created) observer.record(trade.key, trade.provenance, result.id) { trade.observationContent() }
+        }
     }
 
     /**
@@ -1995,6 +2126,7 @@ class ImportEngineImpl(
         batchSize: Int,
         onProgress: (suspend (Progress) -> Unit)?,
         engineOwnedTypeId: AttributeTypeId?,
+        createdLegs: MutableList<Pair<ExpandedTransfer, TransferId>>,
     ): List<TransferId> {
         if (toImport.isEmpty() && toUpdate.isEmpty()) return emptyList()
 
@@ -2047,7 +2179,10 @@ class ImportEngineImpl(
                 )
             // Keep only the main transfers' ids (fee transfers are interleaved), aligned to [toImport].
             createdIds += payload.mainResultIndices.map { allCreatedIds[it] }
-            chunk.flatMap { it.legs }.forEachIndexed { i, leg -> priorIds[leg.key] = allCreatedIds[i] }
+            chunk.flatMap { it.legs }.forEachIndexed { i, leg ->
+                priorIds[leg.key] = allCreatedIds[i]
+                createdLegs += leg to allCreatedIds[i]
+            }
             written += chunk.size
             onProgress?.invoke(
                 Progress(
@@ -2688,6 +2823,7 @@ class ImportEngineImpl(
                 }
 
                 is ApiSessionMutation.DeleteSession -> {
+                    deleteSessionRecords(m.id)
                     apiSessionRepository.deleteSession(m.id)
                 }
 
