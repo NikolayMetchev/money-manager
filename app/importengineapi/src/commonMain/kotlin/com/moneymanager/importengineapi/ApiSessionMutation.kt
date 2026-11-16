@@ -93,7 +93,7 @@ sealed interface ApiSessionMutation {
 
     /**
      * Records [contentHash] as every one of the session's import records' content hash: what its import read besides its
-     * stored responses ([apiSessionInputsHash]), which a re-import compares to tell an unchanged session from a changed one.
+     * stored responses (`apiSessionInputsHash`, in app/apiimporter), which a re-import compares to tell an unchanged session from a changed one.
      */
     data class RecordItems(
         val sessionId: ApiSessionId,
@@ -102,7 +102,7 @@ sealed interface ApiSessionMutation {
 
     /**
      * Returns the session to downloaded but never imported: its records and their observations, its per-item states and
-     * its imports are deleted. What its transactions become is the caller's to settle first ([planApiUnimport]).
+     * its imports are deleted. What its transactions become is the caller's to settle first (`planApiUnimport`, in app/apiimporter).
      */
     data class ResetToUnimported(
         val sessionId: ApiSessionId,
