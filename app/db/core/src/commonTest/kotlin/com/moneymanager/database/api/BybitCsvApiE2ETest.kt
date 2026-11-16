@@ -68,6 +68,26 @@ class BybitCsvApiE2ETest : DbTest() {
             ).first(),
     )
 
+    private suspend fun stageFund2023(fileName: String) =
+        stageCsv(
+            fileName,
+            listOf("Uid", "Date & Time(UTC)", "Coin", "QTY", "Type", "Account Balance", "Description"),
+            listOf(
+                listOf(uid, "2023-11-13 09:18:18", "BTC", "-0.00039664", "Withdraw", "0", "Withdrawal"),
+                listOf(
+                    uid,
+                    "2023-11-13 09:05:55",
+                    "BTC",
+                    "0.00039664",
+                    "Transfer in",
+                    "0.00039664",
+                    "Transfer from Unified Trading Account",
+                ),
+                listOf(uid, "2023-11-11 00:10:00", "KASTA", "-467.4316", "Transfer out", "0", "Transfer to Spot Account"),
+                listOf(uid, "2023-03-24 09:35:02", "KASTA", "467.4316", "Transfer in", "467.4316", "Transfer from Earn Account"),
+            ),
+        )
+
     private suspend fun importCsv() {
         val spotHeaders = listOf("Uid", "Type", "Coin", "Amount", "Wallet Balance", "Time(UTC)")
         val spot2022 =
@@ -103,25 +123,7 @@ class BybitCsvApiE2ETest : DbTest() {
                     listOf(uid, "internalAccountTransferDeposit", "KASTA", "467.4316", "967.4316", "2023-11-11 00:10:00"),
                 ),
             )
-        val fund2023 =
-            stageCsv(
-                "AssetChangeDetails_fund_${uid}_20230101_20231231_0.csv",
-                listOf("Uid", "Date & Time(UTC)", "Coin", "QTY", "Type", "Account Balance", "Description"),
-                listOf(
-                    listOf(uid, "2023-11-13 09:18:18", "BTC", "-0.00039664", "Withdraw", "0", "Withdrawal"),
-                    listOf(
-                        uid,
-                        "2023-11-13 09:05:55",
-                        "BTC",
-                        "0.00039664",
-                        "Transfer in",
-                        "0.00039664",
-                        "Transfer from Unified Trading Account",
-                    ),
-                    listOf(uid, "2023-11-11 00:10:00", "KASTA", "-467.4316", "Transfer out", "0", "Transfer to Spot Account"),
-                    listOf(uid, "2023-03-24 09:35:02", "KASTA", "467.4316", "Transfer in", "467.4316", "Transfer from Earn Account"),
-                ),
-            )
+        val fund2023 = stageFund2023("AssetChangeDetails_fund_${uid}_20230101_20231231_0.csv")
         val uta2023 =
             stageCsv(
                 "AssetChangeDetails_uta_${uid}_20230101_20231231_0.csv",
@@ -320,5 +322,43 @@ class BybitCsvApiE2ETest : DbTest() {
             }
             assertTrue(owners.all { it is ObservationOwner.Record || it is ObservationOwner.Group })
             assertTrue(owners.any { it is ObservationOwner.Group }, "the fills of the 2022 order are one group")
+        }
+
+    @Test
+    fun aSecondCopyOfALedgerObservesTheTransfersTheFirstBooked() =
+        runDbTest {
+            importCsv()
+            val copy = stageFund2023("AssetChangeDetails_fund_${uid}_20230101_20231231_1.csv")
+            bulkApplyCsv(
+                imports = listOf(copy),
+                sourceAccountOverride = null,
+                strategies = repositories.csvImportStrategyRepository.getAllStrategies().first(),
+                currencies = repositories.currencyRepository.getAllCurrencies().first(),
+                accountMappingRepository = repositories.accountMappingRepository,
+                accountRepository = repositories.accountRepository,
+                csvImportRepository = repositories.csvImportRepository,
+                maintenance = maintenance,
+                importEngine = repositories.importEngine,
+                onProgress = { },
+                cryptoRepository = repositories.cryptoRepository,
+                tradeRepository = repositories.tradeRepository,
+            )
+
+            assertEquals(exportBalances, bybitBalances(), "the copy books nothing")
+            val copyRecords =
+                repositories.importRecordRepository
+                    .getCsvImportRecords(copy.id)
+                    .map { it.id }
+                    .toSet()
+            assertEquals(4, copyRecords.size, "every row of the copy is recorded")
+            val observed =
+                copyRecords.flatMap { record ->
+                    repositories.observationRepository.getObservationsOf(ObservationOwner.Record(record))
+                }
+            assertEquals(4, observed.map { it.owner to it.slot }.distinct().size, "each row observes the transfer it duplicates")
+            for (observation in observed) {
+                val owners = repositories.observationRepository.getObservationsOfTransaction(observation.transactionId).map { it.owner }
+                assertTrue(owners.size >= 2, "${observation.transactionId} is observed by both files")
+            }
         }
 }

@@ -987,6 +987,7 @@ class ImportEngineImpl(
             }
         val rowOutcomes =
             classified.zip(orderedRowOutcomes).associate { (c, outcome) -> requireNotNull(c.transfer.rowKey) to outcome }
+        if (observer != null) observeDuplicates(classified, orderedRowOutcomes, existingRelationships, observer)
 
         return TransferOutcome(
             imported = toImport.size,
@@ -997,6 +998,39 @@ class ImportEngineImpl(
             rowOutcomes = rowOutcomes,
             orderedRowOutcomes = orderedRowOutcomes,
         )
+    }
+
+    /**
+     * A row that duplicates a transfer already booked (or one this batch books) says that transfer too: its main leg,
+     * and its fee leg when the transfer has a fee, observe it beside what booked it, so twins are one transaction with
+     * several observations. A row seen before (a re-import of its file) already says its slots and keeps them.
+     */
+    private suspend fun observeDuplicates(
+        classified: List<Classified>,
+        outcomes: List<RowOutcome>,
+        existingRelationships: List<Relationship>,
+        observer: SourceObservations,
+    ) {
+        val duplicates =
+            classified.zip(outcomes).mapNotNull { (c, outcome) ->
+                outcome.transferId?.takeIf { c.status == ImportStatus.DUPLICATE }?.let { c to it }
+            }
+        if (duplicates.isEmpty()) return
+        val feeLegs =
+            existingRelationships
+                .mapNotNull { relationship ->
+                    relationship.transferPair?.let { (primary, related) -> (primary to relationship.relationshipType.id) to related }
+                }.toMap()
+        val rows = ObservationExpander.expandTransfers(duplicates.map { (c, _) -> ExpansionRow(c.transfer) }, emptyMap())
+        for ((duplicate, row) in duplicates.zip(rows)) {
+            val (c, id) = duplicate
+            val approximate = c.transfer.approximateUntil != null
+            observer.record(row.main.key, row.main.provenance, id) { observer.transferContent(row.main, approximate) }
+            val fee = c.transfer.fee ?: continue
+            val feeLeg = row.legs.firstOrNull { it.key.slot == ObservationSlot.FEE } ?: continue
+            val feeId = feeLegs[id to fee.relationshipTypeId] ?: continue
+            observer.record(feeLeg.key, feeLeg.provenance, feeId) { observer.transferContent(feeLeg, approximate) }
+        }
     }
 
     /**
