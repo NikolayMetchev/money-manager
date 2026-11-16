@@ -95,12 +95,15 @@ data class CrossSourcePolicy(
  *
  * Complete linkage in the matcher makes each match one to one: a record already matched joins another only if it
  * pairs with every record of that transaction.
- *
- * @param containerAccounts the accounts each container's own records book (a statement's own account): a record whose
- *   counterparty is one of them is a transfer between two of that source's accounts, never a twin of its record.
- * @param calendarFor the business days of the accounts a pair touches, for business-day windows.
  */
 object CrossSourceRules {
+    /**
+     * The cross-source rules, in rank order, for the families in [policies].
+     *
+     * @param containerAccounts the accounts each container's own records book (a statement's own account): a record
+     *   whose counterparty is one of them is a transfer between two of that source's accounts, never a twin of its record.
+     * @param calendarFor the business days of the accounts a pair touches, for business-day windows.
+     */
     fun forPolicies(
         policies: Map<String, DedupePolicy>,
         containerAccounts: Map<String, Set<AccountId>> = emptyMap(),

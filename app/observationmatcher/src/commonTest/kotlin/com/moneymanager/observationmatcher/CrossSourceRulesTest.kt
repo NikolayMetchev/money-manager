@@ -5,12 +5,14 @@ import com.moneymanager.bigdecimal.BigInteger
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.RelationshipTypeId
+import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.observation.ImportRecordId
 import com.moneymanager.domain.model.observation.ObservationAttribute
 import com.moneymanager.domain.model.observation.ObservationContent
 import com.moneymanager.domain.model.observation.ObservationEnd
 import com.moneymanager.domain.model.observation.ObservationFacts
+import com.moneymanager.domain.model.observation.ObservationId
 import com.moneymanager.domain.model.observation.ObservationOwner
 import com.moneymanager.domain.model.observation.ObservedAssetId
 import com.moneymanager.domain.model.observation.ObservedValues
@@ -300,8 +302,9 @@ class CrossSourceRulesTest {
         container: String = family,
     ) = MatchObservation(
         ref = ObservationRef(ObservationOwner.Record(ImportRecordId(record)), "main"),
-        storedId = null,
-        current = null,
+        // Every record stored in a transaction of its own, as before a re-match: the rules alone decide the joins.
+        storedId = ObservationId(record),
+        current = TransferId(record),
         family = family,
         container = container,
         recordKey = "k-$record",
