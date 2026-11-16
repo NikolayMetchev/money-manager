@@ -312,11 +312,11 @@ class BybitCsvApiE2ETest : DbTest() {
             val trades = repositories.tradeRepository.getTradesByAccount(bybit.id).first()
             val owners =
                 (transfers.map { it.id } + trades.map { it.id })
-                    .map { id ->
+                    .flatMap { id ->
                         val observations = repositories.observationRepository.getObservationsOfTransaction(id)
                         assertTrue(observations.isNotEmpty(), "$id has no observation")
                         observations.map { it.owner }
-                    }.flatten()
+                    }
             for (owner in owners.filterIsInstance<ObservationOwner.Record>()) {
                 assertIs<ImportRecordKey.CsvRow>(repositories.importRecordRepository.getRecord(owner.recordId)?.key)
             }
