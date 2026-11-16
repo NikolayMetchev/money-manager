@@ -52,8 +52,8 @@ data class MaterializationConflict(
  *
  * The merge depends only on what the observations say, never on their ids or the order they were made, so every
  * import order materializes the same row. For each field it takes the best-ranked observation that is good for it:
- * a precise time over an approximate one, a named end over a placeholder, an itemised amount over a gross one. Ties
- * go to a canonical order of the observations' contents.
+ * a precise time over an approximate one, the record's own account then a named end over a placeholder, an itemised
+ * amount over a gross one. Ties go to a canonical order of the observations' contents.
  */
 object Materializer {
     /** The merge of [observations] (all of one kind), or null when there are none. */
@@ -159,8 +159,15 @@ object Materializer {
             transfers.firstOrNull { good(it.first) }?.second ?: best
 
         val time = firstWhere { !it.facts.approximateTime }
-        val source = firstWhere { ObservationEnd.SOURCE !in it.facts.placeholderEnds }
-        val target = firstWhere { ObservationEnd.TARGET !in it.facts.placeholderEnds }
+
+        // An end is surest from the record whose own statement account it is (a bank's "Monzo -> Freetrade Limited"
+        // and a broker's "Freetrade Top Ups -> ISA" are `Monzo -> ISA`), then from one that names it.
+        fun endFrom(end: ObservationEnd): ObservedValues.Transfer =
+            transfers.firstOrNull { it.first.facts.ownEnd == end }?.second
+                ?: firstWhere { end !in it.facts.placeholderEnds }
+
+        val source = endFrom(ObservationEnd.SOURCE)
+        val target = endFrom(ObservationEnd.TARGET)
         val amount = firstWhere { !it.facts.grossAmount }
         val description = transfers.firstOrNull { it.second.description.isNotBlank() }?.second?.description ?: best.description
         // Ends taken from two observations can name one account (each one's placeholder is the other's real end);

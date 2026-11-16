@@ -155,7 +155,13 @@ class ObservationRepositoryImplTest : DbTest() {
                 ObservationContent(
                     values = transferValues(bank, shop, gbp),
                     attributes = setOf(ObservationAttribute(AttributeTypeId(-1), "", "ref-1")),
-                    facts = ObservationFacts(approximateTime = true, placeholderEnds = setOf(ObservationEnd.TARGET), grossAmount = true),
+                    facts =
+                        ObservationFacts(
+                            approximateTime = true,
+                            placeholderEnds = setOf(ObservationEnd.TARGET),
+                            grossAmount = true,
+                            ownEnd = ObservationEnd.SOURCE,
+                        ),
                 )
             val observations = repositories.observationRepository
             val id = observations.insertObservation(ObservationOwner.Record(record), "transfer", tx.id, content)

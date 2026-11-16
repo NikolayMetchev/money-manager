@@ -39,6 +39,9 @@ SELECT end_name FROM observation_placeholder_end WHERE observation_id = ? ORDER 
 countGrossAmount:
 SELECT COUNT(*) FROM observation_gross_amount WHERE observation_id = ?;
 
+selectOwnEnd:
+SELECT end_name FROM observation_own_end WHERE observation_id = ?;
+
 selectKind:
 SELECT kind FROM observation WHERE id = ?;
 

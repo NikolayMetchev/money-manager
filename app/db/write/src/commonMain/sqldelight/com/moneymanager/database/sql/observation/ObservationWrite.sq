@@ -55,6 +55,12 @@ DELETE FROM observation_gross_amount WHERE observation_id = ?;
 insertGrossAmount:
 INSERT INTO observation_gross_amount (observation_id) VALUES (?);
 
+deleteOwnEnd:
+DELETE FROM observation_own_end WHERE observation_id = ?;
+
+insertOwnEnd:
+INSERT INTO observation_own_end (observation_id, end_name) VALUES (?, ?);
+
 assignTransaction:
 UPDATE observation SET transaction_id = ? WHERE id = ?;
 

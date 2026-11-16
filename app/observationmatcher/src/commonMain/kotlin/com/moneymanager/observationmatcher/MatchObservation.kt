@@ -5,6 +5,7 @@ import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.observation.ObservationContent
 import com.moneymanager.domain.model.observation.ObservationId
 import com.moneymanager.domain.model.observation.ObservationOwner
+import kotlin.time.Instant
 
 /** An observation by what makes it unique, `UNIQUE(owner, slot)`: a new one has no id yet. */
 data class ObservationRef(
@@ -42,7 +43,22 @@ data class MatchObservation(
     val recordKey: String,
     val content: ObservationContent,
     val identity: RecordIdentity = RecordIdentity(),
+    val crossSource: CrossSourceFacts = CrossSourceFacts(),
 ) {
     /** Whether its source excluded it from balances (a declined payment, a row the source marks deleted). */
     val excluded: Boolean get() = content.attributes.any { it.typeId.id == WellKnownIds.EXCLUDED_ATTR_TYPE_ID }
 }
+
+/**
+ * What only the cross-source rules ([CrossSourceRules]) read about an observation's record.
+ *
+ * @property approximateUntil the latest instant an approximately-dated record could stand for: its time is anywhere
+ *   from the observed timestamp to this.
+ * @property shadow the record is a reconciliation source's (Koinly's): its shadow accounts never meet a real record.
+ * @property passThrough the record is a leg of a pass-through chain or a conversion: those are matched by their own rules.
+ */
+data class CrossSourceFacts(
+    val approximateUntil: Instant? = null,
+    val shadow: Boolean = false,
+    val passThrough: Boolean = false,
+)

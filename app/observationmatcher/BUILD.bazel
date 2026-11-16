@@ -30,7 +30,12 @@ kmp_library(
         "//app/importengineapi",
         "//app/model/observation",
     ],
-    deps = ["//app/model/core"],
+    deps = [
+        "//app/model/calendar",
+        "//app/model/core",
+        "//app/model/rules",
+        "//utils/bigdecimal",
+    ],
 )
 
 kmp_test(
@@ -57,6 +62,7 @@ kmp_test(
         "//app/importengineapi",
         "//app/model/core",
         "//app/model/observation",
+        "//app/model/rules",
         "//bazel/kmp/deps:kotlin_test",
         "//utils/bigdecimal",
     ],

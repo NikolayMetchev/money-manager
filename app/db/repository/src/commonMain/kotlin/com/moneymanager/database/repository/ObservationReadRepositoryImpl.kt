@@ -158,6 +158,7 @@ class ObservationReadRepositoryImpl(
                 approximateTime = queries.countApproximateTime(id).awaitAsOne() > 0,
                 placeholderEnds = queries.selectPlaceholderEnds(id).awaitAsList().mapTo(LinkedHashSet(), ObservationEnd::fromDbName),
                 grossAmount = queries.countGrossAmount(id).awaitAsOne() > 0,
+                ownEnd = queries.selectOwnEnd(id).awaitAsOneOrNull()?.let(ObservationEnd::fromDbName),
             )
         return Observation(
             id = ObservationId(id),
