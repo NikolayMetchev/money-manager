@@ -1,0 +1,63 @@
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+# gazelle:kmp_generate true
+# gazelle:kmp_export //app/importengineapi
+# gazelle:kmp_export //app/model/observation
+# gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64 web
+# gazelle:kmp_forbid_deps //app/db/core //app/di/core //app/ui/core
+
+kmp_library(
+    name = "observationmatcher",
+    android = True,
+    common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
+    forbidden_deps = [
+        "//app/db/core",
+        "//app/di/core",
+        "//app/ui/core",
+    ],
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    visibility = ["//visibility:public"],
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
+    exports = [
+        "//app/importengineapi",
+        "//app/model/observation",
+    ],
+    deps = ["//app/model/core"],
+)
+
+kmp_test(
+    name = "test",
+    android = True,
+    associate = ":observationmatcher",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    forbidden_deps = [
+        "//app/db/core",
+        "//app/di/core",
+        "//app/ui/core",
+    ],
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
+    deps = [
+        "//app/importengineapi",
+        "//app/model/core",
+        "//app/model/observation",
+        "//bazel/kmp/deps:kotlin_test",
+        "//utils/bigdecimal",
+    ],
+)
