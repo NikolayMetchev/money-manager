@@ -337,11 +337,11 @@ internal val FRESH_IMPORT_GOLDENS: Map<String, String> =
             == trades (3)
             2023-11-14T22:13:25.775Z | Binance 4000 USDT -> Binance 0.1 BTC | Buy BTC/USDT
             2023-11-14T22:13:25.775Z | Binance 8000 USDT -> Binance 0.2 BTC | Buy BTC/USDT
-            2023-11-14T22:13:25Z | Binance 12000 USDT -> Binance 0.3 BTC | Buy BTC/USDT
+            2023-11-14T22:13:25Z | Binance 12000 USDT -> Binance 0.3 BTC | Buy BTC/USDT [excluded=reconciled]
             == relationships (5)
             reconciled: PRIMARY {2023-11-14T22:13:25Z | Binance -> Binance Fees | 4 USDT | Transaction Fee [binance-operation=Transaction Fee, binance-user-id=53064551, excluded=reconciled]} & RELATED {2023-11-14T22:13:25.775Z | Binance -> Binance Fees | 4 USDT | Buy BTC/USDT fee [exchange.txn_id=BTCUSDT-28457-fee]}
             reconciled: PRIMARY {2023-11-14T22:13:25Z | Binance -> Binance Fees | 8 USDT | Transaction Fee [binance-operation=Transaction Fee, binance-user-id=53064551, excluded=reconciled]} & RELATED {2023-11-14T22:13:25.775Z | Binance -> Binance Fees | 8 USDT | Buy BTC/USDT fee [exchange.txn_id=BTCUSDT-28458-fee]}
-            reconciled: PRIMARY {2023-11-14T22:13:25Z | Binance 12000 USDT -> Binance 0.3 BTC | Buy BTC/USDT} & RELATED {2023-11-14T22:13:25.775Z | Binance 4000 USDT -> Binance 0.1 BTC | Buy BTC/USDT} & RELATED {2023-11-14T22:13:25.775Z | Binance 8000 USDT -> Binance 0.2 BTC | Buy BTC/USDT}
+            reconciled: PRIMARY {2023-11-14T22:13:25Z | Binance 12000 USDT -> Binance 0.3 BTC | Buy BTC/USDT [excluded=reconciled]} & RELATED {2023-11-14T22:13:25.775Z | Binance 4000 USDT -> Binance 0.1 BTC | Buy BTC/USDT} & RELATED {2023-11-14T22:13:25.775Z | Binance 8000 USDT -> Binance 0.2 BTC | Buy BTC/USDT}
             reconciled: PRIMARY {2023-11-14T22:19:00Z | Binance -> Binance Funding | 82.358 LINK | Withdraw [binance-operation=Withdraw, binance-remark=Withdraw fee is included, binance-user-id=53064551, excluded=reconciled, manual-entry=Withdrawal fee, unidentified-counterparty=target]} & RELATED {2023-11-14T22:19:30Z | Binance -> ETH:0xwithdrawaddr | 81.108 LINK | Withdraw LINK [blockchain-txid=onchain-wd-1, exchange.txn_id=w1]}
             reconciled: PRIMARY {2023-11-14T22:20:00Z | Binance -> Binance Bank | 1134.83 GBP | Fiat Withdrawal [binance-operation=Fiat Withdrawal, binance-user-id=53064551, excluded=reconciled, unidentified-counterparty=target]} & RELATED {2023-11-14T22:13:32Z | Binance -> Binance Bank | 1133.33 GBP | Withdraw GBP [exchange.txn_id=fw1]}
             == daily balances (13)

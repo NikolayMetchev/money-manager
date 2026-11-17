@@ -21,6 +21,9 @@ import com.moneymanager.domain.model.csv.CsvRowLink
 import com.moneymanager.domain.model.csv.PdfImportSource
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
+import com.moneymanager.domain.model.observation.ObservationId
+import com.moneymanager.domain.model.observation.ObservationPin
+import com.moneymanager.domain.model.observation.ObservationSplit
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.model.passthrough.PassThroughAccountId
 import com.moneymanager.regex.PortableRegex
@@ -92,6 +95,29 @@ sealed interface TradeAttributeMutation {
         override val tradeId: TradeId,
         override val typeId: AttributeTypeId,
     ) : TradeAttributeMutation
+}
+
+/**
+ * A person's decision about which records are one movement (#1430): a pin fixes an observation to a transaction
+ * ("these are the same"), a split keeps two observations apart ("these are different"). The observation matcher
+ * takes them as given on every match sync, so they outlast re-imports and strategy changes.
+ */
+sealed interface ObservationDecision {
+    data class Pin(
+        val pin: ObservationPin,
+    ) : ObservationDecision
+
+    data class Unpin(
+        val observationId: ObservationId,
+    ) : ObservationDecision
+
+    data class Split(
+        val split: ObservationSplit,
+    ) : ObservationDecision
+
+    data class Unsplit(
+        val split: ObservationSplit,
+    ) : ObservationDecision
 }
 
 /** A write of a relationship between existing transactions, outside any one transfer's import. */
