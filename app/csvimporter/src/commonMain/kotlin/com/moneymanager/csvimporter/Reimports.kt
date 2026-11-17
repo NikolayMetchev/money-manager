@@ -360,6 +360,7 @@ class Reimports(
             reappliedEdits = outcome.reappliedEdits.size,
             unmatchedEdits = outcome.unmatchedEdits,
             reappliedLinks = outcome.reappliedLinks,
+            plan = outcome.plan,
         )
     }
 

@@ -206,7 +206,10 @@ class ReimportDialogsTest {
             onNodeWithText("Re-import 1 file").performClick()
 
             waitUntilAtLeastOneExists(hasText("Manual edits not re-applied (1):"), timeoutMillis = 15_000)
-            onNodeWithText("Flat white", substring = true).assertExists()
+            onNodeWithText("Description → \"Flat white\"", substring = true).assertExists()
+            // The plan: the skipped row's transaction is gone.
+            onNodeWithText("Removed (1)").assertExists()
+            onNodeWithText("1 removed", substring = true).assertExists()
             assertEquals(false, completed)
         }
 

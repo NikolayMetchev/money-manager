@@ -181,6 +181,7 @@ and the materialized views are refreshed once at the end.
 |---|---|
 | `directories` | `{ folders, foldersCreated, redownload?, files, failures }` (see below) |
 | `apis` | `{ connections, sessions }` (see below) |
+| `plan` | `{ created, updated, removed, conflicts }`: what the run did to the transactions, as the app's re-import dialogs report it. A plain import only creates (`updated` and `removed` are `0`; what it already had counts as a duplicate), and `conflicts` lists each hand edit a new import value met, as `"#<id> <field>: kept …"` |
 | `needsAttention` | `[{ kind, subject, reason }]`: everything a person must resolve |
 | `errors` | `import all` only: a side that failed as a whole, while the other side carried on |
 

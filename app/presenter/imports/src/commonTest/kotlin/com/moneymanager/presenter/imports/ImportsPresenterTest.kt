@@ -54,6 +54,7 @@ class ImportsPresenterTest {
                             model.tasks.any { it.parentId == null && it.status != TaskStatus.RUNNING }
                     }
                 assertEquals(listOf("noStrategy" to "unknown.csv"), done.attention.map { it.kind to it.subject })
+                assertEquals("0 created", done.planSummary)
                 assertEquals(TaskStatus.SUCCEEDED, done.tasks.single { it.parentId == null }.status)
                 cancelAndIgnoreRemainingEvents()
             }

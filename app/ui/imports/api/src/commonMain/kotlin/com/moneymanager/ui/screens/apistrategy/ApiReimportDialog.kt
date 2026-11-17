@@ -34,7 +34,10 @@ import com.moneymanager.importengineapi.SourceRerunResult
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.components.LoadingTextButton
+import com.moneymanager.ui.components.imports.ImportPlanReport
 import com.moneymanager.ui.components.imports.SourceRerunPreview
+import com.moneymanager.ui.components.imports.UnmatchedEditsReport
+import com.moneymanager.ui.components.imports.UnmatchedLinksReport
 import com.moneymanager.ui.components.imports.rememberAccountNamer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -66,6 +69,7 @@ fun ApiReimportDialog(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var executeProgress by remember { mutableStateOf<Progress?>(null) }
     var planProgress by remember { mutableStateOf<Progress?>(null) }
+    var finished by remember { mutableStateOf<SourceRerunResult<ApiRerunCounts>?>(null) }
 
     LaunchedEffect(session.id) {
         plan =
@@ -73,8 +77,8 @@ fun ApiReimportDialog(
     }
 
     AlertDialog(
-        onDismissRequest = { if (!isRunning) onDismiss() },
-        title = { Text("Re-import session") },
+        onDismissRequest = { if (!isRunning) finished?.let(onComplete) ?: onDismiss() },
+        title = { Text(if (finished == null) "Re-import session" else "Re-import complete") },
         text = {
             Column(
                 modifier =
@@ -82,8 +86,20 @@ fun ApiReimportDialog(
                         .fillMaxWidth()
                         .verticalScroll(rememberScrollState()),
             ) {
-                when (val currentPlan = plan) {
-                    null -> {
+                val result = finished
+                val currentPlan = plan
+                when {
+                    result != null -> {
+                        Text(
+                            text = "Re-imported this session under \"${strategy.name}\".",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        ImportPlanReport(result.plan, accountName)
+                        UnmatchedEditsReport(result.unmatchedEdits, accountName)
+                        UnmatchedLinksReport(result.reappliedLinks)
+                    }
+
+                    currentPlan == null -> {
                         ApiReimportProgress(planProgress ?: Progress("Preparing re-import"))
                     }
 
@@ -108,48 +124,52 @@ fun ApiReimportDialog(
         },
         confirmButton = {
             val currentPlan = plan
-            LoadingTextButton(
-                onClick = {
-                    if (currentPlan == null) return@LoadingTextButton
-                    isRunning = true
-                    errorMessage = null
-                    scope.launch {
-                        try {
-                            val result =
-                                reimports.exclusively {
-                                    executeApiReimport(
-                                        plan = currentPlan,
-                                        session = session,
-                                        strategy = strategy,
-                                        apiReads = apiReads,
-                                        reads = reimports.reads,
-                                        maintenance = maintenance,
-                                        importEngine = importEngine,
-                                        cascadeRerunner = reimports,
-                                        onProgress = { executeProgress = it },
-                                    )
-                                }
-                            onComplete(result)
-                        } catch (expected: CancellationException) {
-                            throw expected
-                        } catch (expected: Exception) {
-                            logger.e(expected) { "Re-import failed: ${expected.message}" }
-                            errorMessage = "Re-import failed: ${expected.message}"
-                            isRunning = false
-                        } finally {
-                            executeProgress = null
+            val done = finished
+            if (done != null) {
+                TextButton(onClick = { onComplete(done) }) { Text("Done") }
+            } else {
+                LoadingTextButton(
+                    onClick = {
+                        if (currentPlan == null) return@LoadingTextButton
+                        isRunning = true
+                        errorMessage = null
+                        scope.launch {
+                            try {
+                                finished =
+                                    reimports.exclusively {
+                                        executeApiReimport(
+                                            plan = currentPlan,
+                                            session = session,
+                                            strategy = strategy,
+                                            apiReads = apiReads,
+                                            reads = reimports.reads,
+                                            maintenance = maintenance,
+                                            importEngine = importEngine,
+                                            cascadeRerunner = reimports,
+                                            onProgress = { executeProgress = it },
+                                        )
+                                    }
+                            } catch (expected: CancellationException) {
+                                throw expected
+                            } catch (expected: Exception) {
+                                logger.e(expected) { "Re-import failed: ${expected.message}" }
+                                errorMessage = "Re-import failed: ${expected.message}"
+                            } finally {
+                                isRunning = false
+                                executeProgress = null
+                            }
                         }
-                    }
-                },
-                enabled = !isRunning && currentPlan != null,
-                loading = isRunning,
-                label = "Re-import",
-                loadingIndicatorModifier = Modifier.padding(end = 8.dp),
-                showLabelWhenLoading = true,
-            )
+                    },
+                    enabled = !isRunning && currentPlan != null,
+                    loading = isRunning,
+                    label = "Re-import",
+                    loadingIndicatorModifier = Modifier.padding(end = 8.dp),
+                    showLabelWhenLoading = true,
+                )
+            }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !isRunning) { Text("Cancel") }
+            if (finished == null) TextButton(onClick = onDismiss, enabled = !isRunning) { Text("Cancel") }
         },
     )
 }

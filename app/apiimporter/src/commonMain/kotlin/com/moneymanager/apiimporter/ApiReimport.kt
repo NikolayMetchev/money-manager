@@ -13,6 +13,7 @@ import com.moneymanager.importengineapi.ApiSessionMutation
 import com.moneymanager.importengineapi.CascadeRerunner
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.ImportPlan
 import com.moneymanager.importengineapi.ManualEdit
 import com.moneymanager.importengineapi.ReappliedLinks
 import com.moneymanager.importengineapi.RerunReads
@@ -148,6 +149,8 @@ data class ApiBulkReimportResult(
     val cascadedFiles: Int = 0,
     /** Files a session's re-import deleted but couldn't import again: they wait for their own re-import. */
     val cascadedFilesNotRerun: Int = 0,
+    /** What the sessions' re-imports created, changed and removed, and where they met a person's overrides. */
+    val plan: ImportPlan = ImportPlan(),
 )
 
 /**
@@ -190,6 +193,7 @@ suspend fun bulkReimportApiSessions(
     var links = ReappliedLinks()
     var cascaded = 0
     var notRerun = 0
+    var importPlan = ImportPlan()
     return reimportSessionsResiliently(sessions, maintenance, onProgress) { session, sessionProgress ->
         val result =
             executeApiReimport(
@@ -211,12 +215,14 @@ suspend fun bulkReimportApiSessions(
         links += result.reappliedLinks
         cascaded += result.cascaded.size
         notRerun += result.notRerun.size
+        importPlan += result.plan
     }.copy(
         reappliedEdits = reapplied,
         unmatchedEdits = unmatched,
         reappliedLinks = links,
         cascadedFiles = cascaded,
         cascadedFilesNotRerun = notRerun,
+        plan = importPlan,
     )
 }
 

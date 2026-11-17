@@ -15,11 +15,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.repository.AccountReadRepository
+import com.moneymanager.importengineapi.ImportPlan
 import com.moneymanager.importengineapi.ManualEdit
 import com.moneymanager.importengineapi.ReappliedLinks
 import com.moneymanager.importengineapi.SourceRerunPlan
+import com.moneymanager.importengineapi.sections
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.tasks.Progress
+import com.moneymanager.ui.util.formatAmount
 
 /** How many bullets a preview section lists before collapsing the rest into an "…and N more" line. */
 const val REIMPORT_PREVIEW_LIMIT = 20
@@ -205,5 +208,26 @@ fun rememberAccountNamer(accountRepository: AccountReadRepository): (AccountId) 
     return remember(accounts) {
         val names = accounts.associate { it.id to it.name }
         return@remember { id: AccountId -> names[id] ?: "account ${id.id}" }
+    }
+}
+
+/**
+ * What a re-import did, as [ImportPlan.sections]: the transactions it created, changed (field by field) and removed, the hand
+ * edits a new import value met, and the overrides it released ("no changes" when it did nothing).
+ */
+@Composable
+fun ImportPlanReport(
+    plan: ImportPlan,
+    accountName: (AccountId) -> String,
+) {
+    Spacer(modifier = Modifier.height(12.dp))
+    Text(text = plan.summary(), style = MaterialTheme.typography.bodyMedium)
+    plan.sections(accountName, amount = ::formatAmount).forEach { section ->
+        ReimportPlanSection(
+            title = section.title,
+            lines = section.lines,
+            limit = REIMPORT_PREVIEW_LIMIT,
+            isError = section.needsAttention,
+        )
     }
 }

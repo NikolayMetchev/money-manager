@@ -126,13 +126,17 @@ internal fun <T> resolveByName(
     }
 }
 
-private fun ImportRunOutcome.toJson() =
-    ImportJson(
-        directories = directories?.toJson(),
-        apis = apis?.toJson(),
+private fun ImportRunOutcome.toJson(): ImportJson {
+    val directories = directories?.toJson()
+    val apis = apis?.toJson()
+    return ImportJson(
+        directories = directories,
+        apis = apis,
+        plan = PlanJson.of(directories, apis),
         needsAttention = needsAttention.map { NeedsAttentionJson(it.kind, it.subject, it.reason) },
         errors = errors,
     )
+}
 
 private fun summaryTable(summary: ImportJson): Widget =
     table {
@@ -150,6 +154,8 @@ private fun summaryTable(summary: ImportJson): Widget =
                     row("session", "${it.strategy.orEmpty()} #${it.id}", it.status, it.error ?: "${it.transactions} transactions")
                 }
             }
+            row("plan", "", "", summary.plan.summary)
+            summary.plan.conflicts.forEach { row("conflict", "", "kept", it) }
             summary.needsAttention.forEach { row("attention", it.subject, it.kind, it.reason) }
             summary.errors.forEach { row("error", "", "failed", it) }
         }

@@ -363,6 +363,8 @@ EOF</code></pre>
         Live progress goes to stderr, and the summary goes to stdout. <code>mm</code> never guesses. Anything only a person
         can resolve, such as a file no strategy matches, a folder with no source account, counterparties to confirm or an
         unassigned card, is listed under <code>needsAttention</code> and exits <code>3</code>.
+        <code>plan</code> sums up what the run did to the transactions (how many it created, updated and removed, and any hand
+        edit a new import value met), as the app's re-import dialogs do. The TUI's Imports tab shows the same line.
       </p>
       <pre><code># Nightly: import everything, upload the cloud copy, fail loudly on anything to resolve
 MM_VAULT_PASSWORD=… mm --quiet --push --keep-local import all

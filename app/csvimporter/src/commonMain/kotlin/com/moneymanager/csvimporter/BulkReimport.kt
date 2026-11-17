@@ -1,6 +1,7 @@
 package com.moneymanager.csvimporter
 
 import co.touchlab.kermit.Logger
+import com.moneymanager.importengineapi.ImportPlan
 import com.moneymanager.importengineapi.ManualEdit
 import com.moneymanager.importengineapi.ReappliedLinks
 import com.moneymanager.tasks.Progress
@@ -31,6 +32,8 @@ data class BulkReimportResult(
     override val filesNotStarted: Int = 0,
     /** Picked files the run left alone: nothing they read changed since they were last imported. */
     val filesUnchanged: Int = 0,
+    /** What the run created, changed and removed, and where it met a person's overrides. */
+    val plan: ImportPlan = ImportPlan(),
 ) : BulkImportResult {
     override fun toSummary(): String =
         buildString {

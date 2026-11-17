@@ -4,7 +4,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -69,7 +71,7 @@ class ApiSessionsBulkButtonsUiTest : DbTest() {
         }
 
     @Test
-    fun `download all then import all confirms the new counterparties`() =
+    fun `download all then import all confirms the new counterparties and re-import reports its plan`() =
         runMoneyManagerComposeUiTest {
             val vault =
                 runBlocking {
@@ -132,5 +134,18 @@ class ApiSessionsBulkButtonsUiTest : DbTest() {
             assertTrue(imported.isNotEmpty(), "Import all imported the downloaded session")
             val accounts = runBlocking { repositories.accountRepository.getAllAccounts().first() }
             assertTrue(accounts.any { it.name == "Alice" }, "the counterparty's account is created: ${accounts.map { it.name }}")
+
+            // Re-importing the session replays its stored responses: the same records make the same transactions.
+            onNodeWithText("Imported (1)").performClick()
+            waitUntilAtLeastOneExists(hasText("Re-import"), timeoutMillis = 10_000)
+            onNodeWithText("Re-import").performClick()
+            waitUntilAtLeastOneExists(hasText("Re-import session"), timeoutMillis = 10_000)
+            waitUntilAtLeastOneExists(hasText("Re-import") and hasAnyAncestor(isDialog()) and isEnabled(), timeoutMillis = 10_000)
+            onNode(hasText("Re-import") and hasAnyAncestor(isDialog())).performClick()
+            waitUntilAtLeastOneExists(hasText("Re-import complete"), timeoutMillis = 10_000)
+            onNodeWithText("no changes").assertExists()
+            onNodeWithText("Done").performClick()
+            waitUntilDoesNotExist(hasText("Re-import complete"), timeoutMillis = 10_000)
+            waitForIdle()
         }
 }

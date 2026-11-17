@@ -23,6 +23,7 @@ import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.components.imports.BulkImportDialogScaffold
+import com.moneymanager.ui.components.imports.ImportPlanReport
 import com.moneymanager.ui.components.imports.UnmatchedEditsReport
 import com.moneymanager.ui.components.imports.UnmatchedLinksReport
 import com.moneymanager.ui.components.imports.rememberAccountNamer
@@ -125,6 +126,7 @@ fun ApiReimportAllDialog(
                     color = MaterialTheme.colorScheme.error,
                 )
             }
+            ImportPlanReport(finished.plan, accountName)
             UnmatchedEditsReport(finished.unmatchedEdits, accountName)
             UnmatchedLinksReport(finished.reappliedLinks)
             if (finished.failures.isNotEmpty()) {

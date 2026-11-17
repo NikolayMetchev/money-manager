@@ -48,6 +48,26 @@ data class ImportsModel(
     val eventSink: (ImportsEvent) -> Unit,
 ) {
     val attention: List<ImportAttention> get() = lastRun?.needsAttention.orEmpty()
+
+    /**
+     * What the latest run did to the transactions, as `mm import` reports its `plan`: a plain import only creates (what it
+     * already had is a duplicate), so this is how many it created.
+     */
+    val planSummary: String?
+        get() =
+            lastRun?.let { run ->
+                val created =
+                    run.directories
+                        ?.csv
+                        ?.files
+                        .orEmpty()
+                        .sumOf { it.transfersCreated } +
+                        run.apis
+                            ?.sessions
+                            .orEmpty()
+                            .sumOf { it.result?.transactionCount ?: 0 }
+                "$created created"
+            }
 }
 
 /**

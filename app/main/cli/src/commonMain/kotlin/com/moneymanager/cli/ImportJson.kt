@@ -20,6 +20,7 @@ import kotlinx.serialization.Serializable
 internal data class ImportJson(
     val directories: DirectoriesImportJson? = null,
     val apis: ApisImportJson? = null,
+    val plan: PlanJson,
     val needsAttention: List<NeedsAttentionJson>,
     val errors: List<String>,
 ) {
@@ -125,6 +126,40 @@ internal data class SessionImportJson(
     companion object {
         const val FAILED = "failed"
         const val SKIPPED = "skipped"
+    }
+}
+
+/**
+ * What the run did to the transactions, as the re-import dialogs report it: how many it created, updated and removed, and
+ * the hand edits a new import value met (`"#<id> <field>: kept …"`). A plain import only creates: what it already had is a
+ * duplicate.
+ */
+@Serializable
+internal data class PlanJson(
+    val created: Int,
+    val updated: Int,
+    val removed: Int,
+    val conflicts: List<String>,
+) {
+    val summary: String
+        get() =
+            listOfNotNull(
+                "$created created",
+                updated.takeIf { it > 0 }?.let { "$it updated" },
+                removed.takeIf { it > 0 }?.let { "$it removed" },
+                conflicts.size.takeIf { it > 0 }?.let { "$it hand edit${if (it == 1) "" else "s"} kept against a new value" },
+            ).joinToString(" · ")
+
+    companion object {
+        fun of(
+            directories: DirectoriesImportJson?,
+            apis: ApisImportJson?,
+        ) = PlanJson(
+            created = directories?.files.orEmpty().sumOf { it.transfers } + apis?.sessions.orEmpty().sumOf { it.transactions },
+            updated = 0,
+            removed = 0,
+            conflicts = emptyList(),
+        )
     }
 }
 
