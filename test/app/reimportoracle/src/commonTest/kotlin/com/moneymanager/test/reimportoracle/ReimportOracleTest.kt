@@ -1,8 +1,10 @@
 package com.moneymanager.test.reimportoracle
 
 import app.cash.sqldelight.async.coroutines.awaitAsList
+import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.test.database.read.testReads
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.random.Random
 import kotlin.test.Test
@@ -148,16 +150,25 @@ class ReimportOracleTest {
         for (entry in scenario.manualEntries) {
             check(transfers.any { "| ${entry.description}" in it }) { "the ${entry.name} manual entry is missing" }
         }
+        check(trades.isEmpty() || trades.any { ORACLE_TRADE_EXCLUSION in it }) { "the hand exclusion of a trade is missing" }
     }
 
-    /** Which of [ids] a re-import gave a new id rather than keeping (#1430): a person's work hangs off the old one. */
+    /** Which of the hand-worked records a re-import gave a new id rather than keeping (#1430): a person's work hangs off the old one. */
     private suspend fun OracleDatabase.lostIds(
-        ids: Set<TransferId>,
+        handled: HandWork,
         context: String,
     ): String? {
-        val kept = db.transactionRepository.getTransactionsByIds(ids.toList()).keys
-        val lost = ids - kept
-        return if (lost.isEmpty()) null else "$context lost the ids of hand-worked transfers ${lost.map { it.id }.sorted()}"
+        val transfers = handled.transfers + handled.copies.filterIsInstance<TransferId>()
+        val trades = handled.trades + handled.copies.filterIsInstance<TradeId>()
+        val keptTransfers = db.transactionRepository.getTransactionsByIds(transfers.toList()).keys
+        val keptTrades =
+            db.accountRepository
+                .getAllAccounts()
+                .first()
+                .flatMap { db.tradeRepository.getTradesByAccount(it.id).first() }
+                .mapTo(mutableSetOf()) { it.id }
+        val lost = (transfers - keptTransfers).map { "transfer ${it.id}" } + (trades - keptTrades).map { "trade ${it.id}" }
+        return if (lost.isEmpty()) null else "$context lost the ids of hand-worked records ${lost.sorted()}"
     }
 
     /** Every audit table's row count, except the one that records the re-import run itself. */

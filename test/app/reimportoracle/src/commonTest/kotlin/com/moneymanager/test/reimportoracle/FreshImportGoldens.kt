@@ -44,7 +44,7 @@ internal val FRESH_IMPORT_GOLDENS: Map<String, String> =
             2026-02-28T09:00:00Z | Monzo -> Landlord | 1000 GBP | RENT [Monzo Category=Transfers, Monzo Transaction ID=tx_ft_2, Type=Faster payment]
             2026-03-01T09:00:00Z | Monzo -> Freetrade ISA | 1000 GBP | FREETRADE [Monzo Category=Transfers, Monzo Transaction ID=tx_ft_1, Type=Faster payment, freetrade-type=TOP_UP]
             == trades (1)
-            2026-03-02T08:49:09.042Z | Freetrade ISA 998.64 GBP -> Freetrade ISA 202 EXFD | Example Fund
+            2026-03-02T08:49:09.042Z | Freetrade ISA 998.64 GBP -> Freetrade ISA 202 EXFD | Example Fund [freetrade-isin=GB0000000001, freetrade-order-id=ORDER2026-03-02T08:49:09.042Z, freetrade-stamp-duty=0.00, freetrade-ticker=EXFD, freetrade-type=ORDER, freetrade-venue=London Stock Exchange]
             == relationships (0)
             == daily balances (8)
             Freetrade ISA | 2026-02-16 | GBP | 0.02
@@ -266,17 +266,20 @@ internal val FRESH_IMPORT_GOLDENS: Map<String, String> =
             2021-05-26T19:48:36Z | Koinly · Binance -> Koinly · Binance Fees | 0.00055 BTC | Fee
             2021-05-26T19:48:36Z | Koinly · Binance -> Koinly · Nexo | 0.27931608 BTC | transfer [koinly-id=K1, koinly-type=transfer]
             2021-05-26T19:49:05Z | Binance -> Binance Funding | 0.27986608 BTC | Withdraw [binance-operation=Withdraw, binance-remark=Withdraw fee is included, binance-user-id=53064551, manual-entry=Withdrawal fee, unidentified-counterparty=target]
-            == trades (0)
+            == trades (1)
+            2021-05-22T12:00:00Z | Koinly · Binance 0.1 BTC -> Koinly · Binance 4000 USDT | trade [koinly-id=K2, koinly-type=trade]
             == relationships (1)
             fee: PRIMARY {2021-05-26T19:48:36Z | Koinly · Binance -> Koinly · Nexo | 0.27931608 BTC | transfer [koinly-id=K1, koinly-type=transfer]} & RELATED {2021-05-26T19:48:36Z | Koinly · Binance -> Koinly · Binance Fees | 0.00055 BTC | Fee}
-            == daily balances (9)
+            == daily balances (11)
             Binance Funding | 2021-05-20 | BTC | -0.5
             Binance Funding | 2021-05-26 | BTC | -0.22013392
             Binance | 2021-05-20 | BTC | 0.5
             Binance | 2021-05-26 | BTC | 0.22013392
             Koinly · Binance Fees | 2021-05-26 | BTC | 0.00055
             Koinly · Binance | 2021-05-20 | BTC | 0.5
-            Koinly · Binance | 2021-05-26 | BTC | 0.22013392
+            Koinly · Binance | 2021-05-22 | BTC | 0.4
+            Koinly · Binance | 2021-05-22 | USDT | 4000
+            Koinly · Binance | 2021-05-26 | BTC | 0.12013392
             Koinly · Nexo | 2021-05-26 | BTC | 0.27931608
             Koinly: External | 2021-05-20 | BTC | -0.5
             """.trimIndent(),
