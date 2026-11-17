@@ -42,6 +42,11 @@ data class NewTrade(
     val source: Source,
     val occurrence: Int = 0,
     val attributes: List<NewAttribute> = emptyList(),
+    /**
+     * A vacant id a re-run reserved for this trade's record (#1430): a new trade is inserted under it, so a person's
+     * overrides and links keyed on it still apply. Ignored when an identical trade is reused.
+     */
+    val reuseId: TradeId? = null,
 )
 
 interface TradeWriteRepository : TradeReadRepository {

@@ -26,6 +26,7 @@ import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Trade
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransactionId
+import com.moneymanager.domain.model.TransactionKind
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
@@ -37,6 +38,7 @@ import com.moneymanager.domain.model.observation.ImportGroupKey
 import com.moneymanager.domain.model.observation.ImportRecordId
 import com.moneymanager.domain.model.observation.ImportRecordKey
 import com.moneymanager.domain.model.observation.MaterializedTransaction
+import com.moneymanager.domain.model.observation.Observation
 import com.moneymanager.domain.model.observation.ObservationContent
 import com.moneymanager.domain.model.observation.ObservationOwner
 import com.moneymanager.domain.model.observation.TransferField
@@ -111,6 +113,7 @@ import com.moneymanager.importengineapi.LocalPersonKey
 import com.moneymanager.importengineapi.LocalTradeKey
 import com.moneymanager.importengineapi.MaterializationReport
 import com.moneymanager.importengineapi.MaterializationRequest
+import com.moneymanager.importengineapi.Materializer
 import com.moneymanager.importengineapi.Materializer.column
 import com.moneymanager.importengineapi.ObservationExpander
 import com.moneymanager.importengineapi.ObservationKey
@@ -121,6 +124,7 @@ import com.moneymanager.importengineapi.PassThroughMutation
 import com.moneymanager.importengineapi.PersonMatchKey
 import com.moneymanager.importengineapi.ReconciliationLinkMutation
 import com.moneymanager.importengineapi.RelationshipMutation
+import com.moneymanager.importengineapi.ReservedTransactions
 import com.moneymanager.importengineapi.RowOutcome
 import com.moneymanager.importengineapi.TradeAttributeMutation
 import com.moneymanager.importengineapi.TradeDedupePolicy
@@ -320,6 +324,7 @@ class ImportEngineImpl(
         // order claims are held back from it. A conversion is never part of an order.
         val orderLinkedTradeKeys = batch.orders.flatMapTo(mutableSetOf()) { it.tradeKeys }
         val conversionReconciler = buildConversionTradeReconciler(batch, orderLinkedTradeKeys)
+        val observer = sourceObservations()
         val tradesToWrite = mutableListOf<Pair<ImportTradeIntent, NewTrade>>()
         for (intent in batch.trades.creates()) {
             // Either kind of cross-source match suppresses the write; they differ only in what can be
@@ -355,6 +360,7 @@ class ImportEngineImpl(
                     source = intent.source,
                     occurrence = occurrence,
                     attributes = intent.attributes,
+                    reuseId = observer?.reuse(intent.observationKey(), TransactionKind.TRADE) as TradeId?,
                 )
             tradeOccurrences[tupleKey] = occurrence + 1
         }
@@ -379,7 +385,6 @@ class ImportEngineImpl(
             createdTradeIds[intent.key] = tradeResult.id
             if (!tradeResult.created) dedupedTradeKeys += intent.key
         }
-        val observer = sourceObservations()
         for ((intent, tradeResult) in tradesToWrite.map { it.first }.zip(tradeResults)) {
             if (tradeResult.created) {
                 observer?.record(
@@ -558,13 +563,14 @@ class ImportEngineImpl(
                     tradeDeletes.filter { it.source.isImport() }.map { requireNotNull(it.existingId) },
                 (transferDeletes.map { it.source } + tradeDeletes.map { it.source }).toSet(),
             )
+        val reserved = reserveVacated(batch, (transferDeleteIds + tradeDeleteIds).filterNot { it in stillObserved })
         transferDeleteIds.filterNot { it in stillObserved }.chunked(DELETE_CHUNK_ROWS).forEach { chunk ->
-            observationRepository?.deleteObservationsOfTransactions(chunk)
+            observationRepository?.deleteObservationsOfTransactions(chunk.filterNot { it in reserved.ids })
             transactionRepository.deleteTransactions(chunk)
             reportDeleted(chunk.size)
         }
         tradeDeleteIds.filterNot { it in stillObserved }.chunked(DELETE_CHUNK_ROWS).forEach { chunk ->
-            observationRepository?.deleteObservationsOfTransactions(chunk)
+            observationRepository?.deleteObservationsOfTransactions(chunk.filterNot { it in reserved.ids })
             tradeRepository.deleteTrades(chunk)
             reportDeleted(chunk.size)
         }
@@ -593,6 +599,7 @@ class ImportEngineImpl(
             materialize(emptyList(), MaterializationRequest(Source.Reconciler, transfers.observedDuplicates))
         }
         val matchSync = batch.takeIf { it.syncMatches }?.let { matchSync()?.run() } ?: MaterializationReport()
+        val settled = batch.settle?.let { settle(it) }
 
         return ImportResult(
             accountsCreated = accountResolution.created,
@@ -622,8 +629,9 @@ class ImportEngineImpl(
             apiSessionIds = config.apiSessionIds,
             apiRequestIds = config.apiRequestIds,
             apiResponseIds = config.apiResponseIds,
-            materialization = materialization,
+            materialization = settled ?: materialization,
             matchSync = matchSync,
+            reserved = reserved,
         )
     }
 
@@ -640,6 +648,81 @@ class ImportEngineImpl(
             placeholderTypeId = attributeTypeRepository.getByName(WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME).first()?.id,
         ).run(mutations, request)
 
+    /**
+     * What a [CsvImportMutation.Reserve] keeps (#1430). Of [vacating] (the deletes no other source still observes), each a
+     * reserved observation is on keeps its observations, pointing at an id with no row, for the re-run to take back. A
+     * reserved observation on any other transaction that keeps its row (one the file shared with another source) goes now,
+     * as a reset's did, and that transaction is rebuilt from what is left. Ids a previous, stopped re-run left vacant stay.
+     */
+    private suspend fun reserveVacated(
+        batch: ImportBatch,
+        vacating: List<TransactionId>,
+    ): ReservedTransactions {
+        val observations = observationRepository ?: return ReservedTransactions()
+        if (batch.csvImportMutations.none { it is CsvImportMutation.Reserve }) return ReservedTransactions()
+        val vacatingIds = vacating.toSet()
+        val alreadyVacant = observations.getVacantReserved().mapTo(mutableSetOf()) { it.id }
+        val kept = mutableSetOf<TransactionId>()
+        for (observation in observations.getReserved()) {
+            when {
+                observation.transactionId in vacatingIds -> kept += observation.transactionId
+                observation.id in alreadyVacant -> Unit
+                else -> observations.deleteObservation(observation.id)
+            }
+        }
+        val placeholderTypeId = placeholderTypeId()
+        val priorMerges =
+            kept
+                .filter { isOverridden(it) }
+                .mapNotNull { id ->
+                    Materializer
+                        .merge(observations.getObservationsOfTransaction(id).map { it.content }, placeholderTypeId)
+                        ?.let { id to it }
+                }.toMap()
+        return ReservedTransactions(kept, priorMerges)
+    }
+
+    /**
+     * Settles a re-run's [reserved] ids once it has run (#1430): an id nothing took back is released, a reserved
+     * observation its record didn't say again goes (a group's is kept: its other legs may come from files not re-run), and
+     * every id a person overrode, or that lost an observation, is rebuilt with the overrides on top. A conflict compares
+     * the new merge with the one before the re-run.
+     */
+    private suspend fun settle(reserved: ReservedTransactions): MaterializationReport {
+        val observations = observationRepository ?: return MaterializationReport()
+        val vacant = reserved.ids.filterTo(mutableSetOf()) { observations.getMaterialized(it) == null }
+        observations.releaseTransactions(vacant)
+        val lost = mutableSetOf<TransactionId>()
+        for (observation in observations.getReserved()) {
+            if (observation.transactionId !in reserved.ids) continue
+            if (observation.owner is ObservationOwner.Group) {
+                observations.unreserve(observation.id)
+            } else {
+                observations.deleteObservation(observation.id)
+                lost += observation.transactionId
+            }
+        }
+        val rebuild =
+            (reserved.priorMerges.keys - vacant) +
+                lost.filter { observations.getObservationsOfTransaction(it).isNotEmpty() }
+        val released = reserved.priorMerges.keys.filterTo(mutableSetOf()) { it in vacant }
+        if (rebuild.isEmpty()) return MaterializationReport(releasedOverridden = released)
+        return materialize(emptyList(), MaterializationRequest(Source.Manual, rebuild, priorMerges = reserved.priorMerges))
+            .copy(releasedOverridden = released)
+    }
+
+    private suspend fun isOverridden(id: TransactionId): Boolean {
+        val overrides = personOverrideRepository ?: return false
+        return when (id) {
+            is TransferId -> overrides.getTransferOverrides(id).isNotEmpty() || overrides.getTransferAttributeOverrides(id).isNotEmpty()
+            is TradeId -> overrides.getTradeAttributeOverrides(id).isNotEmpty()
+            else -> false
+        }
+    }
+
+    private suspend fun placeholderTypeId(): AttributeTypeId? =
+        attributeTypeRepository.getByName(WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME).first()?.id
+
     /** The transactions the records of the files and API sessions [batch] resets observe, read before the reset drops them. */
     private suspend fun transactionsObservedByResets(batch: ImportBatch): Set<TransactionId> {
         val observations = observationRepository ?: return emptySet()
@@ -649,6 +732,7 @@ class ImportEngineImpl(
                 when (it) {
                     is CsvImportMutation.ResetRowStatuses -> it.id
                     is CsvImportMutation.ResetToUnimported -> it.id
+                    is CsvImportMutation.Reserve -> it.id
                     else -> null
                 }
             }
@@ -686,7 +770,9 @@ class ImportEngineImpl(
             observations.getObservationsOfTransaction(id).any {
                 val owner = it.owner
                 owner is ObservationOwner.Record &&
-                    owner.recordId !in own
+                    owner.recordId !in own &&
+                    // A record its file's re-run reserved (#1430) is about to say it again, not to keep it standing.
+                    !observations.isReserved(it.id)
             }
         }
     }
@@ -762,6 +848,44 @@ class ImportEngineImpl(
         private val containerRecords = mutableMapOf<Any, MutableMap<ImportRecordKey, ImportRecordId>>()
         private val groups = mutableMapOf<ImportGroupKey, ImportGroupId>()
 
+        // The vacant ids re-runs reserved (#1430), by the owner and slot that said them, read on first use; a reuse takes one.
+        private var vacant: MutableMap<Pair<ObservationOwner, String>, Observation>? = null
+
+        /**
+         * The id a re-run reserved for [key]'s slot, when its record said it before and nothing took it back yet: a new
+         * [kind] booking for it goes in under that id, so what a person decided about it still applies. Each id goes once.
+         */
+        suspend fun reuse(
+            key: ObservationKey?,
+            kind: TransactionKind,
+        ): TransactionId? {
+            val ownerKey = key?.owner ?: return null
+            val pool =
+                vacant ?: observations.getVacantReserved().associateByTo(mutableMapOf()) { (it.owner to it.slot) }.also { vacant = it }
+            if (pool.isEmpty()) return null
+            val owner =
+                when (ownerKey) {
+                    is ObservationOwnerKey.Record -> {
+                        knownRecord(ownerKey.key)?.let { ObservationOwner.Record(it) }
+                    }
+
+                    is ObservationOwnerKey.Group -> {
+                        records?.let { r ->
+                            ObservationOwner.Group(groups.getOrPut(ownerKey.key) { r.getOrCreateGroup(ownerKey.key) })
+                        }
+                    }
+
+                    else -> {
+                        null
+                    }
+                } ?: return null
+            val reserved = pool[owner to key.slot] ?: return null
+            val id = reserved.transactionId
+            if ((id is TransferId) != (kind == TransactionKind.TRANSFER)) return null
+            pool.remove(owner to key.slot)
+            return id
+        }
+
         fun transferContent(
             leg: ExpandedTransfer,
             approximateTime: Boolean,
@@ -776,8 +900,18 @@ class ImportEngineImpl(
         ) {
             val slot = key?.slot ?: ObservationSlot.TRADE
             val (owner, fresh) = owner(key?.owner, provenance, transactionId) ?: return
-            // A record seen before may already say this slot (a trade its re-import found again): it keeps what it said.
-            if (!fresh && observations.getObservationsOf(owner).any { it.slot == slot }) return
+            val existing = if (fresh) null else observations.getObservationsOf(owner).firstOrNull { it.slot == slot }
+            if (existing != null) {
+                // A slot its file's re-run reserved (#1430) is said again: it takes what the record says now, where it says it.
+                if (observations.isReserved(existing.id)) {
+                    val now = content()
+                    if (existing.content != now) observations.updateContent(existing.id, now)
+                    if (existing.transactionId.id != transactionId.id) observations.assignTransaction(existing.id, transactionId)
+                    observations.unreserve(existing.id)
+                }
+                // Otherwise a record seen before already says this slot (a trade its re-import found again): it keeps what it said.
+                return
+            }
             observations.insertObservation(owner, slot, transactionId, content())
         }
 
@@ -811,25 +945,32 @@ class ImportEngineImpl(
         // a hash that matches nothing, which that write then replaces: until it does, the file never looks unchanged.
         private suspend fun record(key: ImportRecordKey): Pair<ObservationOwner, Boolean>? {
             val records = records ?: return null
-            val known =
-                when (key) {
-                    is ImportRecordKey.ApiItem -> {
-                        containerRecords.getOrPut(key.sessionId) {
-                            records.getApiSessionRecords(key.sessionId).associateTo(mutableMapOf()) { it.key to it.id }
-                        }
-                    }
-
-                    is ImportRecordKey.CsvRow -> {
-                        containerRecords.getOrPut(key.csvImportId) {
-                            records.getCsvImportRecords(key.csvImportId).associateTo(mutableMapOf()) { it.key to it.id }
-                        }
-                    }
-                }
+            val known = recordsOf(key, records)
             known[key]?.let { return ObservationOwner.Record(it) to false }
             val id = records.insertRecord(key, RECORD_UNHASHED)
             known[key] = id
             return ObservationOwner.Record(id) to true
         }
+
+        private suspend fun knownRecord(key: ImportRecordKey): ImportRecordId? = records?.let { recordsOf(key, it)[key] }
+
+        private suspend fun recordsOf(
+            key: ImportRecordKey,
+            records: ImportRecordWriteRepository,
+        ): MutableMap<ImportRecordKey, ImportRecordId> =
+            when (key) {
+                is ImportRecordKey.ApiItem -> {
+                    containerRecords.getOrPut(key.sessionId) {
+                        records.getApiSessionRecords(key.sessionId).associateTo(mutableMapOf()) { it.key to it.id }
+                    }
+                }
+
+                is ImportRecordKey.CsvRow -> {
+                    containerRecords.getOrPut(key.csvImportId) {
+                        records.getCsvImportRecords(key.csvImportId).associateTo(mutableMapOf()) { it.key to it.id }
+                    }
+                }
+            }
 
         // A group outlives each of its runs (its legs may come from several files), so it may already say a slot. Each run
         // names every leg it joined, so its members are those of the latest run.
@@ -1078,8 +1219,8 @@ class ImportEngineImpl(
                 else -> null
             }
         val createdLegs = mutableListOf<Pair<ExpandedTransfer, TransferId>>()
-        val createdIds = writeTransfers(toImport, toUpdate, batchSize, onProgress, engineOwnedTypeId, createdLegs)
         val observer = sourceObservations()
+        val createdIds = writeTransfers(toImport, toUpdate, batchSize, onProgress, engineOwnedTypeId, createdLegs, observer)
         if (observer != null) {
             val approximate =
                 toImport.mapNotNullTo(
@@ -1196,6 +1337,7 @@ class ImportEngineImpl(
                     source = trade.provenance,
                     occurrence = occurrence,
                     attributes = trade.attributes,
+                    reuseId = observer?.reuse(trade.key, TransactionKind.TRADE) as TradeId?,
                 )
             }
         if (trades.isEmpty()) return
@@ -2358,6 +2500,7 @@ class ImportEngineImpl(
         onProgress: (suspend (Progress) -> Unit)?,
         engineOwnedTypeId: AttributeTypeId?,
         createdLegs: MutableList<Pair<ExpandedTransfer, TransferId>>,
+        observer: SourceObservations?,
     ): List<TransferId> {
         if (toImport.isEmpty() && toUpdate.isEmpty()) return emptyList()
 
@@ -2396,6 +2539,13 @@ class ImportEngineImpl(
         val chunks = if (effectiveBatchSize >= expanded.size) listOf(expanded) else expanded.chunked(effectiveBatchSize)
         chunks.forEachIndexed { index, chunk ->
             val payload = buildCreatePayload(chunk, priorIds)
+            // A leg whose record a re-run reserved an id for goes back in under it (#1430).
+            val reusedIds = mutableMapOf<TransferId, TransferId>()
+            if (observer != null) {
+                chunk.flatMap { it.legs }.forEachIndexed { i, leg ->
+                    (observer.reuse(leg.key, TransactionKind.TRANSFER) as TransferId?)?.let { reusedIds[payload.transfers[i].id] = it }
+                }
+            }
             // Updates ride with the final create chunk (one transaction in the common single-chunk case).
             val (updates, updateSources) =
                 if (index == chunks.lastIndex) buildUpdates(toUpdate, engineOwnedTypeId) else emptyList<TransferUpdate>() to emptyList()
@@ -2407,6 +2557,7 @@ class ImportEngineImpl(
                     sources = payload.sources,
                     updates = updates,
                     updateSources = updateSources,
+                    reusedIds = reusedIds,
                 )
             // Keep only the main transfers' ids (fee transfers are interleaved), aligned to [toImport].
             createdIds += payload.mainResultIndices.map { allCreatedIds[it] }
@@ -2975,6 +3126,10 @@ class ImportEngineImpl(
 
                 is CsvImportMutation.ResetRowStatuses -> {
                     csvImportRepository.resetRowStatuses(m.id, m.rowIndexes)
+                }
+
+                is CsvImportMutation.Reserve -> {
+                    csvImportRepository.reserveForRerun(m.id, RECORD_UNHASHED)
                 }
 
                 is CsvImportMutation.SaveErrors -> {

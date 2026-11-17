@@ -67,12 +67,17 @@ class TradeWriteRepositoryImpl(
                     occurrence = trade.occurrence.toLong(),
                 ).awaitAsOneOrNull()
         if (existing != null) return TradeCreateResult(TradeId(existing), created = false)
-        // Allocate a transaction id (insert + last_insert_rowid must share a connection).
-        transactionIdWriteQueries.insert()
-        val id = transactionIdWriteQueries.lastInsertedId().awaitAsOne()
+        // Allocate a transaction id (insert + last_insert_rowid must share a connection), unless a re-run reserved one.
+        val id =
+            trade.reuseId?.id ?: run {
+                transactionIdWriteQueries.insert()
+                transactionIdWriteQueries.lastInsertedId().awaitAsOne()
+            }
+        val revision =
+            if (trade.reuseId == null) 1L else database.entitySourceSelectQueries.selectNextRevision(EntityType.TRADE.id, id).awaitAsOne()
         writeQueries.insert(
             id = id,
-            revision_id = 1L,
+            revision_id = revision,
             timestamp = timestamp,
             description = trade.description,
             from_account_id = trade.fromAccountId.id,
@@ -82,7 +87,7 @@ class TradeWriteRepositoryImpl(
             to_asset_id = trade.toAmount.asset.id.id,
             to_amount = trade.toAmount.amount.toString(),
         )
-        database.recordSource(deviceId, EntityType.TRADE, id, 1L, trade.source)
+        database.recordSource(deviceId, EntityType.TRADE, id, revision, trade.source)
         return TradeCreateResult(TradeId(id), created = true)
     }
 

@@ -31,4 +31,16 @@ interface ObservationReadRepository {
 
     /** The accounts among [accountIds] that some observation names. */
     suspend fun getAccountsWithObservations(accountIds: Collection<AccountId>): Set<AccountId>
+
+    /**
+     * The observations a re-run reserved (#1430) whose transaction has no row yet: the ids its records may take back.
+     * Reservations only exist while a re-run is under way.
+     */
+    suspend fun getVacantReserved(): List<Observation>
+
+    /** Every observation still reserved, vacant or not: what settling a re-run resolves. */
+    suspend fun getReserved(): List<Observation>
+
+    /** Whether a re-run reserved observation [id] (#1430) and its record hasn't said it again yet. */
+    suspend fun isReserved(id: ObservationId): Boolean
 }

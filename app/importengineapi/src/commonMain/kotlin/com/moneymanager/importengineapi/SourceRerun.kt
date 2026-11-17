@@ -278,6 +278,8 @@ data class SourceRerunResult<R>(
     val deletedEmptyAccounts: List<String>,
     /** Hand-made relationships and hand-set trade attributes put back on the re-created transactions. */
     val reappliedLinks: ReappliedLinks = ReappliedLinks(),
+    /** Where a staged file's new records disagree with what a person set on them (#1430), for a person to resolve. */
+    val conflicts: List<MaterializationConflict> = emptyList(),
 )
 
 /** The outcome of [executeRerun]; [result] is what its run returned. */
@@ -288,6 +290,7 @@ data class RerunOutcome<R>(
     val unmatchedEdits: List<ManualEdit>,
     val reappliedLinks: ReappliedLinks,
     val deletedEmptyAccounts: List<String>,
+    val conflicts: List<MaterializationConflict> = emptyList(),
 )
 
 /**
@@ -449,6 +452,7 @@ suspend fun <R> ImportEngine.executeSourceRerun(
         unmatchedEdits = outcome.unmatchedEdits,
         deletedEmptyAccounts = outcome.deletedEmptyAccounts,
         reappliedLinks = outcome.reappliedLinks,
+        conflicts = outcome.conflicts,
     )
 }
 
@@ -474,40 +478,40 @@ suspend fun <R> ImportEngine.executeRerun(
     run: suspend () -> R,
 ): RerunOutcome<R> {
     val deletedTransfers = files.flatMapTo(mutableSetOf()) { it.createdTransfers.keys }
-    val deletedTrades = files.flatMapTo(mutableSetOf()) { it.tradeIds }
     val unhideUpdates =
         reconciledPartnerUnhideUpdates(deletedTransfers, reads.relationshipRepository, reads.transactionRepository)
     val resets =
-        files.mapNotNull { file -> (file.file as? Source.Csv)?.let { CsvImportMutation.ResetRowStatuses(it.importId, null) } }
+        files.mapNotNull { file -> (file.file as? Source.Csv)?.let { CsvImportMutation.Reserve(it.importId) } }
 
     // The un-hide updates ride in the delete batch (the engine applies updates before deletes), and so
     // do the record resets.
     onProgress?.invoke(Progress(REMOVING, fraction = 0f))
-    import(
-        resetRecords.copy(
-            transfers =
-                unhideUpdates +
+    val reserved =
+        import(
+            resetRecords.copy(
+                transfers =
+                    unhideUpdates +
+                        files.flatMap { file ->
+                            file.createdTransfers.keys.map { id ->
+                                ImportTransfer(source = file.file, operation = ImportOperation.DELETE, existingId = id)
+                            }
+                        },
+                trades =
                     files.flatMap { file ->
-                        file.createdTransfers.keys.map { id ->
-                            ImportTransfer(source = file.file, operation = ImportOperation.DELETE, existingId = id)
+                        file.tradeIds.map { id ->
+                            ImportTradeIntent(
+                                key = LocalTradeKey("reimport-delete-${id.id}"),
+                                source = file.file,
+                                operation = ImportOperation.DELETE,
+                                existingId = id,
+                            )
                         }
                     },
-            trades =
-                files.flatMap { file ->
-                    file.tradeIds.map { id ->
-                        ImportTradeIntent(
-                            key = LocalTradeKey("reimport-delete-${id.id}"),
-                            source = file.file,
-                            operation = ImportOperation.DELETE,
-                            existingId = id,
-                        )
-                    }
-                },
-            dedupePolicy = DedupePolicy.None,
-            csvImportMutations = resetRecords.csvImportMutations + resets,
-        ),
-        onProgress = onProgress?.let { sink -> { sink(it.copy(detail = REMOVING)) } },
-    )
+                dedupePolicy = DedupePolicy.None,
+                csvImportMutations = resetRecords.csvImportMutations + resets,
+            ),
+            onProgress = onProgress?.let { sink -> { sink(it.copy(detail = REMOVING)) } },
+        ).reserved
     onProgress?.invoke(Progress("Removed what the import created", fraction = 1f))
 
     onProgress?.invoke(Progress("Re-importing"))
@@ -523,12 +527,23 @@ suspend fun <R> ImportEngine.executeRerun(
     val result = run()
     val emptiedByRun = createdNames.filter { (id, _) -> reads.accountRepository.getAccountById(id).first() == null }.map { it.second }
 
+    // A staged file's records took their old ids back, so a person's overrides, pins and links on them still hold:
+    // settling releases the ids no record took back and rebuilds the overridden ones (#1430).
+    val settled = if (reserved.ids.isEmpty()) MaterializationReport() else import(ImportBatch(settle = reserved)).materialization
+    // A hand edit whose record no longer makes its transaction has nothing left to apply to: reported, as a replay that missed was.
+    val released = settled.releasedOverridden.mapTo(mutableSetOf()) { it.id }
+    val orphanedEdits = manualEdits.filter { it.transferId.id in released }
+    val orphanedTradeEdits = links.tradeEdits.filter { it.tradeId.id in released }.map { it.describe() }
+
     onProgress?.invoke(Progress("Re-applying manual edits"))
-    val deletedIds = deletedTransfers.mapTo(mutableSetOf()) { it.id } + deletedTrades.map { it.id }
+    // Only an API session's transactions still come back under new ids, so only theirs are replayed (#1432 retires this).
+    val replayed = files.filter { it.file is Source.Api }
+    val deletedIds =
+        replayed.flatMapTo(mutableSetOf()) { file -> file.createdTransfers.keys.map { it.id } + file.tradeIds.map { it.id } }
     val reapplication =
         reapplyManualEdits(
-            manualEdits = manualEdits,
-            tradeEdits = links.tradeEdits,
+            manualEdits = manualEdits.filter { it.transferId.id in deletedIds },
+            tradeEdits = links.tradeEdits.filter { it.tradeId.id in deletedIds },
             relationships = links.relationships.filter { r -> r.members.any { it.transactionId.id in deletedIds } },
             deletedIds = deletedIds,
             reads = reads,
@@ -556,9 +571,10 @@ suspend fun <R> ImportEngine.executeRerun(
         result = result,
         unhiddenTransfers = unhideUpdates.size,
         reappliedEdits = reapplication.reapplied,
-        unmatchedEdits = reapplication.unmatched,
-        reappliedLinks = reapplication.links,
+        unmatchedEdits = reapplication.unmatched + orphanedEdits,
+        reappliedLinks = reapplication.links + ReappliedLinks(notReapplied = orphanedTradeEdits),
         deletedEmptyAccounts = deletedEmptyAccounts,
+        conflicts = settled.conflicts,
     )
 }
 

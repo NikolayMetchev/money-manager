@@ -4,6 +4,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Relationship
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TransactionId
+import com.moneymanager.domain.model.observation.MaterializedTransaction
 import com.moneymanager.domain.model.observation.ObservationContent
 import com.moneymanager.domain.model.observation.ObservationOwner
 import com.moneymanager.domain.model.observation.ObservationPin
@@ -57,6 +58,17 @@ data class MaterializationRequest(
     val source: Source,
     val transactionIds: Set<TransactionId> = emptySet(),
     val candidateAccountIds: Set<AccountId> = emptySet(),
+    /** What a transaction merged to before a re-run (#1430): its conflicts compare against this rather than the stored merge. */
+    val priorMerges: Map<TransactionId, MaterializedTransaction> = emptyMap(),
+)
+
+/**
+ * The transactions deleting a reserved file's bookings vacated (#1430): their ids stay reserved for its re-run's
+ * records, and [priorMerges] holds what each one a person overrode merged to before, to report what changed under them.
+ */
+data class ReservedTransactions(
+    val ids: Set<TransactionId> = emptySet(),
+    val priorMerges: Map<TransactionId, MaterializedTransaction> = emptyMap(),
 )
 
 /** What a materialization wrote, and what it left for a person. */
@@ -75,6 +87,8 @@ data class MaterializationReport(
     val orphanedRelationships: List<Relationship> = emptyList(),
     /** Import-created accounts nothing references any more, deleted with their fee accounts. */
     val deletedAccountIds: Set<AccountId> = emptySet(),
+    /** Transactions a person overrode that no record said again when a re-run settled (#1430): their overrides no longer apply. */
+    val releasedOverridden: Set<TransactionId> = emptySet(),
 ) {
     /** Whether the materialization wrote any transaction row. */
     val wroteRows: Boolean get() = inserted.isNotEmpty() || updated.isNotEmpty() || deleted.isNotEmpty()

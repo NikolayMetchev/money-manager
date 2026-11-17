@@ -661,6 +661,12 @@ data class ImportBatch(
      * transaction that goes are linked to the one that stays. Run once after a staged file's import (or a bulk run's).
      */
     val syncMatches: Boolean = false,
+    /**
+     * Settles a re-run's reservations (#1430), after its run: the ids [ReservedTransactions.ids] nothing took back are
+     * released (their observations and the relationships kept for them go), what the run's records no longer say goes,
+     * and every id a person overrode is brought to its new merge with the overrides on top. Reported as [ImportResult.materialization].
+     */
+    val settle: ReservedTransactions? = null,
 ) {
     companion object {
         /**
