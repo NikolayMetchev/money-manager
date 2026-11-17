@@ -181,16 +181,6 @@ WHERE api_entity_source.api_session_id = ?
   AND entity_source.revision_id = 1
 ORDER BY entity_source.id;
 
--- Transfers among the given ids that a person has edited by hand since they were created: a later
--- revision recorded with the MANUAL source (source_type_id = 1).
-selectHandEditedTransferIds:
-SELECT DISTINCT entity_id
-FROM entity_source
-WHERE entity_type_id = 7
-  AND source_type_id = 1
-  AND revision_id > 1
-  AND entity_id IN ?;
-
 -- The CSV rows whose current link is one of the given transfers or trades (they share one id space) without
 -- having written it: their matched entries, which mirror those links exactly (see recordMatchedSource).
 selectImportRecordsMatchedTo:
