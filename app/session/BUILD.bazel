@@ -51,7 +51,10 @@ kmp_library(
         "@maven_kmp//:kotlinx_coroutines_core",
         "@maven_kmp//:ktor_client_core",
     ],
-    deps = ["@maven_kmp//:kermit"],
+    deps = [
+        "//app/query",
+        "@maven_kmp//:kermit",
+    ],
 )
 
 kmp_test(

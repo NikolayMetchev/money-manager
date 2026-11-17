@@ -30,11 +30,14 @@ import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.TradeAuditEntry
 import com.moneymanager.domain.model.TradeId
+import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.AuditReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.presenter.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.presenter.transactions.presentObservations
+import com.moneymanager.query.TransactionObservations
 import com.moneymanager.ui.audit.AttributeChange
 import com.moneymanager.ui.audit.AuditDiffCard
 import com.moneymanager.ui.audit.AuditEntryDiff
@@ -47,6 +50,7 @@ import com.moneymanager.ui.audit.SourceInfoSection
 import com.moneymanager.ui.audit.UpdateNewValues
 import com.moneymanager.ui.audit.computeAuditDiff
 import com.moneymanager.ui.audit.reverseAttributeChanges
+import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.util.formatAmount
 import kotlinx.coroutines.flow.first
 import kotlinx.datetime.TimeZone
@@ -64,8 +68,26 @@ fun TransactionAuditScreen(
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
     onAccountClick: (AccountId) -> Unit = {},
+    observations: (suspend (TransactionId) -> TransactionObservations?)? = null,
     onBack: () -> Unit,
 ) {
+    // A transaction id with no transfer is a trade (same id space); the observations are keyed by the kind.
+    var transactionId by remember(transferId) { mutableStateOf<TransactionId?>(null) }
+    LaunchedEffect(transferId) {
+        transactionId =
+            if (transactionRepository.getTransactionById(transferId.id).first() != null) transferId else TradeId(transferId.id)
+    }
+    // A decision re-matches, which can change the transaction itself, so the audit trail is read again.
+    var revision by remember(transferId) { mutableStateOf(0) }
+    // Presented here, not in the header: the audit screen calls its header from whichever state it is in.
+    val importEngine = LocalImportEngine.current
+    val shownId = transactionId
+    val observationsModel =
+        if (observations != null && shownId != null) {
+            presentObservations(shownId, observations, importEngine, onChanged = { revision++ })
+        } else {
+            null
+        }
     val accounts by accountRepository
         .getAllAccounts()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
@@ -80,7 +102,7 @@ fun TransactionAuditScreen(
     AuditScreen(
         defaultTitle = "Audit History: $transferId",
         entityTypeName = "transaction",
-        loadKey = transferId,
+        loadKey = transferId to revision,
         loadData = {
             val auditEntries = auditRepository.getAuditHistoryForTransfer(transferId)
             val transfer = transactionRepository.getTransactionById(transferId.id).first()
@@ -144,6 +166,7 @@ fun TransactionAuditScreen(
             }
         },
         onBack = onBack,
+        header = { observationsModel?.let { ObservationsCard(it, accounts) } },
         diffCard = { row ->
             when (row) {
                 is TransferAuditRow -> {

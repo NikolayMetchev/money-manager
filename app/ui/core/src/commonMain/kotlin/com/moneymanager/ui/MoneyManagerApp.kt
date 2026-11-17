@@ -60,11 +60,13 @@ import com.moneymanager.presenter.error.ProvideSchemaAwareScope
 import com.moneymanager.presenter.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.query.TransactionDetailQuery
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.remotestorage.sync.StrategySyncController
 import com.moneymanager.remotestorage.sync.SyncState
 import com.moneymanager.remotestorage.sync.SyncStatus
 import com.moneymanager.session.SessionImports
+import com.moneymanager.session.transactionDetailQuery
 import com.moneymanager.strategycatalog.StrategyCatalogController
 import com.moneymanager.ui.components.DefaultCurrencyInitDialog
 import com.moneymanager.ui.foundation.LocalCredentialVault
@@ -211,6 +213,7 @@ fun MoneyManagerApp(
         val showSetupWizard = setupWizardRequested || setupWizardCompleted == false
 
         // Use schema-error-aware collection for flows that may fail on old databases
+        val detailQuery: TransactionDetailQuery = remember(services) { services.transactionDetailQuery() }
         val accounts by services.accounts.accountRepository
             .getAllAccounts()
             .collectAsStateWithSchemaErrorHandling(initial = emptyList())
@@ -952,6 +955,7 @@ fun MoneyManagerApp(
                                                         ),
                                                     )
                                                 },
+                                                observations = { id -> detailQuery.observations(id) },
                                                 onBack = { navigationHistory.navigateBack() },
                                             )
                                         }

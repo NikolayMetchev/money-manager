@@ -21,6 +21,7 @@ import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferAttribute
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.TransactionReadRepository
+import com.moneymanager.query.ObservationReads
 import com.moneymanager.query.TransactionDetailQuery
 import com.moneymanager.query.TransactionQuery
 import dev.mokkery.answering.calls
@@ -71,6 +72,20 @@ class TransactionsPresenterTest {
             mock { },
             mock { every { getByTransaction(any()) } returns flowOf(emptyList()) },
             mock { everySuspend { getSourcesForTransaction(any()) } returns emptyList() },
+            ObservationReads(
+                observationRepository = mock { everySuspend { getObservationsOfTransaction(any()) } returns emptyList() },
+                personOverrideRepository =
+                    mock {
+                        everySuspend { getPinsOnTransactions(any()) } returns emptyList()
+                        everySuspend { getTransferOverrides(any()) } returns emptyMap()
+                        everySuspend { getTransferAttributeOverrides(any()) } returns emptyList()
+                    },
+                importRecordRepository = mock(),
+                csvImportRepository = mock(),
+                attributeTypeRepository = mock(),
+                currencyRepository = mock(),
+                cryptoRepository = mock(),
+            ),
         )
 
     @Test
