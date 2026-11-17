@@ -80,11 +80,17 @@ class MatcherAgreementTest {
                 .getAll()
                 .first()
                 .associate { it.name to it.id }
+        val allAccounts = db.accountRepository.getAllAccounts().first()
+        val accountIdByName = allAccounts.reversed().associate { it.name to it.id }
         val families =
             db.csvImportStrategyRepository
                 .getAllStrategies()
                 .first()
-                .associate { it.id.toString() to it.matchFamily(attributeTypes) }
+                .associate { MatchScopeLoader.csvFamily(it.id.toString()) to it.matchFamily(attributeTypes) } +
+                db.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .associate { MatchScopeLoader.apiFamily(it.id.toString()) to it.matchFamily(attributeTypes, accountIdByName) }
         val loader =
             MatchScopeLoader(
                 db.observationRepository,

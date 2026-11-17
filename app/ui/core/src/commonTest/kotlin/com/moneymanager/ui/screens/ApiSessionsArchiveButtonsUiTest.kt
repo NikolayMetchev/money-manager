@@ -56,6 +56,7 @@ class ApiSessionsArchiveButtonsUiTest : DbTest() {
                             accountRepository = repositories.accountRepository,
                             currencyRepository = repositories.currencyRepository,
                             cryptoRepository = repositories.cryptoRepository,
+                            importRecordRepository = repositories.importRecordRepository,
                             maintenance = repositories.maintenanceService,
                             deviceId = deviceId,
                             apiImportService = services.apiImportService(vault, Mutex()),

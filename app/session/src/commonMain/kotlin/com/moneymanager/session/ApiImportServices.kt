@@ -23,6 +23,7 @@ fun AppServices.apiImportService(
         accountAttributeRepository = accounts.accountAttributeRepository,
         currencyRepository = accounts.currencyRepository,
         cryptoRepository = accounts.cryptoRepository,
+        importRecordRepository = imports.importRecordRepository,
         passThroughAccountRepository = imports.passThroughAccountRepository,
         maintenance = imports.maintenance,
         importEngine = transactions.importEngine,
