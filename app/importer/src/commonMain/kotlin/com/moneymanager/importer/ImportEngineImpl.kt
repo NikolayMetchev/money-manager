@@ -3379,10 +3379,6 @@ class ImportEngineImpl(
                     apiSessionRepository.deleteSession(m.id)
                 }
 
-                is ApiSessionMutation.InsertResponseTransaction -> {
-                    apiSessionRepository.insertResponseTransaction(m.responseId, m.jsonPath, m.state, m.errorMessage)
-                }
-
                 is ApiSessionMutation.InsertResponseTransactions -> {
                     apiSessionRepository.insertResponseTransactions(m.transactions)
                 }
