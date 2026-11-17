@@ -645,6 +645,7 @@ class ImportEngineImpl(
             trades = tradeRepository,
             relationships = relationshipRepository,
             placeholderTypeId = attributeTypeRepository.getByName(WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME).first()?.id,
+            records = importRecordRepository,
         ).run(mutations, request)
 
     /** The transactions the records of the files and API sessions [batch] resets observe, read before the reset drops them. */

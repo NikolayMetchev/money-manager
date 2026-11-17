@@ -259,6 +259,44 @@ object OracleCorpus {
             changedStrategy = "PayPal CSV",
         )
 
+    /**
+     * PayPal's activity export and one PayPal API session of the same movements, as `PayPalImportE2ETest` stages the
+     * API: a payment received with PayPal's fee on top, a payment sent, a GBP to USD conversion and a declined payment.
+     * The export books into one "PayPal" account and the API into one account per balance currency, so today the two
+     * record these movements on different accounts.
+     */
+    val PAYPAL_CSV_API =
+        OracleScenario(
+            name = "PayPal CSV + API session",
+            sources =
+                listOf(
+                    OracleSource(
+                        OracleFile.Csv(
+                            "2025-11-01-2025-11-30.CSV",
+                            PAYPAL_HEADERS,
+                            listOf(
+                                payPalRow(
+                                    "03/11/2025",
+                                    "09:00:00",
+                                    "Alice Buyer",
+                                    "Express Checkout Payment",
+                                    "GBP",
+                                    "50.00",
+                                    "PAY1",
+                                    fee = "-1.59",
+                                    total = "48.41",
+                                ),
+                                payPalRow("04/11/2025", "09:00:00", "Coffee Roasters", "Mobile Payment", "GBP", "-8.00", "PAY2"),
+                                payPalRow("05/11/2025", "09:00:00", "", "General Currency Conversion", "GBP", "-10.00", "CNV1"),
+                                payPalRow("05/11/2025", "09:00:00", "", "General Currency Conversion", "USD", "12.50", "CNV2"),
+                            ),
+                        ),
+                    ),
+                    OracleSource(OracleFile.Api("paypal-session", "PayPal API", PAYPAL_RESPONSES)),
+                ),
+            changedStrategy = "PayPal CSV",
+        )
+
     val CURVE =
         OracleScenario(
             name = "Crypto.com card + Curve export",
@@ -464,6 +502,7 @@ object OracleCorpus {
             AMEX_SANTANDER,
             REVOLUT,
             PAYPAL_CARD,
+            PAYPAL_CSV_API,
             CURVE,
             BINANCE_KOINLY,
             BYBIT_CSV_API,
@@ -648,7 +687,9 @@ private fun payPalRow(
     id: String,
     zone: String = "GMT",
     status: String = "Completed",
-): List<String> = listOf(date, time, zone, name, type, status, currency, amount, "0.00", amount, "", "", "0.00", id, "")
+    fee: String = "0.00",
+    total: String = amount,
+): List<String> = listOf(date, time, zone, name, type, status, currency, amount, fee, total, "", "", "0.00", id, "")
 
 private val CURVE_HEADERS =
     listOf("", "Created Date", "Merchant Name", "Funding Card Last 4 Digits", "Merchant MCC Code", "Txn Currency", "Txn Amount")
@@ -857,3 +898,58 @@ private val MONZO_TX_3 =
 private fun monzoTransactions(vararg transactions: String): Pair<String, String> =
     "https://api.monzo.com/transactions?account_id=$MONZO_ACCOUNT_ID&limit=100" to
         """{"transactions": [${transactions.joinToString(",\n")}]}"""
+
+private const val PAYPAL_API = "https://api-m.paypal.com/v1/reporting"
+
+private val PAYPAL_BALANCES =
+    "$PAYPAL_API/balances" to
+        """
+        {"balances": [
+          {"currency": "GBP", "primary": true, "total_balance": {"currency_code": "GBP", "value": "40.41"}},
+          {"currency": "USD", "total_balance": {"currency_code": "USD", "value": "12.50"}}
+        ], "account_id": "MERCHANT123", "as_of_time": "2025-11-30T00:00:00Z"}
+        """.trimIndent()
+
+/** One Transaction Search item as PayPal formats it: an offset without a colon, signed decimal amounts. */
+private fun payPalItem(
+    id: String,
+    eventCode: String,
+    timestamp: String,
+    currency: String,
+    amount: String,
+    fee: String? = null,
+    status: String = "S",
+    payerName: String? = null,
+): String {
+    val feeJson = fee?.let { """, "fee_amount": {"currency_code": "$currency", "value": "$it"}""" }.orEmpty()
+    val payerJson =
+        payerName
+            ?.let { """, "payer_info": {"email_address": "payer@example.com", "payer_name": {"alternate_full_name": "$it"}}""" }
+            .orEmpty()
+    return """
+        {"transaction_info": {"transaction_id": "$id", "transaction_event_code": "$eventCode",
+          "transaction_initiation_date": "$timestamp", "transaction_amount": {"currency_code": "$currency", "value": "$amount"},
+          "transaction_status": "$status"$feeJson}$payerJson}
+        """.trimIndent()
+}
+
+private fun payPalTransactions(
+    currency: String,
+    vararg items: String,
+): Pair<String, String> =
+    "$PAYPAL_API/transactions?transaction_currency=$currency&fields=all&balance_affecting_records_only=Y" +
+        "&start_date=2025-11-01T00:00:00Z&end_date=2025-12-01T00:00:00Z&page=1&page_size=500" to
+        """{"transaction_details": [${items.joinToString(",\n")}], "page": 1, "total_items": ${items.size}, "total_pages": 1}"""
+
+private val PAYPAL_RESPONSES =
+    listOf(
+        PAYPAL_BALANCES,
+        payPalTransactions(
+            "GBP",
+            payPalItem("PAY1", "T0006", "2025-11-03T09:00:00+0000", "GBP", "50.00", fee = "-1.59", payerName = "Alice Buyer"),
+            payPalItem("PAY2", "T0006", "2025-11-04T09:00:00+0000", "GBP", "-8.00", payerName = "Coffee Roasters"),
+            payPalItem("CNV1", "T0200", "2025-11-05T09:00:00+0000", "GBP", "-10.00"),
+            payPalItem("DEN1", "T0006", "2025-11-06T09:00:00+0000", "GBP", "-99.00", status = "D", payerName = "Coffee Roasters"),
+        ),
+        payPalTransactions("USD", payPalItem("CNV2", "T0200", "2025-11-05T09:00:00+0000", "USD", "12.50")),
+    )
