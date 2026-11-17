@@ -4,7 +4,6 @@ import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.AttributeTypeId
-import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
@@ -13,15 +12,18 @@ import com.moneymanager.domain.model.RelationshipMember
 import com.moneymanager.domain.model.RelationshipRole
 import com.moneymanager.domain.model.RelationshipType
 import com.moneymanager.domain.model.Source
-import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
-import com.moneymanager.domain.model.TransferAuditEntry
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.observation.AttributeOverride
+import com.moneymanager.domain.model.observation.ObservedValues
+import com.moneymanager.domain.model.observation.TransferField
 import com.moneymanager.domain.repository.AccountReadRepository
-import com.moneymanager.domain.repository.AuditReadRepository
+import com.moneymanager.domain.repository.AttributeTypeReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
+import com.moneymanager.domain.repository.ObservationReadRepository
+import com.moneymanager.domain.repository.PersonOverrideReadRepository
 import com.moneymanager.domain.repository.RelationshipReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
@@ -36,7 +38,9 @@ class RerunReads(
     val transactionRepository: TransactionReadRepository,
     val transferSourceRepository: TransferSourceReadRepository,
     val relationshipRepository: RelationshipReadRepository,
-    val auditRepository: AuditReadRepository,
+    val personOverrideRepository: PersonOverrideReadRepository,
+    val observationRepository: ObservationReadRepository,
+    val attributeTypeRepository: AttributeTypeReadRepository,
     val accountRepository: AccountReadRepository,
     val csvImportRepository: CsvImportReadRepository,
     /** Null for a source that never creates trades (QIF). */
@@ -106,8 +110,6 @@ data class TransferValues(
 )
 
 private fun Transfer.values() = TransferValues(timestamp, description, sourceAccountId, targetAccountId, amount)
-
-private fun TransferAuditEntry.values() = TransferValues(timestamp, description, sourceAccountId, targetAccountId, amount)
 
 /**
  * A hand edit of a transfer an import created. A re-import deletes the transfer and creates it again
@@ -278,6 +280,8 @@ data class SourceRerunResult<R>(
     val deletedEmptyAccounts: List<String>,
     /** Hand-made relationships and hand-set trade attributes put back on the re-created transactions. */
     val reappliedLinks: ReappliedLinks = ReappliedLinks(),
+    /** Where a staged file's new records disagree with what a person set on them (#1430), for a person to resolve. */
+    val conflicts: List<MaterializationConflict> = emptyList(),
 )
 
 /** The outcome of [executeRerun]; [result] is what its run returned. */
@@ -288,6 +292,7 @@ data class RerunOutcome<R>(
     val unmatchedEdits: List<ManualEdit>,
     val reappliedLinks: ReappliedLinks,
     val deletedEmptyAccounts: List<String>,
+    val conflicts: List<MaterializationConflict> = emptyList(),
 )
 
 /**
@@ -368,10 +373,14 @@ suspend fun captureRerunLinks(
                     .entries
             }.associate { it.key to it.value }
     val tradeEdits =
-        reads.tradeRepository
-            ?.getHandSetAttributes(createdTrades.keys)
-            .orEmpty()
-            .map { (id, attributes) -> ManualTradeEdit(id, createdTrades.getValue(id), attributes) }
+        if (createdTrades.isEmpty()) {
+            emptyList()
+        } else {
+            reads.personOverrideRepository.getTradeAttributeOverrides(createdTrades.keys).map { (id, overrides) ->
+                // A removed attribute has no value to put back.
+                ManualTradeEdit(id, createdTrades.getValue(id), overrides.associate { it.typeId to (it as? AttributeOverride.Set)?.value })
+            }
+        }
     val createdTransfers = files.flatMap { it.createdTransfers.entries }.associate { it.key to it.value }
     return RerunLinks(tradeEdits, captureManualRelationships(createdTransfers, createdTrades, reads))
 }
@@ -449,6 +458,7 @@ suspend fun <R> ImportEngine.executeSourceRerun(
         unmatchedEdits = outcome.unmatchedEdits,
         deletedEmptyAccounts = outcome.deletedEmptyAccounts,
         reappliedLinks = outcome.reappliedLinks,
+        conflicts = outcome.conflicts,
     )
 }
 
@@ -474,40 +484,40 @@ suspend fun <R> ImportEngine.executeRerun(
     run: suspend () -> R,
 ): RerunOutcome<R> {
     val deletedTransfers = files.flatMapTo(mutableSetOf()) { it.createdTransfers.keys }
-    val deletedTrades = files.flatMapTo(mutableSetOf()) { it.tradeIds }
     val unhideUpdates =
         reconciledPartnerUnhideUpdates(deletedTransfers, reads.relationshipRepository, reads.transactionRepository)
     val resets =
-        files.mapNotNull { file -> (file.file as? Source.Csv)?.let { CsvImportMutation.ResetRowStatuses(it.importId, null) } }
+        files.mapNotNull { file -> (file.file as? Source.Csv)?.let { CsvImportMutation.Reserve(it.importId) } }
 
     // The un-hide updates ride in the delete batch (the engine applies updates before deletes), and so
     // do the record resets.
     onProgress?.invoke(Progress(REMOVING, fraction = 0f))
-    import(
-        resetRecords.copy(
-            transfers =
-                unhideUpdates +
+    val reserved =
+        import(
+            resetRecords.copy(
+                transfers =
+                    unhideUpdates +
+                        files.flatMap { file ->
+                            file.createdTransfers.keys.map { id ->
+                                ImportTransfer(source = file.file, operation = ImportOperation.DELETE, existingId = id)
+                            }
+                        },
+                trades =
                     files.flatMap { file ->
-                        file.createdTransfers.keys.map { id ->
-                            ImportTransfer(source = file.file, operation = ImportOperation.DELETE, existingId = id)
+                        file.tradeIds.map { id ->
+                            ImportTradeIntent(
+                                key = LocalTradeKey("reimport-delete-${id.id}"),
+                                source = file.file,
+                                operation = ImportOperation.DELETE,
+                                existingId = id,
+                            )
                         }
                     },
-            trades =
-                files.flatMap { file ->
-                    file.tradeIds.map { id ->
-                        ImportTradeIntent(
-                            key = LocalTradeKey("reimport-delete-${id.id}"),
-                            source = file.file,
-                            operation = ImportOperation.DELETE,
-                            existingId = id,
-                        )
-                    }
-                },
-            dedupePolicy = DedupePolicy.None,
-            csvImportMutations = resetRecords.csvImportMutations + resets,
-        ),
-        onProgress = onProgress?.let { sink -> { sink(it.copy(detail = REMOVING)) } },
-    )
+                dedupePolicy = DedupePolicy.None,
+                csvImportMutations = resetRecords.csvImportMutations + resets,
+            ),
+            onProgress = onProgress?.let { sink -> { sink(it.copy(detail = REMOVING)) } },
+        ).reserved
     onProgress?.invoke(Progress("Removed what the import created", fraction = 1f))
 
     onProgress?.invoke(Progress("Re-importing"))
@@ -523,12 +533,23 @@ suspend fun <R> ImportEngine.executeRerun(
     val result = run()
     val emptiedByRun = createdNames.filter { (id, _) -> reads.accountRepository.getAccountById(id).first() == null }.map { it.second }
 
+    // A staged file's records took their old ids back, so a person's overrides, pins and links on them still hold:
+    // settling releases the ids no record took back and rebuilds the overridden ones (#1430).
+    val settled = if (reserved.ids.isEmpty()) MaterializationReport() else import(ImportBatch(settle = reserved)).materialization
+    // A hand edit whose record no longer makes its transaction has nothing left to apply to: reported, as a replay that missed was.
+    val released = settled.releasedOverridden.mapTo(mutableSetOf()) { it.id }
+    val orphanedEdits = manualEdits.filter { it.transferId.id in released }
+    val orphanedTradeEdits = links.tradeEdits.filter { it.tradeId.id in released }.map { it.describe() }
+
     onProgress?.invoke(Progress("Re-applying manual edits"))
-    val deletedIds = deletedTransfers.mapTo(mutableSetOf()) { it.id } + deletedTrades.map { it.id }
+    // Only an API session's transactions still come back under new ids, so only theirs are replayed (#1432 retires this).
+    val replayed = files.filter { it.file is Source.Api }
+    val deletedIds =
+        replayed.flatMapTo(mutableSetOf()) { file -> file.createdTransfers.keys.map { it.id } + file.tradeIds.map { it.id } }
     val reapplication =
         reapplyManualEdits(
-            manualEdits = manualEdits,
-            tradeEdits = links.tradeEdits,
+            manualEdits = manualEdits.filter { it.transferId.id in deletedIds },
+            tradeEdits = links.tradeEdits.filter { it.tradeId.id in deletedIds },
             relationships = links.relationships.filter { r -> r.members.any { it.transactionId.id in deletedIds } },
             deletedIds = deletedIds,
             reads = reads,
@@ -556,9 +577,10 @@ suspend fun <R> ImportEngine.executeRerun(
         result = result,
         unhiddenTransfers = unhideUpdates.size,
         reappliedEdits = reapplication.reapplied,
-        unmatchedEdits = reapplication.unmatched,
-        reappliedLinks = reapplication.links,
+        unmatchedEdits = reapplication.unmatched + orphanedEdits,
+        reappliedLinks = reapplication.links + ReappliedLinks(notReapplied = orphanedTradeEdits),
         deletedEmptyAccounts = deletedEmptyAccounts,
+        conflicts = settled.conflicts,
     )
 }
 
@@ -573,7 +595,7 @@ suspend fun manualEditsOf(
     reads: RerunReads,
     onProgress: (suspend (Source, Progress) -> Unit)? = null,
 ): Map<Source, List<ManualEdit>> {
-    val edited = reads.transferSourceRepository.getHandEditedTransferIds(created.values.flatMap { it.keys })
+    val edited = reads.personOverrideRepository.getOverriddenTransfers(created.values.flatMap { it.keys })
     val current = if (edited.isEmpty()) emptyMap() else reads.transactionRepository.getTransactionsByIds(edited)
     return created.mapValues { (source, transfers) ->
         onProgress?.invoke(source, Progress(READING_MANUAL_EDITS))
@@ -589,108 +611,83 @@ private suspend fun captureManualEdits(
     onProgress: (suspend (Progress) -> Unit)?,
 ): List<ManualEdit> {
     onProgress?.invoke(Progress(READING_MANUAL_EDITS))
-    val edited = reads.transferSourceRepository.getHandEditedTransferIds(created.keys)
+    val edited = reads.personOverrideRepository.getOverriddenTransfers(created.keys)
     if (edited.isEmpty()) return emptyList()
     return readManualEdits(created, edited, reads.transactionRepository.getTransactionsByIds(edited), reads, onProgress)
 }
 
-// [edited] are those of [created] edited by hand, [current] (at least) their transfers as they are now.
+// [edited] are those of [created] a person overrode, [current] (at least) their transfers as they are now.
 private suspend fun readManualEdits(
     created: Map<TransferId, Source>,
     edited: Set<TransferId>,
     current: Map<TransferId, Transfer>,
     reads: RerunReads,
     onProgress: (suspend (Progress) -> Unit)?,
-): List<ManualEdit> =
-    edited.sortedBy { it.id }.withIndex().mapNotNull { (index, id) ->
+): List<ManualEdit> {
+    val typeNames = mutableMapOf<AttributeTypeId, AttributeType>()
+    return edited.sortedBy { it.id }.withIndex().mapNotNull { (index, id) ->
         onProgress?.invoke(Progress.counted(READING_MANUAL_EDITS, index, edited.size))
         val transfer = current[id] ?: return@mapNotNull null
-        manualEditOf(
-            transfer = transfer,
-            record = created.getValue(id),
-            history = reads.auditRepository.getAuditHistoryForTransfer(id),
-            sources = reads.transferSourceRepository.getSourcesForTransaction(id),
-        )
+        val overrides = reads.personOverrideRepository
+        val attributeOverrides = overrides.getTransferAttributeOverrides(id)
+        val types =
+            attributeOverrides.map { it.typeId }.distinct().map { typeId ->
+                typeNames.getOrPut(typeId) {
+                    transfer.attributes.firstOrNull { it.attributeType.id == typeId }?.attributeType
+                        ?: reads.attributeTypeRepository.getById(typeId).first()
+                        ?: AttributeType(typeId, "attribute ${typeId.id}")
+                }
+            }
+        val merged =
+            Materializer.merge(reads.observationRepository.getObservationsOfTransaction(id).map { it.content })?.values
+        manualEditOf(transfer, created.getValue(id), overrides.getTransferOverrides(id).keys, types, merged as? ObservedValues.Transfer)
     }
+}
 
 private const val READING_MANUAL_EDITS = "Reading manual edits"
 
 /**
- * Reads a transfer's hand edits from its audit trail. An UPDATE audit row holds the values from before
- * its revision, so the values at revision r are the UPDATE row of revision r + 1, or the transfer itself
- * for the current revision. A field is a hand edit when the last revision that changed it was MANUAL.
+ * A transfer's hand edits, from what a person overrode on it ([fields] and the attribute [types]): each overridden
+ * field with its value now, and each overridden type with the values it holds now (none when removed). What the
+ * import says is [merged], its observations' merge, or the transfer itself where nothing observes it.
  */
 internal fun manualEditOf(
     transfer: Transfer,
     record: Source,
-    history: List<TransferAuditEntry>,
-    sources: List<SourceRecord>,
+    fields: Set<TransferField>,
+    types: List<AttributeType>,
+    merged: ObservedValues.Transfer?,
 ): ManualEdit? {
-    val manualRevisions = sources.filter { it.source == Source.Manual }.map { it.revisionId }.toSet()
-    if (manualRevisions.isEmpty()) return null
-
-    val valuesAt = mutableMapOf(transfer.revisionId to transfer.values())
-    history.forEach { entry ->
-        when (entry.auditType) {
-            AuditType.INSERT -> valuesAt.getOrPut(entry.revisionId) { entry.values() }
-            AuditType.UPDATE -> valuesAt.getOrPut(entry.revisionId - 1) { entry.values() }
-            AuditType.DELETE -> Unit
-        }
-    }
-    val fields = TransferField.entries
-    val lastChange = mutableMapOf<TransferField, Long>()
-    valuesAt.keys.sorted().zipWithNext().forEach { (before, after) ->
-        val old = valuesAt.getValue(before)
-        val new = valuesAt.getValue(after)
-        fields.filter { it.of(old) != it.of(new) }.forEach { lastChange[it] = after }
-    }
-    val manualFields = fields.filter { lastChange[it] in manualRevisions }
-
-    // The import's view: each hand-edited field as it was just before its last edit.
+    if (fields.isEmpty() && types.isEmpty()) return null
     val now = transfer.values()
     val imported =
-        manualFields.fold(now) { values, field ->
-            valuesAt[lastChange.getValue(field) - 1]?.let { field.take(values, it) } ?: values
-        }
-
-    // Attribute changes are only audited outside import batches, so any on a MANUAL revision is a hand edit.
-    val editedTypes =
-        history
-            .flatMap { it.attributeChanges }
-            .filter { it.revisionId in manualRevisions }
-            .map { it.attributeType }
-            .distinctBy { it.id }
-    val attributes =
-        editedTypes.associateWith { type ->
-            transfer.attributes
-                .filter { it.attributeType.id == type.id }
-                .map { NewAttribute(type.id, it.value, it.groupKey) }
-        }
-
-    if (manualFields.isEmpty() && attributes.isEmpty()) return null
+        merged?.let {
+            now.copy(
+                timestamp = if (TransferField.TIMESTAMP in fields) it.timestamp else now.timestamp,
+                description = if (TransferField.DESCRIPTION in fields) it.description else now.description,
+                sourceAccountId = if (TransferField.SOURCE_ACCOUNT in fields) it.sourceAccountId else now.sourceAccountId,
+                targetAccountId = if (TransferField.TARGET_ACCOUNT in fields) it.targetAccountId else now.targetAccountId,
+                // The asset object comes from the transfer: an override of the asset itself keeps the edited one.
+                amount = if (TransferField.AMOUNT in fields) Money(it.amount, now.amount.asset) else now.amount,
+            )
+        } ?: now
+    val amountEdited = TransferField.AMOUNT in fields || TransferField.ASSET in fields
     return ManualEdit(
         transferId = transfer.id,
         record = record,
         imported = imported,
-        timestamp = now.timestamp.takeIf { TransferField.TIMESTAMP in manualFields },
-        description = now.description.takeIf { TransferField.DESCRIPTION in manualFields },
-        sourceAccountId = now.sourceAccountId.takeIf { TransferField.SOURCE in manualFields },
-        targetAccountId = now.targetAccountId.takeIf { TransferField.TARGET in manualFields },
-        amount = now.amount.takeIf { TransferField.AMOUNT in manualFields },
-        attributes = attributes,
+        timestamp = now.timestamp.takeIf { TransferField.TIMESTAMP in fields },
+        description = now.description.takeIf { TransferField.DESCRIPTION in fields },
+        sourceAccountId = now.sourceAccountId.takeIf { TransferField.SOURCE_ACCOUNT in fields },
+        targetAccountId = now.targetAccountId.takeIf { TransferField.TARGET_ACCOUNT in fields },
+        amount = now.amount.takeIf { amountEdited },
+        attributes =
+            types.associateWith { type ->
+                transfer.attributes
+                    .filter { it.attributeType.id == type.id }
+                    .map { NewAttribute(type.id, it.value, it.groupKey) }
+            },
     )
-}
-
-private enum class TransferField(
-    val of: (TransferValues) -> Any,
-    /** [TransferValues] with this field taken from another. */
-    val take: (TransferValues, TransferValues) -> TransferValues,
-) {
-    TIMESTAMP({ it.timestamp }, { to, from -> to.copy(timestamp = from.timestamp) }),
-    DESCRIPTION({ it.description }, { to, from -> to.copy(description = from.description) }),
-    SOURCE({ it.sourceAccountId }, { to, from -> to.copy(sourceAccountId = from.sourceAccountId) }),
-    TARGET({ it.targetAccountId }, { to, from -> to.copy(targetAccountId = from.targetAccountId) }),
-    AMOUNT({ it.amount }, { to, from -> to.copy(amount = from.amount) }),
 }
 
 private class Reapplication(
@@ -876,7 +873,14 @@ private fun Source.wholeImport(): Source =
 private fun matchScore(
     imported: TransferValues,
     candidate: TransferValues,
-): Int = TransferField.entries.count { it.of(imported) == it.of(candidate) }
+): Int =
+    listOf<(TransferValues) -> Any>(
+        { it.timestamp },
+        { it.description },
+        { it.sourceAccountId },
+        { it.targetAccountId },
+        { it.amount },
+    ).count { field -> field(imported) == field(candidate) }
 
 private fun ManualEdit.updateOf(replacement: Transfer): ImportTransfer {
     val editedTypeIds = attributes.keys.map { it.id }.toSet()

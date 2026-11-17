@@ -69,7 +69,7 @@ internal class ObservationMaterialization(
                 affected[it.id.id] = it.id
             }
         }
-        val before = affected.mapValues { (_, id) -> mergeOf(id) }
+        val before = affected.mapValues { (_, id) -> request.priorMerges[id] ?: mergeOf(id) }
 
         val newIds = LinkedHashMap<LocalTransactionKey, TransactionId>()
         for (mutation in mutations) {

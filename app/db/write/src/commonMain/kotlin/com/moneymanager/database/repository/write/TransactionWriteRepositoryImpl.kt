@@ -171,6 +171,7 @@ class TransactionWriteRepositoryImpl(
         sources: List<Source>,
         updates: List<TransferUpdate>,
         updateSources: List<Source>,
+        reusedIds: Map<TransferId, TransferId>,
     ): List<TransferId> =
         withContext(Dispatchers.Default) {
             require(sources.size == transfers.size) { "sources must align 1:1 with transfers" }
@@ -182,7 +183,7 @@ class TransactionWriteRepositoryImpl(
                 if (transfers.isNotEmpty()) {
                     database.beginCreationMode()
                     try {
-                        createdIds += insertNewTransfers(transfers, newAttributes, newRelationships, sources)
+                        createdIds += insertNewTransfers(transfers, newAttributes, newRelationships, sources, reusedIds)
                     } finally {
                         database.endCreationMode()
                     }
@@ -290,20 +291,30 @@ class TransactionWriteRepositoryImpl(
         newAttributes: Map<TransferId, List<NewAttribute>>,
         newRelationships: Map<TransferId, List<NewRelationship>>,
         sources: List<Source>,
+        reusedIds: Map<TransferId, TransferId> = emptyMap(),
     ): List<TransferId> {
         val createdIds = mutableListOf<TransferId>()
         // Pass 1: insert transfers + attributes and record source, building the input(temp) id -> real id
         // map so relationships can reference siblings created in the same batch (e.g. a fee transfer).
         val idMap = mutableMapOf<TransferId, TransferId>()
         transfers.forEachIndexed { index, transfer ->
-            transactionIdWriteQueries.insert()
-            val generatedId = transactionIdWriteQueries.lastInsertedId().awaitAsOne()
+            val generatedId =
+                reusedIds[transfer.id]?.id ?: run {
+                    transactionIdWriteQueries.insert()
+                    transactionIdWriteQueries.lastInsertedId().awaitAsOne()
+                }
             val realId = TransferId(generatedId)
             createdIds += realId
             idMap[transfer.id] = realId
+            val revision =
+                if (transfer.id in reusedIds) {
+                    database.entitySourceSelectQueries.selectNextRevision(EntityType.TRANSFER.id, generatedId).awaitAsOne()
+                } else {
+                    transfer.revisionId
+                }
             transferWriteQueries.insert(
                 id = generatedId,
-                revision_id = transfer.revisionId,
+                revision_id = revision,
                 timestamp = transfer.timestamp.toEpochMilliseconds(),
                 description = transfer.description,
                 source_account_id = transfer.sourceAccountId.id,
@@ -319,7 +330,7 @@ class TransactionWriteRepositoryImpl(
                     group_key = attr.groupKey,
                 )
             }
-            database.recordSource(deviceId, EntityType.TRANSFER, realId.id, transfer.revisionId, sources[index])
+            database.recordSource(deviceId, EntityType.TRANSFER, realId.id, revision, sources[index])
         }
         // Pass 2: insert relationships now that every in-batch transfer has a real id. The owning transfer
         // is the primary member; the related one may be a pre-existing transfer (reconciliation) or a sibling

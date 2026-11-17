@@ -42,6 +42,11 @@ data class NewTrade(
     val source: Source,
     val occurrence: Int = 0,
     val attributes: List<NewAttribute> = emptyList(),
+    /**
+     * A vacant id a re-run reserved for this trade's record (#1430): a new trade is inserted under it, so a person's
+     * overrides and links keyed on it still apply. Ignored when an identical trade is reused.
+     */
+    val reuseId: TradeId? = null,
 )
 
 interface TradeWriteRepository : TradeReadRepository {
@@ -61,7 +66,7 @@ interface TradeWriteRepository : TradeReadRepository {
     /**
      * A person's edit of trade [id]'s attribute of type [typeId]: sets it to [value], or removes it when
      * [value] is null. A change gives the trade a new revision recorded with [source] and a
-     * `trade_attribute_audit` row, so a re-import knows to put it back (see [getHandSetAttributes]); setting
+     * `trade_attribute_audit` row; setting
      * the value it already has writes nothing.
      */
     suspend fun setAttributeByHand(

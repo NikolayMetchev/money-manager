@@ -63,7 +63,4 @@ interface TransferSourceReadRepository {
         imports: Set<CsvImportId>,
         sessions: Set<ApiSessionId> = emptySet(),
     ): Set<CsvImportId>
-
-    /** Those of [ids] a person has edited by hand since they were created. */
-    suspend fun getHandEditedTransferIds(ids: Collection<TransferId>): Set<TransferId>
 }
