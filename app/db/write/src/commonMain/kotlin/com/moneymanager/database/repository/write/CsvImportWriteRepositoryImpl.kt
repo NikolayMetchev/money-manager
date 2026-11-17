@@ -306,6 +306,22 @@ class CsvImportWriteRepositoryImpl(
             }
         }
 
+    override suspend fun reserveForRerun(
+        id: CsvImportId,
+        unhashed: String,
+    ): Unit =
+        withContext(coroutineContext) {
+            val import =
+                csvImportSelectQueries.selectImportById(id.id.toString()).awaitAsOneOrNull()
+                    ?: return@withContext
+            database.transaction {
+                database.forgetMatchedSources(id, null)
+                database.observationWriteQueries.reserveCsvImport(id.id.toString())
+                csvImportWriteQueries.unhashImportRecords(unhashed, id.id.toString())
+                tableManager.resetAllRowStatuses(import.table_name)
+            }
+        }
+
     override suspend fun saveErrors(
         id: CsvImportId,
         errors: Map<Long, String>,

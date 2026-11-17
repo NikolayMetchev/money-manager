@@ -66,18 +66,47 @@ BEGIN
     SELECT RAISE(ABORT, 'a transaction is in at most one reconciliation match');
 END;
 
+-- A transaction a re-import is rebuilding under its own id (a reserved observation still names it, #1430) keeps the
+-- relationships a person made (MANUAL, 1) or copied from a reconciliation source (RECONCILIATION, 9): they are the
+-- person's and come back with it. Settling the re-import removes them if no row says that transaction again.
 CREATE TRIGGER transfer_relationship_member_delete
 AFTER DELETE ON transfer
 FOR EACH ROW
 BEGIN
-    DELETE FROM relationship_member WHERE transaction_id = old.id;
+    DELETE FROM relationship_member
+    WHERE transaction_id = old.id
+      AND (
+        NOT EXISTS (SELECT 1 FROM observation_reserved
+                JOIN observation ON observation.id = observation_reserved.observation_id
+                WHERE observation.transaction_id = old.id)
+        OR NOT EXISTS (
+          SELECT 1 FROM entity_source
+          WHERE entity_source.entity_type_id = 13
+            AND entity_source.entity_id = relationship_member.relationship_id
+            AND entity_source.matched = 0
+            AND entity_source.source_type_id IN (1, 9)
+        )
+      );
 END;
 
 CREATE TRIGGER trade_relationship_member_delete
 AFTER DELETE ON trade
 FOR EACH ROW
 BEGIN
-    DELETE FROM relationship_member WHERE transaction_id = old.id;
+    DELETE FROM relationship_member
+    WHERE transaction_id = old.id
+      AND (
+        NOT EXISTS (SELECT 1 FROM observation_reserved
+                JOIN observation ON observation.id = observation_reserved.observation_id
+                WHERE observation.transaction_id = old.id)
+        OR NOT EXISTS (
+          SELECT 1 FROM entity_source
+          WHERE entity_source.entity_type_id = 13
+            AND entity_source.entity_id = relationship_member.relationship_id
+            AND entity_source.matched = 0
+            AND entity_source.source_type_id IN (1, 9)
+        )
+      );
 END;
 
 -- The directed pairs (one PRIMARY and one RELATED member) that the pairwise relationship types are made

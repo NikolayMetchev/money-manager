@@ -45,3 +45,23 @@ FROM observation_pin
 JOIN observation ON observation.id = observation_pin.observation_id
 WHERE observation_pin.transaction_id IN ?
 ORDER BY observation_pin.observation_id;
+
+-- Those of :ids a person overrode a field or an attribute of.
+selectOverriddenTransferIds:
+SELECT transaction_id FROM transfer_override WHERE transaction_id IN :ids
+UNION
+SELECT transaction_id FROM transfer_attribute_override WHERE transaction_id IN :ids
+UNION
+SELECT transaction_id FROM transfer_attribute_removal WHERE transaction_id IN :ids;
+
+selectTradeAttributeOverridesOf:
+SELECT transaction_id, attribute_type_id, attribute_value
+FROM trade_attribute_override
+WHERE transaction_id IN ?
+ORDER BY transaction_id, attribute_type_id;
+
+selectTradeAttributeRemovalsOf:
+SELECT transaction_id, attribute_type_id
+FROM trade_attribute_removal
+WHERE transaction_id IN ?
+ORDER BY transaction_id, attribute_type_id;

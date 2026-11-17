@@ -24,6 +24,7 @@ import com.moneymanager.test.database.reimports
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration
 
@@ -284,7 +285,8 @@ class AmexSantanderQifReconcileE2ETest : DbTest() {
 
             val result = reimport(card)
 
-            assertEquals(1, result.reappliedEdits, "unmatched: ${result.unmatchedEdits}")
+            assertEquals(0, result.reappliedEdits, "nothing is replayed: the edit is an override on the kept id")
+            assertTrue(result.unmatchedEdits.isEmpty(), "unmatched: ${result.unmatchedEdits}")
             val recreated =
                 repositories.transferSourceRepository
                     .getTransfersCreatedBy(Source.Csv(secondCard.id))

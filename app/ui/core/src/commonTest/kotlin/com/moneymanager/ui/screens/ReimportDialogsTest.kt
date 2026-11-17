@@ -131,7 +131,7 @@ class ReimportDialogsTest {
         }
 
     @Test
-    fun reimportDialog_oneFile_previewsTheHandEdit_andReappliesIt() =
+    fun reimportDialog_oneFile_previewsTheHandEdit_andKeepsIt() =
         runMoneyManagerComposeUiTest {
             val fixture = setUp()
 
@@ -157,9 +157,11 @@ class ReimportDialogsTest {
             onNodeWithText("Re-import 1 file").performClick()
 
             waitUntilAtLeastOneExists(
-                hasText("Re-imported 1 file · 2 imported · 1 manual edit re-applied", substring = true),
+                hasText("Re-imported 1 file · 2 imported", substring = true),
                 timeoutMillis = 15_000,
             )
+            // The edit is an override on the kept id (#1430): nothing is replayed, and nothing is lost.
+            onNodeWithText("not re-applied", substring = true).assertDoesNotExist()
         }
 
     @Test

@@ -1,6 +1,7 @@
 package com.moneymanager.test.reimportoracle
 
 import app.cash.sqldelight.async.coroutines.awaitAsList
+import com.moneymanager.domain.model.TransferId
 import com.moneymanager.test.database.read.testReads
 import kotlinx.coroutines.test.runTest
 import kotlin.random.Random
@@ -89,10 +90,11 @@ class ReimportOracleTest {
             permutations(scenario).firstNotNullOfOrNull { order ->
                 OracleDatabase.with(scenario) {
                     import()
-                    doHandWork()
+                    val handled = doHandWork()
                     changeStrategy()
                     reimport(order)
-                    difference(expected, db.canonicalSnapshot(), "re-import order ${order.names()}")
+                    lostIds(handled, "re-import order ${order.names()}")
+                        ?: difference(expected, db.canonicalSnapshot(), "re-import order ${order.names()}")
                 }
             }
         }
@@ -146,6 +148,16 @@ class ReimportOracleTest {
         for (entry in scenario.manualEntries) {
             check(transfers.any { "| ${entry.description}" in it }) { "the ${entry.name} manual entry is missing" }
         }
+    }
+
+    /** Which of [ids] a re-import gave a new id rather than keeping (#1430): a person's work hangs off the old one. */
+    private suspend fun OracleDatabase.lostIds(
+        ids: Set<TransferId>,
+        context: String,
+    ): String? {
+        val kept = db.transactionRepository.getTransactionsByIds(ids.toList()).keys
+        val lost = ids - kept
+        return if (lost.isEmpty()) null else "$context lost the ids of hand-worked transfers ${lost.map { it.id }.sorted()}"
     }
 
     /** Every audit table's row count, except the one that records the re-import run itself. */

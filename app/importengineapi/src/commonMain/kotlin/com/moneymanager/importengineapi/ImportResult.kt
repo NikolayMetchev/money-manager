@@ -81,4 +81,6 @@ data class ImportResult(
     val materialization: MaterializationReport = MaterializationReport(),
     /** What [ImportBatch.syncMatches] moved and rewrote. */
     val matchSync: MaterializationReport = MaterializationReport(),
+    /** The transactions a [CsvImportMutation.Reserve] vacated for the re-run to take back; pass them to [ImportBatch.settle]. */
+    val reserved: ReservedTransactions = ReservedTransactions(),
 )
