@@ -5,6 +5,7 @@ import com.moneymanager.csvimporter.bulkApplyCsv
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.WellKnownIds
+import com.moneymanager.importengineapi.ensureApiCredential
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
@@ -16,8 +17,8 @@ import kotlin.time.Duration
 
 /**
  * The Binance statement export and the Binance API describe the same account, so importing both must
- * leave every movement counted once — in **either** order. `BinanceCsvE2ETest` covers API-first;
- * this covers CSV-first, which is the order that actually broke on the default database: the exchange
+ * leave every movement counted once — in **either** order. Most cases below import the export first,
+ * the order that actually broke on the default database: the exchange
  * import path derived cross-source reconciliation from `internalTransferReconcile`, a bridge config
  * Binance does not declare, so it ran with reconciliation off and re-booked 912 movements the export
  * had already recorded.
@@ -167,7 +168,9 @@ class BinanceCsvThenApiE2ETest : DbTest() {
     private suspend fun importApi() {
         val strategy = assertNotNull(repositories.apiImportStrategyRepository.getStrategyByName("Binance").first())
         val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-os", "test-machine"))
-        val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
+        // A download always runs under the strategy's credential, which is how its records are known to be Binance's.
+        val credentialId = repositories.importEngine.ensureApiCredential(strategy.id, now)
+        val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null, credentialId)
 
         suspend fun stage(
             marker: String,
@@ -234,13 +237,34 @@ class BinanceCsvThenApiE2ETest : DbTest() {
             .associate { it.balance.asset.code to it.balance.toDisplayValue().toString() }
     }
 
-    private suspend fun tradeCount(): Int {
+    /** Binance's trades, each as its BTC amount and whether it counts towards balances. */
+    private suspend fun trades(): List<Pair<String, Boolean>> {
         val binance = assertNotNull(accountByName("Binance"))
         return repositories.tradeRepository
             .getTradesByAccount(binance.id)
             .first()
-            .size
+            .map { trade ->
+                val btc = if (trade.to.asset.code == "BTC") trade.to else trade.from
+                val counted =
+                    repositories.tradeRepository
+                        .getAttributes(trade.id)
+                        .first()
+                        .none { it.attributeType.id.id == WellKnownIds.EXCLUDED_ATTR_TYPE_ID }
+                btc.toDisplayValue().toString() to counted
+            }.sortedBy { it.first }
     }
+
+    // The export's aggregate is excluded by the API's fills, which say more: the same order, whichever came first.
+    private val reconciledTrades = listOf("0.1" to true, "0.2" to true, "0.3" to false)
+
+    private val exportBalances =
+        mapOf(
+            "BTC" to "0.31",
+            "USDT" to "-12012",
+            "XMR" to "-5.81",
+            "LINK" to "-82.358",
+            "GBP" to "-1134.83",
+        )
 
     @Test
     fun theApiImportDoesNotRebookWhatTheStatementExportAlreadyRecorded() =
@@ -249,18 +273,12 @@ class BinanceCsvThenApiE2ETest : DbTest() {
 
             val balancesAfterCsv = binanceBalances()
             assertEquals(
-                mapOf(
-                    "BTC" to "0.31",
-                    "USDT" to "-12012",
-                    "XMR" to "-5.81",
-                    "LINK" to "-82.358",
-                    "GBP" to "-1134.83",
-                ),
+                exportBalances,
                 balancesAfterCsv,
                 "the export alone: 0.01 deposited + 0.3 bought, 12000 spent + 12 fees, 5.81 into Earn, " +
                     "and two withdrawals booked gross",
             )
-            assertEquals(1, tradeCount(), "the export folds both fills into one trade")
+            assertEquals(listOf("0.3" to true), trades(), "the export folds both fills into one trade")
 
             importApi()
 
@@ -269,7 +287,19 @@ class BinanceCsvThenApiE2ETest : DbTest() {
                 binanceBalances(),
                 "every API movement was already in the export, so no balance may move",
             )
-            assertEquals(1, tradeCount(), "the API's two fills reconcile against the export's aggregate")
+            assertEquals(reconciledTrades, trades(), "the API's two fills reconcile against the export's aggregate")
+        }
+
+    @Test
+    fun importingTheApiFirstBooksWhatImportingTheExportFirstBooks() =
+        runDbTest {
+            importApi()
+            assertEquals(exportBalances, binanceBalances(), "the API alone records the same movements")
+
+            importCsv()
+
+            assertEquals(exportBalances, binanceBalances(), "every export row was already in the API, so no balance may move")
+            assertEquals(reconciledTrades, trades(), "the export's aggregate is excluded by the fills already booked")
         }
 
     @Test
@@ -325,8 +355,15 @@ class BinanceCsvThenApiE2ETest : DbTest() {
                     .first()
             val links = repositories.relationshipRepository.getByTransactions(transfers.map { it.id })
             val reconciled = links.filter { it.relationshipType.id.id == WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID }
-            // Deposit, Earn subscription, two trade fees and the two gross-vs-net withdrawals.
-            assertEquals(6, reconciled.size, "every duplicated transfer is kept and linked to its twin")
+            // The two trade fees and the two gross-vs-net withdrawals: records of different shapes, linked.
+            assertEquals(4, reconciled.size, "every duplicated transfer is kept and linked to its twin")
+            // The deposit and the Earn subscription are twins of one shape, so each is one transaction carrying both
+            // records rather than two linked ones (#1428).
+            assertEquals(
+                1,
+                transfers.count { it.description == "Simple Earn Flexible Subscription" || it.description.startsWith("Subscribe") },
+                "the Earn subscription is booked once",
+            )
             assertTrue(
                 transfers.any { t -> t.attributes.any { it.attributeType.id.id == WellKnownIds.EXCLUDED_ATTR_TYPE_ID } },
                 "a reconciled record is kept but excluded from balances, never silently dropped",

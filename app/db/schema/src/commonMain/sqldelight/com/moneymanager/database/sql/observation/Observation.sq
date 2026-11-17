@@ -181,15 +181,12 @@ SELECT observation_id, 'GROUP' AS owner_kind, group_id AS owner_id, slot FROM ob
 UNION ALL
 SELECT observation_id, 'MANUAL' AS owner_kind, entity_source_id AS owner_id, slot FROM observation_manual;
 
--- An observation a staged file's re-import has yet to confirm (#1430). Reserving a file keeps its records' observations,
--- and the transactions they name keep their ids while the file re-runs: a row that says the same slot again takes its
--- old transaction back, so whatever a person decided about it (its overrides, its hand-made relationships) still applies.
--- The re-run removes the reservation of every observation it records again; settling the file deletes the rest.
+-- An observation a staged file's or an API session's re-import has yet to confirm (#1430, #1429). Reserving a source keeps
+-- its records' observations, and the transactions they name keep their ids while it re-runs: a record that says the same
+-- slot again takes its old transaction back, so whatever a person decided about it (its overrides, its hand-made
+-- relationships) still applies. The re-run removes the reservation of every observation it records again; settling the
+-- source deletes the rest. Whose re-run it is follows from the observation's record.
 CREATE TABLE observation_reserved (
     observation_id INTEGER PRIMARY KEY NOT NULL,
-    csv_import_id TEXT NOT NULL,
-    FOREIGN KEY (observation_id) REFERENCES observation(id) ON DELETE CASCADE,
-    FOREIGN KEY (csv_import_id) REFERENCES csv_import_metadata(id) ON DELETE CASCADE
+    FOREIGN KEY (observation_id) REFERENCES observation(id) ON DELETE CASCADE
 );
-
-CREATE INDEX idx_observation_reserved_import ON observation_reserved(csv_import_id);

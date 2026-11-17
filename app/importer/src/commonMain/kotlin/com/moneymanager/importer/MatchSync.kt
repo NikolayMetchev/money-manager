@@ -34,6 +34,7 @@ import com.moneymanager.observationmatcher.AssignmentChange
 import com.moneymanager.observationmatcher.ExclusionLink
 import com.moneymanager.observationmatcher.MatchObservation
 import com.moneymanager.observationmatcher.ObservationRef
+import com.moneymanager.observationmatcher.ShapeReason
 import com.moneymanager.observationmatcher.TransactionTarget
 import kotlinx.coroutines.flow.first
 
@@ -90,7 +91,7 @@ internal class MatchSync(
                 .shapeMatcherFor(families, calendarFor)
                 .match(scope.filter { it.storedId !in pinned })
                 .links
-                .filter { link -> apart.none { (a, b) -> a in link.matched + link.excluded && b in link.matched + link.excluded } }
+                .filterNot { it.holdsApart(apart) }
         orientLinks(links, scope)
         val involved = links.flatMapTo(mutableSetOf()) { it.matched + it.excluded }
         val twins = scope.filter { it.ref !in involved }
@@ -104,7 +105,7 @@ internal class MatchSync(
         val moved = result.changes.mapTo(mutableSetOf()) { it.ref }
         val linked =
             writeLinks(
-                links
+                (links + result.exclusions.filter { it.reason in WRITTEN_STAGE_REASONS && !it.holdsApart(apart) })
                     .filter { link -> (link.matched + link.excluded).none { it in moved } },
                 scope,
             )
@@ -427,4 +428,16 @@ internal class MatchSync(
         owner: ObservationOwner,
         slot: String,
     ) = LocalTransactionKey("match:$owner/$slot")
+}
+
+/**
+ * The matcher stages whose exclusion links a sync writes. The conversion stages stay with the importers' own
+ * reconcilers until their outcomes are reconciled with today's (#1426).
+ */
+private val WRITTEN_STAGE_REASONS = setOf(ShapeReason.TRADE_AGGREGATION)
+
+/** Whether this link would hold together two observations a person split (#1430). */
+private fun ExclusionLink.holdsApart(apart: List<Pair<ObservationRef, ObservationRef>>): Boolean {
+    val members = matched + excluded
+    return apart.any { (a, b) -> a in members && b in members }
 }

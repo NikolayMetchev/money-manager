@@ -368,65 +368,6 @@ class BinanceCsvE2ETest : DbTest() {
         }
 
     @Test
-    fun aTradeTheApiImportAlreadyBookedIsNotBookedTwice() =
-        runDbTest {
-            // Stand in for the API import: the per-fill trades api/v3/myTrades returns for one order,
-            // stamped to the millisecond, on the single Binance account.
-            val binanceId = repositories.importEngine.createAccount(account("Binance"), Source.Manual)
-            val btc = repositories.importEngine.createCrypto("BTC", "Bitcoin", Source.Manual)
-            val btcAsset = assertNotNull(repositories.cryptoRepository.getCryptoAssetByCode("BTC").first())
-            val gbpAsset =
-                repositories.currencyRepository
-                    .getAllCurrencies()
-                    .first()
-                    .first { it.code == "GBP" }
-            assertNotNull(btc)
-            val fills = listOf("0.04382" to "605.57925400", "0.90716" to "12536.54297800")
-            for ((from, to) in fills) {
-                repositories.importEngine.createTrade(
-                    timestamp = Instant.parse("2022-11-14T20:32:54.462Z"),
-                    description = "Sell BTC/GBP",
-                    fromAccountId = binanceId,
-                    fromAmount = Money.fromDisplayValue(BigDecimal(from), btcAsset),
-                    toAccountId = binanceId,
-                    toAmount = Money.fromDisplayValue(BigDecimal(to), gbpAsset),
-                )
-            }
-            val tradesBefore =
-                repositories.tradeRepository
-                    .getTradesByAccount(binanceId)
-                    .first()
-                    .size
-            assertEquals(2, tradesBefore)
-
-            // The same order as the CSV records it: one row per fill, all stamped to the second, which
-            // the strategy folds into a single aggregate trade.
-            val file =
-                stage(
-                    "overlap.csv",
-                    listOf(
-                        row("2022-11-14 20:32:54", "Transaction Sold", "BTC", "-0.04382"),
-                        row("2022-11-14 20:32:54", "Transaction Revenue", "GBP", "605.57925400"),
-                        row("2022-11-14 20:32:54", "Transaction Sold", "BTC", "-0.90716"),
-                        row("2022-11-14 20:32:54", "Transaction Revenue", "GBP", "12536.54297800"),
-                    ),
-                )
-            applyAll(listOf(file))
-
-            assertEquals(
-                tradesBefore,
-                repositories.tradeRepository
-                    .getTradesByAccount(binanceId)
-                    .first()
-                    .size,
-                "the CSV's aggregate matches the API's fills and is not booked a second time",
-            )
-            // And the balances are the API import's alone - the CSV added nothing.
-            assertEquals("-0.95098", balanceOf("Binance", "BTC"))
-            assertEquals("13142.122232", balanceOf("Binance", "GBP"))
-        }
-
-    @Test
     fun aTradeTheApiImportDoesNotHaveIsStillBooked() =
         runDbTest {
             // The 2022 Convert conversions Binance's API window limit hides: nothing to match, so they

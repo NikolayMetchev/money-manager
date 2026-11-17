@@ -104,17 +104,31 @@ DELETE FROM observation WHERE transaction_id = ?;
 
 -- Reserves every observation :csvImportId's records (and the groups they belong to) own, for its re-run (#1430).
 reserveCsvImport:
-INSERT OR IGNORE INTO observation_reserved (observation_id, csv_import_id)
-SELECT observation_record.observation_id, :csvImportId
+INSERT OR IGNORE INTO observation_reserved (observation_id)
+SELECT observation_record.observation_id
 FROM observation_record
 JOIN csv_import_record ON csv_import_record.record_id = observation_record.record_id
 WHERE csv_import_record.csv_import_id = :csvImportId
 UNION
-SELECT observation_group.observation_id, :csvImportId
+SELECT observation_group.observation_id
 FROM observation_group
 JOIN import_group_member ON import_group_member.group_id = observation_group.group_id
 JOIN csv_import_record ON csv_import_record.record_id = import_group_member.record_id
 WHERE csv_import_record.csv_import_id = :csvImportId;
+
+-- Reserves every observation :apiSessionId's records (and the groups they belong to) own, for its re-run (#1429).
+reserveApiSession:
+INSERT OR IGNORE INTO observation_reserved (observation_id)
+SELECT observation_record.observation_id
+FROM observation_record
+JOIN api_import_record ON api_import_record.record_id = observation_record.record_id
+WHERE api_import_record.api_session_id = :apiSessionId
+UNION
+SELECT observation_group.observation_id
+FROM observation_group
+JOIN import_group_member ON import_group_member.group_id = observation_group.group_id
+JOIN api_import_record ON api_import_record.record_id = import_group_member.record_id
+WHERE api_import_record.api_session_id = :apiSessionId;
 
 unreserve:
 DELETE FROM observation_reserved WHERE observation_id = ?;

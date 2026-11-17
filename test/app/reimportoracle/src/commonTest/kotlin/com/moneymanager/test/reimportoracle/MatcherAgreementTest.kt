@@ -1,11 +1,15 @@
 package com.moneymanager.test.reimportoracle
 
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.MaterializationRequest
 import com.moneymanager.importengineapi.matchFamily
 import com.moneymanager.importer.MatchScopeLoader
+import com.moneymanager.observationmatcher.ExclusionLink
+import com.moneymanager.observationmatcher.MatchObservation
 import com.moneymanager.observationmatcher.ObservationRef
+import com.moneymanager.observationmatcher.ShapeReason
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -118,7 +122,25 @@ class MatcherAgreementTest {
                 val o = byRef.getValue(change.ref)
                 append("  ${o.container} ${change.ref.slot} ${o.content.values}: ${change.from} -> ${change.to}\n")
             }
-            for (exclusion in result.exclusions) append("  exclusion $exclusion\n")
+            for (exclusion in result.exclusions) {
+                if (!stored(exclusion, byRef)) append("  exclusion $exclusion\n")
+            }
+        }
+    }
+
+    /**
+     * Whether a fresh import already stored [exclusion]: a `reconciled` relationship over all its transactions, its
+     * excluded ones out of balances. The import writes the trade-aggregation link itself (#1429).
+     */
+    private suspend fun OracleDatabase.stored(
+        exclusion: ExclusionLink,
+        byRef: Map<ObservationRef, MatchObservation>,
+    ): Boolean {
+        if (exclusion.reason != ShapeReason.TRADE_AGGREGATION) return false
+        val ids = (exclusion.matched + exclusion.excluded).mapNotNull { byRef[it]?.current }.toSet()
+        return db.relationshipRepository.getByTransactions(ids).any { relationship ->
+            relationship.relationshipType.id.id == WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID &&
+                relationship.members.map { it.transactionId.id }.containsAll(ids.map { it.id })
         }
     }
 

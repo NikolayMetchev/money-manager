@@ -386,11 +386,12 @@ class ImportEngineImpl(
             createdTradeIds[intent.key] = tradeResult.id
             if (!tradeResult.created) dedupedTradeKeys += intent.key
         }
-        for ((intent, tradeResult) in tradesToWrite.map { it.first }.zip(tradeResults)) {
-            if (tradeResult.created) {
-                observer?.record(intent.observationKey(), intent.source, tradeResult.id) { intent.observationContent() }
-            } else {
-                observer?.reclaim(intent.observationKey(), tradeResult.id) { intent.observationContent() }
+        // A record observes the trade it lands on, whether it created it or found it again (an overlapping session's
+        // fill): unimporting the record that created it must not take it while another still says it.
+        if (observer != null) {
+            for (intent in batch.trades) {
+                val tradeId = createdTradeIds[intent.key] ?: continue
+                observer.record(intent.observationKey(), intent.source, tradeId) { intent.observationContent() }
             }
         }
         for (intent in batch.orders) {
@@ -656,7 +657,7 @@ class ImportEngineImpl(
         ).run(mutations, request)
 
     /**
-     * What a [CsvImportMutation.Reserve] keeps (#1430). Of [vacating] (the deletes no other source still observes), each a
+     * What a [CsvImportMutation.Reserve] or an [ApiSessionMutation.Reserve] keeps (#1430, #1429). Of [vacating] (the deletes no other source still observes), each a
      * reserved observation is on keeps its observations, pointing at an id with no row, for the re-run to take back. A
      * reserved observation on any other transaction that keeps its row (one the file shared with another source) goes now,
      * as a reset's did, and that transaction is rebuilt from what is left, unless a group owns it: the group's other files
@@ -668,7 +669,11 @@ class ImportEngineImpl(
         vacating: List<TransactionId>,
     ): ReservedTransactions {
         val observations = observationRepository ?: return ReservedTransactions()
-        if (batch.csvImportMutations.none { it is CsvImportMutation.Reserve }) return ReservedTransactions()
+        if (batch.csvImportMutations.none { it is CsvImportMutation.Reserve } &&
+            batch.apiSessionMutations.none { it is ApiSessionMutation.Reserve }
+        ) {
+            return ReservedTransactions()
+        }
         val vacatingIds = vacating.toSet()
         val alreadyVacant = observations.getVacantReserved().mapTo(mutableSetOf()) { it.id }
         // An observation a person pinned or split stays reserved for its record to take back: deleting it would drop the
@@ -771,7 +776,13 @@ class ImportEngineImpl(
                 }
             }
         val resetSessions =
-            batch.apiSessionMutations.mapNotNullTo(mutableSetOf()) { (it as? ApiSessionMutation.ResetToUnimported)?.sessionId }
+            batch.apiSessionMutations.mapNotNullTo(mutableSetOf()) {
+                when (it) {
+                    is ApiSessionMutation.ResetToUnimported -> it.sessionId
+                    is ApiSessionMutation.Reserve -> it.sessionId
+                    else -> null
+                }
+            }
         return (resetIds.flatMap { records.getCsvImportRecords(it) } + resetSessions.flatMap { records.getApiSessionRecords(it) })
             .flatMap { observations.getObservationsOf(ObservationOwner.Record(it.id)) }
             .mapTo(mutableSetOf()) { it.transactionId }
@@ -2298,7 +2309,7 @@ class ImportEngineImpl(
         val minTs = creates.minOf { requireNotNull(it.timestamp) } - policy.window
         val maxTs = creates.maxOf { requireNotNull(it.timestamp) } + policy.window
         val existing = tradeRepository.getTradesByAccountsAndDateRange(accountIds, minTs, maxTs)
-        return if (existing.isEmpty()) null else TradeReconciler(policy, existing, creates)
+        return if (existing.isEmpty()) null else TradeReconciler(policy, existing)
     }
 
     /**
@@ -3363,6 +3374,10 @@ class ImportEngineImpl(
 
                 is ApiSessionMutation.RecordItems -> {
                     recordItems(m)
+                }
+
+                is ApiSessionMutation.Reserve -> {
+                    observationRepository?.reserveApiSession(m.sessionId)
                 }
 
                 is ApiSessionMutation.ResetToUnimported -> {
