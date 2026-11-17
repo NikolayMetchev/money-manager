@@ -488,6 +488,8 @@ suspend fun <R> ImportEngine.executeRerun(
         reconciledPartnerUnhideUpdates(deletedTransfers, reads.relationshipRepository, reads.transactionRepository)
     val resets =
         files.mapNotNull { file -> (file.file as? Source.Csv)?.let { CsvImportMutation.Reserve(it.importId) } }
+    val apiResets =
+        files.mapNotNullTo(linkedSetOf()) { file -> (file.file as? Source.Api)?.let { ApiSessionMutation.Reserve(it.sessionId) } }
 
     // The un-hide updates ride in the delete batch (the engine applies updates before deletes), and so
     // do the record resets.
@@ -515,6 +517,7 @@ suspend fun <R> ImportEngine.executeRerun(
                     },
                 dedupePolicy = DedupePolicy.None,
                 csvImportMutations = resetRecords.csvImportMutations + resets,
+                apiSessionMutations = resetRecords.apiSessionMutations + apiResets,
             ),
             onProgress = onProgress?.let { sink -> { sink(it.copy(detail = REMOVING)) } },
         ).reserved
