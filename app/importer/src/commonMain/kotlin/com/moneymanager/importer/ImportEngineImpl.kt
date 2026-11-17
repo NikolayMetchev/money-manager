@@ -1015,6 +1015,13 @@ class ImportEngineImpl(
             observations.unreserve(existing.id)
         }
 
+        /** Whether [key]'s record said its slot before and its re-run reserved it (#1430). */
+        suspend fun isReserved(key: ObservationKey): Boolean {
+            val recordKey = (key.owner as? ObservationOwnerKey.Record)?.key ?: return false
+            val owner = ObservationOwner.Record(knownRecord(recordKey) ?: return false)
+            return observations.getObservationsOf(owner).any { it.slot == key.slot && observations.isReserved(it.id) }
+        }
+
         /** The owner, and whether it is new (so says nothing yet); null for a booking no API item or person made. */
         private suspend fun owner(
             key: ObservationOwnerKey?,
@@ -1374,6 +1381,8 @@ class ImportEngineImpl(
      * A row that duplicates a transfer already booked (or one this batch books) says that transfer too: its main leg,
      * and its fee leg when the transfer has a fee, observe it beside what booked it, so twins are one transaction with
      * several observations. A row seen before (a re-import of its file) already says its slots and keeps them.
+     * A row that updates a transfer says it only when its re-run reserved the slot (#1429): it takes its observation back
+     * there, so what a person decided about it stays; a fresh import leaves the update to the transfer alone.
      */
     private suspend fun observeDuplicates(
         classified: List<Classified>,
@@ -1383,7 +1392,11 @@ class ImportEngineImpl(
     ): Set<TransactionId> {
         val duplicates =
             classified.zip(outcomes).mapNotNull { (c, outcome) ->
-                outcome.transferId?.takeIf { c.status == ImportStatus.DUPLICATE }?.let { c to it }
+                outcome.transferId
+                    ?.takeIf {
+                        c.status == ImportStatus.DUPLICATE ||
+                            (c.status == ImportStatus.UPDATED && observer.isReserved(c.transfer.observationKey()))
+                    }?.let { c to it }
             }
         if (duplicates.isEmpty()) return emptySet()
         val observed = mutableSetOf<TransactionId>()
