@@ -928,28 +928,39 @@ class ImportEngineImpl(
             approximateTime: Boolean,
         ): ObservationContent = leg.observationContent(approximateTime, unidentifiedCounterpartyTypeId)
 
-        /** Records [content] for [key] (null: a trade no record backs) on [transactionId], when [provenance] says whose. */
+        /**
+         * Records [content] for [key] (null: a trade no record backs) on [transactionId], when [provenance] says whose, and
+         * returns the transaction the observation is on (null when nothing was recorded).
+         */
         suspend fun record(
             key: ObservationKey?,
             provenance: Source,
             transactionId: TransactionId,
             content: () -> ObservationContent,
-        ) {
+        ): TransactionId? {
             val slot = key?.slot ?: ObservationSlot.TRADE
-            val (owner, fresh) = owner(key?.owner, provenance, transactionId) ?: return
+            val (owner, fresh) = owner(key?.owner, provenance, transactionId) ?: return null
             val existing = if (fresh) null else observations.getObservationsOf(owner).firstOrNull { it.slot == slot }
             if (existing != null) {
                 // A slot its file's re-run reserved (#1430) is said again: it takes what the record says now, where it says it.
                 if (observations.isReserved(existing.id)) {
                     val now = content()
                     if (existing.content != now) observations.updateContent(existing.id, now)
-                    if (existing.transactionId.id != transactionId.id) observations.assignTransaction(existing.id, transactionId)
+                    // Said as a duplicate of another transaction while its own stands vacant, it takes its own back (#1429): the
+                    // match sync decides whether the two are one, as a fresh import has it, and a person's work stays on its id.
+                    val target =
+                        existing.transactionId.takeIf {
+                            it.id != transactionId.id && observations.getMaterialized(it) == null
+                        } ?: transactionId
+                    if (existing.transactionId.id != target.id) observations.assignTransaction(existing.id, target)
                     observations.unreserve(existing.id)
+                    return target
                 }
                 // Otherwise a record seen before already says this slot (a trade its re-import found again): it keeps what it said.
-                return
+                return existing.transactionId
             }
             observations.insertObservation(owner, slot, transactionId, content())
+            return transactionId
         }
 
         /** The owner, and whether it is new (so says nothing yet); null for a booking no API item or person made. */
@@ -1333,13 +1344,11 @@ class ImportEngineImpl(
         for ((duplicate, row) in duplicates.zip(rows)) {
             val (c, id) = duplicate
             val approximate = c.transfer.approximateUntil != null
-            observer.record(row.main.key, row.main.provenance, id) { observer.transferContent(row.main, approximate) }
-            observed += id
+            observed += observer.record(row.main.key, row.main.provenance, id) { observer.transferContent(row.main, approximate) } ?: id
             val feeLeg = row.legs.firstOrNull { it.key.slot == ObservationSlot.FEE }
             val feeId = c.transfer.fee?.let { feeLegs[id to it.relationshipTypeId] }
             if (feeLeg != null && feeId != null) {
-                observer.record(feeLeg.key, feeLeg.provenance, feeId) { observer.transferContent(feeLeg, approximate) }
-                observed += feeId
+                observed += observer.record(feeLeg.key, feeLeg.provenance, feeId) { observer.transferContent(feeLeg, approximate) } ?: feeId
             }
         }
         return observed
