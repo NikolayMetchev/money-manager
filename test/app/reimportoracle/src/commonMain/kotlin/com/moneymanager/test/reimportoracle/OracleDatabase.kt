@@ -51,6 +51,7 @@ import com.moneymanager.importengineapi.insertApiResponse
 import com.moneymanager.importengineapi.markApiSessionImported
 import com.moneymanager.importengineapi.setAccountAttributeValues
 import com.moneymanager.importengineapi.setTransferExcluded
+import com.moneymanager.importengineapi.updateApiStrategy
 import com.moneymanager.importengineapi.updateCsvStrategy
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
@@ -170,13 +171,23 @@ class OracleDatabase private constructor(
 
     /** Assertion (c)'s strategy change: [OracleScenario.changedStrategy] tags every record it imports. */
     suspend fun changeStrategy() {
-        val strategy =
+        val tag = StrategyRule(actions = listOf(RuleAction.Attribute(ORACLE_STRATEGY_ATTRIBUTE, RuleValue.constant("v2"))))
+        val csv =
             db.csvImportStrategyRepository
                 .getAllStrategies()
                 .first()
-                .single { it.name == scenario.changedStrategy }
-        val tag = StrategyRule(actions = listOf(RuleAction.Attribute(ORACLE_STRATEGY_ATTRIBUTE, RuleValue.constant("v2"))))
-        db.importEngine.updateCsvStrategy(strategy.copy(config = strategy.config.copy(rules = strategy.config.rules + tag)))
+                .singleOrNull { it.name == scenario.changedStrategy }
+        if (csv != null) {
+            db.importEngine.updateCsvStrategy(csv.copy(config = csv.config.copy(rules = csv.config.rules + tag)))
+            return
+        }
+        // An API strategy tags what every endpoint that books transfers imports.
+        val api = requireNotNull(db.apiImportStrategyRepository.getStrategyByName(scenario.changedStrategy).first())
+        val endpoints =
+            api.config.dataEndpoints.map { endpoint ->
+                endpoint.transactionMappings?.let { endpoint.copy(transactionMappings = it.copy(rules = it.rules + tag)) } ?: endpoint
+            }
+        db.importEngine.updateApiStrategy(api.copy(config = api.config.copy(dataEndpoints = endpoints)))
     }
 
     /**

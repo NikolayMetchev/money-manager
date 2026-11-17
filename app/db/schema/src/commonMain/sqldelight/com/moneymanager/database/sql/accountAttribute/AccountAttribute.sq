@@ -36,3 +36,17 @@ CREATE INDEX idx_account_attribute_group ON account_attribute(account_id, group_
 -- An account has at most one fee account: the one whose fee-account-for attribute (-12, WellKnownIds) names it. Merging
 -- two accounts merges their fee accounts too (AccountWriteRepositoryImpl.mergeAccounts), so a merge never breaks this.
 CREATE UNIQUE INDEX idx_account_attribute_fee_account_for ON account_attribute(attribute_value) WHERE attribute_type_id = -12;
+
+-- The API sessions that put an attribute on an account their import adopted rather than created (a counterparty's
+-- name key on the account a statement already named): the attribute is theirs, like the transfers they booked, so
+-- unimporting or re-importing a session releases its claim, and an attribute no session claims any more goes with it.
+-- An attribute nobody adopted (typed by hand, or written when an import created the account) has no row here.
+CREATE TABLE account_attribute_api_owner (
+    account_attribute_id INTEGER NOT NULL,
+    api_session_id INTEGER NOT NULL,
+    PRIMARY KEY (account_attribute_id, api_session_id),
+    FOREIGN KEY (account_attribute_id) REFERENCES account_attribute(id) ON DELETE CASCADE,
+    FOREIGN KEY (api_session_id) REFERENCES api_session(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_account_attribute_api_owner_session ON account_attribute_api_owner(api_session_id);

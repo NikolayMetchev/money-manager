@@ -2986,6 +2986,10 @@ private class BatchAccountResolver {
                     openingDate = Clock.System.now(),
                     attributes = attributes,
                     source = source,
+                    // A name-keyed counterparty's only identity is its name, so it takes over the same-named
+                    // account a CSV export created for it (one with no identity of its own) rather than forking
+                    // "Tesco (tesco)" beside it: the two records of each payment then land on one account and join.
+                    adoptOnBankMatch = nameKey != null,
                 )
             if (counterpartyId != null) byExternalId[counterpartyId] = key
             if (dedupeKey != null) byPersonalKey[dedupeKey] = key

@@ -268,4 +268,25 @@ internal val FRESH_IMPORT_GOLDENS: Map<String, String> =
             Bybit | 2022-01-05 | USDT | 661.017856
             Bybit | 2023-11-13 | BTC | -0.00039664
             """.trimIndent(),
+        "Monzo CSV + overlapping API sessions" to
+            """
+            == accounts (4)
+            Landlord [counterparty-name-key=landlord]
+            Monzo [account-external-id=acc_00009ORACLE00000000001]
+            Pret A Manger [counterparty-name-key=pret a manger]
+            Tesco [counterparty-name-key=tesco]
+            == transfers (3)
+            2023-11-20T08:01:00Z | Monzo -> Tesco | 12.4 GBP | TESCO STORES [Monzo Category=Transfers, Monzo Transaction ID=tx_api_1, Type=Faster payment]
+            2023-11-21T18:30:00Z | Monzo -> Landlord | 900 GBP | RENT [Monzo Category=Transfers, Monzo Transaction ID=tx_api_2, Type=Faster payment]
+            2023-11-22T12:00:00Z | Monzo -> Pret A Manger | 3.5 GBP | PRET A MANGER
+            == trades (0)
+            == relationships (0)
+            == daily balances (6)
+            Landlord | 2023-11-21 | GBP | 900
+            Monzo | 2023-11-20 | GBP | -12.4
+            Monzo | 2023-11-21 | GBP | -912.4
+            Monzo | 2023-11-22 | GBP | -915.9
+            Pret A Manger | 2023-11-22 | GBP | 3.5
+            Tesco | 2023-11-20 | GBP | 12.4
+            """.trimIndent(),
     )
