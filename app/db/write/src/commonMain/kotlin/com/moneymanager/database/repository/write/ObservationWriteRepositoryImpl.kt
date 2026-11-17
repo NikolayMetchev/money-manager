@@ -4,6 +4,7 @@ import app.cash.sqldelight.async.coroutines.awaitAsOne
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.write.recordSource
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.MergeId
@@ -175,6 +176,10 @@ class ObservationWriteRepositoryImpl(
         withContext(coroutineContext) {
             queries.transaction { transactionIds.forEach { queries.deleteObservationsOfTransaction(it.id) } }
         }
+    }
+
+    override suspend fun reserveApiSession(sessionId: ApiSessionId) {
+        withContext(coroutineContext) { queries.reserveApiSession(sessionId.id) }
     }
 
     override suspend fun unreserve(id: ObservationId) {

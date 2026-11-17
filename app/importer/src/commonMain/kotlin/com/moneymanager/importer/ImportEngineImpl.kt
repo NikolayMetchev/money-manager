@@ -656,7 +656,7 @@ class ImportEngineImpl(
         ).run(mutations, request)
 
     /**
-     * What a [CsvImportMutation.Reserve] keeps (#1430). Of [vacating] (the deletes no other source still observes), each a
+     * What a [CsvImportMutation.Reserve] or an [ApiSessionMutation.Reserve] keeps (#1430, #1429). Of [vacating] (the deletes no other source still observes), each a
      * reserved observation is on keeps its observations, pointing at an id with no row, for the re-run to take back. A
      * reserved observation on any other transaction that keeps its row (one the file shared with another source) goes now,
      * as a reset's did, and that transaction is rebuilt from what is left. Ids a previous, stopped re-run left vacant stay.
@@ -666,7 +666,11 @@ class ImportEngineImpl(
         vacating: List<TransactionId>,
     ): ReservedTransactions {
         val observations = observationRepository ?: return ReservedTransactions()
-        if (batch.csvImportMutations.none { it is CsvImportMutation.Reserve }) return ReservedTransactions()
+        if (batch.csvImportMutations.none { it is CsvImportMutation.Reserve } &&
+            batch.apiSessionMutations.none { it is ApiSessionMutation.Reserve }
+        ) {
+            return ReservedTransactions()
+        }
         val vacatingIds = vacating.toSet()
         val alreadyVacant = observations.getVacantReserved().mapTo(mutableSetOf()) { it.id }
         val kept = mutableSetOf<TransactionId>()
@@ -744,7 +748,13 @@ class ImportEngineImpl(
                 }
             }
         val resetSessions =
-            batch.apiSessionMutations.mapNotNullTo(mutableSetOf()) { (it as? ApiSessionMutation.ResetToUnimported)?.sessionId }
+            batch.apiSessionMutations.mapNotNullTo(mutableSetOf()) {
+                when (it) {
+                    is ApiSessionMutation.ResetToUnimported -> it.sessionId
+                    is ApiSessionMutation.Reserve -> it.sessionId
+                    else -> null
+                }
+            }
         return (resetIds.flatMap { records.getCsvImportRecords(it) } + resetSessions.flatMap { records.getApiSessionRecords(it) })
             .flatMap { observations.getObservationsOf(ObservationOwner.Record(it.id)) }
             .mapTo(mutableSetOf()) { it.transactionId }
@@ -3294,6 +3304,10 @@ class ImportEngineImpl(
 
                 is ApiSessionMutation.RecordItems -> {
                     recordItems(m)
+                }
+
+                is ApiSessionMutation.Reserve -> {
+                    observationRepository?.reserveApiSession(m.sessionId)
                 }
 
                 is ApiSessionMutation.ResetToUnimported -> {

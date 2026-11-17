@@ -1,6 +1,7 @@
 package com.moneymanager.domain.repository.write
 
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.MergeId
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.TransactionKind
@@ -38,6 +39,12 @@ interface ObservationWriteRepository : ObservationReadRepository {
 
     /** Deletes every observation on [transactionIds], whoever owns it: the transactions are being deleted. */
     suspend fun deleteObservationsOfTransactions(transactionIds: Collection<TransactionId>)
+
+    /**
+     * Reserves every observation [sessionId]'s records (and their groups) own, for its re-run (#1429): its transactions keep
+     * their ids while it runs, as a staged file's do (`CsvImportWriteRepository.reserveForRerun`).
+     */
+    suspend fun reserveApiSession(sessionId: ApiSessionId)
 
     /** Ends [id]'s reservation: its record said it again. */
     suspend fun unreserve(id: ObservationId)

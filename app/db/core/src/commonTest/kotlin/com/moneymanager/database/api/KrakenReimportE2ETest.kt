@@ -216,17 +216,15 @@ class KrakenReimportE2ETest : DbTest() {
             val rewritten = withdrawalsAfter.first { it.id != monzoCredit && it.sourceAccountId != it.targetAccountId }
             assertEquals(monzoId, rewritten.targetAccountId, "the withdrawal should now be rewritten onto Monzo")
 
-            // The planned deletion really executed: the original withdrawal row is gone from the
-            // database, and the only GBP legs left are the seeded credit plus the one rewrite.
+            // The planned deletion really executed: the original withdrawal's row is replaced by the rewrite, and the only
+            // GBP legs left are the seeded credit plus that one rewrite.
             assertEquals(
                 setOf(monzoCredit, rewritten.id),
                 withdrawalsAfter.map { it.id }.toSet(),
                 "after the re-import only the seeded credit and the rewritten withdrawal should be persisted",
             )
-            assertTrue(
-                repositories.transactionRepository.getTransactionsByIds(setOf(withdrawalBefore.id)).isEmpty(),
-                "executeApiReimport should have deleted the original withdrawal, not merely planned its deletion",
-            )
+            // The session's item said the same slot again, so its transaction took its id back (#1429), as a staged file's does.
+            assertEquals(withdrawalBefore.id, rewritten.id, "the rewritten withdrawal should keep the id the session gave it")
 
             val monzoCreditAfter = repositories.transactionRepository.getTransactionsByIds(setOf(monzoCredit))[monzoCredit]
             assertNotNull(monzoCreditAfter, "the seeded Monzo credit should still exist")

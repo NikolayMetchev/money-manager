@@ -110,6 +110,15 @@ sealed interface ApiSessionMutation {
     ) : ApiSessionMutation
 
     /**
+     * Gets the session ready to re-run in place (#1429), as [CsvImportMutation.Reserve] does a staged file: its records and
+     * their observations stay, reserved for the run, so an item that says a slot again takes its old transaction back.
+     * [ImportBatch.settle] ends the run.
+     */
+    data class Reserve(
+        val sessionId: ApiSessionId,
+    ) : ApiSessionMutation
+
+    /**
      * Returns the session to downloaded but never imported: its records and their observations, its per-item states and
      * its imports are deleted. What its transactions become is the caller's to settle first (`planApiUnimport`).
      */
