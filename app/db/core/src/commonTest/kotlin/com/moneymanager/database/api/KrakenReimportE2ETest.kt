@@ -324,6 +324,7 @@ class KrakenReimportE2ETest : DbTest() {
                             accountAttributeRepository = repositories.accountAttributeRepository,
                             currencyRepository = repositories.currencyRepository,
                             cryptoRepository = repositories.cryptoRepository,
+                            importRecordRepository = repositories.importRecordRepository,
                         ),
                     reads = reimports.reads,
                     maintenance = testMaintenance,
