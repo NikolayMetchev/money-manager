@@ -76,7 +76,6 @@ class ApiSessionsScreenLogicTest {
                             responseId = ApiResponseId(9),
                             jsonPath = JsonPath("$.transactions[0]"),
                             state = ApiResponseTransactionState.IMPORTED,
-                            transactionId = null,
                             errorMessage = null,
                         ),
                     ),

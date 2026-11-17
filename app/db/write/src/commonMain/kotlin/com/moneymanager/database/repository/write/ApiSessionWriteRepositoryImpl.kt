@@ -12,7 +12,6 @@ import com.moneymanager.domain.model.ApiResponseTransactionState
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.JsonPath
-import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.domain.repository.write.ApiSessionWriteRepository
 import kotlinx.coroutines.Dispatchers
@@ -145,7 +144,6 @@ class ApiSessionWriteRepositoryImpl(
         responseId: ApiResponseId,
         jsonPath: JsonPath,
         state: ApiResponseTransactionState,
-        transactionId: TransferId?,
         errorMessage: String?,
     ): ApiResponseTransactionId =
         withContext(Dispatchers.Default) {
@@ -155,7 +153,6 @@ class ApiSessionWriteRepositoryImpl(
                         response_id = responseId.id,
                         json_path = jsonPath.value,
                         state = state.id.toLong(),
-                        transaction_id = transactionId?.id,
                         error_message = errorMessage,
                     )
                     writeQueries.lastInsertApiResponseTransactionId().awaitAsOne()
@@ -173,7 +170,6 @@ class ApiSessionWriteRepositoryImpl(
                         response_id = transaction.responseId.id,
                         json_path = transaction.jsonPath.value,
                         state = transaction.state.id.toLong(),
-                        transaction_id = transaction.transactionId?.id,
                         error_message = transaction.errorMessage,
                     )
                 }

@@ -125,7 +125,6 @@ class ApiSessionReadRepositoryImpl(
                     responseId = ApiResponseId(row.response_id),
                     jsonPath = JsonPath(row.json_path),
                     state = ApiResponseTransactionState.fromId(row.state.toInt()),
-                    transactionId = row.transaction_id?.let(::TransferId),
                     errorMessage = row.error_message,
                 )
             }
@@ -139,7 +138,6 @@ class ApiSessionReadRepositoryImpl(
                     responseId = ApiResponseId(row.response_id),
                     jsonPath = JsonPath(row.json_path),
                     state = ApiResponseTransactionState.fromId(row.state.toInt()),
-                    transactionId = row.transaction_id?.let(::TransferId),
                     errorMessage = row.error_message,
                 )
             }

@@ -10,7 +10,6 @@ import com.moneymanager.domain.model.ApiResponseTransactionState
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.JsonPath
-import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.ApiSessionReadRepository
 import kotlin.time.Instant
 
@@ -92,8 +91,6 @@ interface ApiSessionWriteRepository : ApiSessionReadRepository {
      * @param responseId The ID of the API response containing the transaction
      * @param jsonPath JSONPath expression locating the transaction within the response body
      * @param state The import state (IMPORTED, DUPLICATE, or ERROR)
-     * @param transactionId For IMPORTED: the new transaction ID. For DUPLICATE: the
-     *   pre-existing transaction ID that this entry duplicates. Null for ERROR.
      * @param errorMessage For ERROR state: description of what went wrong
      * @return The ID of the newly created record
      */
@@ -101,7 +98,6 @@ interface ApiSessionWriteRepository : ApiSessionReadRepository {
         responseId: ApiResponseId,
         jsonPath: JsonPath,
         state: ApiResponseTransactionState,
-        transactionId: TransferId?,
         errorMessage: String?,
     ): ApiResponseTransactionId
 

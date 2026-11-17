@@ -232,7 +232,6 @@ class ApiSessionRepositoryImplTest : DbTest() {
                     responseId = responseId,
                     jsonPath = JsonPath("$.transactions[0]"),
                     state = com.moneymanager.domain.model.ApiResponseTransactionState.ERROR,
-                    transactionId = null,
                     errorMessage = "Currency not found",
                 )
 
@@ -257,14 +256,12 @@ class ApiSessionRepositoryImplTest : DbTest() {
                 responseId = responseId,
                 jsonPath = JsonPath("$.transactions[0]"),
                 state = com.moneymanager.domain.model.ApiResponseTransactionState.ERROR,
-                transactionId = null,
                 errorMessage = "Currency not found",
             )
             repositories.apiSessionRepository.insertResponseTransaction(
                 responseId = responseId,
                 jsonPath = JsonPath("$.transactions[1]"),
                 state = com.moneymanager.domain.model.ApiResponseTransactionState.ERROR,
-                transactionId = null,
                 errorMessage = "Currency not found",
             )
 
@@ -302,14 +299,12 @@ class ApiSessionRepositoryImplTest : DbTest() {
                 responseId = firstResponseId,
                 jsonPath = JsonPath("$.transactions[0]"),
                 state = com.moneymanager.domain.model.ApiResponseTransactionState.ERROR,
-                transactionId = null,
                 errorMessage = "Currency not found",
             )
             repositories.apiSessionRepository.insertResponseTransaction(
                 responseId = secondResponseId,
                 jsonPath = JsonPath("$.transactions[0]"),
                 state = com.moneymanager.domain.model.ApiResponseTransactionState.ERROR,
-                transactionId = null,
                 errorMessage = "Currency not found",
             )
 
@@ -336,7 +331,6 @@ class ApiSessionRepositoryImplTest : DbTest() {
                 responseId = responseId,
                 jsonPath = JsonPath("$.transactions[0]"),
                 state = com.moneymanager.domain.model.ApiResponseTransactionState.ERROR,
-                transactionId = null,
                 errorMessage = "Currency not found",
             )
 
@@ -345,14 +339,13 @@ class ApiSessionRepositoryImplTest : DbTest() {
                     responseId = responseId,
                     jsonPath = JsonPath("$.transactions[0]"),
                     state = com.moneymanager.domain.model.ApiResponseTransactionState.ERROR,
-                    transactionId = null,
                     errorMessage = "Duplicate",
                 )
             }
         }
 
     @Test
-    fun `insertResponseTransaction rejects imported state without transaction id`() =
+    fun `insertResponseTransaction rejects an error message on an imported entry`() =
         runDbTest {
             val deviceId = deviceId()
             val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
@@ -370,8 +363,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
                     responseId = responseId,
                     jsonPath = JsonPath("$.transactions[0]"),
                     state = com.moneymanager.domain.model.ApiResponseTransactionState.IMPORTED,
-                    transactionId = null,
-                    errorMessage = null,
+                    errorMessage = "Currency not found",
                 )
             }
         }
@@ -411,7 +403,6 @@ class ApiSessionRepositoryImplTest : DbTest() {
                 responseId = responseId,
                 jsonPath = JsonPath("$.transactions[0]"),
                 state = com.moneymanager.domain.model.ApiResponseTransactionState.ERROR,
-                transactionId = null,
                 errorMessage = "Currency not found",
             )
 

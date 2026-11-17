@@ -8,6 +8,5 @@ data class ApiResponseTransactionInsert(
     val responseId: ApiResponseId,
     val jsonPath: JsonPath,
     val state: ApiResponseTransactionState,
-    val transactionId: TransferId?,
     val errorMessage: String?,
 )

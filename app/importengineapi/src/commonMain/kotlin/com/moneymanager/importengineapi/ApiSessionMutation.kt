@@ -3,13 +3,9 @@ package com.moneymanager.importengineapi
 import com.moneymanager.domain.model.ApiCredentialId
 import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.ApiRequestId
-import com.moneymanager.domain.model.ApiResponseId
 import com.moneymanager.domain.model.ApiResponseTransactionInsert
-import com.moneymanager.domain.model.ApiResponseTransactionState
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceId
-import com.moneymanager.domain.model.JsonPath
-import com.moneymanager.domain.model.TransferId
 import kotlin.time.Instant
 
 /**
@@ -67,15 +63,6 @@ sealed interface ApiSessionMutation {
 
     data class DeleteSession(
         val id: ApiSessionId,
-    ) : ApiSessionMutation
-
-    data class InsertResponseTransaction(
-        val key: String,
-        val responseId: ApiResponseId,
-        val jsonPath: JsonPath,
-        val state: ApiResponseTransactionState,
-        val transactionId: TransferId?,
-        val errorMessage: String?,
     ) : ApiSessionMutation
 
     data class InsertResponseTransactions(

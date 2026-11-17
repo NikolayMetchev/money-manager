@@ -123,6 +123,11 @@ class ApiSessionsBulkButtonsUiTest : DbTest() {
 
             waitUntilAtLeastOneExists(hasText("Import all (0)"), timeoutMillis = 10_000)
             onNodeWithText("Import all (0)").assertIsNotEnabled()
+            // The imported session leaves Outstanding for Imported, where its row says how the import went.
+            onNodeWithText("Imported (1)").performClick()
+            waitUntilAtLeastOneExists(hasText("Import complete:", substring = true), timeoutMillis = 10_000)
+            waitUntilAtLeastOneExists(hasText("Import took:", substring = true), timeoutMillis = 10_000)
+            waitUntilAtLeastOneExists(hasText("Transactions ", substring = true), timeoutMillis = 10_000)
             val imported = runBlocking { repositories.apiSessionRepository.getImportedSessionRevisions() }
             assertTrue(imported.isNotEmpty(), "Import all imported the downloaded session")
             val accounts = runBlocking { repositories.accountRepository.getAllAccounts().first() }
