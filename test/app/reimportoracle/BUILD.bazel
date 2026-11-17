@@ -21,6 +21,7 @@ kmp_library(
         "//app/model/csv",
         "//app/model/reconciliation",
         "//app/model/rules",
+        "//app/reconciliation",
         "//test/app/db",
         "@maven_kmp//:kotlinx_coroutines_core",
         "@maven_kmp//:kotlinx_datetime",

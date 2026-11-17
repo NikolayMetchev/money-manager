@@ -659,7 +659,9 @@ class ImportEngineImpl(
      * What a [CsvImportMutation.Reserve] or an [ApiSessionMutation.Reserve] keeps (#1430, #1429). Of [vacating] (the deletes no other source still observes), each a
      * reserved observation is on keeps its observations, pointing at an id with no row, for the re-run to take back. A
      * reserved observation on any other transaction that keeps its row (one the file shared with another source) goes now,
-     * as a reset's did, and that transaction is rebuilt from what is left. Ids a previous, stopped re-run left vacant stay.
+     * as a reset's did, and that transaction is rebuilt from what is left, unless a group owns it: the group's other files
+     * still say it (a cross-file trade another file booked), so it stays reserved for the re-run to say again, and the
+     * settle releases it. Ids a previous, stopped re-run left vacant stay.
      */
     private suspend fun reserveVacated(
         batch: ImportBatch,
@@ -678,6 +680,7 @@ class ImportEngineImpl(
             when {
                 observation.transactionId in vacatingIds -> kept += observation.transactionId
                 observation.id in alreadyVacant -> Unit
+                observation.owner is ObservationOwner.Group -> Unit
                 else -> observations.deleteObservation(observation.id)
             }
         }
@@ -705,10 +708,9 @@ class ImportEngineImpl(
         observations.releaseTransactions(vacant)
         val lost = mutableSetOf<TransactionId>()
         for (observation in observations.getReserved()) {
-            if (observation.transactionId !in reserved.ids) continue
             if (observation.owner is ObservationOwner.Group) {
                 observations.unreserve(observation.id)
-            } else {
+            } else if (observation.transactionId in reserved.ids) {
                 observations.deleteObservation(observation.id)
                 lost += observation.transactionId
             }
@@ -949,6 +951,29 @@ class ImportEngineImpl(
                 return
             }
             observations.insertObservation(owner, slot, transactionId, content())
+        }
+
+        /**
+         * A trade booking that found [transactionId] standing rather than creating it: when its record's re-run reserved the
+         * slot on that very trade (a person's work kept it standing, #1430), the record takes the observation back, or the
+         * settle drops it and the trade is left unobserved. A trade another source booked stays that source's alone.
+         */
+        suspend fun reclaim(
+            key: ObservationKey?,
+            transactionId: TransactionId,
+            content: () -> ObservationContent,
+        ) {
+            val owner =
+                when (val ownerKey = key?.owner) {
+                    is ObservationOwnerKey.Record -> knownRecord(ownerKey.key)?.let { ObservationOwner.Record(it) }
+                    is ObservationOwnerKey.Group -> group(ownerKey)?.first
+                    else -> null
+                } ?: return
+            val existing = observations.getObservationsOf(owner).firstOrNull { it.slot == key?.slot } ?: return
+            if (existing.transactionId.id != transactionId.id || !observations.isReserved(existing.id)) return
+            val now = content()
+            if (existing.content != now) observations.updateContent(existing.id, now)
+            observations.unreserve(existing.id)
         }
 
         /** The owner, and whether it is new (so says nothing yet); null for a booking no API item or person made. */
@@ -1379,8 +1404,13 @@ class ImportEngineImpl(
         if (trades.isEmpty()) return
         val results = tradeRepository.createTrades(trades)
         if (observer == null) return
-        for ((trade, result) in expanded.zip(results)) {
-            if (result.created) observer.record(trade.key, trade.provenance, result.id) { trade.observationContent() }
+        for ((index, result) in results.withIndex()) {
+            val trade = expanded[index]
+            if (result.created) {
+                observer.record(trade.key, trade.provenance, result.id) { trade.observationContent() }
+            } else {
+                observer.reclaim(trade.key, result.id) { trade.observationContent() }
+            }
         }
     }
 
