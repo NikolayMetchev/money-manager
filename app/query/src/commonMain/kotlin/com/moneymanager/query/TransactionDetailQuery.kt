@@ -5,6 +5,7 @@ import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.model.TradeId
+import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.TransactionKind
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
@@ -14,12 +15,13 @@ import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.TransferSourceReadRepository
 import kotlinx.coroutines.flow.first
 
-/** Everything about one row of an account's transactions: its legs, attributes, linked transfers and provenance. */
+/** Everything about one row of an account's transactions: its legs, attributes, linked transfers, provenance and observations. */
 class TransactionDetailQuery(
     private val transactionRepository: TransactionReadRepository,
     private val tradeRepository: TradeReadRepository,
     private val relationshipRepository: RelationshipReadRepository,
     private val sourceRepository: TransferSourceReadRepository,
+    private val observationReads: ObservationReads,
 ) {
     /** The detail of [row], or null when it no longer exists. */
     suspend fun detail(row: AccountRow): TransactionDetail? =
@@ -27,6 +29,10 @@ class TransactionDetailQuery(
             TransactionKind.TRANSFER -> transferDetail(row, TransferId(row.transactionId.id))
             TransactionKind.TRADE -> tradeDetail(row, TradeId(row.transactionId.id))
         }
+
+    /** What [transactionId] is made of, for a screen that shows it without the rest of the detail. */
+    suspend fun observations(transactionId: TransactionId): TransactionObservations =
+        observationReads.observationsOf(transactionId, emptyList())
 
     private suspend fun transferDetail(
         row: AccountRow,
@@ -51,6 +57,7 @@ class TransactionDetailQuery(
             attributes = transfer.attributes.map { DetailAttribute(it.attributeType.name, it.value) },
             links = links,
             sources = sourceRepository.getSourcesForTransaction(id),
+            observations = observationReads.observationsOf(id, listOf(transfer.amount.asset)),
         )
     }
 
@@ -69,6 +76,7 @@ class TransactionDetailQuery(
             attributes = tradeRepository.getAttributes(id).first().map { DetailAttribute(it.attributeType.name, it.value) },
             links = emptyList(),
             sources = emptyList(),
+            observations = observationReads.observationsOf(id, listOf(trade.from.asset, trade.to.asset)),
         )
     }
 }
@@ -82,6 +90,8 @@ data class TransactionDetail(
     val links: List<LinkedTransfer>,
     /** Where each revision came from, newest first. Empty for trades. */
     val sources: List<SourceRecord>,
+    /** Who observed it, and what a person pinned, split and overrode on it. */
+    val observations: TransactionObservations = TransactionObservations(),
 )
 
 data class TransactionLeg(

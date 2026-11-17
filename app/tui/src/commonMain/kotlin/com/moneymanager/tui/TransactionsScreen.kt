@@ -18,7 +18,6 @@ import com.jakewharton.mosaic.ui.Column
 import com.jakewharton.mosaic.ui.Row
 import com.jakewharton.mosaic.ui.Text
 import com.jakewharton.mosaic.ui.TextStyle
-import com.moneymanager.database.di.AppServices
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.DeviceInfo
@@ -34,10 +33,11 @@ import com.moneymanager.presenter.transactions.presentTransactions
 import com.moneymanager.query.AccountSnapshot
 import com.moneymanager.query.LinkedTransfer
 import com.moneymanager.query.TransactionDetail
-import com.moneymanager.query.TransactionDetailQuery
+import com.moneymanager.query.TransactionObservations
 import com.moneymanager.query.TransactionQuery
 import com.moneymanager.query.counterpartyId
 import com.moneymanager.query.parseDateBound
+import com.moneymanager.session.transactionDetailQuery
 import com.moneymanager.terminal.fit
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
@@ -388,6 +388,7 @@ internal fun detailLines(
     heading("Sources")
     if (detail.sources.isEmpty()) line("none", TextStyle.Dim)
     detail.sources.forEach { line(it.describe(zone)) }
+    observationLines(detail.observations, names, zone, ::heading, ::line)
     return lines
 }
 
@@ -483,11 +484,31 @@ private fun accountChoices(snapshot: AccountSnapshot?): List<Pair<AccountId, Str
         .sortedBy { it.account.name.lowercase() }
         .map { it.account.id to it.account.name + if (it.isShadow) " (shadow)" else "" }
 
-/** The detail query over the session's read services. */
-internal fun AppServices.transactionDetailQuery(): TransactionDetailQuery =
-    TransactionDetailQuery(
-        transactionRepository = transactions.transactionRepository,
-        tradeRepository = transactions.tradeRepository,
-        relationshipRepository = transactions.relationshipRepository,
-        sourceRepository = transactions.transferSourceRepository,
-    )
+/** Who observed the transaction, and what a person pinned, split and overrode on it. */
+private fun observationLines(
+    observations: TransactionObservations,
+    names: Map<AccountId, String>,
+    zone: TimeZone,
+    heading: (String) -> Boolean,
+    line: (String, TextStyle) -> Boolean,
+) {
+    heading("Observations")
+    if (observations.observations.isEmpty()) line("none", TextStyle.Dim)
+    observations.observations.forEach { observation ->
+        val pinned = if (observation.pinned) " · pinned" else ""
+        line("${observation.id} ${observation.ownerLabel} · ${observation.slot}$pinned", TextStyle.Unspecified)
+        val legs = observation.legs.joinToString("; ") { "${names.nameOf(it.from)} → ${names.nameOf(it.to)} ${it.amount.text()}" }
+        line("    ${observation.timestamp.local(zone)} ${observation.description} · $legs", TextStyle.Dim)
+    }
+    if (observations.splits.isNotEmpty()) {
+        heading("Kept apart")
+        observations.splits.forEach { split ->
+            val where = split.otherTransaction?.let { "on transaction $it" } ?: "gone"
+            line("${split.observation} is not ${split.other} ($where)", TextStyle.Unspecified)
+        }
+    }
+    if (observations.overrides.isNotEmpty()) {
+        heading("Set by hand")
+        observations.overrides.forEach { line("${it.name}: ${it.value ?: "removed"}", TextStyle.Unspecified) }
+    }
+}

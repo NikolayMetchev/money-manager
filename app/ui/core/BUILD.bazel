@@ -64,6 +64,7 @@ kmp_library(
         "//app/model/repository/read",
         "//app/model/timeline",
         "//app/presenter/core",
+        "//app/query",
         "//app/remotestorage/core",
         "//app/remotestorage/sync",
         "//app/session",

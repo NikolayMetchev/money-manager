@@ -11,6 +11,11 @@ import com.moneymanager.domain.model.CurrencyScaleFactors
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
+import com.moneymanager.domain.model.TradeId
+import dev.mokkery.answering.returns
+import dev.mokkery.everySuspend
+import dev.mokkery.matcher.any
+import dev.mokkery.mock
 import kotlin.time.Instant
 
 val gbp = Currency(id = CurrencyId(1), code = "GBP", name = "Pound Sterling", scaleFactor = CurrencyScaleFactors.DEFAULT_SCALE_FACTOR)
@@ -29,3 +34,21 @@ fun money(
     amount: String,
     asset: Asset,
 ) = Money.fromDisplayValue(amount, asset)
+
+/** [ObservationReads] for a transaction nobody observed and nobody decided anything about. */
+fun noObservations(): ObservationReads =
+    ObservationReads(
+        observationRepository = mock { everySuspend { getObservationsOfTransaction(any()) } returns emptyList() },
+        personOverrideRepository =
+            mock {
+                everySuspend { getPinsOnTransactions(any()) } returns emptyList()
+                everySuspend { getTransferOverrides(any()) } returns emptyMap()
+                everySuspend { getTransferAttributeOverrides(any()) } returns emptyList()
+                everySuspend { getTradeAttributeOverrides(any<TradeId>()) } returns emptyList()
+            },
+        importRecordRepository = mock(),
+        csvImportRepository = mock(),
+        attributeTypeRepository = mock(),
+        currencyRepository = mock(),
+        cryptoRepository = mock(),
+    )
