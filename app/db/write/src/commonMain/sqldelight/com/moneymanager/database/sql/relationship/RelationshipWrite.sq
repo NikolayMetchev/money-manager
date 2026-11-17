@@ -11,3 +11,7 @@ VALUES (?, ?, ?);
 
 deleteById:
 DELETE FROM relationship WHERE id = ?;
+
+-- A re-run's vacant transaction leaves every relationship it was kept in (#1430); one left with a single member is pruned.
+deleteMembersOfTransaction:
+DELETE FROM relationship_member WHERE transaction_id = ?;

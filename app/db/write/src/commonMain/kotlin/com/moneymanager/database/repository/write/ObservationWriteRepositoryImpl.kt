@@ -177,6 +177,22 @@ class ObservationWriteRepositoryImpl(
         }
     }
 
+    override suspend fun unreserve(id: ObservationId) {
+        withContext(coroutineContext) { queries.unreserve(id.id) }
+    }
+
+    override suspend fun releaseTransactions(transactionIds: Collection<TransactionId>) {
+        if (transactionIds.isEmpty()) return
+        withContext(coroutineContext) {
+            queries.transaction {
+                transactionIds.forEach {
+                    database.relationshipWriteQueries.deleteMembersOfTransaction(it.id)
+                    queries.deleteObservationsOfTransaction(it.id)
+                }
+            }
+        }
+    }
+
     override suspend fun moveAccountReferences(
         mergeId: MergeId,
         deletedAccountId: AccountId,

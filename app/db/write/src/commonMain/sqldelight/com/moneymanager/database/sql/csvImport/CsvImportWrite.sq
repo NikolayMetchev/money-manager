@@ -118,3 +118,7 @@ DELETE FROM observation WHERE id IN (
 
 deleteImportRecords:
 DELETE FROM import_record WHERE id IN (SELECT record_id FROM csv_import_record WHERE csv_import_id = ?);
+
+-- A re-import keeps its file's records (#1430), but until its run completes none may say it is up to date.
+unhashImportRecords:
+UPDATE import_record SET content_hash = ? WHERE id IN (SELECT record_id FROM csv_import_record WHERE csv_import_id = ?);

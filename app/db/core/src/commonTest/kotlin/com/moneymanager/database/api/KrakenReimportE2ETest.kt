@@ -12,13 +12,19 @@ import com.moneymanager.domain.model.ApiCredentialId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.Money
+import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.apistrategy.ApiAccountBridge
 import com.moneymanager.domain.model.apistrategy.ApiInternalTransferReconcile
 import com.moneymanager.domain.model.rules.SettlementWindow
+import com.moneymanager.importengineapi.AccountRef
+import com.moneymanager.importengineapi.ImportBatch
+import com.moneymanager.importengineapi.ImportOperation
+import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.ensureApiCredential
+import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.importengineapi.markApiSessionImported
 import com.moneymanager.importengineapi.updateApiStrategy
 import com.moneymanager.test.database.DbTest
@@ -268,6 +274,76 @@ class KrakenReimportE2ETest : DbTest() {
                 withdrawalsFinal.count { it.targetAccountId == monzoId && it.attributes.none { attr -> attr.attributeType.id.id == -1L } },
                 "a second re-import must remain idempotent — still exactly one movement counted into Monzo's balance",
             )
+        }
+
+    @Test
+    fun `re-import replays a hand edit of a transaction the session created`() =
+        runDbTest {
+            val sessionId = stageAndImport()
+            val withdrawal =
+                repositories.transactionRepository
+                    .getTransactionsByDateRange(
+                        startDate = Instant.fromEpochMilliseconds(1_700_000_003_000L),
+                        endDate = Instant.fromEpochMilliseconds(1_700_000_004_000L),
+                    ).first()
+                    .first { it.amount.asset.code == "GBP" }
+            val noteType = repositories.importEngine.getOrCreateAttributeType("note")
+            repositories.importEngine.import(
+                ImportBatch.manualEdits(
+                    transfers =
+                        listOf(
+                            ImportTransfer(
+                                source = Source.Manual,
+                                operation = ImportOperation.UPDATE,
+                                existingId = withdrawal.id,
+                                fromAccount = AccountRef.Existing(withdrawal.sourceAccountId),
+                                toAccount = AccountRef.Existing(withdrawal.targetAccountId),
+                                timestamp = withdrawal.timestamp,
+                                description = "Rent to savings",
+                                amount = withdrawal.amount,
+                                attributes = listOf(NewAttribute(noteType, "moved by hand")),
+                            ),
+                        ),
+                ),
+            )
+
+            val session = repositories.apiSessionRepository.getSessionById(sessionId)!!
+            val strategy = repositories.apiImportStrategyRepository.getStrategyByName("Kraken").first()!!
+            val reimports = repositories.reimports(testMaintenance)
+            val plan = planApiReimport(sessionId, repositories.apiSessionRepository, reimports.reads)
+            assertEquals("Rent to savings", plan.manualEdits.single().description, "the plan lists the hand edit")
+            val result =
+                executeApiReimport(
+                    plan = plan,
+                    session = session,
+                    strategy = strategy,
+                    apiReads =
+                        ApiImportReads(
+                            apiSessionRepository = repositories.apiSessionRepository,
+                            accountRepository = repositories.accountRepository,
+                            accountAttributeRepository = repositories.accountAttributeRepository,
+                            currencyRepository = repositories.currencyRepository,
+                            cryptoRepository = repositories.cryptoRepository,
+                            importRecordRepository = repositories.importRecordRepository,
+                        ),
+                    reads = reimports.reads,
+                    maintenance = testMaintenance,
+                    importEngine = repositories.importEngine,
+                    cascadeRerunner = reimports,
+                )
+
+            // An API session's re-run still deletes and re-creates its transactions, so the edit is replayed (#1432 retires it).
+            assertEquals(1, result.reappliedEdits.size, "the hand edit is re-applied")
+            assertTrue(result.unmatchedEdits.isEmpty())
+            val recreated =
+                repositories.transactionRepository
+                    .getTransactionsByDateRange(
+                        startDate = Instant.fromEpochMilliseconds(1_700_000_003_000L),
+                        endDate = Instant.fromEpochMilliseconds(1_700_000_004_000L),
+                    ).first()
+                    .single { it.amount.asset.code == "GBP" }
+            assertEquals("Rent to savings", recreated.description)
+            assertEquals(listOf("moved by hand"), recreated.attributes.filter { it.attributeType.name == "note" }.map { it.value })
         }
 
     @Test

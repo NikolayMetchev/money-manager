@@ -121,15 +121,6 @@ class TransferSourceReadRepositoryImpl(
                 .awaitAsList()
                 .mapTo(mutableSetOf()) { CsvImportId(Uuid.parse(it)) }
         }
-
-    override suspend fun getHandEditedTransferIds(ids: Collection<TransferId>): Set<TransferId> =
-        withContext(Dispatchers.Default) {
-            val edited = mutableSetOf<TransferId>()
-            for (chunk in ids.mapTo(mutableSetOf()) { it.id }.chunked(ID_CHUNK)) {
-                queries.selectHandEditedTransferIds(chunk).awaitAsList().mapTo(edited) { TransferId(it) }
-            }
-            edited
-        }
 }
 
 // Keeps each IN list well under SQLite's bound-parameter limit.
