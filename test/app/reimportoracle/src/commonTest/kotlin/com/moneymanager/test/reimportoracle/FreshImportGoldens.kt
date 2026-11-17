@@ -291,12 +291,14 @@ internal val FRESH_IMPORT_GOLDENS: Map<String, String> =
             2023-11-14T22:19:30Z | Binance -> Binance Fees | 1.25 LINK | LINK fee [exchange.txn_id=w1-fee]
             2023-11-14T22:19:30Z | Binance -> ETH:0xwithdrawaddr | 81.108 LINK | Withdraw LINK [blockchain-txid=onchain-wd-1, exchange.txn_id=w1]
             2023-11-14T22:20:00Z | Binance -> Binance Bank | 1134.83 GBP | Fiat Withdrawal [binance-operation=Fiat Withdrawal, binance-user-id=53064551, excluded=reconciled, unidentified-counterparty=target]
-            == trades (2)
+            == trades (3)
             2023-11-14T22:13:25.775Z | Binance 4000 USDT -> Binance 0.1 BTC | Buy BTC/USDT
             2023-11-14T22:13:25.775Z | Binance 8000 USDT -> Binance 0.2 BTC | Buy BTC/USDT
-            == relationships (4)
+            2023-11-14T22:13:25Z | Binance 12000 USDT -> Binance 0.3 BTC | Buy BTC/USDT
+            == relationships (5)
             reconciled: PRIMARY {2023-11-14T22:13:25Z | Binance -> Binance Fees | 4 USDT | Transaction Fee [binance-operation=Transaction Fee, binance-user-id=53064551, excluded=reconciled]} & RELATED {2023-11-14T22:13:25.775Z | Binance -> Binance Fees | 4 USDT | Buy BTC/USDT fee [exchange.txn_id=BTCUSDT-28457-fee]}
             reconciled: PRIMARY {2023-11-14T22:13:25Z | Binance -> Binance Fees | 8 USDT | Transaction Fee [binance-operation=Transaction Fee, binance-user-id=53064551, excluded=reconciled]} & RELATED {2023-11-14T22:13:25.775Z | Binance -> Binance Fees | 8 USDT | Buy BTC/USDT fee [exchange.txn_id=BTCUSDT-28458-fee]}
+            reconciled: PRIMARY {2023-11-14T22:13:25Z | Binance 12000 USDT -> Binance 0.3 BTC | Buy BTC/USDT} & RELATED {2023-11-14T22:13:25.775Z | Binance 4000 USDT -> Binance 0.1 BTC | Buy BTC/USDT} & RELATED {2023-11-14T22:13:25.775Z | Binance 8000 USDT -> Binance 0.2 BTC | Buy BTC/USDT}
             reconciled: PRIMARY {2023-11-14T22:19:00Z | Binance -> Binance Funding | 82.358 LINK | Withdraw [binance-operation=Withdraw, binance-remark=Withdraw fee is included, binance-user-id=53064551, excluded=reconciled, manual-entry=Withdrawal fee, unidentified-counterparty=target]} & RELATED {2023-11-14T22:19:30Z | Binance -> ETH:0xwithdrawaddr | 81.108 LINK | Withdraw LINK [blockchain-txid=onchain-wd-1, exchange.txn_id=w1]}
             reconciled: PRIMARY {2023-11-14T22:20:00Z | Binance -> Binance Bank | 1134.83 GBP | Fiat Withdrawal [binance-operation=Fiat Withdrawal, binance-user-id=53064551, excluded=reconciled, unidentified-counterparty=target]} & RELATED {2023-11-14T22:13:32Z | Binance -> Binance Bank | 1133.33 GBP | Withdraw GBP [exchange.txn_id=fw1]}
             == daily balances (13)
@@ -313,6 +315,26 @@ internal val FRESH_IMPORT_GOLDENS: Map<String, String> =
             Binance | 2023-11-14 | USDT | -12012
             Binance | 2023-11-14 | XMR | -5.81
             ETH:0xwithdrawaddr | 2023-11-14 | LINK | 81.108
+            """.trimIndent(),
+        "Kraken overlapping API sessions" to
+            """
+            == accounts (4)
+            Kraken Fees [fee-account-for=Kraken]
+            Kraken Funding
+            Kraken [exchange-account-external-id=kraken]
+            bc1qsenderaddr [blockchain-wallet-address=bc1qsenderaddr]
+            == transfers (2)
+            2023-11-14T22:13:21.500Z | bc1qsenderaddr -> Kraken | 0.01 BTC | Deposit XXBT [blockchain-txid=onchain-abc, exchange.txn_id=LG1]
+            2023-11-14T22:13:22.500Z | Kraken -> Kraken Funding | 100 USD | Withdraw ZUSD [exchange.txn_id=LG2]
+            == trades (2)
+            2023-11-14T22:13:20.099Z | Kraken 20000.27 USD -> Kraken 0.5 BTC | Buy BTC/USD
+            2023-11-14T22:13:20.200Z | Kraken 0.1 BTC -> Kraken 4100 USD | Sell BTC/USD
+            == relationships (0)
+            == daily balances (4)
+            Kraken Funding | 2023-11-14 | USD | 100
+            Kraken | 2023-11-14 | BTC | 0.41
+            Kraken | 2023-11-14 | USD | -16000.27
+            bc1qsenderaddr | 2023-11-14 | BTC | -0.01
             """.trimIndent(),
         "Monzo CSV + overlapping API sessions" to
             """

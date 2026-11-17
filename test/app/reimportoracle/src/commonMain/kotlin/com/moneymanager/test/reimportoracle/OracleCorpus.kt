@@ -383,8 +383,8 @@ object OracleCorpus {
 
     /**
      * Binance's statement export and one API session of the same movements, as `BinanceCsvThenApiE2ETest` stages them:
-     * a deposit the export can only give a placeholder for, the fee rows of a two-fill order whose fees the API books
-     * with its fills, a Simple Earn subscription, and two withdrawals the API reports net of their fee.
+     * a deposit the export can only give a placeholder for, a two-fill order the export folds into one trade, a Simple
+     * Earn subscription, and two withdrawals the API reports net of their fee.
      */
     val BINANCE_CSV_API =
         OracleScenario(
@@ -397,6 +397,8 @@ object OracleCorpus {
                             BINANCE_HEADERS,
                             listOf(
                                 binanceRow("2023-11-14 22:13:21", "Deposit", "BTC", "0.01"),
+                                binanceRow("2023-11-14 22:13:25", "Transaction Spend", "USDT", "-12000"),
+                                binanceRow("2023-11-14 22:13:25", "Transaction Buy", "BTC", "0.3"),
                                 binanceRow("2023-11-14 22:13:25", "Transaction Fee", "USDT", "-4"),
                                 binanceRow("2023-11-14 22:13:25", "Transaction Fee", "USDT", "-8"),
                                 binanceRow("2023-11-14 22:13:26", "Simple Earn Flexible Subscription", "XMR", "-5.81", "Binance Earn"),
@@ -408,6 +410,24 @@ object OracleCorpus {
                     OracleSource(OracleFile.Api("binance-session", "Binance", BINANCE_RESPONSES)),
                 ),
             changedStrategy = "Binance CSV",
+        )
+
+    /**
+     * Two Kraken downloads, as `KrakenExchangeApiE2ETest` stages them: the first holds two trades and a deposit, the
+     * second (overlapping it) the same trades again and a withdrawal. Kraken has no CSV strategy, so (c) changes the API
+     * strategy itself.
+     */
+    val KRAKEN_API =
+        OracleScenario(
+            name = "Kraken overlapping API sessions",
+            sources =
+                listOf(
+                    OracleSource(
+                        OracleFile.Api("kraken-session-1", "Kraken", listOf(KRAKEN_TRADES, KRAKEN_DEPOSITS, KRAKEN_DEPOSIT_STATUS)),
+                    ),
+                    OracleSource(OracleFile.Api("kraken-session-2", "Kraken", listOf(KRAKEN_TRADES, KRAKEN_WITHDRAWALS))),
+                ),
+            changedStrategy = "Kraken",
         )
 
     /**
@@ -448,6 +468,7 @@ object OracleCorpus {
             BINANCE_KOINLY,
             BYBIT_CSV_API,
             BINANCE_CSV_API,
+            KRAKEN_API,
             MONZO_CSV_API,
         )
 }
@@ -768,6 +789,42 @@ private val BINANCE_RESPONSES =
             {"rows":[{"purchaseId":26055,"asset":"XMR","amount":"5.81000000","time":1700000006320,"status":"SUCCESS"}],"total":1}
             """.trimIndent(),
     )
+
+// Kraken keys its trades and ledger entries by id, and names assets by their legacy codes (XXBT, ZUSD).
+private val KRAKEN_TRADES =
+    "https://api.kraken.com/0/private/TradesHistory?ep=0/private/TradesHistory" to
+        """
+        {"error":[],"result":{"trades":{
+          "TCWJEG-FL4SZ-3FKGH6":{"ordertxid":"O1","pair":"XXBTZUSD","time":1700000000.100,"type":"buy",
+           "price":"40000.54","cost":"20000.27","vol":"0.5","fee":"0.05","trade_id":"t1"},
+          "TCWJEG-FL4SZ-3FKGH7":{"ordertxid":"O2","pair":"XXBTZUSD","time":1700000000.200,"type":"sell",
+           "price":"41000.00","cost":"4100.00","vol":"0.1","fee":"0.52","trade_id":"t2"}
+        },"count":2}}
+        """.trimIndent()
+
+private val KRAKEN_DEPOSITS =
+    "https://api.kraken.com/0/private/Ledgers?type=deposit?ep=0/private/Ledgers?type=deposit" to
+        """
+        {"error":[],"result":{"ledger":{
+          "LG1":{"refid":"REF1","time":1700000001.5,"asset":"XXBT","amount":"0.01","fee":"0.0000"}
+        },"count":1}}
+        """.trimIndent()
+
+private val KRAKEN_WITHDRAWALS =
+    "https://api.kraken.com/0/private/Ledgers?type=withdrawal?ep=0/private/Ledgers?type=withdrawal" to
+        """
+        {"error":[],"result":{"ledger":{
+          "LG2":{"refid":"REF2","time":1700000002.5,"asset":"ZUSD","amount":"-100.00","fee":"0.0000"}
+        },"count":1}}
+        """.trimIndent()
+
+private val KRAKEN_DEPOSIT_STATUS =
+    "https://api.kraken.com/0/private/DepositStatus?ep=0/private/DepositStatus" to
+        """
+        {"error":[],"result":[
+          {"method":"Bitcoin","asset":"XBT","refid":"REF1","txid":"onchain-abc","info":"bc1qsenderaddr","amount":"0.01","time":1700000001}
+        ]}
+        """.trimIndent()
 
 private const val MONZO_ACCOUNT_ID = "acc_00009ORACLE00000000001"
 

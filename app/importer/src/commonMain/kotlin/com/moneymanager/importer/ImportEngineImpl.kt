@@ -379,14 +379,13 @@ class ImportEngineImpl(
             createdTradeIds[intent.key] = tradeResult.id
             if (!tradeResult.created) dedupedTradeKeys += intent.key
         }
+        // A record observes the trade it lands on, whether it created it or found it again (an overlapping session's
+        // fill): unimporting the record that created it must not take it while another still says it.
         val observer = sourceObservations()
-        for ((intent, tradeResult) in tradesToWrite.map { it.first }.zip(tradeResults)) {
-            if (tradeResult.created) {
-                observer?.record(
-                    intent.observationKey(),
-                    intent.source,
-                    tradeResult.id,
-                ) { intent.observationContent() }
+        if (observer != null) {
+            for (intent in batch.trades) {
+                val tradeId = createdTradeIds[intent.key] ?: continue
+                observer.record(intent.observationKey(), intent.source, tradeId) { intent.observationContent() }
             }
         }
         for (intent in batch.orders) {
@@ -2101,7 +2100,7 @@ class ImportEngineImpl(
         val minTs = creates.minOf { requireNotNull(it.timestamp) } - policy.window
         val maxTs = creates.maxOf { requireNotNull(it.timestamp) } + policy.window
         val existing = tradeRepository.getTradesByAccountsAndDateRange(accountIds, minTs, maxTs)
-        return if (existing.isEmpty()) null else TradeReconciler(policy, existing, creates)
+        return if (existing.isEmpty()) null else TradeReconciler(policy, existing)
     }
 
     /**

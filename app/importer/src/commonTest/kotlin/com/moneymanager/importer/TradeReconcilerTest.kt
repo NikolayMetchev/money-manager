@@ -87,12 +87,11 @@ class TradeReconcilerTest {
     private fun reconciler(
         existing: List<Trade>,
         window: Long = 300,
-        allowAggregation: Boolean = true,
         matchFromLegOnly: Boolean = false,
     ) = TradeReconciler(
         TradeDedupePolicy.Fuzzy(
             window = window.seconds,
-            allowAggregation = allowAggregation,
+            allowAggregation = true,
             matchFromLegOnly = matchFromLegOnly,
         ),
         existing,
@@ -116,37 +115,15 @@ class TradeReconcilerTest {
     }
 
     @Test
-    fun aggregatesPerFillTradesWhoseTotalsEqualTheIncomingTrade() {
-        // The real 2022-11-14 group: six API fills, one CSV row group summing to them.
+    fun leavesPerFillTradesWhoseTotalsEqualTheIncomingTradeToTheMatcher() {
+        // The real 2022-11-14 group: six API fills, one CSV row group summing to them. Both are booked; the matcher's
+        // trade-aggregation stage excludes the gross trade, whichever came first.
         val btcFills = listOf("0.04382", "0.90716", "0.00441", "0.00312", "0.01351", "0.02798")
         val gbpFills =
             listOf("605.57925400", "12536.54297800", "60.96551580", "43.12694880", "186.70374170", "386.67128880")
         val fills = btcFills.zip(gbpFills).map { (b, g) -> existing("2022-11-14T20:32:54.462Z", b, btc, g, gbp) }
 
-        val matched =
-            reconciler(fills).match(incoming("2022-11-14T20:32:54Z", "1.00000000", btc, "13819.5897271", gbp))
-        assertEquals(fills.first().id, matched, "the earliest of the matched set is reported")
-    }
-
-    @Test
-    fun aggregationIsRefusedWhenTheTotalsDisagree() {
-        // A partial overlap - some fills already imported, some not - is genuinely ambiguous, so the
-        // incoming trade is written rather than guessed at.
-        val fills =
-            listOf("0.04382", "0.90716").zip(listOf("605.57925400", "12536.54297800")).map { (b, g) ->
-                existing("2022-11-14T20:32:54.462Z", b, btc, g, gbp)
-            }
         assertNull(reconciler(fills).match(incoming("2022-11-14T20:32:54Z", "1.00000000", btc, "13819.5897271", gbp)))
-    }
-
-    @Test
-    fun aggregationCanBeTurnedOff() {
-        val fills =
-            listOf("0.5", "0.5").map { existing("2022-11-14T20:32:54.462Z", it, btc, "6909.79486355", gbp) }
-        assertNull(
-            reconciler(fills, allowAggregation = false)
-                .match(incoming("2022-11-14T20:32:54Z", "1.0", btc, "13819.5897271", gbp)),
-        )
     }
 
     @Test
