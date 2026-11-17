@@ -19,6 +19,7 @@ kmp_library(
         "//app/model/apistrategy",
         "//app/model/core",
         "//app/model/csv",
+        "//app/model/observation",
         "//app/model/reconciliation",
         "//app/model/rules",
         "//app/reconciliation",

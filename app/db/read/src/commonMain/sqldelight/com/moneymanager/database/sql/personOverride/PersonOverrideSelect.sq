@@ -33,6 +33,18 @@ JOIN observation ON observation.id = observation_pin.observation_id
 WHERE observation_pin.observation_id IN ?
 ORDER BY observation_pin.observation_id;
 
+-- Every pin and split: a person makes few, and the match sync reads them all.
+selectAllPins:
+SELECT observation_pin.observation_id, observation_pin.transaction_id, observation.kind
+FROM observation_pin
+JOIN observation ON observation.id = observation_pin.observation_id
+ORDER BY observation_pin.observation_id;
+
+selectAllSplits:
+SELECT observation_a_id, observation_b_id
+FROM observation_split
+ORDER BY observation_a_id, observation_b_id;
+
 selectSplits:
 SELECT observation_a_id, observation_b_id
 FROM observation_split

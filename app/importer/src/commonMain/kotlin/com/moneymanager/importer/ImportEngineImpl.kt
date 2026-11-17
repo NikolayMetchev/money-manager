@@ -115,6 +115,7 @@ import com.moneymanager.importengineapi.MaterializationReport
 import com.moneymanager.importengineapi.MaterializationRequest
 import com.moneymanager.importengineapi.Materializer
 import com.moneymanager.importengineapi.Materializer.column
+import com.moneymanager.importengineapi.ObservationDecision
 import com.moneymanager.importengineapi.ObservationExpander
 import com.moneymanager.importengineapi.ObservationKey
 import com.moneymanager.importengineapi.ObservationMutation
@@ -583,7 +584,7 @@ class ImportEngineImpl(
         // A transaction the reset left with no observation at all stays as its import booked it until the file's re-import:
         // rebuilding it from nothing would delete what the reset file's other rows still report.
         val rebuilt =
-            (sharedByResets - (transferDeleteIds + tradeDeleteIds).toSet() + partners).filterTo(mutableSetOf()) {
+            (sharedByResets - (transferDeleteIds + tradeDeleteIds).toSet() + partners - reserved.ids).filterTo(mutableSetOf()) {
                 observationRepository?.getObservationsOfTransaction(it)?.isNotEmpty() == true
             } + stillObserved
         if (rebuilt.isNotEmpty()) materialize(emptyList(), MaterializationRequest(Source.Reconciler, rebuilt))
@@ -670,12 +671,33 @@ class ImportEngineImpl(
         if (batch.csvImportMutations.none { it is CsvImportMutation.Reserve }) return ReservedTransactions()
         val vacatingIds = vacating.toSet()
         val alreadyVacant = observations.getVacantReserved().mapTo(mutableSetOf()) { it.id }
+        // An observation a person pinned or split stays reserved for its record to take back: deleting it would drop the
+        // decision with it.
+        val decided =
+            personOverrideRepository
+                ?.let { o ->
+                    o.getAllPins().mapTo(mutableSetOf()) { it.observationId } + o.getAllSplits().flatMap { listOf(it.first, it.second) }
+                }.orEmpty()
         val kept = mutableSetOf<TransactionId>()
-        for (observation in observations.getReserved()) {
+        val reserved = observations.getReserved()
+        val reservedIds = reserved.mapTo(mutableSetOf()) { it.id }
+        // A split gives an observation a transaction of its own, which no source created and so no re-run deletes: when
+        // only reserved observations say it, it is vacated with the rest, so the record takes the id back.
+        val decidedAlone =
+            reserved
+                .filter { it.id in decided && it.id !in alreadyVacant && it.transactionId !in vacatingIds }
+                .map { it.transactionId }
+                .distinct()
+                .filter { id -> observations.getObservationsOfTransaction(id).all { it.id in reservedIds } }
+                .toSet()
+        transactionRepository.deleteTransactions(decidedAlone.filterIsInstance<TransferId>())
+        tradeRepository.deleteTrades(decidedAlone.filterIsInstance<TradeId>())
+        for (observation in reserved) {
             when {
-                observation.transactionId in vacatingIds -> kept += observation.transactionId
+                observation.transactionId in vacatingIds || observation.transactionId in decidedAlone -> kept += observation.transactionId
                 observation.id in alreadyVacant -> Unit
                 observation.owner is ObservationOwner.Group -> Unit
+                observation.id in decided -> Unit
                 else -> observations.deleteObservation(observation.id)
             }
         }
@@ -706,6 +728,10 @@ class ImportEngineImpl(
             if (observation.owner is ObservationOwner.Group) {
                 observations.unreserve(observation.id)
             } else if (observation.transactionId in reserved.ids) {
+                observations.deleteObservation(observation.id)
+                lost += observation.transactionId
+            } else if (observations.getMaterialized(observation.transactionId) != null) {
+                // One a person pinned or split, kept on a transaction another source holds, that its record didn't say again.
                 observations.deleteObservation(observation.id)
                 lost += observation.transactionId
             }
@@ -834,6 +860,7 @@ class ImportEngineImpl(
             records = importRecords,
             csvImports = csvImportRepository,
             relationships = relationshipRepository,
+            overrides = personOverrideRepository,
             calendarFor = calendars::forAccounts,
             materialize = ::materialize,
         )
@@ -3038,6 +3065,18 @@ class ImportEngineImpl(
         }
     }
 
+    private suspend fun applyObservationDecisions(decisions: List<ObservationDecision>) {
+        val overrides = checkNotNull(personOverrideRepository) { "This engine has no person override repository" }
+        for (decision in decisions) {
+            when (decision) {
+                is ObservationDecision.Pin -> overrides.pin(decision.pin)
+                is ObservationDecision.Unpin -> overrides.unpin(decision.observationId)
+                is ObservationDecision.Split -> overrides.split(decision.split)
+                is ObservationDecision.Unsplit -> overrides.unsplit(decision.split)
+            }
+        }
+    }
+
     private suspend fun applyConfigMutations(batch: ImportBatch): ConfigOutcome {
         if (batch.reconciliationLinkMutations.isNotEmpty()) applyReconciliationLinkMutations(batch.reconciliationLinkMutations)
         for (m in batch.tradeAttributeMutations) {
@@ -3048,6 +3087,7 @@ class ImportEngineImpl(
             val value = (m as? TradeAttributeMutation.Set)?.value
             personOverrideRepository?.setTradeAttributeOverride(m.tradeId, m.typeId.tradeOverride(value))
         }
+        if (batch.observationDecisions.isNotEmpty()) applyObservationDecisions(batch.observationDecisions)
         for (m in batch.passThroughMutations) {
             when (m) {
                 is PassThroughMutation.Create -> passThroughAccountRepository.create(m.account)

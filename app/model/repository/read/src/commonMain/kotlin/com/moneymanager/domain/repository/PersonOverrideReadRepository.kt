@@ -32,6 +32,12 @@ interface PersonOverrideReadRepository {
     /** The pins fixing an observation to any of [transactionIds]. */
     suspend fun getPinsOnTransactions(transactionIds: Collection<TransactionId>): List<ObservationPin>
 
+    /** Every pin a person made. */
+    suspend fun getAllPins(): List<ObservationPin>
+
+    /** Every split a person made. */
+    suspend fun getAllSplits(): Set<ObservationSplit>
+
     /** The splits naming any of [observationIds]. */
     suspend fun getSplits(observationIds: Collection<ObservationId>): Set<ObservationSplit>
 }
