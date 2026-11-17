@@ -23,10 +23,10 @@ sealed interface TradeDedupePolicy {
      * millisecond, and an export aggregates the fills an API reports one by one.
      *
      * @property window How far apart the two sources' timestamps for one movement may be.
-     * @property allowAggregation Match one incoming trade against a *set* of existing trades whose
-     *                            amounts sum to it — the per-fill case. The whole in-window candidate
-     *                            set is tried as a unit; no subset search is attempted, so a partial
-     *                            overlap deliberately does not match.
+     * @property allowAggregation Let the trade-aggregation stage exclude one source's aggregate trade against the
+     *                            *set* of fills another source reports for it, whose amounts sum to it. The
+     *                            whole in-window set is tried as a unit; no subset search is attempted, so a
+     *                            partial overlap deliberately does not match.
      * @property matchFromLegOnly Compare only the debited leg (account, asset and amount), ignoring the
      *                            credited amount. For sources whose credited amount is net of a charge
      *                            the other source reports gross — Binance's dust sweeps, where the CSV

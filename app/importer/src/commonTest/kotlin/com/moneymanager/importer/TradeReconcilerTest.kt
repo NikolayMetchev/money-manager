@@ -91,7 +91,6 @@ class TradeReconcilerTest {
     ) = TradeReconciler(
         TradeDedupePolicy.Fuzzy(
             window = window.seconds,
-            allowAggregation = true,
             matchFromLegOnly = matchFromLegOnly,
         ),
         existing,
