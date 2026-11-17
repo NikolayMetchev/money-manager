@@ -407,12 +407,12 @@ private val MONZO_HEADERS =
         "Money In",
     )
 
-private fun monzoFile(
+internal fun monzoFile(
     fileName: String,
     vararg rows: List<String>,
 ) = OracleFile.Csv(fileName, MONZO_HEADERS, rows.toList())
 
-private fun monzoRow(
+internal fun monzoRow(
     id: String,
     date: String,
     time: String,

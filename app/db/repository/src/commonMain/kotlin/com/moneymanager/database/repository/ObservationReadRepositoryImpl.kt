@@ -61,8 +61,67 @@ class ObservationReadRepositoryImpl(
         if (accountIds.isEmpty()) {
             emptyList()
         } else {
-            queries.selectHeadersOnAccounts(accountIds.map { it.id }, ::Header).awaitAsList().map { load(it) }
+            loadOnAccounts(accountIds.map { it.id })
         }
+
+    /**
+     * Every observation naming one of [ids], in a fixed number of queries (#1433): a match scope can hold every
+     * observation of the database, and [load]'s seven queries each would make loading it the import's cost.
+     */
+    private suspend fun loadOnAccounts(ids: List<Long>): List<Observation> {
+        val headers = queries.selectHeadersOnAccounts(ids, ::Header).awaitAsList()
+        if (headers.isEmpty()) return emptyList()
+        val values = mutableMapOf<Long, ObservedValues>()
+        queries
+            .selectTransferValuesOnAccounts(ids) { id, timestamp, description, source, target, asset, amount ->
+                values[id] = transferValues(timestamp, description, source, target, asset, amount)
+            }.awaitAsList()
+        queries
+            .selectTradeValuesOnAccounts(ids) { id, timestamp, description, from, fromAsset, fromAmount, to, toAsset, toAmount ->
+                values[id] = tradeValues(timestamp, description, from, fromAsset, fromAmount, to, toAsset, toAmount)
+            }.awaitAsList()
+        val attributes =
+            queries
+                .selectAttributesOnAccounts(ids) { id, typeId, groupKey, value ->
+                    id to
+                        ObservationAttribute(AttributeTypeId(typeId), groupKey, value)
+                }.awaitAsList()
+                .groupBy({ it.first }, { it.second })
+        val approximate = queries.selectApproximateTimeOnAccounts(ids).awaitAsList().toSet()
+        val placeholders =
+            queries
+                .selectPlaceholderEndsOnAccounts(ids) { id, end -> id to ObservationEnd.fromDbName(end) }
+                .awaitAsList()
+                .groupBy({ it.first }, { it.second })
+        val gross = queries.selectGrossAmountOnAccounts(ids).awaitAsList().toSet()
+        val ownEnds =
+            queries
+                .selectOwnEndsOnAccounts(ids) { id, end -> id to ObservationEnd.fromDbName(end) }
+                .awaitAsList()
+                .toMap()
+        return headers.map { header ->
+            val id = header.id
+            val kind = TransactionKind.valueOf(header.kind)
+            Observation(
+                id = ObservationId(id),
+                owner = ownerOf(header.ownerKind, header.ownerId),
+                slot = header.slot,
+                transactionId = transactionIdOf(kind, header.transactionId),
+                content =
+                    ObservationContent(
+                        values = checkNotNull(values[id]) { "observation $id has no $kind values" },
+                        attributes = attributes[id].orEmpty().toSet(),
+                        facts =
+                            ObservationFacts(
+                                approximateTime = id in approximate,
+                                placeholderEnds = placeholders[id].orEmpty().toCollection(LinkedHashSet()),
+                                grossAmount = id in gross,
+                                ownEnd = ownEnds[id],
+                            ),
+                    ),
+            )
+        }
+    }
 
     override suspend fun getMaterialized(transactionId: TransactionId): MaterializedTransaction? =
         when (transactionId) {
@@ -139,30 +198,14 @@ class ObservationReadRepositoryImpl(
                 TransactionKind.TRANSFER -> {
                     queries
                         .selectTransferValues(id) { _, timestamp, description, source, target, asset, amount ->
-                            ObservedValues.Transfer(
-                                timestamp = Instant.fromEpochMilliseconds(timestamp),
-                                description = description,
-                                sourceAccountId = AccountId(source),
-                                targetAccountId = AccountId(target),
-                                assetId = ObservedAssetId(asset),
-                                amount = BigInteger(amount),
-                            )
+                            transferValues(timestamp, description, source, target, asset, amount)
                         }.awaitAsOne()
                 }
 
                 TransactionKind.TRADE -> {
                     queries
                         .selectTradeValues(id) { _, timestamp, description, from, fromAsset, fromAmount, to, toAsset, toAmount ->
-                            ObservedValues.Trade(
-                                timestamp = Instant.fromEpochMilliseconds(timestamp),
-                                description = description,
-                                fromAccountId = AccountId(from),
-                                fromAssetId = ObservedAssetId(fromAsset),
-                                fromAmount = BigInteger(fromAmount),
-                                toAccountId = AccountId(to),
-                                toAssetId = ObservedAssetId(toAsset),
-                                toAmount = BigInteger(toAmount),
-                            )
+                            tradeValues(timestamp, description, from, fromAsset, fromAmount, to, toAsset, toAmount)
                         }.awaitAsOne()
                 }
             }
@@ -187,6 +230,44 @@ class ObservationReadRepositoryImpl(
         )
     }
 }
+
+@Suppress("LongParameterList")
+private fun transferValues(
+    timestamp: Long,
+    description: String,
+    source: Long,
+    target: Long,
+    asset: Long,
+    amount: String,
+) = ObservedValues.Transfer(
+    timestamp = Instant.fromEpochMilliseconds(timestamp),
+    description = description,
+    sourceAccountId = AccountId(source),
+    targetAccountId = AccountId(target),
+    assetId = ObservedAssetId(asset),
+    amount = BigInteger(amount),
+)
+
+@Suppress("LongParameterList")
+private fun tradeValues(
+    timestamp: Long,
+    description: String,
+    from: Long,
+    fromAsset: Long,
+    fromAmount: String,
+    to: Long,
+    toAsset: Long,
+    toAmount: String,
+) = ObservedValues.Trade(
+    timestamp = Instant.fromEpochMilliseconds(timestamp),
+    description = description,
+    fromAccountId = AccountId(from),
+    fromAssetId = ObservedAssetId(fromAsset),
+    fromAmount = BigInteger(fromAmount),
+    toAccountId = AccountId(to),
+    toAssetId = ObservedAssetId(toAsset),
+    toAmount = BigInteger(toAmount),
+)
 
 /** The `observation_owner` view's owner_kind for this owner. */
 internal fun ObservationOwner.kindName(): String =

@@ -8,7 +8,10 @@ import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.calendar.BusinessDayCalendar
 import com.moneymanager.domain.model.calendar.WeekendOnlyCalendar
+import com.moneymanager.domain.model.observation.ImportGroup
 import com.moneymanager.domain.model.observation.ImportGroupId
+import com.moneymanager.domain.model.observation.ImportRecord
+import com.moneymanager.domain.model.observation.ImportRecordId
 import com.moneymanager.domain.model.observation.ImportRecordKey
 import com.moneymanager.domain.model.observation.Observation
 import com.moneymanager.domain.model.observation.ObservationEnd
@@ -72,9 +75,14 @@ class MatchScopeLoader(
                 .mapTo(mutableSetOf()) { it.accountId }
         val approximateType = attributeTypes.getByName(WellKnownIds.TIMESTAMP_APPROXIMATE_ATTR_TYPE_NAME).first()?.id
         val chainOwners = stored.filter { it.slot.startsWith(CONDUIT_SLOT_PREFIX) }.mapTo(mutableSetOf()) { it.owner }
+        val owners = stored.map { it.owner }
+        val recordsById =
+            records.getRecords(owners.filterIsInstance<ObservationOwner.Record>().map { it.recordId }).associateBy { it.id }
+        val groupsById =
+            records.getGroupsById(owners.filterIsInstance<ObservationOwner.Group>().map { it.groupId }).associateBy { it.id }
         val origins = mutableMapOf<ObservationOwner, Origin>()
         return stored.map { observation ->
-            val origin = origins.getOrPut(observation.owner) { originOf(observation.owner) }
+            val origin = origins.getOrPut(observation.owner) { originOf(observation.owner, recordsById, groupsById) }
             val family = families[origin.family]
             val attributes = observation.content.attributes
             MatchObservation(
@@ -121,10 +129,14 @@ class MatchScopeLoader(
 
     private val strategyOfCredential = mutableMapOf<ApiCredentialId, String>()
 
-    private suspend fun originOf(owner: ObservationOwner): Origin =
+    private suspend fun originOf(
+        owner: ObservationOwner,
+        recordsById: Map<ImportRecordId, ImportRecord>,
+        groupsById: Map<ImportGroupId, ImportGroup>,
+    ): Origin =
         when (owner) {
             is ObservationOwner.Record -> {
-                val record = checkNotNull(records.getRecord(owner.recordId)) { "observation owner ${owner.recordId} has no record" }
+                val record = checkNotNull(recordsById[owner.recordId]) { "observation owner ${owner.recordId} has no record" }
                 when (val key = record.key) {
                     is ImportRecordKey.CsvRow -> Origin(csvFamily(key.csvImportId), csvContainer(key.csvImportId), record.contentHash)
                     is ImportRecordKey.ApiItem -> Origin(apiFamily(key.sessionId), apiContainer(key.sessionId), record.contentHash)
@@ -132,7 +144,7 @@ class MatchScopeLoader(
             }
 
             is ObservationOwner.Group -> {
-                val group = checkNotNull(records.getGroupById(owner.groupId)) { "observation owner ${owner.groupId} has no group" }
+                val group = checkNotNull(groupsById[owner.groupId]) { "observation owner ${owner.groupId} has no group" }
                 Origin(csvFamily(group.key.strategyId), groupContainer(owner.groupId), "${group.key.groupName}|${group.key.keyValue}")
             }
 
@@ -141,7 +153,11 @@ class MatchScopeLoader(
             }
         }
 
-    private suspend fun csvFamily(id: CsvImportId): String =
+    private val familyOfCsvImport = mutableMapOf<CsvImportId, String>()
+
+    private suspend fun csvFamily(id: CsvImportId): String = familyOfCsvImport.getOrPut(id) { csvFamilyUncached(id) }
+
+    private suspend fun csvFamilyUncached(id: CsvImportId): String =
         csvImports
             .getImport(id)
             .first()

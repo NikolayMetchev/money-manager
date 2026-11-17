@@ -1,6 +1,7 @@
 load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
 
 # gazelle:kmp_generate true
+# gazelle:kmp_test_data //tools/bench-db:bench_db
 # Every scenario imports its files into a fresh database many times over.
 # gazelle:kmp_test_size large
 
@@ -31,6 +32,8 @@ kmp_test(
     size = "large",
     associate = ":reimportoracle",
     common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    data = ["//tools/bench-db:bench_db"],
+    jvm_srcs = glob(["src/jvmTest/kotlin/**/*.kt"]),
     deps = [
         "//app/db/di",  # keep
         "//app/importengineapi",
