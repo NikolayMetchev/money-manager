@@ -723,7 +723,7 @@ class ImportEngineImpl(
     private suspend fun placeholderTypeId(): AttributeTypeId? =
         attributeTypeRepository.getByName(WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME).first()?.id
 
-    /** The transactions the records of the files [batch] resets observe, read before the reset drops them. */
+    /** The transactions the records of the files and API sessions [batch] resets observe, read before the reset drops them. */
     private suspend fun transactionsObservedByResets(batch: ImportBatch): Set<TransactionId> {
         val observations = observationRepository ?: return emptySet()
         val records = importRecordRepository ?: return emptySet()
@@ -736,8 +736,9 @@ class ImportEngineImpl(
                     else -> null
                 }
             }
-        return resetIds
-            .flatMap { records.getCsvImportRecords(it) }
+        val resetSessions =
+            batch.apiSessionMutations.mapNotNullTo(mutableSetOf()) { (it as? ApiSessionMutation.ResetToUnimported)?.sessionId }
+        return (resetIds.flatMap { records.getCsvImportRecords(it) } + resetSessions.flatMap { records.getApiSessionRecords(it) })
             .flatMap { observations.getObservationsOf(ObservationOwner.Record(it.id)) }
             .mapTo(mutableSetOf()) { it.transactionId }
     }
@@ -800,6 +801,7 @@ class ImportEngineImpl(
                     attributeTypeRepository,
                 ),
             strategies = csvImportStrategyRepository,
+            apiStrategies = apiImportStrategyRepository,
             attributeTypes = attributeTypeRepository,
             accounts = accountRepository,
             records = importRecords,
@@ -1526,6 +1528,8 @@ class ImportEngineImpl(
                     // Now carries this intent's identity attributes: a later same-batch intent that would
                     // otherwise adopt it by the "unclaimed name" fallback must see it as claimed.
                     claimedAccountIds += match.id
+                } else if (intent.adoptOnBankMatch) {
+                    shareAdoptedAttributes(intent, match.id)
                 }
                 keyToId[intent.key] = match.id
                 continue
@@ -1726,14 +1730,41 @@ class ImportEngineImpl(
         }
         val currentAttrs = accountAttributeRepository.getByAccount(id).first()
         val storedGroupKey = storedGroupKeyResolver(intent.attributes, currentAttrs)
+        // What an API session adopts is the session's (account_attribute_api_owner), so its unimport or re-import takes it
+        // back. An attribute already there is claimed only when another session adopted it too: one typed by hand, or
+        // written by the import that created the account, stays nobody's.
+        val session = (intent.source as? Source.Api)?.sessionId
         for (attr in intent.attributes) {
-            val present = currentAttrs.any { it.attributeType.id == attr.typeId && it.value == attr.value }
-            if (!present) {
+            val present = currentAttrs.firstOrNull { it.attributeType.id == attr.typeId && it.value == attr.value }
+            if (present == null) {
                 // Upsert rather than insert-and-swallow: the (type, group) slot may already hold a
                 // different value, and dropping the write there would silently lose this provider's
                 // identity for the account.
-                accountAttributeRepository.upsertInCreationMode(id, attr.typeId, attr.value, storedGroupKey(attr))
+                val groupKey = storedGroupKey(attr)
+                accountAttributeRepository.upsertInCreationMode(id, attr.typeId, attr.value, groupKey)
+                if (session != null) accountAttributeRepository.claimForApiSession(id, attr.typeId, groupKey, session)
                 byAttr.getOrPut(attr.typeId to attr.value) { id }
+            } else if (session != null && accountAttributeRepository.isClaimed(present.id)) {
+                accountAttributeRepository.claimForApiSession(id, attr.typeId, present.groupKey, session)
+            }
+        }
+    }
+
+    /**
+     * Claims, for [intent]'s API session, the attributes of account [id] it names that another session adopted: a fresh
+     * import without that session would have adopted them for this one, so its unimport must leave them.
+     */
+    private suspend fun shareAdoptedAttributes(
+        intent: ImportAccountIntent,
+        id: AccountId,
+    ) {
+        val session = (intent.source as? Source.Api)?.sessionId ?: return
+        if (intent.attributes.isEmpty()) return
+        val currentAttrs = accountAttributeRepository.getByAccount(id).first()
+        for (attr in intent.attributes) {
+            val present = currentAttrs.firstOrNull { it.attributeType.id == attr.typeId && it.value == attr.value } ?: continue
+            if (accountAttributeRepository.isClaimed(present.id)) {
+                accountAttributeRepository.claimForApiSession(id, attr.typeId, present.groupKey, session)
             }
         }
     }
@@ -2926,6 +2957,14 @@ class ImportEngineImpl(
         }
     }
 
+    // Without the records repository there are no records to hash, so the session is never unchanged and its re-import runs.
+    private suspend fun recordItems(mutation: ApiSessionMutation.RecordItems) {
+        val records = importRecordRepository ?: return
+        for (record in records.getApiSessionRecords(mutation.sessionId)) {
+            if (record.contentHash != mutation.contentHash) records.updateContentHash(record.id, mutation.contentHash)
+        }
+    }
+
     // What each transfer a person edits holds before the edit; none without the repositories to record overrides in.
     private suspend fun handEditSnapshots(updates: List<ImportTransfer>): Map<TransferId, MaterializedTransaction> {
         val observations = observationRepository ?: return emptyMap()
@@ -3206,6 +3245,7 @@ class ImportEngineImpl(
                 }
 
                 is ApiSessionMutation.DeleteSession -> {
+                    accountAttributeRepository.releaseApiSession(m.id)
                     deleteSessionRecords(m.id)
                     apiSessionRepository.deleteSession(m.id)
                 }
@@ -3220,6 +3260,21 @@ class ImportEngineImpl(
 
                 is ApiSessionMutation.DeleteResponseTransactionsBySession -> {
                     apiSessionRepository.deleteResponseTransactionsBySession(m.sessionId)
+                }
+
+                is ApiSessionMutation.ReleaseAdoptedAttributes -> {
+                    accountAttributeRepository.releaseApiSession(m.sessionId)
+                }
+
+                is ApiSessionMutation.RecordItems -> {
+                    recordItems(m)
+                }
+
+                is ApiSessionMutation.ResetToUnimported -> {
+                    accountAttributeRepository.releaseApiSession(m.sessionId)
+                    deleteSessionRecords(m.sessionId)
+                    apiSessionRepository.deleteResponseTransactionsBySession(m.sessionId)
+                    apiSessionRepository.deleteSessionImports(m.sessionId)
                 }
 
                 is ApiSessionMutation.MarkSessionImported -> {

@@ -10,11 +10,13 @@ kmp_library(
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
     visibility = ["//visibility:public"],
     deps = [
+        "//app/apiimporter",
         "//app/cryptodata",
         "//app/csvimporter",
         "//app/db/di",  # keep
         "//app/db/write",
         "//app/importengineapi",
+        "//app/model/apistrategy",
         "//app/model/core",
         "//app/model/csv",
         "//app/model/reconciliation",

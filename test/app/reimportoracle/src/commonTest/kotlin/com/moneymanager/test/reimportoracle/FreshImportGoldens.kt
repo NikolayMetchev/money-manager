@@ -240,4 +240,53 @@ internal val FRESH_IMPORT_GOLDENS: Map<String, String> =
             Koinly · Nexo | 2021-05-26 | BTC | 0.27931608
             Koinly: External | 2021-05-20 | BTC | -0.5
             """.trimIndent(),
+        "Bybit CSV + overlapping API sessions" to
+            """
+            == accounts (4)
+            BTC:bc1qwithdrawaddr [blockchain-wallet-address=bc1qwithdrawaddr]
+            Bybit Fees [fee-account-for=Bybit]
+            Bybit Funding
+            Bybit [exchange-account-external-id=bybit]
+            == transfers (5)
+            2022-01-02T14:36:12Z | Bybit Funding -> Bybit | 1346 USDT | Deposit USDT [blockchain-txid=0xdeposit, bybit-type=userDeposit, bybit-uid=12345678, exchange.txn_id=3562579, timestamp-approximate=1643327999999]
+            2022-01-05T13:18:18Z | Bybit -> Bybit Fees | 0.4928 KASTA | tradingFee [bybit-type=tradingFee, bybit-uid=12345678]
+            2023-11-13T09:18:16Z | Bybit -> BTC:bc1qwithdrawaddr | 0.00031164 BTC | Withdraw BTC [blockchain-txid=withdrawtx, exchange.txn_id=26711021]
+            2023-11-13T09:18:16Z | Bybit -> Bybit Fees | 0.000085 BTC | BTC fee [exchange.txn_id=26711021-fee]
+            2023-11-13T09:18:18Z | Bybit -> Bybit Funding | 0.00039664 BTC | Withdraw [bybit-description=Withdrawal, bybit-type=Withdraw, bybit-uid=12345678, excluded=reconciled, unidentified-counterparty=target]
+            == trades (1)
+            2022-01-05T13:18:18Z | Bybit 684.982144 USDT -> Bybit 492.8 KASTA | Buy KASTA/USDT
+            == relationships (1)
+            reconciled: PRIMARY {2023-11-13T09:18:18Z | Bybit -> Bybit Funding | 0.00039664 BTC | Withdraw [bybit-description=Withdrawal, bybit-type=Withdraw, bybit-uid=12345678, excluded=reconciled, unidentified-counterparty=target]} & RELATED {2023-11-13T09:18:16Z | Bybit -> BTC:bc1qwithdrawaddr | 0.00031164 BTC | Withdraw BTC [blockchain-txid=withdrawtx, exchange.txn_id=26711021]}
+            == daily balances (9)
+            BTC:bc1qwithdrawaddr | 2023-11-13 | BTC | 0.00031164
+            Bybit Fees | 2022-01-05 | KASTA | 0.4928
+            Bybit Fees | 2023-11-13 | BTC | 0.000085
+            Bybit Funding | 2022-01-02 | USDT | -1346
+            Bybit Funding | 2023-11-13 | BTC | 0
+            Bybit | 2022-01-02 | USDT | 1346
+            Bybit | 2022-01-05 | KASTA | 492.3072
+            Bybit | 2022-01-05 | USDT | 661.017856
+            Bybit | 2023-11-13 | BTC | -0.00039664
+            """.trimIndent(),
+        "Monzo CSV + overlapping API sessions" to
+            """
+            == accounts (4)
+            Landlord [counterparty-name-key=landlord]
+            Monzo [account-external-id=acc_00009ORACLE00000000001]
+            Pret A Manger [counterparty-name-key=pret a manger]
+            Tesco [counterparty-name-key=tesco]
+            == transfers (3)
+            2023-11-20T08:01:00Z | Monzo -> Tesco | 12.4 GBP | TESCO STORES [Monzo Category=Transfers, Monzo Transaction ID=tx_api_1, Type=Faster payment]
+            2023-11-21T18:30:00Z | Monzo -> Landlord | 900 GBP | RENT [Monzo Category=Transfers, Monzo Transaction ID=tx_api_2, Type=Faster payment]
+            2023-11-22T12:00:00Z | Monzo -> Pret A Manger | 3.5 GBP | PRET A MANGER
+            == trades (0)
+            == relationships (0)
+            == daily balances (6)
+            Landlord | 2023-11-21 | GBP | 900
+            Monzo | 2023-11-20 | GBP | -12.4
+            Monzo | 2023-11-21 | GBP | -912.4
+            Monzo | 2023-11-22 | GBP | -915.9
+            Pret A Manger | 2023-11-22 | GBP | 3.5
+            Tesco | 2023-11-20 | GBP | 12.4
+            """.trimIndent(),
     )

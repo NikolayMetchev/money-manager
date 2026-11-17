@@ -125,10 +125,10 @@ WHERE (
       AND entity_source.source_type_id IN (2, 10)
   );
 
--- Which of :transactionIds something other than the staged files :csvImportIds still observes: a record of another
--- file or API session, a person (a transaction made by hand), or a leg group none of whose records those files hold: a
--- group says what its records say together, so it stops saying it once one of them is withdrawn.
-selectTransactionsObservedOutsideCsvImports:
+-- Which of :transactionIds something other than the staged files :csvImportIds and the API sessions :apiSessionIds
+-- still observes: a record of another file or session, a person (a transaction made by hand), or a leg group none of
+-- whose records those hold: a group says what its records say together, so it stops saying it once one is withdrawn.
+selectTransactionsObservedOutsideSources:
 SELECT DISTINCT observation.transaction_id
 FROM observation
 JOIN observation_owner ON observation_owner.observation_id = observation.id
@@ -138,6 +138,7 @@ WHERE observation.transaction_id IN :transactionIds
     OR (
       observation_owner.owner_kind = 'RECORD'
       AND observation_owner.owner_id NOT IN (SELECT record_id FROM csv_import_record WHERE csv_import_id IN :csvImportIds)
+      AND observation_owner.owner_id NOT IN (SELECT record_id FROM api_import_record WHERE api_session_id IN :apiSessionIds)
     )
     OR (
       observation_owner.owner_kind = 'GROUP'
@@ -145,9 +146,41 @@ WHERE observation.transaction_id IN :transactionIds
       AND NOT EXISTS (
         SELECT 1 FROM import_group_member
         WHERE import_group_member.group_id = observation_owner.owner_id
-          AND import_group_member.record_id IN (SELECT record_id FROM csv_import_record WHERE csv_import_id IN :csvImportIds)
+          AND (
+            import_group_member.record_id IN (SELECT record_id FROM csv_import_record WHERE csv_import_id IN :csvImportIds)
+            OR import_group_member.record_id IN (SELECT record_id FROM api_import_record WHERE api_session_id IN :apiSessionIds)
+          )
       )
     )
+  );
+
+-- The transfers and trades the records of API session :apiSessionId (or leg groups holding them) observe that an import
+-- or the match created: one a person or a reconciliation copy created is not the session's to delete.
+selectTransactionsObservedByApiSession:
+SELECT DISTINCT observation.transaction_id, observation.kind
+FROM observation
+JOIN observation_owner ON observation_owner.observation_id = observation.id
+WHERE (
+    (
+      observation_owner.owner_kind = 'RECORD'
+      AND observation_owner.owner_id IN (SELECT record_id FROM api_import_record WHERE api_session_id = :apiSessionId)
+    )
+    OR (
+      observation_owner.owner_kind = 'GROUP'
+      AND observation_owner.owner_id IN (
+        SELECT import_group_member.group_id FROM import_group_member
+        JOIN api_import_record ON api_import_record.record_id = import_group_member.record_id
+        WHERE api_import_record.api_session_id = :apiSessionId
+      )
+    )
+  )
+  AND EXISTS (
+    SELECT 1 FROM entity_source
+    WHERE entity_source.entity_type_id = CASE observation.kind WHEN 'TRADE' THEN 11 ELSE 7 END
+      AND entity_source.entity_id = observation.transaction_id
+      AND entity_source.revision_id = 1
+      AND entity_source.matched = 0
+      AND entity_source.source_type_id IN (2, 5, 10)
   );
 
 -- The values, attributes and facts of every observation naming one of :accountIds, each in one query (#1433): a match

@@ -91,6 +91,32 @@ sealed interface ApiSessionMutation {
         val sessionId: ApiSessionId,
     ) : ApiSessionMutation
 
+    /**
+     * Gives back the account attributes the session's import adopted onto accounts it didn't create: each is deleted once
+     * no other session claims it. A re-import does this first, and adopts again whatever its items still name;
+     * [ResetToUnimported] and [DeleteSession] do it themselves.
+     */
+    data class ReleaseAdoptedAttributes(
+        val sessionId: ApiSessionId,
+    ) : ApiSessionMutation
+
+    /**
+     * Records [contentHash] as every one of the session's import records' content hash: what its import read besides its
+     * stored responses (`apiSessionInputsHash`), which a re-import compares to tell an unchanged session from a changed one.
+     */
+    data class RecordItems(
+        val sessionId: ApiSessionId,
+        val contentHash: String,
+    ) : ApiSessionMutation
+
+    /**
+     * Returns the session to downloaded but never imported: its records and their observations, its per-item states and
+     * its imports are deleted. What its transactions become is the caller's to settle first (`planApiUnimport`).
+     */
+    data class ResetToUnimported(
+        val sessionId: ApiSessionId,
+    ) : ApiSessionMutation
+
     data class MarkSessionImported(
         val id: ApiSessionId,
         val revisionId: Long,

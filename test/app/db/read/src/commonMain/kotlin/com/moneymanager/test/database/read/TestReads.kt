@@ -89,6 +89,8 @@ private val EXCLUDED_FROM_AUDIT =
         "relationship",
         "relationship_member",
         "account_attribute",
+        // Which API sessions adopted an account attribute: provenance, like entity_source.
+        "account_attribute_api_owner",
         "person_attribute",
         "_import_batch",
         "_creation_mode",

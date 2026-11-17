@@ -11,6 +11,7 @@ import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.TradeId
+import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.TransferId
 import kotlinx.coroutines.flow.Flow
 import kotlin.time.Instant
@@ -108,6 +109,21 @@ interface ApiSessionReadRepository {
      * deletes to what the session itself produced.
      */
     suspend fun getTradeIdsCreatedBySession(sessionId: ApiSessionId): Set<TradeId>
+
+    /**
+     * The transfers and trades the records of [sessionId] observe that an import or the match created. One a person or a
+     * reconciliation copy created is not the session's to delete.
+     */
+    suspend fun getTransactionsObservedBySession(sessionId: ApiSessionId): Set<TransactionId>
+
+    /**
+     * Which of [transactionIds] something other than the sessions [sessionIds] still observes: a staged file's or another
+     * session's record, a person, or a leg group none of whose records those sessions hold. Unimporting them leaves these.
+     */
+    suspend fun getTransactionsObservedOutsideSessions(
+        sessionIds: Collection<ApiSessionId>,
+        transactionIds: Collection<TransactionId>,
+    ): Set<TransactionId>
 }
 
 data class ApiSessionImportRevision(

@@ -56,3 +56,10 @@ WHERE attribute_type_id = :typeId AND (:value IS NULL OR attribute_value = :valu
 -- The fee-account-for attribute (-12) naming :owner: its id and the fee account holding it.
 selectFeeAccountTag:
 SELECT id, account_id FROM account_attribute WHERE attribute_type_id = -12 AND attribute_value = :owner;
+
+-- How many API sessions own attribute :id (they adopted it onto an account they didn't create).
+countApiOwners:
+SELECT COUNT(*) FROM account_attribute_api_owner WHERE account_attribute_id = ?;
+
+selectClaimedByApiSession:
+SELECT account_attribute_id FROM account_attribute_api_owner WHERE api_session_id = ?;
