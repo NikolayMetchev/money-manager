@@ -478,7 +478,6 @@ suspend fun <R> ImportEngine.executeRerun(
     run: suspend () -> R,
 ): RerunOutcome<R> {
     val deletedTransfers = files.flatMapTo(mutableSetOf()) { it.createdTransfers.keys }
-    val deletedTrades = files.flatMapTo(mutableSetOf()) { it.tradeIds }
     val unhideUpdates =
         reconciledPartnerUnhideUpdates(deletedTransfers, reads.relationshipRepository, reads.transactionRepository)
     val resets =
