@@ -55,12 +55,11 @@ import com.moneymanager.domain.model.reconciliation.ReconciliationSource
 import com.moneymanager.domain.model.reconciliation.ShadowAccount
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
+import com.moneymanager.domain.repository.ObservationReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.ReconciliationReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.importengineapi.createManualFee
-import com.moneymanager.importengineapi.createReconciliationMatch
-import com.moneymanager.importengineapi.createReconciliationMatches
 import com.moneymanager.importengineapi.deleteRelationship
 import com.moneymanager.importengineapi.setReconciliationLinks
 import com.moneymanager.importengineapi.setTradeExcluded
@@ -71,6 +70,7 @@ import com.moneymanager.reconciliation.LegMatch
 import com.moneymanager.reconciliation.ReconciliationResult
 import com.moneymanager.reconciliation.UnlinkedWallet
 import com.moneymanager.reconciliation.UnmatchedSourceLeg
+import com.moneymanager.reconciliation.acceptMatches
 import com.moneymanager.reconciliation.applyAutoLinks
 import com.moneymanager.reconciliation.copyToMoneyManager
 import com.moneymanager.reconciliation.createAndLinkAccounts
@@ -125,6 +125,7 @@ fun ReconciliationScreen(
     categoryRepository: CategoryReadRepository,
     personRepository: PersonReadRepository,
     transactionRepository: TransactionReadRepository,
+    observationRepository: ObservationReadRepository,
     onOpenLeg: (ReconciliationLeg) -> Unit,
     onOpenSource: (ReconciliationLeg) -> Unit = {},
     pickerState: MatchPickerState = remember { MatchPickerState() },
@@ -172,6 +173,7 @@ fun ReconciliationScreen(
             categoryRepository = categoryRepository,
             personRepository = personRepository,
             transactionRepository = transactionRepository,
+            observationRepository = observationRepository,
             onOpenLeg = onOpenLeg,
             onOpenSource = onOpenSource,
             pickerState = pickerState,
@@ -189,6 +191,7 @@ private fun SourceReconciliation(
     categoryRepository: CategoryReadRepository,
     personRepository: PersonReadRepository,
     transactionRepository: TransactionReadRepository,
+    observationRepository: ObservationReadRepository,
     onOpenLeg: (ReconciliationLeg) -> Unit,
     onOpenSource: (ReconciliationLeg) -> Unit,
     pickerState: MatchPickerState,
@@ -349,7 +352,7 @@ private fun SourceReconciliation(
     }
 
     fun storeMatch(legs: List<ReconciliationLeg>) =
-        write("Matching") { importEngine.createReconciliationMatch(legs.map { it.transactionRef }.distinct()) }
+        write("Matching") { importEngine.acceptMatches(listOf(legs.map { it.transactionRef }.distinct()), observationRepository) }
 
     // Ignoring a source row excludes every transaction of its movement (a trade and its fee, say).
     suspend fun applyIgnored(
@@ -407,7 +410,7 @@ private fun SourceReconciliation(
 
     fun storeMatches(matches: List<LegMatch>) =
         runBulk("Accepting ${matches.size} matches", "Accepting matches", matches) { chunk ->
-            importEngine.createReconciliationMatches(chunk.map { it.memberTransactions() })
+            importEngine.acceptMatches(chunk.map { it.memberTransactions() }, observationRepository)
         }
 
     fun ignoreAll(legs: List<ReconciliationLeg>) =
@@ -536,7 +539,7 @@ private fun SourceReconciliation(
                                 onClick = {
                                     write(
                                         "Matching",
-                                    ) { importEngine.createReconciliationMatches(listOf(match.memberTransactions())) }
+                                    ) { importEngine.acceptMatches(listOf(match.memberTransactions()), observationRepository) }
                                 },
                                 enabled = !bulkRunning,
                             ) { Text("Accept") }
@@ -681,7 +684,7 @@ private fun SourceReconciliation(
                 pickerState.close()
                 write("Adding the fee") {
                     val feeId = importEngine.createManualFee(fee.account, fee.fee, fee.timestamp)
-                    importEngine.createReconciliationMatch((movement + selected).map { it.transactionRef } + feeId)
+                    importEngine.acceptMatches(listOf((movement + selected).map { it.transactionRef } + feeId), observationRepository)
                 }
             },
             onOpenLeg = onOpenLeg,
@@ -689,7 +692,7 @@ private fun SourceReconciliation(
             copyPlan = remember(movement, shadowAccounts, links, accountNames) { planCopy(movement, shadowAccounts, links, accountNames) },
             onCopy = { plan ->
                 pickerState.close()
-                write("Copying to Money Manager") { importEngine.copyToMoneyManager(movement, plan) }
+                write("Copying to Money Manager") { importEngine.copyToMoneyManager(movement, plan, observationRepository) }
             },
         )
     }

@@ -388,7 +388,7 @@ class OracleDatabase private constructor(
         val movement = result.missingInMm.map { it.leg }.filter { it.kind == trade.kind && it.transactionId == trade.transactionId }
         val plan = planCopy(movement, shadows, links, accounts.associate { it.id to it.name })
         check(plan is CopyPlan.Ready) { "the source's trade can't be copied: $plan" }
-        return db.importEngine.copyToMoneyManager(movement, plan)
+        return db.importEngine.copyToMoneyManager(movement, plan, db.observationRepository)
     }
 
     private fun byValue(transfers: List<Transfer>): List<Transfer> =

@@ -4,6 +4,8 @@ import com.moneymanager.domain.model.Asset
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.Money
+import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.TransferId
@@ -73,10 +75,14 @@ data class DetailOverride(
     val value: String?,
 )
 
-/** Reads [TransactionObservations] for [transactionId]; [knownAssets] saves loading the assets its legs already hold. */
+/**
+ * Reads [TransactionObservations] for [transactionId]; [knownAssets] saves loading the assets its legs already hold, and
+ * [sources] (its provenance rows) tell a person's own entry from one copied in reconciliation.
+ */
 internal suspend fun ObservationReads.observationsOf(
     transactionId: TransactionId,
     knownAssets: Collection<Asset>,
+    sources: List<SourceRecord> = emptyList(),
 ): TransactionObservations {
     val observations = observationRepository.getObservationsOfTransaction(transactionId)
     val ids = observations.map { it.id }
@@ -94,7 +100,7 @@ internal suspend fun ObservationReads.observationsOf(
                 DetailSplit(mine, other, observationRepository.getObservation(other)?.transactionId)
             }
         }
-    val labels = ownerLabels(observations.map { it.owner }.toSet())
+    val labels = ownerLabels(observations.map { it.owner }.toSet(), sources)
     val assets = assetsById(observations, knownAssets)
     return TransactionObservations(
         observations =
@@ -136,7 +142,10 @@ private suspend fun ObservationReads.overridesOf(transactionId: TransactionId): 
 
 private fun TransferField.label(): String = name.lowercase().replace('_', ' ')
 
-private suspend fun ObservationReads.ownerLabels(owners: Set<ObservationOwner>): Map<ObservationOwner, String> {
+private suspend fun ObservationReads.ownerLabels(
+    owners: Set<ObservationOwner>,
+    sources: List<SourceRecord>,
+): Map<ObservationOwner, String> {
     if (owners.isEmpty()) return emptyMap()
     val records =
         importRecordRepository
@@ -166,7 +175,11 @@ private suspend fun ObservationReads.ownerLabels(owners: Set<ObservationOwner>):
             }
 
             is ObservationOwner.Manual -> {
-                "by hand"
+                if (sources.any { it.id == owner.entitySourceId && it.source == Source.Reconciliation }) {
+                    "copied in reconciliation"
+                } else {
+                    "by hand"
+                }
             }
         }
     }

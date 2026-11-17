@@ -1022,7 +1022,10 @@ class ImportEngineImpl(
             return observations.getObservationsOf(owner).any { it.slot == key.slot && observations.isReserved(it.id) }
         }
 
-        /** The owner, and whether it is new (so says nothing yet); null for a booking no API item or person made. */
+        /**
+         * The owner, and whether it is new (so says nothing yet); null for a booking no API item, person or reconciliation copy
+         * made. A person's entry and a reconciliation copy are owned by their creation's provenance row.
+         */
         private suspend fun owner(
             key: ObservationOwnerKey?,
             provenance: Source,
@@ -1038,7 +1041,8 @@ class ImportEngineImpl(
                     group(key)
                 }
 
-                provenance == Source.Manual && (key == null || key is ObservationOwnerKey.Unrecorded) -> {
+                (provenance == Source.Manual || provenance == Source.Reconciliation) &&
+                    (key == null || key is ObservationOwnerKey.Unrecorded) -> {
                     observations.getCreationSourceId(transactionId)?.let { ObservationOwner.Manual(it) to true }
                 }
 

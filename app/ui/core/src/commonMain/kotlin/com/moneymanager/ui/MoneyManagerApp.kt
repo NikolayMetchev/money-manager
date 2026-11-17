@@ -703,6 +703,7 @@ fun MoneyManagerApp(
                                                 relationshipRepository = services.transactions.relationshipRepository,
                                                 tradeRepository = services.transactions.tradeRepository,
                                                 maintenance = services.imports.maintenance,
+                                                observationRepository = services.transactions.observationRepository,
                                                 personRepository = services.people.personRepository,
                                                 personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
                                                 importEngine = services.transactions.importEngine,

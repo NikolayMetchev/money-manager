@@ -33,6 +33,8 @@ kmp_library(
         "//app/model/reconciliation",
     ],
     deps = [
+        "//app/model/observation",
+        "//app/model/repository/read",
         "//app/tasks",
         "//utils/bigdecimal",
         "@maven_kmp//:kotlinx_coroutines_core",

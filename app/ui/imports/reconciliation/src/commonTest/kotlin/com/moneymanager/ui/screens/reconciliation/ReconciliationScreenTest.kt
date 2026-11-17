@@ -47,6 +47,7 @@ import com.moneymanager.domain.model.reconciliation.ShadowAccount
 import com.moneymanager.domain.model.reconciliation.reconciliationMonth
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
+import com.moneymanager.domain.repository.ObservationReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.ReconciliationReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
@@ -110,6 +111,9 @@ class ReconciliationScreenTest {
 
     private val transactionRepository: TransactionReadRepository = mock()
 
+    private val observationRepository: ObservationReadRepository =
+        mock { everySuspend { getObservationsOfTransaction(any()) } returns emptyList() }
+
     private fun accountRepository(accounts: List<Account>): AccountReadRepository =
         mock {
             every { getAllAccounts() } returns flowOf(accounts)
@@ -142,6 +146,7 @@ class ReconciliationScreenTest {
                         categoryRepository = categoryRepository,
                         personRepository = personRepository,
                         transactionRepository = transactionRepository,
+                        observationRepository = observationRepository,
                         onOpenLeg = {},
                     )
                 }
@@ -168,6 +173,7 @@ class ReconciliationScreenTest {
                         categoryRepository = categoryRepository,
                         personRepository = personRepository,
                         transactionRepository = transactionRepository,
+                        observationRepository = observationRepository,
                         onOpenLeg = {},
                     )
                 }
@@ -210,6 +216,7 @@ class ReconciliationScreenTest {
                             categoryRepository = categoryRepository,
                             personRepository = personRepository,
                             transactionRepository = transactionRepository,
+                            observationRepository = observationRepository,
                             onOpenLeg = {},
                         )
                     }
@@ -244,6 +251,7 @@ class ReconciliationScreenTest {
                         categoryRepository = categoryRepository,
                         personRepository = personRepository,
                         transactionRepository = transactionRepository,
+                        observationRepository = observationRepository,
                         onOpenLeg = {},
                     )
                 }
@@ -282,6 +290,7 @@ class ReconciliationScreenTest {
                             categoryRepository = categoryRepository,
                             personRepository = personRepository,
                             transactionRepository = transactionRepository,
+                            observationRepository = observationRepository,
                             onOpenLeg = {},
                         )
                     }
@@ -307,6 +316,7 @@ class ReconciliationScreenTest {
                             categoryRepository = categoryRepository,
                             personRepository = personRepository,
                             transactionRepository = transactionRepository,
+                            observationRepository = observationRepository,
                             onOpenLeg = {},
                         )
                     }
@@ -390,6 +400,7 @@ class ReconciliationScreenTest {
                         categoryRepository = categoryRepository,
                         personRepository = personRepository,
                         transactionRepository = transactionRepository,
+                        observationRepository = observationRepository,
                         onOpenLeg = { opened += it },
                         onOpenSource = { openedSources += it },
                         focus = focus,
@@ -843,6 +854,7 @@ class ReconciliationScreenTest {
                             categoryRepository = categoryRepository,
                             personRepository = personRepository,
                             transactionRepository = transactionRepository,
+                            observationRepository = observationRepository,
                             onOpenLeg = {},
                         )
                     }
@@ -889,6 +901,7 @@ class ReconciliationScreenTest {
                             categoryRepository = categoryRepository,
                             personRepository = personRepository,
                             transactionRepository = transactionRepository,
+                            observationRepository = observationRepository,
                             onOpenLeg = {},
                         )
                     }

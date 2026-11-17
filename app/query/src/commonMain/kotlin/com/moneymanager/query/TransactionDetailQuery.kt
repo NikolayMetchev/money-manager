@@ -32,13 +32,18 @@ class TransactionDetailQuery(
 
     /** What [transactionId] is made of, for a screen that shows it without the rest of the detail. */
     suspend fun observations(transactionId: TransactionId): TransactionObservations =
-        observationReads.observationsOf(transactionId, emptyList())
+        observationReads.observationsOf(
+            transactionId,
+            emptyList(),
+            (transactionId as? TransferId)?.let { sourceRepository.getSourcesForTransaction(it) }.orEmpty(),
+        )
 
     private suspend fun transferDetail(
         row: AccountRow,
         id: TransferId,
     ): TransactionDetail? {
         val transfer = transactionRepository.getTransactionById(id.id).first() ?: return null
+        val sources = sourceRepository.getSourcesForTransaction(id)
         val relationships = relationshipRepository.getByTransaction(id).first()
         val others =
             transactionRepository.getTransactionsByIds(relationships.flatMap { it.othersThan(id) }.filterIsInstance<TransferId>())
@@ -56,8 +61,8 @@ class TransactionDetailQuery(
             legs = listOf(TransactionLeg(transfer.sourceAccountId, transfer.targetAccountId, transfer.amount)),
             attributes = transfer.attributes.map { DetailAttribute(it.attributeType.name, it.value) },
             links = links,
-            sources = sourceRepository.getSourcesForTransaction(id),
-            observations = observationReads.observationsOf(id, listOf(transfer.amount.asset)),
+            sources = sources,
+            observations = observationReads.observationsOf(id, listOf(transfer.amount.asset), sources),
         )
     }
 
