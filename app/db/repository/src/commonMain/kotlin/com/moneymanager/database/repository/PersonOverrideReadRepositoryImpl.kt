@@ -92,6 +92,18 @@ class PersonOverrideReadRepositoryImpl(
                 }.awaitAsList()
         }
 
+    override suspend fun getAllPins(): List<ObservationPin> =
+        queries
+            .selectAllPins { observationId, transactionId, kind ->
+                ObservationPin(ObservationId(observationId), transactionIdOf(TransactionKind.valueOf(kind), transactionId))
+            }.awaitAsList()
+
+    override suspend fun getAllSplits(): Set<ObservationSplit> =
+        queries
+            .selectAllSplits { a, b -> ObservationSplit(ObservationId(a), ObservationId(b)) }
+            .awaitAsList()
+            .toSet()
+
     override suspend fun getSplits(observationIds: Collection<ObservationId>): Set<ObservationSplit> =
         queries
             .selectSplits(observationIds.map { it.id }) { a, b -> ObservationSplit(ObservationId(a), ObservationId(b)) }
