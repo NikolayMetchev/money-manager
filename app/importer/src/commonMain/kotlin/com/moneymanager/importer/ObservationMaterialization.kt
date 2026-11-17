@@ -116,10 +116,10 @@ internal class ObservationMaterialization(
             val current = observations.getMaterialized(id)
             val merged =
                 mergedByKey[key]?.let {
-                    when {
-                        key in excludedByLink -> it.excludedAsReconciled()
-                        key in countedByLink -> it
-                        key in linked && current.isReconciledExclusion() -> it.excludedAsReconciled()
+                    when (key) {
+                        in excludedByLink -> it.excludedAsReconciled()
+                        in countedByLink -> it
+                        in linked if current.isReconciledExclusion() -> it.excludedAsReconciled()
                         else -> it
                     }
                 }
