@@ -562,6 +562,14 @@ class ImportEngineImpl(
                     tradeDeletes.filter { it.source.isImport() }.map { requireNotNull(it.existingId) },
                 (transferDeletes.map { it.source } + tradeDeletes.map { it.source }).toSet(),
             )
+        // What a withdrawn record was reconciled with is rebuilt once it goes: a link left with one member is pruned, so
+        // the exclusion it held lifts, as a fresh import of the others has it.
+        val partners =
+            reconciledPartnersOf(
+                transferDeletes.filter { it.source.isImport() }.map { requireNotNull(it.existingId) } +
+                    tradeDeletes.filter { it.source.isImport() }.map { requireNotNull(it.existingId) },
+                stillObserved,
+            )
         val reserved = reserveVacated(batch, (transferDeleteIds + tradeDeleteIds).filterNot { it in stillObserved })
         transferDeleteIds.filterNot { it in stillObserved }.chunked(DELETE_CHUNK_ROWS).forEach { chunk ->
             observationRepository?.deleteObservationsOfTransactions(chunk.filterNot { it in reserved.ids })
@@ -576,7 +584,7 @@ class ImportEngineImpl(
         // A transaction the reset left with no observation at all stays as its import booked it until the file's re-import:
         // rebuilding it from nothing would delete what the reset file's other rows still report.
         val rebuilt =
-            (sharedByResets - (transferDeleteIds + tradeDeleteIds).toSet() - reserved.ids).filterTo(mutableSetOf()) {
+            (sharedByResets - (transferDeleteIds + tradeDeleteIds).toSet() + partners - reserved.ids).filterTo(mutableSetOf()) {
                 observationRepository?.getObservationsOfTransaction(it)?.isNotEmpty() == true
             } + stillObserved
         if (rebuilt.isNotEmpty()) materialize(emptyList(), MaterializationRequest(Source.Reconciler, rebuilt))
@@ -767,6 +775,25 @@ class ImportEngineImpl(
         return (resetIds.flatMap { records.getCsvImportRecords(it) } + resetSessions.flatMap { records.getApiSessionRecords(it) })
             .flatMap { observations.getObservationsOf(ObservationOwner.Record(it.id)) }
             .mapTo(mutableSetOf()) { it.transactionId }
+    }
+
+    /**
+     * The transactions in a `reconciled` link with any of [deleting] that outlive the delete (neither among them nor
+     * [kept]), read before the rows and their memberships go.
+     */
+    private suspend fun reconciledPartnersOf(
+        deleting: List<TransactionId>,
+        kept: Set<TransactionId>,
+    ): Set<TransactionId> {
+        val gone = deleting.filterNot { it in kept }
+        if (gone.isEmpty()) return emptySet()
+        val goneIds = gone.mapTo(mutableSetOf()) { it.id }
+        return relationshipRepository
+            ?.getByTransactions(gone)
+            .orEmpty()
+            .filter { it.relationshipType.id.id == WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID }
+            .flatMap { link -> link.members.map { it.transactionId } }
+            .filterTo(mutableSetOf()) { it.id !in goneIds }
     }
 
     /**

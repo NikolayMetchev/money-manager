@@ -53,6 +53,8 @@ data class ShapeMatchResult(
  * - [ShapeReason.SPLIT_CONDUIT]: a placeholder leg on a conduit against two to [MAX_SPLIT_LEGS] chain movements
  *   through it to one merchant whose amounts (charges plus, refunds minus) sum to it. As a conduit statement match,
  *   once per movement.
+ * - [ShapeReason.FEE_ROW]: a record's fee against another container's leg of its own between the same accounts, same asset
+ *   and amount. The leg is excluded.
  *
  * Every candidate is found first, then they are taken best first: by kind (in the order above), then the time
  * between the records, then the records' keys. An observation is in at most one link. Nothing depends on the order
@@ -75,7 +77,7 @@ class ShapeMatcher(
         val candidates =
             (
                 conduitStatements(placeholders, chains, byOwner) + grossItemised(transfers, byOwner) +
-                    splitConduits(placeholders, chains, byOwner)
+                    splitConduits(placeholders, chains, byOwner) + feeRows(transfers, byOwner)
             ).sortedWith(compareBy<Candidate> { it.reason.ordinal }.thenBy { it.distance }.thenBy { it.tieKey })
 
         val claimed = mutableSetOf<ObservationRef>()
@@ -274,6 +276,36 @@ class ShapeMatcher(
                     secondsApart(gross, net),
                     ExclusionLink(ShapeReason.GROSS_ITEMISED, setOf(gross.ref, net.ref, fee.ref), setOf(gross.ref)),
                     listOf(gross, net, fee),
+                )
+            }
+        }
+    }
+
+    /**
+     * Every record's fee against a leg of another container that books only it: same accounts, asset and amount, a record
+     * of its own with no fee. Such a leg is the fee, booked as a row: it is excluded.
+     */
+    private fun feeRows(
+        transfers: List<MatchObservation>,
+        byOwner: Map<ObservationOwner, List<MatchObservation>>,
+    ): List<Candidate> {
+        val rows =
+            transfers
+                .filter { o ->
+                    o.ref.slot == MAIN &&
+                        o.content.facts.placeholderEnds
+                            .isEmpty() &&
+                        byOwner.getValue(o.ref.owner).none { it.ref.slot == FEE }
+                }.groupBy { o -> o.transfer().let { listOf(it.sourceAccountId, it.targetAccountId, it.assetId, it.amount.toString()) } }
+        return transfers.filter { it.ref.slot == FEE }.flatMap { fee ->
+            val f = fee.transfer()
+            rows[listOf(f.sourceAccountId, f.targetAccountId, f.assetId, f.amount.toString())].orEmpty().mapNotNull { row ->
+                if (!apart(row, fee) || !window.holds(row, fee)) return@mapNotNull null
+                Candidate(
+                    ShapeReason.FEE_ROW,
+                    secondsApart(row, fee),
+                    ExclusionLink(ShapeReason.FEE_ROW, setOf(row.ref, fee.ref), setOf(row.ref)),
+                    listOf(row, fee),
                 )
             }
         }
