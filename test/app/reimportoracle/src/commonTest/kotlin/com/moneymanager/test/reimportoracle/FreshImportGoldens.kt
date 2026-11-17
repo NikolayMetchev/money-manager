@@ -178,6 +178,46 @@ internal val FRESH_IMPORT_GOLDENS: Map<String, String> =
             Uber Technologies, Inc | 2025-10-20 | USD | 4.04
             Ubertrip 3 | 2025-11-02 | GBP | 0
             """.trimIndent(),
+        "PayPal CSV + API session" to
+            """
+            == accounts (7)
+            Alice Buyer [counterparty-name-key=alice buyer]
+            Coffee Roasters [counterparty-name-key=coffee roasters]
+            PayPal
+            PayPal Currency Conversion
+            PayPal GBP Fees [fee-account-for=PayPal GBP]
+            PayPal GBP [account-external-id=paypal:GBP]
+            PayPal USD [account-external-id=paypal:USD]
+            == transfers (8)
+            2025-11-03T09:00:00Z | Alice Buyer -> PayPal GBP | 50 GBP | Alice Buyer [paypal-event-code=T0006, paypal-payer-email=payer@example.com]
+            2025-11-03T09:00:00Z | Alice Buyer -> PayPal | 50 GBP | Alice Buyer [paypal-fee=-1.59, paypal-status=Completed, paypal-transaction-id=PAY1, paypal-type=Express Checkout Payment]
+            2025-11-03T09:00:00Z | PayPal GBP -> PayPal GBP Fees | 1.59 GBP | Fee
+            2025-11-04T09:00:00Z | PayPal -> Coffee Roasters | 8 GBP | Coffee Roasters [paypal-status=Completed, paypal-transaction-id=PAY2, paypal-type=Mobile Payment]
+            2025-11-04T09:00:00Z | PayPal GBP -> Coffee Roasters | 8 GBP | Coffee Roasters [paypal-event-code=T0006, paypal-payer-email=payer@example.com]
+            2025-11-05T09:00:00Z | PayPal Currency Conversion -> PayPal USD | 12.5 USD | Unknown [paypal-event-code=T0200]
+            2025-11-05T09:00:00Z | PayPal GBP -> PayPal Currency Conversion | 10 GBP | Unknown [paypal-event-code=T0200]
+            2025-11-06T09:00:00Z | PayPal GBP -> Coffee Roasters | 99 GBP | Coffee Roasters [excluded=declined: D, paypal-event-code=T0006, paypal-payer-email=payer@example.com]
+            == trades (1)
+            2025-11-05T09:00:00Z | PayPal 10 GBP -> PayPal 12.5 USD | Convert GBP to USD
+            == relationships (1)
+            fee: PRIMARY {2025-11-03T09:00:00Z | Alice Buyer -> PayPal GBP | 50 GBP | Alice Buyer [paypal-event-code=T0006, paypal-payer-email=payer@example.com]} & RELATED {2025-11-03T09:00:00Z | PayPal GBP -> PayPal GBP Fees | 1.59 GBP | Fee}
+            == daily balances (15)
+            Alice Buyer | 2025-11-03 | GBP | -100
+            Coffee Roasters | 2025-11-04 | GBP | 16
+            Coffee Roasters | 2025-11-06 | GBP | 16
+            PayPal Currency Conversion | 2025-11-05 | GBP | 10
+            PayPal Currency Conversion | 2025-11-05 | USD | -12.5
+            PayPal GBP Fees | 2025-11-03 | GBP | 1.59
+            PayPal GBP | 2025-11-03 | GBP | 48.41
+            PayPal GBP | 2025-11-04 | GBP | 40.41
+            PayPal GBP | 2025-11-05 | GBP | 30.41
+            PayPal GBP | 2025-11-06 | GBP | 30.41
+            PayPal USD | 2025-11-05 | USD | 12.5
+            PayPal | 2025-11-03 | GBP | 50
+            PayPal | 2025-11-04 | GBP | 42
+            PayPal | 2025-11-05 | GBP | 32
+            PayPal | 2025-11-05 | USD | 12.5
+            """.trimIndent(),
         "Crypto.com card + Curve export" to
             """
             == accounts (6)

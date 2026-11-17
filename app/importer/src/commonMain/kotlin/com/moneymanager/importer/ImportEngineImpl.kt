@@ -654,6 +654,7 @@ class ImportEngineImpl(
             trades = tradeRepository,
             relationships = relationshipRepository,
             placeholderTypeId = attributeTypeRepository.getByName(WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME).first()?.id,
+            records = importRecordRepository,
         ).run(mutations, request)
 
     /**
@@ -956,28 +957,39 @@ class ImportEngineImpl(
             approximateTime: Boolean,
         ): ObservationContent = leg.observationContent(approximateTime, unidentifiedCounterpartyTypeId)
 
-        /** Records [content] for [key] (null: a trade no record backs) on [transactionId], when [provenance] says whose. */
+        /**
+         * Records [content] for [key] (null: a trade no record backs) on [transactionId], when [provenance] says whose, and
+         * returns the transaction the observation is on (null when nothing was recorded).
+         */
         suspend fun record(
             key: ObservationKey?,
             provenance: Source,
             transactionId: TransactionId,
             content: () -> ObservationContent,
-        ) {
+        ): TransactionId? {
             val slot = key?.slot ?: ObservationSlot.TRADE
-            val (owner, fresh) = owner(key?.owner, provenance, transactionId) ?: return
+            val (owner, fresh) = owner(key?.owner, provenance, transactionId) ?: return null
             val existing = if (fresh) null else observations.getObservationsOf(owner).firstOrNull { it.slot == slot }
             if (existing != null) {
                 // A slot its file's re-run reserved (#1430) is said again: it takes what the record says now, where it says it.
                 if (observations.isReserved(existing.id)) {
                     val now = content()
                     if (existing.content != now) observations.updateContent(existing.id, now)
-                    if (existing.transactionId.id != transactionId.id) observations.assignTransaction(existing.id, transactionId)
+                    // Said as a duplicate of another transaction while its own stands vacant, it takes its own back (#1429): the
+                    // match sync decides whether the two are one, as a fresh import has it, and a person's work stays on its id.
+                    val target =
+                        existing.transactionId.takeIf {
+                            it.id != transactionId.id && observations.getMaterialized(it) == null
+                        } ?: transactionId
+                    if (existing.transactionId.id != target.id) observations.assignTransaction(existing.id, target)
                     observations.unreserve(existing.id)
+                    return target
                 }
                 // Otherwise a record seen before already says this slot (a trade its re-import found again): it keeps what it said.
-                return
+                return existing.transactionId
             }
             observations.insertObservation(owner, slot, transactionId, content())
+            return transactionId
         }
 
         /**
@@ -1001,6 +1013,13 @@ class ImportEngineImpl(
             val now = content()
             if (existing.content != now) observations.updateContent(existing.id, now)
             observations.unreserve(existing.id)
+        }
+
+        /** Whether [key]'s record said its slot before and its re-run reserved it (#1430). */
+        suspend fun isReserved(key: ObservationKey): Boolean {
+            val recordKey = (key.owner as? ObservationOwnerKey.Record)?.key ?: return false
+            val owner = ObservationOwner.Record(knownRecord(recordKey) ?: return false)
+            return observations.getObservationsOf(owner).any { it.slot == key.slot && observations.isReserved(it.id) }
         }
 
         /** The owner, and whether it is new (so says nothing yet); null for a booking no API item or person made. */
@@ -1362,6 +1381,8 @@ class ImportEngineImpl(
      * A row that duplicates a transfer already booked (or one this batch books) says that transfer too: its main leg,
      * and its fee leg when the transfer has a fee, observe it beside what booked it, so twins are one transaction with
      * several observations. A row seen before (a re-import of its file) already says its slots and keeps them.
+     * A row that updates a transfer says it only when its re-run reserved the slot (#1429): it takes its observation back
+     * there, so what a person decided about it stays; a fresh import leaves the update to the transfer alone.
      */
     private suspend fun observeDuplicates(
         classified: List<Classified>,
@@ -1371,7 +1392,11 @@ class ImportEngineImpl(
     ): Set<TransactionId> {
         val duplicates =
             classified.zip(outcomes).mapNotNull { (c, outcome) ->
-                outcome.transferId?.takeIf { c.status == ImportStatus.DUPLICATE }?.let { c to it }
+                outcome.transferId
+                    ?.takeIf {
+                        c.status == ImportStatus.DUPLICATE ||
+                            (c.status == ImportStatus.UPDATED && observer.isReserved(c.transfer.observationKey()))
+                    }?.let { c to it }
             }
         if (duplicates.isEmpty()) return emptySet()
         val observed = mutableSetOf<TransactionId>()
@@ -1384,13 +1409,11 @@ class ImportEngineImpl(
         for ((duplicate, row) in duplicates.zip(rows)) {
             val (c, id) = duplicate
             val approximate = c.transfer.approximateUntil != null
-            observer.record(row.main.key, row.main.provenance, id) { observer.transferContent(row.main, approximate) }
-            observed += id
+            observed += observer.record(row.main.key, row.main.provenance, id) { observer.transferContent(row.main, approximate) } ?: id
             val feeLeg = row.legs.firstOrNull { it.key.slot == ObservationSlot.FEE }
             val feeId = c.transfer.fee?.let { feeLegs[id to it.relationshipTypeId] }
             if (feeLeg != null && feeId != null) {
-                observer.record(feeLeg.key, feeLeg.provenance, feeId) { observer.transferContent(feeLeg, approximate) }
-                observed += feeId
+                observed += observer.record(feeLeg.key, feeLeg.provenance, feeId) { observer.transferContent(feeLeg, approximate) } ?: feeId
             }
         }
         return observed

@@ -2,16 +2,20 @@ package com.moneymanager.importer
 
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
+import com.moneymanager.domain.model.JsonPath
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.TransactionKind
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
+import com.moneymanager.domain.model.observation.ImportRecordKey
 import com.moneymanager.domain.model.observation.MaterializedTransaction
 import com.moneymanager.domain.model.observation.MaterializedWrite
 import com.moneymanager.domain.model.observation.Observation
 import com.moneymanager.domain.model.observation.ObservationAttribute
 import com.moneymanager.domain.model.observation.ObservationOwner
+import com.moneymanager.domain.repository.ImportRecordReadRepository
 import com.moneymanager.domain.repository.PersonOverrideReadRepository
 import com.moneymanager.domain.repository.RelationshipReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
@@ -45,6 +49,7 @@ internal class ObservationMaterialization(
     private val trades: TradeReadRepository,
     private val relationships: RelationshipReadRepository?,
     private val placeholderTypeId: AttributeTypeId?,
+    private val records: ImportRecordReadRepository?,
 ) {
     suspend fun run(
         mutations: List<ObservationMutation>,
@@ -125,7 +130,8 @@ internal class ObservationMaterialization(
                 }
             val personal = overridesOf(id)
             val effective = merged?.let { Materializer.applyOverrides(it, personal) }
-            Materializer.write(key, id.kind(), current, effective, request.source)?.let(writes::add)
+            val source = if (current == null && request.source == Source.Reconciler) creatorOf(id) ?: request.source else request.source
+            Materializer.write(key, id.kind(), current, effective, source)?.let(writes::add)
             conflicts += Materializer.conflicts(key, before[key], merged, personal)
         }
 
@@ -185,6 +191,25 @@ internal class ObservationMaterialization(
                     attributes + ObservationAttribute(EXCLUDED_TYPE, "", RECONCILED_EXCLUSION),
             )
         }
+
+    /**
+     * The record a transaction the matcher splits off is created by, when every observation it carries is that one
+     * record's: it is then the record's own movement, as a fresh import books it, so the record's re-import replaces it
+     * and carries its hand edits over. Null for a transaction several records or a group make up.
+     */
+    private suspend fun creatorOf(id: TransactionId): Source? {
+        val owner =
+            observations
+                .getObservationsOfTransaction(id)
+                .map { it.owner }
+                .distinct()
+                .singleOrNull() as? ObservationOwner.Record ?: return null
+        return when (val key = records?.getRecord(owner.recordId)?.key) {
+            is ImportRecordKey.CsvRow -> Source.Csv(key.csvImportId, key.rowIndex)
+            is ImportRecordKey.ApiItem -> Source.Api(key.sessionId, key.requestId, JsonPath(key.jsonPath))
+            null -> null
+        }
+    }
 
     private suspend fun mergeOf(id: TransactionId): MaterializedTransaction? =
         Materializer.merge(observations.getObservationsOfTransaction(id).map { it.content }, placeholderTypeId)
