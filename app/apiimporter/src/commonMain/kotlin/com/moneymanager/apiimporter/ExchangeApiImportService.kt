@@ -34,6 +34,7 @@ import com.moneymanager.domain.model.rules.AccountSide
 import com.moneymanager.domain.model.rules.EXCLUDED_ATTRIBUTE_TYPE_NAME
 import com.moneymanager.domain.model.rules.FeeRule
 import com.moneymanager.domain.model.rules.Record
+import com.moneymanager.domain.model.rules.RuleAttribute
 import com.moneymanager.domain.model.rules.RuleEngine
 import com.moneymanager.domain.model.rules.RuleOutcome
 import com.moneymanager.domain.model.rules.ValueExpr
@@ -617,6 +618,8 @@ private data class ParsedTrade(
     val jsonPath: String,
     /** The value of the `excluded` attribute when the rules exclude this trade from balances. */
     val excludedValue: String? = null,
+    /** The attributes the rules tag this trade with. */
+    val ruleAttributes: List<RuleAttribute> = emptyList(),
 )
 
 private data class ParsedExchangeTransfer(
@@ -653,6 +656,8 @@ private data class ParsedExchangeTransfer(
     val approximateUntil: Instant? = null,
     /** The value of the `excluded` attribute when the rules exclude this movement from balances. */
     val excludedValue: String? = null,
+    /** The attributes the rules tag this movement with. */
+    val ruleAttributes: List<RuleAttribute> = emptyList(),
     /** The observation slot of its JSON item it fills: the item's own movement, or the fee it reports beside it. */
     val observationSlot: String = ObservationSlot.MAIN,
 )
@@ -951,11 +956,25 @@ suspend fun importApiSessionExchange(
     val fundingKey = LocalAccountKey("exchange-funding")
     val openingDate =
         (trades.map { it.timestamp } + transfers.map { it.timestamp }).minOrNull() ?: Clock.System.now()
+
+    // An account the session creates for its records is sourced from the first record that needs it, so the session that
+    // created it is recorded (an API source names a request) and unimporting that session deletes it once empty.
+    fun recordSource(tx: ParsedExchangeTransfer) = Source.Api(sessionId, tx.requestId, JsonPath(tx.jsonPath))
+
+    // The generic funding account is the far end only of a movement that names neither a wallet address nor an account (see
+    // the counterparty accounts below), so it exists only when one does: an account no movement uses would outlive
+    // unimporting whatever else had made it.
+    val fundingRecord =
+        transfers.firstOrNull { tx ->
+            val txAsset = asset(tx.currencyCode)
+            txAsset != null && !tx.isFeeOnly && tx.counterpartyAccountName == null &&
+                (txAsset !is CryptoAsset || tx.counterpartyAddress.isNullOrBlank())
+        }
     val accountResult =
         importEngine.import(
             ImportBatch(
                 accountsToCreate =
-                    listOf(
+                    listOfNotNull(
                         // Found by its external id, else it adopts the same-named account a CSV export created (both
                         // name it "Crypto.com Exchange") and tags it, so the account is the same whichever imports first.
                         ImportAccountIntent(
@@ -973,19 +992,21 @@ suspend fun importApiSessionExchange(
                             match = AccountMatchKey.FeeAccountOf(AccountRef.Local(syntheticKey)),
                             openingDate = openingDate,
                         ),
-                        ImportAccountIntent(
-                            key = fundingKey,
-                            source = source,
-                            match = AccountMatchKey.ByName("${synthetic.name} Funding"),
-                            name = "${synthetic.name} Funding",
-                            openingDate = openingDate,
-                        ),
+                        fundingRecord?.let {
+                            ImportAccountIntent(
+                                key = fundingKey,
+                                source = recordSource(it),
+                                match = AccountMatchKey.ByName("${synthetic.name} Funding"),
+                                name = "${synthetic.name} Funding",
+                                openingDate = openingDate,
+                            )
+                        },
                     ),
             ),
         )
     val syntheticId = requireNotNull(accountResult.createdAccountIds[syntheticKey])
     val feeAccountId = requireNotNull(accountResult.createdAccountIds[feeKey])
-    val fundingId = requireNotNull(accountResult.createdAccountIds[fundingKey])
+    val fundingId = accountResult.createdAccountIds[fundingKey]
 
     bar.emit(base = BUILD_BASE + 0.10f, detail = "Building trades and transfers")
     val tradeIntents = mutableListOf<ImportTradeIntent>()
@@ -993,24 +1014,28 @@ suspend fun importApiSessionExchange(
     // Fill-trade keys per order id, collected only for trades that actually became intents (a trade
     // skipped for an unresolvable asset must not surface as a dangling link key).
     val tradeKeysByOrderRef = mutableMapOf<String, MutableList<LocalTradeKey>>()
-    // Records the rules exclude are booked with an `excluded` attribute, which a re-download clears again once
-    // the rules stop excluding the record (only the values those rules can write, never a hand-set one).
+    // Records are booked with the attributes their rules write (an `Attribute` tag, an `excluded` value), and a
+    // re-download clears an owned one again once the rules stop writing it (only the values those rules can write,
+    // never a hand-set one).
     val excludedAttr = AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID)
-    val ownedExclusion =
+    val attributeTypes = mutableMapOf(EXCLUDED_ATTRIBUTE_TYPE_NAME to excludedAttr)
+    val ownedAttributes =
         strategy.config.dataEndpoints
             .flatMap { it.transactionMappings?.rules.orEmpty() + it.tradeMappings?.rules.orEmpty() }
             .ownedAttributeValues()
-            .let { owned ->
-                if (EXCLUDED_ATTRIBUTE_TYPE_NAME in
-                    owned
-                ) {
-                    mapOf(excludedAttr to owned[EXCLUDED_ATTRIBUTE_TYPE_NAME])
-                } else {
-                    emptyMap()
-                }
+            .entries
+            .associate { (typeName, values) ->
+                attributeTypes.getOrPut(typeName) { importEngine.getOrCreateAttributeType(typeName) } to values
             }
 
-    fun exclusion(value: String?) = listOfNotNull(value?.let { NewAttribute(excludedAttr, it) })
+    suspend fun ruleAttributes(
+        excludedValue: String?,
+        tags: List<RuleAttribute>,
+    ): List<NewAttribute> =
+        listOfNotNull(excludedValue?.let { NewAttribute(excludedAttr, it) }) +
+            tags.map { tag ->
+                NewAttribute(attributeTypes.getOrPut(tag.typeName) { importEngine.getOrCreateAttributeType(tag.typeName) }, tag.value)
+            }
 
     trades.forEach forEachTrade@{ t ->
         val baseAsset = asset(t.baseCode)
@@ -1033,8 +1058,8 @@ suspend fun importApiSessionExchange(
                 fromAmount = fromAmount,
                 toAccountId = syntheticId,
                 toAmount = toAmount,
-                attributes = exclusion(t.excludedValue),
-                ownedAttributes = ownedExclusion,
+                attributes = ruleAttributes(t.excludedValue, t.ruleAttributes),
+                ownedAttributes = ownedAttributes,
                 owner = ObservationOwnerKey.Record(ImportRecordKey.ApiItem(sessionId, t.requestId, t.jsonPath)),
             )
         t.orderId?.let { tradeKeysByOrderRef.getOrPut(it, ::mutableListOf).add(tradeKey) }
@@ -1061,8 +1086,8 @@ suspend fun importApiSessionExchange(
                         txnIdAttr = txnIdAttr,
                     ).let {
                         it.copy(
-                            attributes = it.attributes + exclusion(t.excludedValue),
-                            ownedAttributes = ownedExclusion,
+                            attributes = it.attributes + ruleAttributes(t.excludedValue, emptyList()),
+                            ownedAttributes = ownedAttributes,
                             observationSlot = ObservationSlot.FEE,
                         )
                     }
@@ -1082,16 +1107,23 @@ suspend fun importApiSessionExchange(
     // CSV export reconciles to it), and only a row naming nothing lands in the generic funding account.
     val accountKeys = mutableMapOf<String, LocalAccountKey>()
     val counterpartyIntents = mutableListOf<ImportAccountIntent>()
-    transfers
-        .mapNotNull { it.counterpartyAccountName }
-        .distinct()
-        .forEach { name ->
+    // Only a name some movement books to becomes an account: a crypto movement with an address books to its wallet instead,
+    // and an account no movement uses would outlive unimporting whatever else had made it.
+    val namedRecords =
+        transfers.filter { tx ->
+            val txAsset = asset(tx.currencyCode)
+            txAsset != null && !tx.isFeeOnly && tx.counterpartyAccountName != null &&
+                (txAsset !is CryptoAsset || tx.counterpartyAddress.isNullOrBlank())
+        }
+    namedRecords
+        .groupBy { requireNotNull(it.counterpartyAccountName) }
+        .forEach { (name, records) ->
             val key = LocalAccountKey("alias-$name")
             accountKeys[name] = key
             counterpartyIntents +=
                 ImportAccountIntent(
                     key = key,
-                    source = source,
+                    source = recordSource(records.first()),
                     match = AccountMatchKey.ByName(name),
                     name = name,
                     openingDate = openingDate,
@@ -1108,7 +1140,7 @@ suspend fun importApiSessionExchange(
             counterpartyIntents +=
                 ImportAccountIntent(
                     key = key,
-                    source = source,
+                    source = recordSource(transfers.first { it.counterpartyAddress == address }),
                     match = AccountMatchKey.ByExternalId(walletAddrAttr, address),
                     name = if (network != null) "$network:$address" else address,
                     openingDate = openingDate,
@@ -1155,7 +1187,7 @@ suspend fun importApiSessionExchange(
                         ?: tx.counterpartyAccountName?.let { accountKeys[it] }
                 val counterparty =
                     counterpartyKey?.let { AccountRef.Local(it) }
-                        ?: AccountRef.Existing(fundingId).also { unidentifiedCounterparty = fundingId }
+                        ?: AccountRef.Existing(requireNotNull(fundingId)).also { unidentifiedCounterparty = fundingId }
                 if (tx.direction == TransferDirection.IN) counterparty to exchangeRef else exchangeRef to counterparty
             }
         val grossMoney =
@@ -1200,8 +1232,8 @@ suspend fun importApiSessionExchange(
                                     NewAttribute(approximateTimestampAttr, it.toEpochMilliseconds().toString())
                                 },
                             ) +
-                            exclusion(tx.excludedValue),
-                    ownedAttributes = ownedExclusion,
+                            ruleAttributes(tx.excludedValue, tx.ruleAttributes),
+                    ownedAttributes = ownedAttributes,
                 )
             }
     }
@@ -1445,6 +1477,7 @@ private fun parseTrade(
         requestId = requestId,
         jsonPath = jsonPath,
         excludedValue = outcome.excludedValue(),
+        ruleAttributes = outcome.attributes,
     )
 }
 
@@ -1571,6 +1604,7 @@ private fun parseExchangeTransfer(
                 isFeeOnly = wholeFee,
                 approximateUntil = approximateUntil,
                 excludedValue = outcome.excludedValue(),
+                ruleAttributes = outcome.attributes,
             )
     }
 

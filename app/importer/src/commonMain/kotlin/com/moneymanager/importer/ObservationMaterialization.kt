@@ -57,7 +57,7 @@ internal class ObservationMaterialization(
 
         // Every transaction an observation leaves or joins, keyed by its id (a transfer's and a trade's never clash).
         val affected = LinkedHashMap<Long, TransactionId>()
-        request.transactionIds.forEach { affected[it.id] = it }
+        (request.transactionIds + request.linkExcluded + request.linkCounted).forEach { affected[it.id] = it }
         for (mutation in mutations) {
             slotsOf(mutation.owner)[mutation.slot]?.let { affected[it.transactionId.id] = it.transactionId }
             ((mutation as? ObservationMutation.Upsert)?.transaction as? ObservationTransaction.Existing)?.let {
@@ -108,11 +108,21 @@ internal class ObservationMaterialization(
         val mergedByKey = affected.mapValues { (_, id) -> mergeOf(id) }
         val gone = mergedByKey.filterValues { it == null }.keys
         val linked = reconciledLinked(affected.filterKeys { it !in gone }.values, gone)
+        val excludedByLink = request.linkExcluded.mapTo(mutableSetOf()) { it.id }
+        val countedByLink = request.linkCounted.mapTo(mutableSetOf()) { it.id }
         val writes = mutableListOf<MaterializedWrite>()
         val conflicts = mutableListOf<MaterializationConflict>()
         for ((key, id) in affected) {
             val current = observations.getMaterialized(id)
-            val merged = mergedByKey[key]?.let { if (key in linked && current.isReconciledExclusion()) it.excludedAsReconciled() else it }
+            val merged =
+                mergedByKey[key]?.let {
+                    when (key) {
+                        in excludedByLink -> it.excludedAsReconciled()
+                        in countedByLink -> it
+                        in linked if current.isReconciledExclusion() -> it.excludedAsReconciled()
+                        else -> it
+                    }
+                }
             val personal = overridesOf(id)
             val effective = merged?.let { Materializer.applyOverrides(it, personal) }
             Materializer.write(key, id.kind(), current, effective, request.source)?.let(writes::add)
