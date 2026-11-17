@@ -19,6 +19,7 @@ import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
 import com.moneymanager.domain.repository.AttributeTypeReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.ImportRecordReadRepository
+import com.moneymanager.domain.repository.PersonOverrideReadRepository
 import com.moneymanager.domain.repository.write.CsvImportWriteRepository
 import com.moneymanager.domain.repository.write.RelationshipWrite
 import com.moneymanager.domain.repository.write.RelationshipWriteRepository
@@ -55,6 +56,7 @@ internal class MatchSync(
     private val records: ImportRecordReadRepository,
     private val csvImports: CsvImportWriteRepository,
     private val relationships: RelationshipWriteRepository?,
+    private val overrides: PersonOverrideReadRepository?,
     private val calendarFor: (List<AccountId>) -> BusinessDayCalendar,
     private val materialize: suspend (List<ObservationMutation>, MaterializationRequest) -> MaterializationReport,
 ) {
@@ -77,22 +79,41 @@ internal class MatchSync(
                 .filter { it.family !in families && it.family != MatchScopeLoader.MANUAL_FAMILY }
                 .mapNotNullTo(mutableSetOf()) { it.current }
         val scope = loaded.filter { it.current !in frozen && (it.current != null || it.family in families) }
-        val shape = MatchScopeLoader.shapeMatcherFor(families, calendarFor).match(scope)
-        orientLinks(shape.links, scope)
-        val involved = shape.involved
+        // A person's pins and splits (#1430) are given: a pinned observation is never shape-linked away from its
+        // transaction, and no link holds two observations a person split.
+        val pins = overrides?.getAllPins().orEmpty()
+        val splits = overrides?.getAllSplits().orEmpty()
+        val pinned = pins.mapTo(mutableSetOf()) { it.observationId }
+        val refOf = scope.mapNotNull { o -> o.storedId?.let { it to o.ref } }.toMap()
+        val apart = splits.mapNotNull { s -> refOf[s.first]?.let { a -> refOf[s.second]?.let { b -> a to b } } }
+        val links =
+            MatchScopeLoader
+                .shapeMatcherFor(families, calendarFor)
+                .match(scope.filter { it.storedId !in pinned })
+                .links
+                .filterNot { it.holdsApart(apart) }
+        orientLinks(links, scope)
+        val involved = links.flatMapTo(mutableSetOf()) { it.matched + it.excluded }
         val twins = scope.filter { it.ref !in involved }
-        val result = MatchScopeLoader.matcherFor(families, MatchScopeLoader.containerAccounts(scope), calendarFor).match(twins)
+        val result =
+            MatchScopeLoader
+                .matcherFor(
+                    families,
+                    MatchScopeLoader.containerAccounts(scope),
+                    calendarFor,
+                ).match(twins, pins, splits)
         val moved = result.changes.mapTo(mutableSetOf()) { it.ref }
         val linked =
             writeLinks(
-                (shape.links + result.exclusions.filter { it.reason in WRITTEN_STAGE_REASONS })
+                (links + result.exclusions.filter { it.reason in WRITTEN_STAGE_REASONS && !it.holdsApart(apart) })
                     .filter { link -> (link.matched + link.excluded).none { it in moved } },
                 scope,
             )
         val inScope = scope.mapNotNullTo(mutableSetOf()) { it.current?.id }
         val shaped = scope.filter { it.ref in involved }.mapNotNullTo(mutableSetOf()) { it.current?.id }
         val headless = dropHeadlessLinks(scope.mapNotNullTo(mutableSetOf()) { it.current }, inScope - shaped)
-        if (result.changes.isEmpty() && linked.isEmpty && headless.isEmpty()) return MaterializationReport()
+        val separated = dropSplitLinks(apart, scope, involved)
+        if (result.changes.isEmpty() && linked.isEmpty && headless.isEmpty() && separated.isEmpty()) return MaterializationReport()
 
         val contentOf = scope.associate { it.ref to it.content }
         val mutations =
@@ -112,7 +133,7 @@ internal class MatchSync(
             result.changes
                 .flatMap { listOfNotNull(it.from, (it.to as? TransactionTarget.Existing)?.id) }
                 .mapTo(mutableSetOf()) { known[it] ?: it }
-        val unlinked = dropStaleLinks(touched, inScope - shaped) + headless
+        val unlinked = dropStaleLinks(touched, inScope - shaped) + headless + separated
 
         val report =
             materialize(
@@ -320,6 +341,35 @@ internal class MatchSync(
     }
 
     /**
+     * Deletes each `reconciled` link between the transactions of two observations a person split, and returns their ends
+     * to rebuild: the deduper reconciled one record against the other and excluded an end for it, which the person said
+     * is wrong, so both count. A link a shape match still holds stays.
+     */
+    private suspend fun dropSplitLinks(
+        apart: List<Pair<ObservationRef, ObservationRef>>,
+        scope: List<MatchObservation>,
+        involved: Set<ObservationRef>,
+    ): Set<TransactionId> {
+        val repository = relationships ?: return emptySet()
+        val transactionOf = scope.mapNotNull { o -> o.current?.let { o.ref to it } }.toMap()
+        val pairs =
+            apart
+                .filter { (a, b) -> a !in involved && b !in involved }
+                .mapNotNull { (a, b) -> transactionOf[a]?.let { x -> transactionOf[b]?.let { y -> setOf(x.id, y.id) } } }
+                .filter { it.size == 2 }
+        if (pairs.isEmpty()) return emptySet()
+        val ends = pairs.flatMapTo(mutableSetOf()) { pair -> transactionOf.values.filter { it.id in pair } }
+        val stale =
+            repository.getByTransactions(ends).filter { link ->
+                val ids = link.members.mapTo(mutableSetOf()) { it.transactionId.id }
+                link.relationshipType.id.id == WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID && pairs.any { ids.containsAll(it) }
+            }
+        if (stale.isEmpty()) return emptySet()
+        repository.apply(stale.map { RelationshipWrite.Delete(it.id) })
+        return stale.flatMapTo(mutableSetOf()) { link -> link.members.map { it.transactionId } }
+    }
+
+    /**
      * Deletes each `reconciled` link an unimport left headless: without its primary, the transaction it excluded in
      * another's place, or with nothing but its primary, nothing left counted in its place. Returns their ends to rebuild:
      * what remains stands on its own, as a fresh import without the deleted records holds it. Only links whose every end
@@ -385,3 +435,9 @@ internal class MatchSync(
  * reconcilers until their outcomes are reconciled with today's (#1426).
  */
 private val WRITTEN_STAGE_REASONS = setOf(ShapeReason.TRADE_AGGREGATION)
+
+/** Whether this link would hold together two observations a person split (#1430). */
+private fun ExclusionLink.holdsApart(apart: List<Pair<ObservationRef, ObservationRef>>): Boolean {
+    val members = matched + excluded
+    return apart.any { (a, b) -> a in members && b in members }
+}

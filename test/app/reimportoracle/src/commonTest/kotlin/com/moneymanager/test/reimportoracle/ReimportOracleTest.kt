@@ -67,10 +67,11 @@ class ReimportOracleTest {
             permutations(scenario).firstNotNullOfOrNull { order ->
                 OracleDatabase.with(scenario) {
                     import()
-                    doHandWork()
+                    val handled = doHandWork()
                     val expected = db.canonicalSnapshot().also { it.expectHandWork(scenario) }
                     reimport(order)
-                    difference(expected, db.canonicalSnapshot(), "re-import order ${order.names()}")
+                    lostIds(handled, "re-import order ${order.names()}")
+                        ?: difference(expected, db.canonicalSnapshot(), "re-import order ${order.names()}")
                 }
             }
         }
@@ -167,7 +168,12 @@ class ReimportOracleTest {
                 .first()
                 .flatMap { db.tradeRepository.getTradesByAccount(it.id).first() }
                 .mapTo(mutableSetOf()) { it.id }
-        val lost = (transfers - keptTransfers).map { "transfer ${it.id}" } + (trades - keptTrades).map { "trade ${it.id}" }
+        val keptPins = db.personOverrideRepository.getAllPins().toSet()
+        val keptSplits = db.personOverrideRepository.getAllSplits()
+        val lost =
+            (transfers - keptTransfers).map { "transfer ${it.id}" } + (trades - keptTrades).map { "trade ${it.id}" } +
+                (handled.pins - keptPins).map { "pin of observation ${it.observationId.id}" } +
+                (handled.splits - keptSplits).map { "split of observations ${it.first.id} and ${it.second.id}" }
         return if (lost.isEmpty()) null else "$context lost the ids of hand-worked records ${lost.sorted()}"
     }
 

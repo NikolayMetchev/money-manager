@@ -33,6 +33,8 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.csv.CsvImport
+import com.moneymanager.domain.model.observation.ObservationPin
+import com.moneymanager.domain.model.observation.ObservationSplit
 import com.moneymanager.domain.model.reconciliation.IGNORED_IN_RECONCILIATION
 import com.moneymanager.domain.model.reconciliation.LegTransactionKind
 import com.moneymanager.domain.model.rules.RuleAction
@@ -53,6 +55,8 @@ import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.importengineapi.insertApiRequest
 import com.moneymanager.importengineapi.insertApiResponse
 import com.moneymanager.importengineapi.markApiSessionImported
+import com.moneymanager.importengineapi.pinObservations
+import com.moneymanager.importengineapi.separateObservations
 import com.moneymanager.importengineapi.setAccountAttributeValues
 import com.moneymanager.importengineapi.setReconciliationLinks
 import com.moneymanager.importengineapi.setTradeExcluded
@@ -88,6 +92,8 @@ const val ORACLE_NOTE = "checked by hand"
 /** The reason a hand exclusion of a trade gives. */
 const val ORACLE_TRADE_EXCLUSION = "excluded by hand"
 
+private const val DAY_MILLIS = 86_400_000L
+
 /** What assertion (d)'s hand work touched, which a re-import must keep under the same ids (#1430). */
 data class HandWork(
     /** The transfers it edited or matched. */
@@ -96,6 +102,10 @@ data class HandWork(
     val trades: Set<TradeId>,
     /** What Copy to Money Manager booked. */
     val copies: List<TransactionId>,
+    /** The observations a person pinned, each to its transaction ("these are the same"). */
+    val pins: List<ObservationPin> = emptyList(),
+    /** The observations a person kept apart ("these are different"). */
+    val splits: Set<ObservationSplit> = emptySet(),
 )
 
 /** The attribute the strategy change of assertion (c) adds to every record of the changed strategy. */
@@ -288,11 +298,58 @@ class OracleDatabase private constructor(
                 .firstOrNull()
         excludedTrade?.let { db.importEngine.setTradeExcluded(it.id, ORACLE_TRADE_EXCLUSION) }
 
+        val touched = setOf(edited.id) + matched.map { it.id }
+        val copies = copySourceTrade()
+        val (pins, splits) = decideTwins(real.filter { it.id !in touched })
         return HandWork(
-            transfers = setOf(edited.id) + matched.map { it.id },
+            transfers = touched,
             trades = setOfNotNull(excludedTrade?.id),
-            copies = copySourceTrade(),
+            copies = copies,
+            pins = pins,
+            splits = splits,
         )
+    }
+
+    /**
+     * A person's decisions about which records are one movement (#1430): "these are different" on the first transfer
+     * two exports joined (it splits in two, both counted), "these are the same" on the next one (both its observations
+     * pinned to it), and "these are the same" on the first two transfers of one asset, amount and day that two
+     * exports recorded but the rules kept apart (joined into the first). Returns the pins and splits made.
+     */
+    private suspend fun decideTwins(candidates: List<Transfer>): Pair<List<ObservationPin>, Set<ObservationSplit>> {
+        val observations = db.observationRepository
+        val observed = candidates.associateWith { observations.getObservationsOfTransaction(it.id) }
+        val twins = observed.filterValues { it.size >= 2 && it.map { o -> o.owner }.toSet().size >= 2 }.keys.toList()
+        val splits = mutableSetOf<ObservationSplit>()
+        val pins = mutableListOf<ObservationPin>()
+        twins.firstOrNull()?.let { twin ->
+            val (a, b) = observed.getValue(twin).take(2)
+            db.importEngine.separateObservations(a.id, b.id)
+            splits += ObservationSplit.of(a.id, b.id)
+        }
+        twins.getOrNull(1)?.let { twin ->
+            val ids = observed.getValue(twin).map { it.id }
+            db.importEngine.pinObservations(ids, twin.id)
+            pins += ids.map { ObservationPin(it, twin.id) }
+        }
+        val singles = observed.filterValues { it.size == 1 }
+        val apart =
+            singles.keys.firstNotNullOfOrNull { x ->
+                singles.keys
+                    .firstOrNull { y ->
+                        y.id != x.id &&
+                            y.amount == x.amount &&
+                            setOf(y.sourceAccountId, y.targetAccountId).any { it == x.sourceAccountId || it == x.targetAccountId } &&
+                            y.timestamp.toEpochMilliseconds() / DAY_MILLIS == x.timestamp.toEpochMilliseconds() / DAY_MILLIS &&
+                            singles.getValue(y).single().owner != singles.getValue(x).single().owner
+                    }?.let { x to it }
+            }
+        apart?.let { (x, y) ->
+            val ids = listOf(singles.getValue(x).single().id, singles.getValue(y).single().id)
+            db.importEngine.pinObservations(ids, x.id)
+            pins += ids.map { ObservationPin(it, x.id) }
+        }
+        return pins to splits
     }
 
     /**

@@ -28,6 +28,9 @@ import com.moneymanager.domain.model.calendar.HolidayCalendar
 import com.moneymanager.domain.model.csv.PdfImportSource
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
+import com.moneymanager.domain.model.observation.ObservationId
+import com.moneymanager.domain.model.observation.ObservationPin
+import com.moneymanager.domain.model.observation.ObservationSplit
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.model.passthrough.PassThroughAccountId
 import com.moneymanager.regex.PortableRegex
@@ -39,6 +42,46 @@ import kotlin.time.Instant
  * repository, keeping the engine the sole writer. Each create reads its generated id back from the
  * result map under a per-call read-back key derived from the input.
  */
+
+// region Observation decisions
+
+/**
+ * "These are the same": pins every one of [observationIds] to [transactionId], then re-matches, so the matcher joins
+ * them whatever its rules say and keeps them joined through re-imports.
+ */
+suspend fun ImportEngine.pinObservations(
+    observationIds: Collection<ObservationId>,
+    transactionId: TransactionId,
+): ImportResult =
+    import(
+        ImportBatch(
+            observationDecisions = observationIds.map { ObservationDecision.Pin(ObservationPin(it, transactionId)) },
+            syncMatches = true,
+        ),
+    )
+
+/** Takes back the pins of [observationIds], then re-matches: the matcher's rules decide them again. */
+suspend fun ImportEngine.unpinObservations(observationIds: Collection<ObservationId>): ImportResult =
+    import(ImportBatch(observationDecisions = observationIds.map { ObservationDecision.Unpin(it) }, syncMatches = true))
+
+/**
+ * "These are different": keeps observations [a] and [b] apart, then re-matches, so the transaction that joined them
+ * splits in two and both count, now and after every re-import.
+ */
+suspend fun ImportEngine.separateObservations(
+    a: ObservationId,
+    b: ObservationId,
+): ImportResult =
+    import(ImportBatch(observationDecisions = listOf(ObservationDecision.Split(ObservationSplit.of(a, b))), syncMatches = true))
+
+/** Takes back a split of [a] and [b], then re-matches. */
+suspend fun ImportEngine.unseparateObservations(
+    a: ObservationId,
+    b: ObservationId,
+): ImportResult =
+    import(ImportBatch(observationDecisions = listOf(ObservationDecision.Unsplit(ObservationSplit.of(a, b))), syncMatches = true))
+
+// endregion
 
 // region Trade attributes
 
