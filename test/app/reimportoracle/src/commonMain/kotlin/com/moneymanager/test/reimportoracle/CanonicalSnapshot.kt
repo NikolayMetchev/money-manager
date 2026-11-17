@@ -63,7 +63,12 @@ suspend fun DatabaseComponent.canonicalSnapshot(): CanonicalSnapshot {
     val trades = accounts.flatMap { tradeRepository.getTradesByAccount(it.id).first() }.distinctBy { it.id.id }
 
     val transferLines = transfers.associate { it.id.id to it.line(::name) }
-    val tradeLines = trades.associate { it.id.id to it.line(::name) }
+    // A trade read by account carries no attributes: read them, so an excluded or tagged trade shows.
+    val tradeLines =
+        trades.associate { trade ->
+            val attributes = tradeRepository.getAttributes(trade.id).first().map { "${it.attributeType.name}=${it.value}" }
+            trade.id.id to trade.line(::name, attributes)
+        }
     val memberLines = transferLines + tradeLines
 
     val relationships =
@@ -137,20 +142,17 @@ private fun Transfer.line(name: (AccountId) -> String): String =
     "$timestamp | ${name(sourceAccountId)} -> ${name(targetAccountId)} | ${amount.plain()} ${amount.asset.code} | " +
         "$description${attributes.render()}"
 
-private fun Trade.line(name: (AccountId) -> String): String =
+private fun Trade.line(
+    name: (AccountId) -> String,
+    attributes: List<String>,
+): String =
     "$timestamp | ${name(fromAccountId)} ${from.plain()} ${from.asset.code} -> ${name(toAccountId)} ${to.plain()} ${to.asset.code} | " +
-        "$description${attributes.render()}"
+        "$description${attributes.renderLines()}"
 
-private fun List<TransferAttribute>.render(): String =
-    if (isEmpty()) {
-        ""
-    } else {
-        map { "${it.attributeType.name}=${it.value}" }.sorted().joinToString(
-            prefix = " [",
-            postfix = "]",
-            separator = ", ",
-        )
-    }
+private fun List<String>.renderLines(): String =
+    if (isEmpty()) "" else sorted().joinToString(prefix = " [", postfix = "]", separator = ", ")
+
+private fun List<TransferAttribute>.render(): String = map { "${it.attributeType.name}=${it.value}" }.renderLines()
 
 /** The amount without the trailing zeros of the 18 places every asset is stored at. */
 private fun Money.plain(): String {

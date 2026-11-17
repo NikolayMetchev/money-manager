@@ -26,12 +26,15 @@ import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.TradeId
+import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.reconciliation.IGNORED_IN_RECONCILIATION
+import com.moneymanager.domain.model.reconciliation.LegTransactionKind
 import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.RuleValue
 import com.moneymanager.domain.model.rules.StrategyRule
@@ -51,9 +54,17 @@ import com.moneymanager.importengineapi.insertApiRequest
 import com.moneymanager.importengineapi.insertApiResponse
 import com.moneymanager.importengineapi.markApiSessionImported
 import com.moneymanager.importengineapi.setAccountAttributeValues
+import com.moneymanager.importengineapi.setReconciliationLinks
+import com.moneymanager.importengineapi.setTradeExcluded
 import com.moneymanager.importengineapi.setTransferExcluded
 import com.moneymanager.importengineapi.updateApiStrategy
 import com.moneymanager.importengineapi.updateCsvStrategy
+import com.moneymanager.reconciliation.CopyPlan
+import com.moneymanager.reconciliation.copyToMoneyManager
+import com.moneymanager.reconciliation.planCopy
+import com.moneymanager.reconciliation.realAccounts
+import com.moneymanager.reconciliation.reconcile
+import com.moneymanager.reconciliation.suggestRealAccount
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
@@ -73,6 +84,19 @@ private val FILE_TIME = Instant.parse("2026-01-01T00:00:00Z")
 /** The note a hand edit adds, and the attribute type it's stored under. */
 const val ORACLE_NOTE_TYPE = "note"
 const val ORACLE_NOTE = "checked by hand"
+
+/** The reason a hand exclusion of a trade gives. */
+const val ORACLE_TRADE_EXCLUSION = "excluded by hand"
+
+/** What assertion (d)'s hand work touched, which a re-import must keep under the same ids (#1430). */
+data class HandWork(
+    /** The transfers it edited or matched. */
+    val transfers: Set<TransferId>,
+    /** The trade it excluded. */
+    val trades: Set<TradeId>,
+    /** What Copy to Money Manager booked. */
+    val copies: List<TransactionId>,
+)
 
 /** The attribute the strategy change of assertion (c) adds to every record of the changed strategy. */
 const val ORACLE_STRATEGY_ATTRIBUTE = "oracle-strategy"
@@ -195,9 +219,10 @@ class OracleDatabase private constructor(
      * Assertion (d)'s hand work, chosen by value so it lands on the same records in any database holding the same
      * money: a hand edit (new description and a note), a hand-made match of two records (a reconciliation source's
      * row and a real one when the scenario has a source), an Ignore of a reconciliation source's row, and the
-     * scenario's Manual Entries. Returns the transfers it edited or matched, which a re-import must keep under their ids (#1430).
+     * scenario's Manual Entries, a hand exclusion of a trade, and Copy to Money Manager of a reconciliation source's
+     * unmatched trade. Returns what it touched, which a re-import must keep under the same ids (#1430).
      */
-    suspend fun doHandWork(): Set<TransferId> {
+    suspend fun doHandWork(): HandWork {
         val accounts = db.accountRepository.getAllAccounts().first()
         val shadowIds =
             db.accountAttributeRepository
@@ -250,7 +275,63 @@ class OracleDatabase private constructor(
                 excludedFromBalances = entry.excludedFromBalances,
             )
         }
-        return setOf(edited.id) + matched.map { it.id }
+
+        val trades = accounts.flatMap { db.tradeRepository.getTradesByAccount(it.id).first() }.distinctBy { it.id }
+        val excludedTrade =
+            trades
+                .filter { trade ->
+                    db.tradeRepository
+                        .getAttributes(trade.id)
+                        .first()
+                        .none { it.attributeType.id.id == WellKnownIds.EXCLUDED_ATTR_TYPE_ID }
+                }.sortedWith(compareBy({ it.timestamp }, { it.description }, { it.from.toDisplayValue().toString() }))
+                .firstOrNull()
+        excludedTrade?.let { db.importEngine.setTradeExcluded(it.id, ORACLE_TRADE_EXCLUSION) }
+
+        return HandWork(
+            transfers = setOf(edited.id) + matched.map { it.id },
+            trades = setOfNotNull(excludedTrade?.id),
+            copies = copySourceTrade(),
+        )
+    }
+
+    /**
+     * Links each reconciliation source's wallets to the real account named like it, as the Reconciliation tab offers,
+     * then copies the first of the source's unmatched trades onto the real accounts (Copy to Money Manager). Returns
+     * the copies.
+     */
+    private suspend fun copySourceTrade(): List<TransactionId> {
+        val reconciliation = db.reconciliationLinkRepository
+        val sources = reconciliation.getSources().first()
+        if (sources.isEmpty()) return emptyList()
+        val accounts = db.accountRepository.getAllAccounts().first()
+        val shadows = reconciliation.getShadowAccounts().first()
+        val real = realAccounts(accounts, shadows)
+        val linked = reconciliation.getLinks().first().mapTo(mutableSetOf()) { it.shadowAccountId }
+        for (source in sources) {
+            for (wallet in shadows.filter { source.isLinkable(it) && it.accountId !in linked }) {
+                suggestRealAccount(source.walletName(wallet), real)?.let {
+                    db.importEngine.setReconciliationLinks(wallet.accountId, setOf(it.id))
+                }
+            }
+        }
+        val links = reconciliation.getLinks().first()
+        val result =
+            reconcile(
+                sourceLegs = reconciliation.getLegs(shadows.map { it.accountId }.toSet()),
+                links = links,
+                realLegs = reconciliation.getLegs(links.map { it.realAccountId }.toSet()),
+            )
+        val trade =
+            result.missingInMm
+                .map { it.leg }
+                .filter { it.kind == LegTransactionKind.TRADE }
+                .minByOrNull { it.timestamp }
+                ?: return emptyList()
+        val movement = result.missingInMm.map { it.leg }.filter { it.kind == trade.kind && it.transactionId == trade.transactionId }
+        val plan = planCopy(movement, shadows, links, accounts.associate { it.id to it.name })
+        check(plan is CopyPlan.Ready) { "the source's trade can't be copied: $plan" }
+        return db.importEngine.copyToMoneyManager(movement, plan)
     }
 
     private fun byValue(transfers: List<Transfer>): List<Transfer> =
