@@ -145,7 +145,7 @@ class MatchScopeLoader(
 
             is ObservationOwner.Group -> {
                 val group = checkNotNull(groupsById[owner.groupId]) { "observation owner ${owner.groupId} has no group" }
-                Origin(group.key.strategyId, groupContainer(owner.groupId), "${group.key.groupName}|${group.key.keyValue}")
+                Origin(csvFamily(group.key.strategyId), groupContainer(owner.groupId), "${group.key.groupName}|${group.key.keyValue}")
             }
 
             is ObservationOwner.Manual -> {
@@ -162,12 +162,17 @@ class MatchScopeLoader(
             .getImport(id)
             .first()
             ?.lastAppliedStrategyId
-            ?.toString() ?: "$UNKNOWN_FAMILY:${csvContainer(id)}"
+            ?.let { csvFamily(it.toString()) } ?: "$UNKNOWN_FAMILY:${csvContainer(id)}"
 
     private suspend fun apiFamily(id: ApiSessionId): String {
         val credential = apiSessions.getSessionById(id)?.credentialId ?: return "$UNKNOWN_FAMILY:${apiContainer(id)}"
         if (credential !in strategyOfCredential) {
-            apiSessions.getCredentialsFlow().first().forEach { c -> c.strategyId?.let { strategyOfCredential[c.id] = it.toString() } }
+            apiSessions.getCredentialsFlow().first().forEach { c ->
+                c.strategyId?.let {
+                    strategyOfCredential[c.id] =
+                        apiFamily(it.toString())
+                }
+            }
         }
         return strategyOfCredential[credential] ?: "$UNKNOWN_FAMILY:${apiContainer(id)}"
     }
@@ -177,6 +182,15 @@ class MatchScopeLoader(
         const val MANUAL_FAMILY = "manual"
         private const val UNKNOWN_FAMILY = "unknown"
         private const val CONDUIT_SLOT_PREFIX = "conduit/"
+
+        /**
+         * A CSV strategy's family, by its id. Built-in CSV and API strategies share ids (Crypto.com's crypto export and
+         * its Exchange API are both 9), so a family names the kind of strategy as well.
+         */
+        fun csvFamily(strategyId: String): String = "csv-strategy:$strategyId"
+
+        /** An API strategy's family, by its id (see [csvFamily]). */
+        fun apiFamily(strategyId: String): String = "api-strategy:$strategyId"
 
         fun csvContainer(id: CsvImportId): String = "csv:$id"
 

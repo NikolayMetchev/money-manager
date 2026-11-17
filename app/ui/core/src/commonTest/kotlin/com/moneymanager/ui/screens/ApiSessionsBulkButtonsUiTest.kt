@@ -96,6 +96,7 @@ class ApiSessionsBulkButtonsUiTest : DbTest() {
                             accountRepository = repositories.accountRepository,
                             currencyRepository = repositories.currencyRepository,
                             cryptoRepository = repositories.cryptoRepository,
+                            importRecordRepository = repositories.importRecordRepository,
                             maintenance = repositories.maintenanceService,
                             deviceId = services.deviceId,
                             apiImportService = services.apiImportService(vault, Mutex(), monzo),

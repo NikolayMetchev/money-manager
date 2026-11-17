@@ -23,6 +23,8 @@ import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.TradeId
+import com.moneymanager.domain.model.TransactionId
+import com.moneymanager.domain.model.TransactionKind
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.ApiSessionImportRevision
 import com.moneymanager.domain.repository.ApiSessionReadRepository
@@ -38,6 +40,7 @@ class ApiSessionReadRepositoryImpl(
 ) : ApiSessionReadRepository {
     private val selectQueries = database.apiSessionSelectQueries
     private val entitySourceSelectQueries = database.entitySourceSelectQueries
+    private val observationSelectQueries = database.observationSelectQueries
 
     override suspend fun getAllCredentials(): List<ApiCredential> =
         withContext(Dispatchers.Default) {
@@ -224,5 +227,37 @@ class ApiSessionReadRepositoryImpl(
             importDurationMillis = import_duration_millis,
         )
 
+    override suspend fun getTransactionsObservedBySession(sessionId: ApiSessionId): Set<TransactionId> =
+        withContext(Dispatchers.Default) {
+            observationSelectQueries
+                .selectTransactionsObservedByApiSession(sessionId.id)
+                .awaitAsList()
+                .mapTo(mutableSetOf()) {
+                    when (TransactionKind.valueOf(it.kind)) {
+                        TransactionKind.TRADE -> TradeId(it.transaction_id)
+                        TransactionKind.TRANSFER -> TransferId(it.transaction_id)
+                    }
+                }
+        }
+
+    override suspend fun getTransactionsObservedOutsideSessions(
+        sessionIds: Collection<ApiSessionId>,
+        transactionIds: Collection<TransactionId>,
+    ): Set<TransactionId> {
+        if (transactionIds.isEmpty()) return emptySet()
+        val observed =
+            withContext(Dispatchers.Default) {
+                transactionIds.map { it.id }.distinct().chunked(OBSERVED_CHUNK).flatMapTo(mutableSetOf()) { chunk ->
+                    observationSelectQueries
+                        .selectTransactionsObservedOutsideSources(chunk, emptyList(), sessionIds.map { it.id })
+                        .awaitAsList()
+                }
+            }
+        return transactionIds.filterTo(mutableSetOf()) { it.id in observed }
+    }
+
     private fun <K, V> Map<K, List<V>>.getValueOrDefault(key: K): List<V> = get(key).orEmpty()
 }
+
+// SQLite caps a statement's variables, so long id lists are queried in chunks.
+private const val OBSERVED_CHUNK = 500

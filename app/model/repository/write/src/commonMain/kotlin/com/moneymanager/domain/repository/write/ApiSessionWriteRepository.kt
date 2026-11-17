@@ -127,4 +127,7 @@ interface ApiSessionWriteRepository : ApiSessionReadRepository {
         importedAt: Instant,
         importDurationMillis: Long? = null,
     ): Long
+
+    /** Forgets every import of the given session, so it reads as downloaded but never imported. */
+    suspend fun deleteSessionImports(id: ApiSessionId)
 }

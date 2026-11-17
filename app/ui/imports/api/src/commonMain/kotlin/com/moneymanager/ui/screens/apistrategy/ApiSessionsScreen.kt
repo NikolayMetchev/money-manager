@@ -110,6 +110,7 @@ import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
 import com.moneymanager.domain.repository.ApiSessionImportRevision
 import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
+import com.moneymanager.domain.repository.ImportRecordReadRepository
 import com.moneymanager.domain.repository.ImportTimelineReadRepository
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
@@ -151,6 +152,7 @@ fun ApiSessionsScreen(
     accountRepository: AccountReadRepository,
     currencyRepository: CurrencyReadRepository,
     cryptoRepository: com.moneymanager.domain.repository.CryptoReadRepository,
+    importRecordRepository: ImportRecordReadRepository,
     maintenance: Maintenance,
     deviceId: DeviceId,
     apiImportService: ApiImportService,
@@ -726,6 +728,7 @@ fun ApiSessionsScreen(
                     accountAttributeRepository = accountAttributeRepository,
                     currencyRepository = currencyRepository,
                     cryptoRepository = cryptoRepository,
+                    importRecordRepository = importRecordRepository,
                 ),
             reimports = reimports,
             maintenance = maintenance,
@@ -760,6 +763,7 @@ fun ApiSessionsScreen(
                     accountAttributeRepository = accountAttributeRepository,
                     currencyRepository = currencyRepository,
                     cryptoRepository = cryptoRepository,
+                    importRecordRepository = importRecordRepository,
                 ),
             reimports = reimports,
             maintenance = maintenance,

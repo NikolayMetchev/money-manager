@@ -44,7 +44,6 @@ import com.moneymanager.domain.model.rules.RuleAttribute
 import com.moneymanager.domain.model.rules.RuleEngine
 import com.moneymanager.domain.model.rules.RuleEvaluator
 import com.moneymanager.domain.model.rules.RuleOutcome
-import com.moneymanager.domain.model.rules.RuleValue
 import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
@@ -73,10 +72,13 @@ import com.moneymanager.importengineapi.LocalPersonKey
 import com.moneymanager.importengineapi.PassThroughDetector
 import com.moneymanager.importengineapi.PersonMatchKey
 import com.moneymanager.importengineapi.bankKeysFrom
+import com.moneymanager.importengineapi.dedupePolicy
 import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.importengineapi.normalizeNameKey
 import com.moneymanager.importengineapi.personalCounterpartyKey
 import com.moneymanager.importengineapi.recordApiDownloadCoverage
+import com.moneymanager.importengineapi.transactionIdAttributeName
+import com.moneymanager.importengineapi.uniqueIdentifierAttributeNames
 import com.moneymanager.rest.ApiClient
 import com.moneymanager.rest.ApiHttpResponse
 import com.moneymanager.rest.ScaParams
@@ -685,12 +687,13 @@ suspend fun importApiSessionTransactions(
     buildPeopleAndOwnershipIntents(setup)
     onProgress(Progress(detail = "Saving to database...", fraction = 0.7f))
     val importResult = runImportEngine(setup, preparedTransfers)
+    val folded = importEngine.syncSessionMatches(apiSessionRepository, sessionId)
     onProgress(Progress(detail = "Import finalized.", fraction = 0.98f))
     return ApiSessionImportResult(
         accountCount = setup.accountsById.size,
-        transactionCount = importResult.transfersImported,
+        transactionCount = importResult.transfersImported - folded.transfers,
         personCount = importResult.peopleCreated,
-        duplicateCount = importResult.duplicates,
+        duplicateCount = importResult.duplicates + folded.total,
         errorCount = preparedTransfers.errorCount,
     )
 }
@@ -845,14 +848,8 @@ private suspend fun setupImportSession(
         transactionResponses = transactionResponses,
         requestsById = requestsById,
         counterpartyIdField = counterpartyIdField,
-        uniqueAttributeNames =
-            transactionRules
-                .attributeActions()
-                .filter { it.uniqueIdentifier }
-                .map { it.typeName }
-                .distinct(),
-        transactionIdAttributeName =
-            transactionRules.attributeActions().firstOrNull { (it.value as? RuleValue.Read)?.expr?.paths == listOf("id") }?.typeName,
+        uniqueAttributeNames = strategy.uniqueIdentifierAttributeNames(),
+        transactionIdAttributeName = strategy.transactionIdAttributeName(),
         accountResolver = BatchAccountResolver(),
         peopleResolver = BatchPeopleResolver(),
         currencyCache = currencyCache,
@@ -1701,13 +1698,8 @@ private suspend fun runImportEngine(
         ImportBatch(
             transfers = importTransfers,
             dedupePolicy =
-                DedupePolicy.ApiMultiKey(
-                    reconcileWindow = setup.strategy.config.reconcileWindows.crossSource,
-                    reconciledExclusionAttributeTypeId = AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID),
-                    reconciledRelationshipTypeId = RelationshipTypeId(WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID),
-                    unidentifiedCounterpartyAttributeTypeId =
-                        setup.attributeTypeCache.getOrCreate(WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME),
-                    unidentifiedCounterpartyWindow = setup.strategy.config.reconcileWindows.placeholder,
+                setup.strategy.dedupePolicy(
+                    setup.attributeTypeCache.getOrCreate(WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME),
                 ),
             accountsToCreate = setup.accountResolver.intents(),
             peopleToCreate = setup.peopleResolver.intents(),
@@ -2994,6 +2986,10 @@ private class BatchAccountResolver {
                     openingDate = Clock.System.now(),
                     attributes = attributes,
                     source = source,
+                    // A name-keyed counterparty's only identity is its name, so it takes over the same-named
+                    // account a CSV export created for it (one with no identity of its own) rather than forking
+                    // "Tesco (tesco)" beside it: the two records of each payment then land on one account and join.
+                    adoptOnBankMatch = nameKey != null,
                 )
             if (counterpartyId != null) byExternalId[counterpartyId] = key
             if (dedupeKey != null) byPersonalKey[dedupeKey] = key

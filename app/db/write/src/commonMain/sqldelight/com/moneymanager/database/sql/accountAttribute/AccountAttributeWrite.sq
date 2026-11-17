@@ -31,3 +31,17 @@ retagFeeAccount:
 UPDATE account_attribute
 SET attribute_value = :to
 WHERE id = :id AND attribute_type_id = -12 AND attribute_value = :from;
+
+claimForApiSession:
+-- Records :api_session_id as an owner of whatever the (type, group) slot holds.
+INSERT OR IGNORE INTO account_attribute_api_owner (account_attribute_id, api_session_id)
+SELECT id, :api_session_id FROM account_attribute
+WHERE account_id = :account_id AND attribute_type_id = :attribute_type_id AND group_key = :group_key;
+
+releaseApiSession:
+DELETE FROM account_attribute_api_owner WHERE api_session_id = ?;
+
+deleteUnclaimed:
+-- Of :ids, deletes the attributes no session claims any more.
+DELETE FROM account_attribute
+WHERE id IN :ids AND id NOT IN (SELECT account_attribute_id FROM account_attribute_api_owner);

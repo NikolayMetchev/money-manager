@@ -14,6 +14,7 @@ import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.observation.ImportRecordKey
 import com.moneymanager.domain.model.observation.ObservationOwner
 import com.moneymanager.domain.repository.AccountReadRepository
+import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
 import com.moneymanager.domain.repository.AttributeTypeReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.ImportRecordReadRepository
@@ -45,6 +46,7 @@ import kotlinx.coroutines.flow.first
 internal class MatchSync(
     private val loader: MatchScopeLoader,
     private val strategies: CsvImportStrategyReadRepository,
+    private val apiStrategies: ApiImportStrategyReadRepository,
     private val attributeTypes: AttributeTypeReadRepository,
     private val accounts: AccountReadRepository,
     private val records: ImportRecordReadRepository,
@@ -55,9 +57,17 @@ internal class MatchSync(
 ) {
     suspend fun run(): MaterializationReport {
         val typeIds = attributeTypes.getAll().first().associate { it.name to it.id }
-        val families = strategies.getAllStrategies().first().associate { it.id.toString() to it.matchFamily(typeIds) }
-        val loaded = loader.load(accounts.getAllAccounts().first().map { it.id }, families)
-        // A record no CSV strategy here describes (an API session's, or a file whose strategy is gone) has no rules to match it
+        val allAccounts = accounts.getAllAccounts().first()
+        // An account name can repeat; a bridge names the first account of that name, as the importer picks it.
+        val accountIdByName = allAccounts.reversed().associate { it.name to it.id }
+        val families =
+            strategies.getAllStrategies().first().associate { MatchScopeLoader.csvFamily(it.id.toString()) to it.matchFamily(typeIds) } +
+                apiStrategies.getAllStrategies().first().associate {
+                    MatchScopeLoader.apiFamily(it.id.toString()) to
+                        it.matchFamily(typeIds, accountIdByName)
+                }
+        val loaded = loader.load(allAccounts.map { it.id }, families)
+        // A record no strategy here describes (a file or session whose strategy is gone) has no rules to match it
         // by, so the matcher would split whatever its import joined it with: its transaction stays as the import left it.
         val frozen =
             loaded

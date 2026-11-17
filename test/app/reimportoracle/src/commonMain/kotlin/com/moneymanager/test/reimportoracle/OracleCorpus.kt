@@ -2,7 +2,7 @@ package com.moneymanager.test.reimportoracle
 
 import com.moneymanager.domain.model.WellKnownIds
 
-/** One file a person would import: a CSV export or a QIF statement, staged and applied as the import folders do. */
+/** One source a person would import: a CSV export or a QIF statement, staged and applied as the import folders do, or an API session. */
 sealed interface OracleFile {
     val fileName: String
 
@@ -15,6 +15,16 @@ sealed interface OracleFile {
     data class Qif(
         override val fileName: String,
         val content: String,
+    ) : OracleFile
+
+    /**
+     * One downloaded API session of the built-in strategy [strategyName]: each response staged under its request's marker
+     * URL, as the download stores it. [fileName] only names the session in the oracle's messages.
+     */
+    data class Api(
+        override val fileName: String,
+        val strategyName: String,
+        val responses: List<Pair<String, String>>,
     ) : OracleFile
 }
 
@@ -335,7 +345,81 @@ object OracleCorpus {
                 ),
         )
 
-    val ALL: List<OracleScenario> = listOf(MONZO_JOINT, FREETRADE_MONZO, AMEX_SANTANDER, REVOLUT, PAYPAL_CARD, CURVE, BINANCE_KOINLY)
+    /**
+     * Bybit's ledger exports and two downloads of its API: the first holds the deposit and the withdrawal, the second
+     * (an incremental download overlapping it) the withdrawal again. Each movement is one transaction, whatever records it.
+     */
+    val BYBIT_CSV_API =
+        OracleScenario(
+            name = "Bybit CSV + overlapping API sessions",
+            sources =
+                listOf(
+                    OracleSource(
+                        OracleFile.Csv(
+                            "AssetChangeDetails_spot_${BYBIT_UID}_20220101_20221231_0.csv",
+                            listOf("Uid", "Type", "Coin", "Amount", "Wallet Balance", "Time(UTC)"),
+                            listOf(
+                                listOf(BYBIT_UID, "trade", "USDT", "-684.982144", "0.119229", "2022-01-05 13:18:18"),
+                                listOf(BYBIT_UID, "trade", "KASTA", "492.8", "967.9244", "2022-01-05 13:18:18"),
+                                listOf(BYBIT_UID, "tradingFee", "KASTA", "-0.4928", "967.4316", "2022-01-05 13:18:18"),
+                                listOf(BYBIT_UID, "userDeposit", "USDT", "1346", "1346", "2022-01-02 14:36:12"),
+                            ),
+                        ),
+                    ),
+                    OracleSource(
+                        OracleFile.Csv(
+                            "AssetChangeDetails_fund_${BYBIT_UID}_20230101_20231231_0.csv",
+                            listOf("Uid", "Date & Time(UTC)", "Coin", "QTY", "Type", "Account Balance", "Description"),
+                            listOf(
+                                listOf(BYBIT_UID, "2023-11-13 09:18:18", "BTC", "-0.00039664", "Withdraw", "0", "Withdrawal"),
+                            ),
+                        ),
+                    ),
+                    OracleSource(OracleFile.Api("bybit-session-1", "Bybit", listOf(BYBIT_DEPOSIT, BYBIT_WITHDRAWAL))),
+                    OracleSource(OracleFile.Api("bybit-session-2", "Bybit", listOf(BYBIT_WITHDRAWAL))),
+                ),
+            changedStrategy = "Bybit Funding CSV",
+        )
+
+    /**
+     * Monzo's data export and two downloads of its API, all of one account: the export holds two payments, the first
+     * download those two, the second (an incremental download overlapping it) the second payment again and a third.
+     */
+    val MONZO_CSV_API =
+        OracleScenario(
+            name = "Monzo CSV + overlapping API sessions",
+            sources =
+                listOf(
+                    OracleSource(
+                        monzoFile(
+                            "MonzoDataExport_api.csv",
+                            monzoRow("tx_api_1", "20/11/2023", "08:01:00", "Tesco", "-12.40", "TESCO STORES"),
+                            monzoRow("tx_api_2", "21/11/2023", "18:30:00", "Landlord", "-900.00", "RENT"),
+                        ),
+                        account = "Monzo",
+                    ),
+                    OracleSource(
+                        OracleFile.Api("monzo-session-1", "Monzo", listOf(MONZO_ACCOUNTS, monzoTransactions(MONZO_TX_1, MONZO_TX_2))),
+                    ),
+                    OracleSource(
+                        OracleFile.Api("monzo-session-2", "Monzo", listOf(MONZO_ACCOUNTS, monzoTransactions(MONZO_TX_2, MONZO_TX_3))),
+                    ),
+                ),
+            changedStrategy = "Monzo CSV",
+        )
+
+    val ALL: List<OracleScenario> =
+        listOf(
+            MONZO_JOINT,
+            FREETRADE_MONZO,
+            AMEX_SANTANDER,
+            REVOLUT,
+            PAYPAL_CARD,
+            CURVE,
+            BINANCE_KOINLY,
+            BYBIT_CSV_API,
+            MONZO_CSV_API,
+        )
 }
 
 private val MONZO_HEADERS =
@@ -588,3 +672,56 @@ private fun koinlyRow(
         }
     return KOINLY_HEADERS.map { cells[it].orEmpty() }
 }
+
+private const val BYBIT_UID = "12345678"
+
+// Bybit's real responses, down to successAt = "0" and the fetch window in the marker URL.
+private val BYBIT_DEPOSIT =
+    "https://api.bybit.com/v5/asset/deposit/query-record?ep=v5/asset/deposit/query-record&ws=1640736000000&we=1643327999999&pg=0" to
+        """
+        {"retCode":0,"retMsg":"success","result":{"rows":[{"coin":"USDT","chain":"ETH","amount":"1346",
+        "txID":"0xdeposit","status":3,"toAddress":"0xbybit","tag":"","depositFee":"","successAt":"0",
+        "confirmations":"30","txIndex":"200","blockHash":"","batchReleaseLimit":"-1","depositType":"0",
+        "fromAddress":"","id":"3562579"}],"nextPageCursor":""},"retExtInfo":{},"time":1790930541991}
+        """.trimIndent()
+
+private val BYBIT_WITHDRAWAL =
+    "https://api.bybit.com/v5/asset/withdraw/query-record?ep=v5/asset/withdraw/query-record&ws=1697760000000&we=1700351999999&pg=0" to
+        """
+        {"retCode":0,"retMsg":"success","result":{"rows":[{"coin":"BTC","chain":"BTC","amount":"0.00031164",
+        "txID":"withdrawtx","status":"success","toAddress":"bc1qwithdrawaddr","tag":"","withdrawFee":"0.000085",
+        "createTime":"1699867096000","updateTime":"1699868403000","withdrawId":"26711021","withdrawType":0}],
+        "nextPageCursor":""},"retExtInfo":{},"time":1790930647825}
+        """.trimIndent()
+
+private const val MONZO_ACCOUNT_ID = "acc_00009ORACLE00000000001"
+
+private val MONZO_ACCOUNTS =
+    "https://api.monzo.com/accounts" to
+        """
+        {"accounts": [{"id": "$MONZO_ACCOUNT_ID", "closed": false, "created": "2022-01-01T00:00:00.000Z",
+          "description": "user_00009ORACLE0000user", "type": "uk_retail", "currency": "GBP"}]}
+        """.trimIndent()
+
+// Monzo's amounts are in pence; its ids are the export's Transaction IDs.
+private val MONZO_TX_1 =
+    """
+    {"id": "tx_api_1", "account_id": "$MONZO_ACCOUNT_ID", "created": "2023-11-20T08:01:00.000Z", "amount": -1240,
+     "currency": "GBP", "description": "TESCO STORES", "merchant": {"name": "Tesco"}, "counterparty": {}}
+    """.trimIndent()
+
+private val MONZO_TX_2 =
+    """
+    {"id": "tx_api_2", "account_id": "$MONZO_ACCOUNT_ID", "created": "2023-11-21T18:30:00.000Z", "amount": -90000,
+     "currency": "GBP", "description": "RENT", "merchant": null, "counterparty": {"name": "Landlord"}}
+    """.trimIndent()
+
+private val MONZO_TX_3 =
+    """
+    {"id": "tx_api_3", "account_id": "$MONZO_ACCOUNT_ID", "created": "2023-11-22T12:00:00.000Z", "amount": -350,
+     "currency": "GBP", "description": "PRET A MANGER", "merchant": {"name": "Pret A Manger"}, "counterparty": {}}
+    """.trimIndent()
+
+private fun monzoTransactions(vararg transactions: String): Pair<String, String> =
+    "https://api.monzo.com/transactions?account_id=$MONZO_ACCOUNT_ID&limit=100" to
+        """{"transactions": [${transactions.joinToString(",\n")}]}"""

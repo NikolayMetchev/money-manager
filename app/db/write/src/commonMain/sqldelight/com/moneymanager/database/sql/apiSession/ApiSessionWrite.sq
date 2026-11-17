@@ -54,3 +54,6 @@ SELECT last_insert_rowid();
 deleteResponseTransactionsBySession:
 DELETE FROM api_response_transaction
 WHERE response_id IN (SELECT id FROM api_response WHERE session_id = ?);
+
+deleteSessionImports:
+DELETE FROM api_import WHERE session_id = ?;

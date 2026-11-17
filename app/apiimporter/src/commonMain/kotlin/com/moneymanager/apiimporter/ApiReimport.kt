@@ -56,6 +56,9 @@ data class ApiRerunCounts(
  * deletes what the session created, then re-parses its stored responses from scratch. Deleting first
  * matters: with the session's own transfers still present, the deduper would classify the re-parsed
  * items DUPLICATE against themselves (by `apiId`) before any reconcile ran.
+ *
+ * A session nothing it reads has changed since its last import ([isApiSessionUnchanged]) is left as it is: importing it
+ * again would book what it booked, so the re-import writes nothing.
  */
 @Suppress("LongParameterList")
 suspend fun executeApiReimport(
@@ -75,10 +78,30 @@ suspend fun executeApiReimport(
     require((plan.source as? Source.Api)?.sessionId == session.id) {
         "plan is for ${plan.source} but executeApiReimport was called with session ${session.id}"
     }
+    if (isApiSessionUnchanged(session, strategy, apiReads, counterpartyAccountNames, passThroughAccounts)) {
+        return SourceRerunResult(
+            rerun = ApiRerunCounts(transactionsImported = 0, tradesImported = 0),
+            deletedTransfers = 0,
+            deletedTrades = 0,
+            unhiddenTransfers = 0,
+            cascaded = emptyList(),
+            notRerun = emptyList(),
+            reappliedEdits = emptyList(),
+            unmatchedEdits = emptyList(),
+            deletedEmptyAccounts = emptyList(),
+        )
+    }
     val importStartedAt = Clock.System.now()
     return importEngine.executeSourceRerun(
         plan = plan,
-        resetRecords = ImportBatch(apiSessionMutations = listOf(ApiSessionMutation.DeleteResponseTransactionsBySession(session.id))),
+        resetRecords =
+            ImportBatch(
+                apiSessionMutations =
+                    listOf(
+                        ApiSessionMutation.DeleteResponseTransactionsBySession(session.id),
+                        ApiSessionMutation.ReleaseAdoptedAttributes(session.id),
+                    ),
+            ),
         reads = reads,
         maintenance = maintenance,
         cascadeRerunner = cascadeRerunner,
