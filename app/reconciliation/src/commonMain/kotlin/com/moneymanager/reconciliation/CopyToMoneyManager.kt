@@ -8,6 +8,7 @@ import com.moneymanager.domain.model.reconciliation.LegTransactionKind
 import com.moneymanager.domain.model.reconciliation.ReconciliationLeg
 import com.moneymanager.domain.model.reconciliation.ReconciliationLink
 import com.moneymanager.domain.model.reconciliation.ShadowAccount
+import com.moneymanager.domain.repository.ObservationReadRepository
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ImportBatch
@@ -16,7 +17,6 @@ import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTradeIntent
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalTradeKey
-import com.moneymanager.importengineapi.createReconciliationMatch
 import com.moneymanager.importengineapi.feeAccounts
 import kotlin.time.Instant
 
@@ -129,11 +129,13 @@ fun planCopy(
 
 /**
  * Books [plan] on the real accounts as [Source.Reconciliation] records, and stores them as the match of [movement],
- * so the source row they copy counts as reconciled. Returns the copies.
+ * so the source row they copy counts as reconciled ([acceptMatches]: the copies are Reconciliation-owned observations, pinned
+ * with the rest of the match). Returns the copies.
  */
 suspend fun ImportEngine.copyToMoneyManager(
     movement: List<ReconciliationLeg>,
     plan: CopyPlan.Ready,
+    observations: ObservationReadRepository,
 ): List<TransactionId> {
     val source = Source.Reconciliation
     val feeOwners = plan.transfers.flatMap { listOf(it.from, it.to) }.filterIsInstance<CopyEnd.FeeAccountOf>()
@@ -183,6 +185,6 @@ suspend fun ImportEngine.copyToMoneyManager(
     val copies =
         tradeKeys.map { requireNotNull(result.createdTradeIds[it]) { "A trade was not copied" } } +
             rowKeys.map { requireNotNull(result.createdTransferIds[it]) { "A transfer was not copied" } }
-    createReconciliationMatch(movement.map { it.transactionRef }.distinct() + copies)
+    acceptMatches(listOf(movement.map { it.transactionRef }.distinct() + copies), observations)
     return copies
 }

@@ -4,12 +4,15 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.DeviceInfo
+import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.Relationship
 import com.moneymanager.domain.model.RelationshipId
 import com.moneymanager.domain.model.RelationshipMember
 import com.moneymanager.domain.model.RelationshipRole
 import com.moneymanager.domain.model.RelationshipType
 import com.moneymanager.domain.model.RelationshipTypeId
+import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
@@ -123,6 +126,7 @@ class TransactionDetailQueryTest {
                 listOf(
                     Observation(ObservationId(1), ObservationOwner.Record(record.id), "main", TransferId(10), ObservationContent(values)),
                     Observation(ObservationId(2), ObservationOwner.Manual(7), "main", TransferId(10), ObservationContent(values)),
+                    Observation(ObservationId(3), ObservationOwner.Manual(8), "main", TransferId(10), ObservationContent(values)),
                 )
             val csvImport =
                 CsvImport(
@@ -163,10 +167,16 @@ class TransactionDetailQueryTest {
                     cryptoRepository = mock(),
                 )
 
-            val result = reads.observationsOf(TransferId(10), listOf(gbp))
+            // A Manual owner whose creation came from the Reconciliation tab was copied there, not typed in.
+            val copied = SourceRecord(8, EntityType.TRANSFER, 10, 1, Source.Reconciliation, 1, null, null, at)
+            val result = reads.observationsOf(TransferId(10), listOf(gbp), listOf(copied))
 
             assertEquals(
-                listOf(Triple("monzo.csv row 3", "main", true), Triple("by hand", "main", false)),
+                listOf(
+                    Triple("monzo.csv row 3", "main", true),
+                    Triple("by hand", "main", false),
+                    Triple("copied in reconciliation", "main", false),
+                ),
                 result.observations.map { Triple(it.ownerLabel, it.slot, it.pinned) },
             )
             assertEquals(listOf(TransactionLeg(AccountId(2), accountId, money("1", gbp))), result.observations[0].legs)

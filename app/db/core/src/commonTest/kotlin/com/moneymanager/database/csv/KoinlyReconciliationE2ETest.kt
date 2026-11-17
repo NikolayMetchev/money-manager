@@ -16,6 +16,7 @@ import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csv.CsvImport
+import com.moneymanager.domain.model.observation.ObservationOwner
 import com.moneymanager.domain.model.reconciliation.IGNORED_IN_RECONCILIATION
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.ImportBatch
@@ -689,7 +690,12 @@ class KoinlyReconciliationE2ETest : DbTest() {
                         .first()
                         .associate { it.id to it.name },
                 )
-            val copies = repositories.importEngine.copyToMoneyManager(movement, assertIs<CopyPlan.Ready>(plan))
+            val copies =
+                repositories.importEngine.copyToMoneyManager(
+                    movement,
+                    assertIs<CopyPlan.Ready>(plan),
+                    repositories.observationRepository,
+                )
 
             val trade =
                 repositories.tradeRepository
@@ -714,6 +720,18 @@ class KoinlyReconciliationE2ETest : DbTest() {
             assertEquals(
                 listOf(Source.Reconciliation),
                 repositories.transferSourceRepository.getSourcesForTransaction(fee).map { it.source },
+            )
+            // A copy is the reconciliation's own observation, and the match pins every member's observations in place.
+            val copied = copies.flatMap { repositories.observationRepository.getObservationsOfTransaction(it) }
+            assertEquals(copies.size, copied.size)
+            assertTrue(copied.all { it.owner is ObservationOwner.Manual }, "$copied")
+            val members = movement.map { it.transactionRef }.distinct() + copies
+            assertEquals(
+                members.flatMap { repositories.observationRepository.getObservationsOfTransaction(it) }.map { it.id }.toSet(),
+                repositories.personOverrideRepository
+                    .getPinsOnTransactions(members)
+                    .map { it.observationId }
+                    .toSet(),
             )
             // The copy is stored as the source row's match, so nothing is left to reconcile.
             val after = reconcileKoinly()

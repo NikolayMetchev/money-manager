@@ -38,6 +38,7 @@ import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.ImportRecordReadRepository
 import com.moneymanager.domain.repository.ImportTimelineReadRepository
+import com.moneymanager.domain.repository.ObservationReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
@@ -102,6 +103,7 @@ fun ImportsScreen(
     relationshipRepository: RelationshipReadRepository,
     tradeRepository: TradeReadRepository,
     maintenance: Maintenance,
+    observationRepository: ObservationReadRepository,
     personRepository: PersonReadRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipReadRepository,
     importEngine: ImportEngine,
@@ -251,6 +253,7 @@ fun ImportsScreen(
                             categoryRepository = categoryRepository,
                             personRepository = personRepository,
                             transactionRepository = transactionRepository,
+                            observationRepository = observationRepository,
                             onOpenLeg = onReconciliationLegClick,
                             onOpenSource = onReconciliationSourceClick,
                             pickerState = matchPickerState,
