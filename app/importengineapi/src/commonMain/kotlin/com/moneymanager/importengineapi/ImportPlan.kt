@@ -114,7 +114,7 @@ class TransactionSnapshot(
             val tradeRows = tradeRepository?.let { repo -> trades.keys.mapNotNull { repo.getTradeById(it).first() } }.orEmpty()
             return TransactionSnapshot(
                 transferRows.values.associate { it.id to it.planned() } + tradeRows.associate { it.id to it.planned() },
-                buildMap<TransactionId, Source> {
+                buildMap {
                     putAll(transfers)
                     putAll(trades)
                 },

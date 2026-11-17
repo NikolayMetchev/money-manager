@@ -184,6 +184,7 @@ class ImportCommandsTest {
             val apis = checkNotNull(summary.apis)
             assertEquals(listOf("Monzo" to "downloaded"), apis.connections.map { it.strategy to it.status })
             assertEquals(listOf("imported" to 1), apis.sessions.map { it.status to it.transactions })
+            assertEquals(PlanJson(created = 2, updated = 0, removed = 0, conflicts = emptyList()), summary.plan)
             assertContains(run.stderr, "need attention")
         }
 
@@ -286,4 +287,21 @@ class ImportCommandsTest {
             assertEquals(null, summary.directories)
             assertEquals(listOf("imported"), checkNotNull(summary.apis).sessions.map { it.status })
         }
+
+    @Test
+    fun importAllPrintsItsPlanInTheTable() =
+        withFixture { fixture ->
+            val run = fixture.mm("--format", "table", "import", "all")
+
+            assertEquals(ExitCodes.NEEDS_ATTENTION, run.exitCode, run.stderr)
+            assertContains(run.stdout, "2 created")
+        }
+
+    @Test
+    fun planSummaryNamesOnlyWhatChanged() {
+        val plan = PlanJson(created = 0, updated = 2, removed = 1, conflicts = listOf("#7 description: kept \"Rent\""))
+
+        assertEquals("0 created · 2 updated · 1 removed · 1 hand edit kept against a new value", plan.summary)
+        assertEquals("3 created", PlanJson(3, 0, 0, emptyList()).summary)
+    }
 }
