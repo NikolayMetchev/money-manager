@@ -18,7 +18,6 @@ import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
-import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.apistrategy.ApiAmountFormat
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
@@ -1572,7 +1571,6 @@ private data class ResponseTransactionImportRecord(
     val responseId: ApiResponseId,
     val jsonPath: JsonPath,
     val state: ApiResponseTransactionState,
-    val transactionId: TransferId?,
     val errorMessage: String?,
 ) {
     fun toInsert(): ApiResponseTransactionInsert =
@@ -1580,7 +1578,6 @@ private data class ResponseTransactionImportRecord(
             responseId = responseId,
             jsonPath = jsonPath,
             state = state,
-            transactionId = transactionId,
             errorMessage = errorMessage,
         )
 }
@@ -1748,10 +1745,7 @@ private suspend fun runImportEngine(
                 else -> ApiResponseTransactionState.DUPLICATE
             }
         responseRecords +=
-            p.responseRecord(
-                state = state,
-                transactionId = outcome.transferId,
-            )
+            p.responseRecord(state)
     }
 
     // Clear any response-transaction rows from a prior run of this session and insert the fresh set in
@@ -2086,17 +2080,13 @@ private suspend fun buildApiTransferAttributes(
         }
     }
 
-private fun PreparedApiTransaction.responseRecord(
-    state: ApiResponseTransactionState,
-    transactionId: TransferId?,
-): ResponseTransactionImportRecord =
+private fun PreparedApiTransaction.responseRecord(state: ApiResponseTransactionState): ResponseTransactionImportRecord =
     ResponseTransactionImportRecord(
         pageIndex = pageIndex,
         itemIndex = itemIndex,
         responseId = responseId,
         jsonPath = item.jsonPath,
         state = state,
-        transactionId = transactionId,
         errorMessage = null,
     )
 
@@ -2112,7 +2102,6 @@ private fun ApiTransactionPageItem.errorRecord(
         responseId = responseId,
         jsonPath = jsonPath,
         state = ApiResponseTransactionState.ERROR,
-        transactionId = null,
         errorMessage = message,
     )
 

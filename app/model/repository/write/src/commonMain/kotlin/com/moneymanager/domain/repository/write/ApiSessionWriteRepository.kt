@@ -10,7 +10,6 @@ import com.moneymanager.domain.model.ApiResponseTransactionState
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.JsonPath
-import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.ApiSessionReadRepository
 import kotlin.time.Instant
 
@@ -101,7 +100,6 @@ interface ApiSessionWriteRepository : ApiSessionReadRepository {
         responseId: ApiResponseId,
         jsonPath: JsonPath,
         state: ApiResponseTransactionState,
-        transactionId: TransferId?,
         errorMessage: String?,
     ): ApiResponseTransactionId
 

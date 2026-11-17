@@ -9,7 +9,6 @@ import com.moneymanager.domain.model.ApiResponseTransactionState
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.JsonPath
-import com.moneymanager.domain.model.TransferId
 import kotlin.time.Instant
 
 /**
@@ -74,7 +73,6 @@ sealed interface ApiSessionMutation {
         val responseId: ApiResponseId,
         val jsonPath: JsonPath,
         val state: ApiResponseTransactionState,
-        val transactionId: TransferId?,
         val errorMessage: String?,
     ) : ApiSessionMutation
 

@@ -112,28 +112,21 @@ CREATE INDEX idx_api_response_responded_at ON api_response(responded_at);
 
 -- Tracks the import state of each transaction entry found in an API response.
 -- Created when processing responses during import so that the UI can display
--- which transactions were imported, which were duplicates, and which failed.
--- transaction_id meaning depends on state:
---   state=imported (1): the newly created transaction
---   state=duplicate (2): the pre-existing transaction this entry duplicates
---   state=error (3): NULL
+-- which transactions were imported, which were duplicates, and which failed. Which transaction an item makes is its
+-- observations' to say (#1429), so this keeps only the item's state and error.
 CREATE TABLE api_response_transaction (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     response_id INTEGER NOT NULL,
     json_path TEXT NOT NULL,
     -- State: 1=imported, 2=duplicate, 3=error
     state INTEGER NOT NULL CHECK(state IN (1, 2, 3)),
-    transaction_id INTEGER,
     error_message TEXT,
     created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now') * 1000),
     CHECK (
-        (state IN (1, 2) AND transaction_id IS NOT NULL AND error_message IS NULL) OR
-        (state = 3 AND transaction_id IS NULL)
+        (state IN (1, 2) AND error_message IS NULL) OR state = 3
     ),
-    FOREIGN KEY (response_id) REFERENCES api_response(id) ON DELETE CASCADE,
-    FOREIGN KEY (transaction_id) REFERENCES transaction_id(id)
+    FOREIGN KEY (response_id) REFERENCES api_response(id) ON DELETE CASCADE
 );
 
 CREATE UNIQUE INDEX idx_api_response_transaction_response_json_path
     ON api_response_transaction(response_id, json_path);
-CREATE INDEX idx_api_response_transaction_transaction ON api_response_transaction(transaction_id);

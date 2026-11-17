@@ -3380,7 +3380,7 @@ class ImportEngineImpl(
                 }
 
                 is ApiSessionMutation.InsertResponseTransaction -> {
-                    apiSessionRepository.insertResponseTransaction(m.responseId, m.jsonPath, m.state, m.transactionId, m.errorMessage)
+                    apiSessionRepository.insertResponseTransaction(m.responseId, m.jsonPath, m.state, m.errorMessage)
                 }
 
                 is ApiSessionMutation.InsertResponseTransactions -> {

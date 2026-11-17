@@ -36,8 +36,8 @@ lastInsertRowId:
 SELECT last_insert_rowid();
 
 insertResponseTransaction:
-INSERT INTO api_response_transaction(response_id, json_path, state, transaction_id, error_message)
-VALUES (?, ?, ?, ?, ?);
+INSERT INTO api_response_transaction(response_id, json_path, state, error_message)
+VALUES (?, ?, ?, ?);
 
 markSessionImported:
 INSERT INTO api_import(session_id, revision_id, imported_at, import_duration_millis)

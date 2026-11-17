@@ -6,18 +6,12 @@ import kotlin.jvm.JvmInline
  * Represents the import state of a single transaction entry found in an API response.
  * Allows the UI to display which transactions were imported, which were duplicates,
  * and which encountered errors.
- *
- * [transactionId] meaning depends on [state]:
- * - IMPORTED: the newly created Money Manager transaction ID
- * - DUPLICATE: the pre-existing transaction ID that this entry duplicates
- * - ERROR: null
  */
 data class ApiResponseTransaction(
     val id: ApiResponseTransactionId,
     val responseId: ApiResponseId,
     val jsonPath: JsonPath,
     val state: ApiResponseTransactionState,
-    val transactionId: TransferId?,
     val errorMessage: String?,
 )
 
