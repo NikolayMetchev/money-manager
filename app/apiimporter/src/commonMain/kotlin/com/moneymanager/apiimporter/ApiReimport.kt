@@ -94,7 +94,14 @@ suspend fun executeApiReimport(
     val importStartedAt = Clock.System.now()
     return importEngine.executeSourceRerun(
         plan = plan,
-        resetRecords = ImportBatch(apiSessionMutations = listOf(ApiSessionMutation.DeleteResponseTransactionsBySession(session.id))),
+        resetRecords =
+            ImportBatch(
+                apiSessionMutations =
+                    listOf(
+                        ApiSessionMutation.DeleteResponseTransactionsBySession(session.id),
+                        ApiSessionMutation.ReleaseAdoptedAttributes(session.id),
+                    ),
+            ),
         reads = reads,
         maintenance = maintenance,
         cascadeRerunner = cascadeRerunner,

@@ -381,8 +381,45 @@ object OracleCorpus {
             changedStrategy = "Bybit Funding CSV",
         )
 
+    /**
+     * Monzo's data export and two downloads of its API, all of one account: the export holds two payments, the first
+     * download those two, the second (an incremental download overlapping it) the second payment again and a third.
+     */
+    val MONZO_CSV_API =
+        OracleScenario(
+            name = "Monzo CSV + overlapping API sessions",
+            sources =
+                listOf(
+                    OracleSource(
+                        monzoFile(
+                            "MonzoDataExport_api.csv",
+                            monzoRow("tx_api_1", "20/11/2023", "08:01:00", "Tesco", "-12.40", "TESCO STORES"),
+                            monzoRow("tx_api_2", "21/11/2023", "18:30:00", "Landlord", "-900.00", "RENT"),
+                        ),
+                        account = "Monzo",
+                    ),
+                    OracleSource(
+                        OracleFile.Api("monzo-session-1", "Monzo", listOf(MONZO_ACCOUNTS, monzoTransactions(MONZO_TX_1, MONZO_TX_2))),
+                    ),
+                    OracleSource(
+                        OracleFile.Api("monzo-session-2", "Monzo", listOf(MONZO_ACCOUNTS, monzoTransactions(MONZO_TX_2, MONZO_TX_3))),
+                    ),
+                ),
+            changedStrategy = "Monzo CSV",
+        )
+
     val ALL: List<OracleScenario> =
-        listOf(MONZO_JOINT, FREETRADE_MONZO, AMEX_SANTANDER, REVOLUT, PAYPAL_CARD, CURVE, BINANCE_KOINLY, BYBIT_CSV_API)
+        listOf(
+            MONZO_JOINT,
+            FREETRADE_MONZO,
+            AMEX_SANTANDER,
+            REVOLUT,
+            PAYPAL_CARD,
+            CURVE,
+            BINANCE_KOINLY,
+            BYBIT_CSV_API,
+            MONZO_CSV_API,
+        )
 }
 
 private val MONZO_HEADERS =
@@ -656,3 +693,35 @@ private val BYBIT_WITHDRAWAL =
         "createTime":"1699867096000","updateTime":"1699868403000","withdrawId":"26711021","withdrawType":0}],
         "nextPageCursor":""},"retExtInfo":{},"time":1790930647825}
         """.trimIndent()
+
+private const val MONZO_ACCOUNT_ID = "acc_00009ORACLE00000000001"
+
+private val MONZO_ACCOUNTS =
+    "https://api.monzo.com/accounts" to
+        """
+        {"accounts": [{"id": "$MONZO_ACCOUNT_ID", "closed": false, "created": "2022-01-01T00:00:00.000Z",
+          "description": "user_00009ORACLE0000user", "type": "uk_retail", "currency": "GBP"}]}
+        """.trimIndent()
+
+// Monzo's amounts are in pence; its ids are the export's Transaction IDs.
+private val MONZO_TX_1 =
+    """
+    {"id": "tx_api_1", "account_id": "$MONZO_ACCOUNT_ID", "created": "2023-11-20T08:01:00.000Z", "amount": -1240,
+     "currency": "GBP", "description": "TESCO STORES", "merchant": {"name": "Tesco"}, "counterparty": {}}
+    """.trimIndent()
+
+private val MONZO_TX_2 =
+    """
+    {"id": "tx_api_2", "account_id": "$MONZO_ACCOUNT_ID", "created": "2023-11-21T18:30:00.000Z", "amount": -90000,
+     "currency": "GBP", "description": "RENT", "merchant": null, "counterparty": {"name": "Landlord"}}
+    """.trimIndent()
+
+private val MONZO_TX_3 =
+    """
+    {"id": "tx_api_3", "account_id": "$MONZO_ACCOUNT_ID", "created": "2023-11-22T12:00:00.000Z", "amount": -350,
+     "currency": "GBP", "description": "PRET A MANGER", "merchant": {"name": "Pret A Manger"}, "counterparty": {}}
+    """.trimIndent()
+
+private fun monzoTransactions(vararg transactions: String): Pair<String, String> =
+    "https://api.monzo.com/transactions?account_id=$MONZO_ACCOUNT_ID&limit=100" to
+        """{"transactions": [${transactions.joinToString(",\n")}]}"""

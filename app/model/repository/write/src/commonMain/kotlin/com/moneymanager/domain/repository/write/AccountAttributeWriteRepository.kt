@@ -1,6 +1,7 @@
 package com.moneymanager.domain.repository.write
 
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 
@@ -70,6 +71,26 @@ interface AccountAttributeWriteRepository : AccountAttributeReadRepository {
      * which bumps the account revision and records to audit.
      */
     suspend fun delete(id: Long)
+
+    /**
+     * Records [sessionId] as an owner of what the (type, group) slot of [accountId] holds: an attribute the session's import
+     * adopted onto an account it didn't create.
+     */
+    suspend fun claimForApiSession(
+        accountId: AccountId,
+        attributeTypeId: AttributeTypeId,
+        groupKey: String,
+        sessionId: ApiSessionId,
+    )
+
+    /** Whether any API session owns attribute [id] ([claimForApiSession]). */
+    suspend fun isClaimed(id: Long): Boolean
+
+    /**
+     * Drops every claim of [sessionId] and deletes the attributes it leaves unclaimed, as unimporting or re-importing the
+     * session does with what it booked. Returns how many attributes it deleted.
+     */
+    suspend fun releaseApiSession(sessionId: ApiSessionId): Int
 }
 
 data class AccountAttributeCreateInput(
