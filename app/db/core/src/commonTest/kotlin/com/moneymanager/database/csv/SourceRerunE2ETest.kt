@@ -256,6 +256,15 @@ class SourceRerunE2ETest : DbTest() {
             // The edit is an override on the kept id, so the next re-import keeps it too.
             val again = reimports.planFile(first.id)
             assertEquals(1, again.cascaded.size, "the re-run duplicate is recorded against the kept transaction")
+            val keptEdit = again.manualEdits.single()
+            assertEquals("Flat white", keptEdit.description, "the plan still lists the edit after an id-stable re-import")
+            assertEquals(coffee.description, keptEdit.imported.description, "against what the import says")
+            assertEquals(
+                listOf("work trip"),
+                keptEdit.attributes.values
+                    .single()
+                    .map { it.value },
+            )
             reimports.runPlan(again)
             val twice = transfersOn(monzo).single { it.id == coffee.id }
             assertEquals("Flat white", twice.description)

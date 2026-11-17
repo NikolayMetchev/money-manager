@@ -22,9 +22,11 @@ import com.moneymanager.domain.repository.HolidayCalendarReadRepository
 import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.ImportRecordReadRepository
 import com.moneymanager.domain.repository.ImportTimelineReadRepository
+import com.moneymanager.domain.repository.ObservationReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
 import com.moneymanager.domain.repository.PersonAttributeReadRepository
+import com.moneymanager.domain.repository.PersonOverrideReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.ReconciliationReadRepository
 import com.moneymanager.domain.repository.RelationshipReadRepository
@@ -85,6 +87,8 @@ data class TransactionsDomain(
     val relationshipRepository: RelationshipReadRepository,
     val tradeRepository: TradeReadRepository,
     val exchangeOrderRepository: ExchangeOrderReadRepository,
+    val personOverrideRepository: PersonOverrideReadRepository,
+    val observationRepository: ObservationReadRepository,
     val importEngine: ImportEngine,
 )
 
@@ -144,6 +148,8 @@ fun DatabaseComponent.toAppServices(importEngine: ImportEngine) =
                 relationshipRepository = relationshipRepository,
                 tradeRepository = tradeRepository,
                 exchangeOrderRepository = exchangeOrderRepository,
+                personOverrideRepository = personOverrideRepository,
+                observationRepository = observationRepository,
                 importEngine = importEngine,
             ),
         people =
