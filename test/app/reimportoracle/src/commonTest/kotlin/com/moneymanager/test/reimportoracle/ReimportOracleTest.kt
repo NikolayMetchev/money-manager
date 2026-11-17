@@ -153,7 +153,7 @@ class ReimportOracleTest {
         check(trades.isEmpty() || trades.any { ORACLE_TRADE_EXCLUSION in it }) { "the hand exclusion of a trade is missing" }
     }
 
-    /** Which of [ids] a re-import gave a new id rather than keeping (#1430): a person's work hangs off the old one. */
+    /** Which of the hand-worked records a re-import gave a new id rather than keeping (#1430): a person's work hangs off the old one. */
     private suspend fun OracleDatabase.lostIds(
         handled: HandWork,
         context: String,
