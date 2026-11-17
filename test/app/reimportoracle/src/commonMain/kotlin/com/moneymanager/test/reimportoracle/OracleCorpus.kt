@@ -322,6 +322,13 @@ object OracleCorpus {
                                     to = Triple("Binance;binance", "0.5", "BTC;1"),
                                 ),
                                 koinlyRow(
+                                    "K2",
+                                    "2021-05-22 12:00:00",
+                                    "trade",
+                                    from = Triple("Binance;binance", "0.1", "BTC;1"),
+                                    to = Triple("Binance;binance", "4000", "USDT;2"),
+                                ),
+                                koinlyRow(
                                     "K1",
                                     "2021-05-26 19:48:36",
                                     "transfer",
