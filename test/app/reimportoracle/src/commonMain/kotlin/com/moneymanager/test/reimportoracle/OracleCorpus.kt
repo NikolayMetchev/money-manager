@@ -382,6 +382,35 @@ object OracleCorpus {
         )
 
     /**
+     * Binance's statement export and one API session of the same movements, as `BinanceCsvThenApiE2ETest` stages them:
+     * a deposit the export can only give a placeholder for, the fee rows of a two-fill order whose fees the API books
+     * with its fills, a Simple Earn subscription, and two withdrawals the API reports net of their fee.
+     */
+    val BINANCE_CSV_API =
+        OracleScenario(
+            name = "Binance CSV + API session",
+            sources =
+                listOf(
+                    OracleSource(
+                        OracleFile.Csv(
+                            "0452506e-8714-11ee-9934-06655da838d5-1.csv",
+                            BINANCE_HEADERS,
+                            listOf(
+                                binanceRow("2023-11-14 22:13:21", "Deposit", "BTC", "0.01"),
+                                binanceRow("2023-11-14 22:13:25", "Transaction Fee", "USDT", "-4"),
+                                binanceRow("2023-11-14 22:13:25", "Transaction Fee", "USDT", "-8"),
+                                binanceRow("2023-11-14 22:13:26", "Simple Earn Flexible Subscription", "XMR", "-5.81", "Binance Earn"),
+                                binanceRow("2023-11-14 22:19:00", "Withdraw", "LINK", "-82.358", "Withdraw fee is included"),
+                                binanceRow("2023-11-14 22:20:00", "Fiat Withdrawal", "GBP", "-1134.83"),
+                            ),
+                        ),
+                    ),
+                    OracleSource(OracleFile.Api("binance-session", "Binance", BINANCE_RESPONSES)),
+                ),
+            changedStrategy = "Binance CSV",
+        )
+
+    /**
      * Monzo's data export and two downloads of its API, all of one account: the export holds two payments, the first
      * download those two, the second (an incremental download overlapping it) the second payment again and a third.
      */
@@ -418,6 +447,7 @@ object OracleCorpus {
             CURVE,
             BINANCE_KOINLY,
             BYBIT_CSV_API,
+            BINANCE_CSV_API,
             MONZO_CSV_API,
         )
 }
@@ -693,6 +723,51 @@ private val BYBIT_WITHDRAWAL =
         "createTime":"1699867096000","updateTime":"1699868403000","withdrawId":"26711021","withdrawType":0}],
         "nextPageCursor":""},"retExtInfo":{},"time":1790930647825}
         """.trimIndent()
+
+private fun binanceRow(
+    time: String,
+    operation: String,
+    coin: String,
+    change: String,
+    remark: String = "",
+): List<String> = listOf("53064551", time, "Spot", operation, coin, change, remark)
+
+// Binance's API stamps every movement to the millisecond where the export truncates to the second, and reports the
+// withdrawals net of the charge it books beside them.
+private val BINANCE_RESPONSES =
+    listOf(
+        "https://api.binance.com/sapi/v1/capital/deposit/hisrec?ep=sapi/v1/capital/deposit/hisrec" to
+            """
+            [{"id":"d1","coin":"BTC","amount":"0.01000000","status":1,"address":"bc1qdepositaddr",
+              "network":"BTC","txId":"onchain-dep-1","insertTime":1700000001450}]
+            """.trimIndent(),
+        "https://api.binance.com/api/v3/myTrades?ep=api/v3/myTrades&fv=BTCUSDT" to
+            """
+            [{"symbol":"BTCUSDT","id":28457,"orderId":1000,"price":"40000.00","qty":"0.10000000",
+              "quoteQty":"4000.00","commission":"4.00000000","commissionAsset":"USDT","time":1700000005775,
+              "isBuyer":true},
+             {"symbol":"BTCUSDT","id":28458,"orderId":1000,"price":"40000.00","qty":"0.20000000",
+              "quoteQty":"8000.00","commission":"8.00000000","commissionAsset":"USDT","time":1700000005775,
+              "isBuyer":true}]
+            """.trimIndent(),
+        "https://api.binance.com/sapi/v1/fiat/orders?ep=sapi/v1/fiat/orders?transactionType=1" to
+            """
+            {"code":"000000","message":"success","data":[
+              {"orderNo":"fw1","fiatCurrency":"GBP","amount":"1133.33","totalFee":"1.5","status":"Successful",
+               "createTime":1700000012000}
+            ],"total":1,"success":true}
+            """.trimIndent(),
+        "https://api.binance.com/sapi/v1/capital/withdraw/history?ep=sapi/v1/capital/withdraw/history" to
+            """
+            [{"id":"w1","coin":"LINK","amount":"81.10800000","transactionFee":"1.25000000","status":6,
+              "address":"0xwithdrawaddr","network":"ETH","txId":"onchain-wd-1","applyTime":"2023-11-14 22:19:30"}]
+            """.trimIndent(),
+        "https://api.binance.com/sapi/v1/simple-earn/flexible/history/subscriptionRecord" +
+            "?ep=sapi/v1/simple-earn/flexible/history/subscriptionRecord" to
+            """
+            {"rows":[{"purchaseId":26055,"asset":"XMR","amount":"5.81000000","time":1700000006320,"status":"SUCCESS"}],"total":1}
+            """.trimIndent(),
+    )
 
 private const val MONZO_ACCOUNT_ID = "acc_00009ORACLE00000000001"
 

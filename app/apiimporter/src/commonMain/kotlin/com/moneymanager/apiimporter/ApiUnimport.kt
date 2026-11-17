@@ -99,6 +99,9 @@ suspend fun executeApiUnimport(
                 },
             dedupePolicy = DedupePolicy.None,
             apiSessionMutations = listOf(ApiSessionMutation.ResetToUnimported(plan.sessionId)),
+            // What the session's records were matched or linked with is matched again without them, as a fresh import of
+            // the others would.
+            syncMatches = true,
         ),
     )
     val deletedEmptyAccounts =

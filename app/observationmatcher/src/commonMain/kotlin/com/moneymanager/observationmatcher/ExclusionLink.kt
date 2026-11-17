@@ -21,6 +21,12 @@ enum class ShapeReason {
      */
     SPLIT_CONDUIT,
 
+    /**
+     * One source books a fee as a row of its own (Binance's export: a "Transaction Fee" row), another as the fee of the
+     * record that charged it (the API's trade): the row is excluded, as the fee that names its charge is the precise one.
+     */
+    FEE_ROW,
+
     /** A gross trade one source reports, against the fills another reports for it: the gross trade is excluded. */
     TRADE_AGGREGATION,
 

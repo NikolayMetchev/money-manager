@@ -172,6 +172,9 @@ suspend fun executeCsvUnimport(
                     CsvImportMutation.ResetToUnimported(plan.importId),
                     CsvImportMutation.SetIgnored(plan.importId, ignored = true),
                 ),
+            // What the file's rows were matched or linked with is matched again without them, as a fresh import of the
+            // others would.
+            syncMatches = true,
         ),
     )
 

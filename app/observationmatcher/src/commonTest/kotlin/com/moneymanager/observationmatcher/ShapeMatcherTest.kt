@@ -111,6 +111,29 @@ class ShapeMatcherTest {
     }
 
     @Test
+    fun `a fee row is excluded against the fee another source books with its charge`() {
+        val api = record("api-trade", "api-session", leg(FEE, EXCHANGE, EXCHANGE_FEES, 4))
+        val csv = record("csv-fee", "csv-export", leg(MAIN, EXCHANGE, EXCHANGE_FEES, 4))
+        val records = listOf(api, csv)
+
+        val result = matcher.match(records.flatMap { it.observations })
+
+        val link = result.links.single()
+        assertEquals(ShapeReason.FEE_ROW, link.reason)
+        assertEquals(setOf(key("csv-fee", MAIN)), link.excluded.keys(records))
+        assertEquals(mapOf(EXCHANGE to -4L, EXCHANGE_FEES to 4L), balances(records, result))
+    }
+
+    @Test
+    fun `a fee row of another amount or account is no fee row`() {
+        val api = record("api-trade", "api-session", leg(FEE, EXCHANGE, EXCHANGE_FEES, 4))
+        val other = record("csv-fee", "csv-export", leg(MAIN, EXCHANGE, EXCHANGE_FEES, 5))
+        val elsewhere = record("csv-payment", "csv-export", leg(MAIN, EXCHANGE, WALLET, 4))
+
+        assertTrue(matcher.match((listOf(api, other, elsewhere)).flatMap { it.observations }).links.isEmpty())
+    }
+
+    @Test
     fun `a gross leg naming the same far end matches but not one naming another`() {
         val api = record("api", "api-session", leg(MAIN, EXCHANGE, WALLET, 99), leg(FEE, EXCHANGE, EXCHANGE_FEES, 1))
         val same = record("same", "csv-1", leg(MAIN, EXCHANGE, WALLET, 100))
