@@ -135,6 +135,7 @@ fun ReimportDialog(
         onComplete = onComplete,
         report = { finished ->
             Text(finished.toSummary(), style = MaterialTheme.typography.bodyMedium)
+            ImportPlanReport(finished.plan, accountName)
             UnmatchedEditsReport(finished.unmatchedEdits, accountName)
             UnmatchedLinksReport(finished.reappliedLinks)
         },

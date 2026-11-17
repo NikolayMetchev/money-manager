@@ -105,8 +105,9 @@ private fun Attention(
     val run = model.lastRun ?: return
     val items = model.attention
     val errors = run.errors
-    if (items.isEmpty() && errors.isEmpty()) return
     Text("")
+    model.planSummary?.let { Text(fit("Last run · $it", width)) }
+    if (items.isEmpty() && errors.isEmpty()) return
     for (error in errors) Text(fit("✗ $error", width), color = Color.Red)
     if (items.isEmpty()) return
     Text(fit("Needs attention · ${items.size}", width), textStyle = TextStyle.Bold)

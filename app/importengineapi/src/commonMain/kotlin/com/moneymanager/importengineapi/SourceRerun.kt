@@ -282,6 +282,8 @@ data class SourceRerunResult<R>(
     val reappliedLinks: ReappliedLinks = ReappliedLinks(),
     /** Where a staged file's new records disagree with what a person set on them (#1430), for a person to resolve. */
     val conflicts: List<MaterializationConflict> = emptyList(),
+    /** What the re-import created, changed (field by field) and removed, with [conflicts] and the released overrides. */
+    val plan: ImportPlan = ImportPlan(),
 )
 
 /** The outcome of [executeRerun]; [result] is what its run returned. */
@@ -293,6 +295,7 @@ data class RerunOutcome<R>(
     val reappliedLinks: ReappliedLinks,
     val deletedEmptyAccounts: List<String>,
     val conflicts: List<MaterializationConflict> = emptyList(),
+    val plan: ImportPlan = ImportPlan(),
 )
 
 /**
@@ -459,6 +462,7 @@ suspend fun <R> ImportEngine.executeSourceRerun(
         deletedEmptyAccounts = outcome.deletedEmptyAccounts,
         reappliedLinks = outcome.reappliedLinks,
         conflicts = outcome.conflicts,
+        plan = outcome.plan,
     )
 }
 
@@ -484,6 +488,13 @@ suspend fun <R> ImportEngine.executeRerun(
     run: suspend () -> R,
 ): RerunOutcome<R> {
     val deletedTransfers = files.flatMapTo(mutableSetOf()) { it.createdTransfers.keys }
+    val before =
+        TransactionSnapshot.read(
+            files.flatMap { it.createdTransfers.entries }.associate { it.key to it.value },
+            files.flatMap { reads.transferSourceRepository.getTradesCreatedBy(it.file).entries }.associate { it.key to it.value },
+            reads.transactionRepository,
+            reads.tradeRepository,
+        )
     val unhideUpdates =
         reconciledPartnerUnhideUpdates(deletedTransfers, reads.relationshipRepository, reads.transactionRepository)
     val resets =
@@ -571,6 +582,14 @@ suspend fun <R> ImportEngine.executeRerun(
                 )
             }.orEmpty() + emptiedByRun
 
+    val after =
+        TransactionSnapshot.read(
+            files.flatMap { reads.transferSourceRepository.getTransfersCreatedBy(it.file).entries }.associate { it.key to it.value },
+            files.flatMap { reads.transferSourceRepository.getTradesCreatedBy(it.file).entries }.associate { it.key to it.value },
+            reads.transactionRepository,
+            reads.tradeRepository,
+        )
+
     if (refreshViews) {
         onProgress?.invoke(Progress("Refreshing views"))
         maintenance.refreshMaterializedViews()
@@ -584,6 +603,7 @@ suspend fun <R> ImportEngine.executeRerun(
         reappliedLinks = reapplication.links + ReappliedLinks(notReapplied = orphanedTradeEdits),
         deletedEmptyAccounts = deletedEmptyAccounts,
         conflicts = settled.conflicts,
+        plan = planFrom(before, after, settled.conflicts, settled.releasedOverridden),
     )
 }
 

@@ -265,6 +265,12 @@ internal val IMPORT_DIRS_GOLDEN =
                 ],
                 "failures": []
             },
+            "plan": {
+                "created": 1,
+                "updated": 0,
+                "removed": 0,
+                "conflicts": []
+            },
             "needsAttention": [
                 {
                     "kind": "noStrategy",
