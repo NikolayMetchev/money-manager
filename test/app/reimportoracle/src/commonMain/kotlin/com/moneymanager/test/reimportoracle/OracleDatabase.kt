@@ -169,8 +169,11 @@ class OracleDatabase private constructor(
     }
 
     /** Re-imports every one of [sources] in one run, as "Re-import all" does. */
-    suspend fun reimportAll(sources: List<OracleSource> = scenario.sources) {
-        val reimports = db.reimports()
+    suspend fun reimportAll(
+        sources: List<OracleSource> = scenario.sources,
+        force: Boolean = false,
+    ) {
+        val reimports = db.reimports(skipUnchanged = !force)
         val files =
             sources.map { source ->
                 val id = requireNotNull(staged[source]) { "${source.file.fileName} was never imported" }

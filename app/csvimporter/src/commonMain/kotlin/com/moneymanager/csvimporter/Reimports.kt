@@ -6,6 +6,7 @@ import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.ImportFileKind
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
@@ -357,42 +358,64 @@ class Reimports(
             ) {
                 val strategies = csvImportStrategyRepository.getAllStrategies().first()
                 val currencies = currencies()
-                runBulkReimport(
-                    imports = run,
-                    rowCount = { it.rowCount },
-                    fileName = fileLabel,
-                    stopRequested = stopRequested,
-                    logLabel = "file",
-                    onProgress = onFileProgress,
-                    startDetail = "Preparing",
-                    prepare = { onPrepared ->
-                        // Every crypto asset the run needs exists before the first file, at the run-wide precision.
-                        prepareImports(run, strategies, currencies, reads.csvImportRepository, importEngine, cryptoRepository) { index, _ ->
-                            onPrepared(index)
-                        }
-                    },
-                ) { _, file, _, onFileProgress ->
-                    val strategy = plan.strategies[file.source]
-                    when {
-                        // An empty file has nothing to re-import, and (unlike a missing strategy) is not counted.
-                        file.rowCount == 0 -> {
-                            BulkReimportFileOutcome.NoWork
-                        }
+                val booked = mutableListOf<Set<TransferId>>()
+                val result =
+                    runBulkReimport(
+                        imports = run,
+                        rowCount = { it.rowCount },
+                        fileName = fileLabel,
+                        stopRequested = stopRequested,
+                        logLabel = "file",
+                        onProgress = onFileProgress,
+                        startDetail = "Preparing",
+                        prepare = { onPrepared ->
+                            // Every crypto asset the run needs exists before the first file, at the run-wide precision.
+                            prepareImports(
+                                run,
+                                strategies,
+                                currencies,
+                                reads.csvImportRepository,
+                                importEngine,
+                                cryptoRepository,
+                            ) { index, _ ->
+                                onPrepared(index)
+                            }
+                        },
+                    ) { _, file, _, reportFile ->
+                        val strategy = plan.strategies[file.source]
+                        when {
+                            // An empty file has nothing to re-import, and (unlike a missing strategy) is not counted.
+                            file.rowCount == 0 -> {
+                                BulkReimportFileOutcome.NoWork
+                            }
 
-                        strategy == null -> {
-                            BulkReimportFileOutcome.NoStrategy
-                        }
+                            strategy == null -> {
+                                BulkReimportFileOutcome.NoStrategy
+                            }
 
-                        else -> {
-                            val imported = plan.imported.getValue(file.source)
-                            val settings = ImportedSettings(imported.accountId ?: accountId, imported.currencyId ?: currencyId)
-                            val result = runStaged(file, strategy, settings, currencies, onFileProgress)
-                            BulkReimportFileOutcome.Reimported(
-                                successCount = result?.successCount ?: 0,
-                                duplicateCount = result?.duplicateCount ?: 0,
-                            )
+                            else -> {
+                                val imported = plan.imported.getValue(file.source)
+                                val settings = ImportedSettings(imported.accountId ?: accountId, imported.currencyId ?: currencyId)
+                                val booking = runStaged(file, strategy, settings, currencies, reportFile)
+                                if (booking != null) booked += booking.createdTransferIds
+                                BulkReimportFileOutcome.Reimported(
+                                    successCount = booking?.successCount ?: 0,
+                                    duplicateCount = booking?.duplicateCount ?: 0,
+                                )
+                            }
                         }
                     }
+                if (booked.isEmpty()) {
+                    result
+                } else {
+                    // Match once over the booked files, while the re-run still holds the reservations for settling.
+                    lastFileProgress?.let { progress ->
+                        val step = "Matching observations"
+                        onProgress(progress.copy(detail = step, item = progress.item?.copy(step = step)))
+                    }
+                    val gone = importEngine.import(ImportBatch(syncMatches = true)).matchSync.deleted
+                    val folded = booked.sumOf { ids -> ids.count { it in gone } }
+                    result.copy(transfersCreated = result.transfersCreated - folded, duplicatesSkipped = result.duplicatesSkipped + folded)
                 }
             }
         return outcome.result.copy(
@@ -456,6 +479,7 @@ class Reimports(
             cryptoRepository = cryptoRepository,
             attributeAccountMatchers = AttributeAccountMatcher.registry(accountAttributeRepository.getAll().first()),
             tradeRepository = reads.tradeRepository,
+            syncMatches = false,
         )
 
     /**

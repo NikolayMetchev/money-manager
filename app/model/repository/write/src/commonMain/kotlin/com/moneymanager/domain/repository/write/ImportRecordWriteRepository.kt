@@ -13,9 +13,9 @@ interface ImportRecordWriteRepository : ImportRecordReadRepository {
         contentHash: String,
     ): ImportRecordId
 
-    suspend fun updateContentHash(
-        id: ImportRecordId,
-        contentHash: String,
+    suspend fun writeRecords(
+        inserts: Map<ImportRecordKey, String>,
+        hashes: Map<ImportRecordId, String>,
     )
 
     /** Deletes a record and its group memberships. Its observations must be deleted first. */

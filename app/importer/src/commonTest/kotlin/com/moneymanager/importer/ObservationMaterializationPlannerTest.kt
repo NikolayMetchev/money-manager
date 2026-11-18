@@ -2,6 +2,8 @@ package com.moneymanager.importer
 
 import com.moneymanager.bigdecimal.BigInteger
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.ApiSessionId
+import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransactionId
@@ -124,6 +126,11 @@ class ObservationMaterializationPlannerTest {
     private inner class ReadObservations : ObservationReadRepository {
         override suspend fun getObservationsOf(owner: ObservationOwner) = if (owner == existingOwner) listOf(stored) else emptyList()
 
+        override suspend fun getObservationsOfRecords(recordIds: Collection<ImportRecordId>): Nothing =
+            error("Unexpected record lookup: $recordIds")
+
+        override suspend fun getReservedIds(ids: Collection<ObservationId>): Nothing = error("Unexpected reservation lookup: $ids")
+
         override suspend fun getObservationsOfTransaction(transactionId: TransactionId): List<Observation> {
             assertEquals(existingId, transactionId)
             return listOf(stored)
@@ -133,6 +140,21 @@ class ObservationMaterializationPlannerTest {
             assertEquals(existingId, transactionId)
             return saved
         }
+
+        override suspend fun getObservationsOfTransactions(transactionIds: Collection<TransactionId>): List<Observation> =
+            transactionIds.flatMap { getObservationsOfTransaction(it) }
+
+        override suspend fun getRecordTransactions(
+            csvImports: Set<CsvImportId>,
+            apiSessions: Set<ApiSessionId>,
+        ): Nothing = error("Unexpected source lookup for CSV files $csvImports and API sessions $apiSessions")
+
+        override suspend fun getTransactionsObservedByOtherRecords(
+            transactions: Collection<TransactionId>,
+            csvImports: Set<CsvImportId>,
+            apiSessions: Set<ApiSessionId>,
+        ): Nothing =
+            error("Unexpected source lookup for transactions $transactions outside CSV files $csvImports and API sessions $apiSessions")
 
         override suspend fun getObservation(id: ObservationId): Nothing = error("Unexpected lookup: $id")
 
@@ -145,12 +167,22 @@ class ObservationMaterializationPlannerTest {
 
         override suspend fun getVacantReserved(): Nothing = error("Unexpected reservation lookup")
 
+        override suspend fun getVacantReservedRecords(recordIds: Collection<ImportRecordId>): Nothing =
+            error("Unexpected record reservation lookup: $recordIds")
+
+        override suspend fun getVacantReservedGroups(): Nothing = error("Unexpected group reservation lookup")
+
+        override suspend fun getMaterializedIds(transactionIds: Collection<TransactionId>): Nothing =
+            error("Unexpected row lookup: $transactionIds")
+
         override suspend fun getReserved(): Nothing = error("Unexpected reservation lookup")
 
         override suspend fun isReserved(id: ObservationId): Nothing = error("Unexpected lookup: $id")
     }
 
     private inner class Overrides : PersonOverrideReadRepository {
+        override suspend fun getOverriddenTransactions(): Nothing = error("Unexpected override lookup")
+
         override suspend fun getTransferOverrides(transferId: TransferId): Map<TransferField, String> {
             assertEquals(existingId, transferId)
             return mapOf(TransferField.DESCRIPTION to "My edit")

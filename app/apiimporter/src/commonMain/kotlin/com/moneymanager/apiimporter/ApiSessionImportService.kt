@@ -3114,7 +3114,7 @@ private class CurrencyCache(
 ) {
     private val mutex = Mutex()
     private var currenciesByCode: Map<String, Currency>? = null
-    private var codeByName: Map<String, String> = emptyMap()
+    private var codeByName: Lazy<Map<String, String>> = lazyOf(emptyMap())
 
     // A code, else a currency's name, as a CSV row's is read (see [resolveAssetCode]).
     suspend fun getCurrency(code: String): Currency? {
@@ -3129,7 +3129,7 @@ private class CurrencyCache(
 
             currencyRepository.getAllCurrencies().first().associateBy { it.code.uppercase() }.also {
                 currenciesByCode = it
-                codeByName = codesByName(it.values.map { currency -> currency.code to currency.name })
+                codeByName = lazy { codesByName(it.values.map { currency -> currency.code to currency.name }) }
             }
         }
 }

@@ -18,6 +18,7 @@ import com.moneymanager.domain.model.observation.Observation
 import com.moneymanager.domain.model.observation.ObservationEnd
 import com.moneymanager.domain.model.observation.ObservationOwner
 import com.moneymanager.domain.model.observation.ObservedValues
+import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.domain.model.rules.meets
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.ApiSessionReadRepository
@@ -39,9 +40,12 @@ import com.moneymanager.observationmatcher.ObservationRef
 import com.moneymanager.observationmatcher.RecordIdentity
 import com.moneymanager.observationmatcher.SameFamilyRules
 import com.moneymanager.observationmatcher.ShapeMatcher
+import com.moneymanager.observationmatcher.ShapeReason
+import com.moneymanager.observationmatcher.ShapeWindow
 import com.moneymanager.observationmatcher.TradeRules
 import com.moneymanager.observationmatcher.TradeStages
 import kotlinx.coroutines.flow.first
+import kotlin.time.Duration
 import kotlin.time.Instant
 
 /**
@@ -145,7 +149,8 @@ class MatchScopeLoader(
         val recordKey: String,
     )
 
-    private val strategyOfCredential = mutableMapOf<ApiCredentialId, String>()
+    private var strategyOfCredential: Map<ApiCredentialId, String>? = null
+    private val familyOfApiSession = mutableMapOf<ApiSessionId, String>()
 
     private suspend fun originOf(
         owner: ObservationOwner,
@@ -182,17 +187,17 @@ class MatchScopeLoader(
             ?.lastAppliedStrategyId
             ?.let { csvFamily(it.toString()) } ?: "$UNKNOWN_FAMILY:${csvContainer(id)}"
 
-    private suspend fun apiFamily(id: ApiSessionId): String {
+    private suspend fun apiFamily(id: ApiSessionId): String = familyOfApiSession.getOrPut(id) { apiFamilyUncached(id) }
+
+    private suspend fun apiFamilyUncached(id: ApiSessionId): String {
         val credential = apiSessions.getSessionById(id)?.credentialId ?: return "$UNKNOWN_FAMILY:${apiContainer(id)}"
-        if (credential !in strategyOfCredential) {
-            apiSessions.getCredentialsFlow().first().forEach { c ->
-                c.strategyId?.let {
-                    strategyOfCredential[c.id] =
-                        apiFamily(it.toString())
-                }
-            }
-        }
-        return strategyOfCredential[credential] ?: "$UNKNOWN_FAMILY:${apiContainer(id)}"
+        val strategies =
+            strategyOfCredential ?: apiSessions
+                .getAllCredentials()
+                .mapNotNull { c -> c.strategyId?.let { c.id to apiFamily(it.toString()) } }
+                .toMap()
+                .also { strategyOfCredential = it }
+        return strategies[credential] ?: "$UNKNOWN_FAMILY:${apiContainer(id)}"
     }
 
     companion object {
@@ -225,6 +230,7 @@ class MatchScopeLoader(
             families: Map<String, MatchFamily>,
             containerAccounts: Map<String, Set<AccountId>> = emptyMap(),
             calendarFor: (List<AccountId>) -> BusinessDayCalendar = { WeekendOnlyCalendar },
+            stageReasons: Set<ShapeReason>? = null,
         ): ObservationMatcher {
             val policies = families.mapValues { it.value.dedupePolicy }
             val tradePolicies =
@@ -241,7 +247,7 @@ class MatchScopeLoader(
                     // same movement finds it, as the deduper found every transfer on its accounts.
                     CrossSourceRules.forPolicies(mapOf(MANUAL_FAMILY to DedupePolicy.None) + policies, containerAccounts, calendarFor) +
                     TradeRules.forPolicies(tradePolicies),
-                TradeStages.forPolicies(tradePolicies, conversionWindows),
+                TradeStages.forPolicies(tradePolicies, conversionWindows).filter { stageReasons == null || it.reason in stageReasons },
             )
         }
 
@@ -253,18 +259,75 @@ class MatchScopeLoader(
             families: Map<String, MatchFamily>,
             calendarFor: (List<AccountId>) -> BusinessDayCalendar = { WeekendOnlyCalendar },
         ): ShapeMatcher {
-            val policies = families.mapValues { CrossSourcePolicy.of(it.value.dedupePolicy) }
-            return ShapeMatcher { a, b ->
-                val x = a.content.values as ObservedValues.Transfer
-                val y = b.content.values as ObservedValues.Transfer
-                val calendar = calendarFor(listOf(x.sourceAccountId, x.targetAccountId, y.sourceAccountId, y.targetAccountId).distinct())
-                listOf(a, b).any { o ->
-                    val policy = policies[o.family] ?: return@any false
-                    listOfNotNull(policy.placeholderWindow, policy.reconcileWindow).any { window ->
-                        window.meets(x.timestamp, a.crossSource.approximateUntil, y.timestamp, b.crossSource.approximateUntil, calendar)
+            val windowsByFamily =
+                families.mapValues { (_, family) ->
+                    val policy = CrossSourcePolicy.of(family.dedupePolicy)
+                    listOfNotNull(policy.placeholderWindow, policy.reconcileWindow).distinct()
+                }
+            val businessDayFamilies = windowsByFamily.filterValues { windows -> windows.any { it is SettlementWindow.BusinessDays } }.keys
+            val elapsedByFamily =
+                windowsByFamily.mapValues { (_, windows) ->
+                    windows.filterIsInstance<SettlementWindow.Elapsed>().maxOfOrNull { it.duration } ?: Duration.ZERO
+                }
+            val window =
+                object : ShapeWindow {
+                    override fun candidateBounds(
+                        observation: MatchObservation,
+                        otherFamily: String,
+                    ): ClosedRange<Instant>? {
+                        if (observation.family in businessDayFamilies || otherFamily in businessDayFamilies) return null
+                        val reach =
+                            maxOf(
+                                Duration.ZERO,
+                                elapsedByFamily[observation.family] ?: Duration.ZERO,
+                                elapsedByFamily[otherFamily] ?: Duration.ZERO,
+                            )
+                        val start = (observation.content.values as ObservedValues.Transfer).timestamp
+                        val end = maxOf(start, observation.crossSource.approximateUntil ?: start)
+                        return (start - reach)..(end + reach)
+                    }
+
+                    override fun holds(
+                        a: MatchObservation,
+                        b: MatchObservation,
+                    ): Boolean {
+                        val first = windowsByFamily[a.family].orEmpty()
+                        val second = windowsByFamily[b.family].orEmpty()
+                        if (first.isEmpty() && second.isEmpty()) return false
+                        val x = a.content.values as ObservedValues.Transfer
+                        val y = b.content.values as ObservedValues.Transfer
+                        var businessCalendar: BusinessDayCalendar? = null
+
+                        fun meets(window: SettlementWindow): Boolean {
+                            val calendar =
+                                when (window) {
+                                    is SettlementWindow.Elapsed -> {
+                                        WeekendOnlyCalendar
+                                    }
+
+                                    is SettlementWindow.BusinessDays -> {
+                                        businessCalendar ?: calendarFor(
+                                            listOf(
+                                                x.sourceAccountId,
+                                                x.targetAccountId,
+                                                y.sourceAccountId,
+                                                y.targetAccountId,
+                                            ).distinct(),
+                                        ).also { businessCalendar = it }
+                                    }
+                                }
+                            return window.meets(
+                                x.timestamp,
+                                a.crossSource.approximateUntil,
+                                y.timestamp,
+                                b.crossSource.approximateUntil,
+                                calendar,
+                            )
+                        }
+                        return first.any { meets(it) } || (first !== second && second.any { meets(it) })
                     }
                 }
-            }
+            return ShapeMatcher(window)
         }
 
         /**

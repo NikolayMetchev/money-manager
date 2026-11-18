@@ -1,5 +1,5 @@
 -- Reads a trade with both legs' assets resolved via asset_details (fiat or crypto, per `kind`).
-selectById:
+selectByIds:
 SELECT
     trade.id,
     trade.revision_id,
@@ -24,7 +24,7 @@ SELECT
 FROM trade
 JOIN asset_details fa ON trade.from_asset_id = fa.id
 JOIN asset_details ta ON trade.to_asset_id = ta.id
-WHERE trade.id = ?;
+WHERE trade.id IN ?;
 
 -- Finds the occurrence-th existing trade identical on every field, for re-import dedup (so
 -- re-running the same CSV/API session doesn't double-book a conversion) while still allowing N

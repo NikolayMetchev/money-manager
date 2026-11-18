@@ -10,6 +10,8 @@ import kotlin.time.Instant
 interface TradeReadRepository {
     fun getTradeById(id: TradeId): Flow<Trade?>
 
+    suspend fun getTradesByIds(ids: Collection<TradeId>): List<Trade>
+
     /** The attributes set on trade [id] (e.g. `excluded` with its reason), ordered by type name. */
     fun getAttributes(id: TradeId): Flow<List<TradeAttribute>>
 

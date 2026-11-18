@@ -52,6 +52,9 @@ class PersonOverrideReadRepositoryImpl(
         return (set + removed).sortedWith(BY_TYPE_AND_GROUP)
     }
 
+    override suspend fun getOverriddenTransactions(): Set<TransactionId> =
+        queries.selectOverriddenTransactions { id, kind -> transactionIdOf(TransactionKind.valueOf(kind), id) }.awaitAsList().toSet()
+
     override suspend fun getPins(observationIds: Collection<ObservationId>): List<ObservationPin> =
         queries
             .selectPins(observationIds.map { it.id }) { observationId, transactionId, kind ->

@@ -10,7 +10,6 @@ import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
-import kotlinx.coroutines.flow.first
 import kotlin.time.Instant
 
 /**
@@ -111,7 +110,7 @@ class TransactionSnapshot(
             tradeRepository: TradeReadRepository?,
         ): TransactionSnapshot {
             val transferRows = if (transfers.isEmpty()) emptyMap() else transactionRepository.getTransactionsByIds(transfers.keys)
-            val tradeRows = tradeRepository?.let { repo -> trades.keys.mapNotNull { repo.getTradeById(it).first() } }.orEmpty()
+            val tradeRows = if (trades.isEmpty()) emptyList() else tradeRepository?.getTradesByIds(trades.keys).orEmpty()
             return TransactionSnapshot(
                 transferRows.values.associate { it.id to it.planned() } + tradeRows.associate { it.id to it.planned() },
                 buildMap {
