@@ -345,23 +345,27 @@ class ShapeMatcherTest {
                 fullChecks++
                 elapsed.holds(a, b)
             }.match(scope)
-        var indexedChecks = 0
-        val indexed =
-            ShapeMatcher(
-                object : ShapeWindow by elapsed {
-                    override fun holds(
-                        a: MatchObservation,
-                        b: MatchObservation,
-                    ): Boolean {
-                        indexedChecks++
-                        return elapsed.holds(a, b)
-                    }
-                },
-            ).match(scope)
+        val indexedWindow = CountingWindow(elapsed)
+        val indexed = ShapeMatcher(indexedWindow).match(scope)
         assertEquals(full.links, indexed.links)
         assertEquals(256, indexed.links.size)
         assertEquals(256 * 512, fullChecks)
-        assertEquals(512, indexedChecks)
+        assertEquals(512, indexedWindow.checks)
+    }
+
+    private class CountingWindow(
+        private val window: ShapeWindow,
+    ) : ShapeWindow by window {
+        var checks = 0
+            private set
+
+        override fun holds(
+            a: MatchObservation,
+            b: MatchObservation,
+        ): Boolean {
+            checks++
+            return window.holds(a, b)
+        }
     }
 
     @Test

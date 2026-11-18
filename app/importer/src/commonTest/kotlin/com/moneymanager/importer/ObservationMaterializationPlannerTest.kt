@@ -126,9 +126,10 @@ class ObservationMaterializationPlannerTest {
     private inner class ReadObservations : ObservationReadRepository {
         override suspend fun getObservationsOf(owner: ObservationOwner) = if (owner == existingOwner) listOf(stored) else emptyList()
 
-        override suspend fun getObservationsOfRecords(recordIds: Collection<ImportRecordId>): Nothing = error("Unexpected record lookup")
+        override suspend fun getObservationsOfRecords(recordIds: Collection<ImportRecordId>): Nothing =
+            error("Unexpected record lookup: $recordIds")
 
-        override suspend fun getReservedIds(ids: Collection<ObservationId>): Nothing = error("Unexpected reservation lookup")
+        override suspend fun getReservedIds(ids: Collection<ObservationId>): Nothing = error("Unexpected reservation lookup: $ids")
 
         override suspend fun getObservationsOfTransaction(transactionId: TransactionId): List<Observation> {
             assertEquals(existingId, transactionId)
@@ -146,13 +147,14 @@ class ObservationMaterializationPlannerTest {
         override suspend fun getRecordTransactions(
             csvImports: Set<CsvImportId>,
             apiSessions: Set<ApiSessionId>,
-        ): Nothing = error("Unexpected source lookup")
+        ): Nothing = error("Unexpected source lookup for CSV files $csvImports and API sessions $apiSessions")
 
         override suspend fun getTransactionsObservedByOtherRecords(
             transactions: Collection<TransactionId>,
             csvImports: Set<CsvImportId>,
             apiSessions: Set<ApiSessionId>,
-        ): Nothing = error("Unexpected source lookup")
+        ): Nothing =
+            error("Unexpected source lookup for transactions $transactions outside CSV files $csvImports and API sessions $apiSessions")
 
         override suspend fun getObservation(id: ObservationId): Nothing = error("Unexpected lookup: $id")
 
@@ -166,11 +168,12 @@ class ObservationMaterializationPlannerTest {
         override suspend fun getVacantReserved(): Nothing = error("Unexpected reservation lookup")
 
         override suspend fun getVacantReservedRecords(recordIds: Collection<ImportRecordId>): Nothing =
-            error("Unexpected record reservation lookup")
+            error("Unexpected record reservation lookup: $recordIds")
 
         override suspend fun getVacantReservedGroups(): Nothing = error("Unexpected group reservation lookup")
 
-        override suspend fun getMaterializedIds(transactionIds: Collection<TransactionId>): Nothing = error("Unexpected row lookup")
+        override suspend fun getMaterializedIds(transactionIds: Collection<TransactionId>): Nothing =
+            error("Unexpected row lookup: $transactionIds")
 
         override suspend fun getReserved(): Nothing = error("Unexpected reservation lookup")
 

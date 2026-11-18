@@ -475,14 +475,12 @@ class ImportEngineImpl(
         }
         // A record observes the trade it lands on, whether it created it or found it again (an overlapping session's
         // fill): unimporting the record that created it must not take it while another still says it.
-        if (observer != null) {
-            observer.recordAll(
-                batch.trades.mapNotNull { intent ->
-                    val tradeId = createdTradeIds[intent.key] ?: return@mapNotNull null
-                    SourceBooking(intent.observationKey(), intent.source, tradeId) { intent.observationContent() }
-                },
-            )
-        }
+        observer?.recordAll(
+            batch.trades.mapNotNull { intent ->
+                val tradeId = createdTradeIds[intent.key] ?: return@mapNotNull null
+                SourceBooking(intent.observationKey(), intent.source, tradeId) { intent.observationContent() }
+            },
+        )
         for (intent in batch.orders) {
             val orderResult =
                 exchangeOrderRepository.upsertOrder(
