@@ -244,6 +244,9 @@ exclude:
       - bazel/kmp/checks/checks.bzl
       - bazel/kmp/constants/google_oauth.bzl
       - bazel/kmp/deps/extensions.bzl
+      # The desktop BUILD loads and calls these packaging rules.
+      - bazel/kmp/jpackage/jpackage.bzl
+      - bazel/kmp/proguard/proguard.bzl
       - bazel/kmp/metadata.bzl
       - bazel/kmp/native.bzl
       - bazel/kmp/native/extensions.bzl

@@ -699,12 +699,12 @@ class ImportEngineImpl(
         // only reserved observations say it, it is vacated with the rest, so the record takes the id back.
         val decidedAlone =
             reserved
+                .asSequence()
                 .filter { it.id in decided || it.isCopy() }
                 .filter { it.id !in alreadyVacant && it.transactionId !in vacatingIds }
                 .map { it.transactionId }
-                .distinct()
-                .filter { id -> observations.getObservationsOfTransaction(id).all { it.id in reservedIds } }
                 .toSet()
+                .filterTo(mutableSetOf()) { id -> observations.getObservationsOfTransaction(id).all { it.id in reservedIds } }
         transactionRepository.deleteTransactions(decidedAlone.filterIsInstance<TransferId>())
         tradeRepository.deleteTrades(decidedAlone.filterIsInstance<TradeId>())
         val kept =

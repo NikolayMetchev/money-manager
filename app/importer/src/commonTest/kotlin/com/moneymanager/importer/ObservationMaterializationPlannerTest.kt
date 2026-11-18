@@ -6,6 +6,7 @@ import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.observation.AttributeOverride
 import com.moneymanager.domain.model.observation.ImportRecordId
 import com.moneymanager.domain.model.observation.MaterializedTransaction
 import com.moneymanager.domain.model.observation.MaterializedWrite
@@ -155,18 +156,22 @@ class ObservationMaterializationPlannerTest {
             return mapOf(TransferField.DESCRIPTION to "My edit")
         }
 
-        override suspend fun getTransferAttributeOverrides(transferId: TransferId) = emptyList<Nothing>()
+        override suspend fun getTransferAttributeOverrides(transferId: TransferId): List<AttributeOverride> {
+            assertEquals(existingId, transferId)
+            return emptyList()
+        }
 
-        override suspend fun getTradeAttributeOverrides(tradeId: TradeId) = emptyList<Nothing>()
+        override suspend fun getTradeAttributeOverrides(tradeId: TradeId): Nothing = error("Unexpected lookup: $tradeId")
 
-        override suspend fun getPins(observationIds: Collection<ObservationId>) = emptyList<Nothing>()
+        override suspend fun getPins(observationIds: Collection<ObservationId>): Nothing = error("Unexpected lookup: $observationIds")
 
-        override suspend fun getPinsOnTransactions(transactionIds: Collection<TransactionId>) = emptyList<Nothing>()
+        override suspend fun getPinsOnTransactions(transactionIds: Collection<TransactionId>): Nothing =
+            error("Unexpected lookup: $transactionIds")
 
         override suspend fun getAllPins() = emptyList<Nothing>()
 
         override suspend fun getAllSplits() = emptySet<Nothing>()
 
-        override suspend fun getSplits(observationIds: Collection<ObservationId>) = emptySet<Nothing>()
+        override suspend fun getSplits(observationIds: Collection<ObservationId>): Nothing = error("Unexpected lookup: $observationIds")
     }
 }

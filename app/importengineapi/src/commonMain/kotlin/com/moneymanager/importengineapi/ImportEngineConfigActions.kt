@@ -60,10 +60,6 @@ suspend fun ImportEngine.pinObservations(
         ),
     )
 
-/** Takes back the pins of [observationIds], then re-matches: the matcher's rules decide them again. */
-suspend fun ImportEngine.unpinObservations(observationIds: Collection<ObservationId>): ImportResult =
-    import(ImportBatch(observationDecisions = observationIds.map { ObservationDecision.Unpin(it) }, syncMatches = true))
-
 /**
  * "These are different": keeps observations [a] and [b] apart, then re-matches, so the transaction that joined them
  * splits in two and both count, now and after every re-import.
@@ -73,13 +69,6 @@ suspend fun ImportEngine.separateObservations(
     b: ObservationId,
 ): ImportResult =
     import(ImportBatch(observationDecisions = listOf(ObservationDecision.Split(ObservationSplit.of(a, b))), syncMatches = true))
-
-/** Takes back a split of [a] and [b], then re-matches. */
-suspend fun ImportEngine.unseparateObservations(
-    a: ObservationId,
-    b: ObservationId,
-): ImportResult =
-    import(ImportBatch(observationDecisions = listOf(ObservationDecision.Unsplit(ObservationSplit.of(a, b))), syncMatches = true))
 
 // endregion
 

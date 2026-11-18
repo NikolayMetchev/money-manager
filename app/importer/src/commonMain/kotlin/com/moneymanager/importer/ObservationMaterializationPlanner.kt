@@ -19,7 +19,6 @@ import com.moneymanager.domain.model.observation.ObservationAttribute
 import com.moneymanager.domain.model.observation.ObservationBooking
 import com.moneymanager.domain.model.observation.ObservationChange
 import com.moneymanager.domain.model.observation.ObservationContent
-import com.moneymanager.domain.model.observation.ObservationId
 import com.moneymanager.domain.model.observation.ObservationOwner
 import com.moneymanager.domain.model.observation.ObservedValues
 import com.moneymanager.domain.repository.ImportRecordReadRepository
@@ -114,7 +113,7 @@ internal class ObservationMaterializationPlanner(
         val deleted = writes.idsOf<MaterializedWrite.Delete>(affected)
         // Deleting or replacing an observation also deletes its pin, before the effective rows are applied.
         val removedObservations =
-            changes.mapNotNullTo(mutableSetOf<ObservationId>()) { change ->
+            changes.mapNotNullTo(mutableSetOf()) { change ->
                 change.before?.id?.takeIf { it != change.after?.storedId }
             }
         val pins =
