@@ -125,7 +125,7 @@
     },
     "forces": {
       "com.google.code.findbugs:jsr305": "3.0.2",
-      "com.google.errorprone:error_prone_annotations": "2.52.0",
+      "com.google.errorprone:error_prone_annotations": "2.53.0",
       "com.ionspin.kotlin:bignum-mingwx64": "0.4.0",
       "com.squareup:javawriter": "2.5.1",
       "commons-io:commons-io": "2.22.0",
@@ -10730,22 +10730,22 @@
     },
     "com.google.errorprone:error_prone_annotations": {
       "android": {
-        "version": "2.52.0",
+        "version": "2.53.0",
         "files": [
           {
-            "name": "error_prone_annotations-2.52.0.jar",
-            "url": "https://repo1.maven.org/maven2/com/google/errorprone/error_prone_annotations/2.52.0/error_prone_annotations-2.52.0.jar",
-            "sha256": "24822b246a2da324006fc5a1c940b1d2cf9cd716e530155c39fea695d5ab01c4"
+            "name": "error_prone_annotations-2.53.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/google/errorprone/error_prone_annotations/2.53.0/error_prone_annotations-2.53.0.jar",
+            "sha256": "cd2d6921538eaa749a38b026c7a2bebad8c4d461add3177ddc07187755fac644"
           }
         ]
       },
       "jvm": {
-        "version": "2.52.0",
+        "version": "2.53.0",
         "files": [
           {
-            "name": "error_prone_annotations-2.52.0.jar",
-            "url": "https://repo1.maven.org/maven2/com/google/errorprone/error_prone_annotations/2.52.0/error_prone_annotations-2.52.0.jar",
-            "sha256": "24822b246a2da324006fc5a1c940b1d2cf9cd716e530155c39fea695d5ab01c4"
+            "name": "error_prone_annotations-2.53.0.jar",
+            "url": "https://repo1.maven.org/maven2/com/google/errorprone/error_prone_annotations/2.53.0/error_prone_annotations-2.53.0.jar",
+            "sha256": "cd2d6921538eaa749a38b026c7a2bebad8c4d461add3177ddc07187755fac644"
           }
         ]
       }
