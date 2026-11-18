@@ -517,7 +517,6 @@ object BuiltInApiStrategies {
                                         responseArrayKey = "feedItems",
                                         pagination =
                                             ApiPaginationConfig(
-                                                sendLimitParam = false,
                                                 window =
                                                     ApiDateWindowing(
                                                         startParam = "minTransactionTimestamp",
