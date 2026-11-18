@@ -23,12 +23,20 @@ import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.Url
 import io.ktor.http.headersOf
 import kotlinx.coroutines.flow.first
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
 
 private const val ACCOUNT_UID = "11111111-1111-1111-1111-111111111111"
@@ -233,7 +241,32 @@ class StarlingImportE2ETest : DbTest() {
 
                 url.contains("/feed/account/") -> {
                     feedRequestUrls?.add(url)
-                    feedJson
+                    assertTrue(request.url.encodedPath.endsWith("/transactions-between"))
+                    val start = Instant.parse(assertNotNull(request.url.parameters["minTransactionTimestamp"]))
+                    val end = Instant.parse(assertNotNull(request.url.parameters["maxTransactionTimestamp"]))
+                    assertTrue(end >= start && end - start < 365.days, "Starling rejects oversized date ranges: $url")
+                    assertEquals(null, request.url.parameters["changesSince"])
+                    assertEquals(null, request.url.parameters["limit"])
+                    val items =
+                        Json
+                            .parseToJsonElement(feedJson)
+                            .jsonObject
+                            .getValue("feedItems")
+                            .jsonArray
+                    JsonObject(
+                        mapOf(
+                            "feedItems" to
+                                JsonArray(
+                                    items.filter {
+                                        Instant.parse(
+                                            it.jsonObject
+                                                .getValue("transactionTime")
+                                                .jsonPrimitive.content,
+                                        ) in start..end
+                                    },
+                                ),
+                        ),
+                    ).toString()
                 }
 
                 url.contains("/api/v2/accounts") -> {
@@ -295,13 +328,13 @@ class StarlingImportE2ETest : DbTest() {
             assertEquals(2, importResult.transactionCount, "Both feed items should import")
             assertEquals(0, importResult.errorCount, "No import errors expected")
 
-            // Starling's feed endpoint rejects requests without the mandatory `changesSince` bound
-            // with HTTP 400, so every feed request must carry it.
-            assertTrue(feedRequestUrls.isNotEmpty(), "A feed request should have been made")
-            assertTrue(
-                feedRequestUrls.all { it.contains("changesSince=") },
-                "Every Starling feed request must include the mandatory changesSince parameter: $feedRequestUrls",
-            )
+            assertTrue(feedRequestUrls.size > 1, "History must span multiple bounded requests")
+            val windows = feedRequestUrls.map { Url(it).parameters }
+            windows.zipWithNext().forEach { (previous, next) ->
+                val end = Instant.parse(assertNotNull(previous["maxTransactionTimestamp"]))
+                val start = Instant.parse(assertNotNull(next["minTransactionTimestamp"]))
+                assertEquals(1L, (start - end).inWholeMilliseconds, "History windows must not leave gaps")
+            }
 
             val allAccounts = repositories.accountRepository.getAllAccounts().first()
             val ownAccount = allAccounts.single { it.name == "Personal" }
