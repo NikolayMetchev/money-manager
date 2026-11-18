@@ -636,6 +636,8 @@ data class ImportBatch(
     val uniqueKeyExtractor: ExistingUniqueKeyExtractor? = null,
     /** Required when [dedupePolicy] is [DedupePolicy.ApiMultiKey]. */
     val apiIdExtractor: ExistingApiIdExtractor? = null,
+    /** The strategy producing this batch, before a fresh file has its last-applied strategy recorded. */
+    val strategyId: String? = null,
     /**
      * Set for an import from a reconciliation source (the strategy's `ReconciliationConfig.sourceName`):
      * the batch may only touch that source's **shadow accounts**. Name matching for [accountsToCreate]

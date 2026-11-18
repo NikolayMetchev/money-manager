@@ -13,7 +13,6 @@ class ExpansionGoldenTest {
     @Test
     fun every_scenario_imports_as_before_the_expander() =
         runTest(timeout = 30.minutes) {
-            assertEquals(OracleCorpus.ALL.map { it.name }.toSet(), FRESH_IMPORT_GOLDENS.keys, "a scenario without a golden")
             // Every scenario runs before any fails, so one run shows every divergence.
             val mismatches =
                 OracleCorpus.ALL.mapNotNull { scenario ->
@@ -23,9 +22,10 @@ class ExpansionGoldenTest {
                                 import()
                                 db.canonicalSnapshot().render()
                             }.trimEnd('\n')
-                    (scenario.name to actual).takeIf { actual != FRESH_IMPORT_GOLDENS.getValue(scenario.name) }
+                    (scenario.name to actual).takeIf { actual != FRESH_IMPORT_GOLDENS[scenario.name] }
                 }
             mismatches.forEach { (name, actual) -> println("=== GOLDEN $name\n$actual\n=== END") }
+            assertEquals(OracleCorpus.ALL.map { it.name }.toSet(), FRESH_IMPORT_GOLDENS.keys, "a scenario without a golden")
             mismatches.firstOrNull()?.let { (name, actual) -> assertEquals(FRESH_IMPORT_GOLDENS.getValue(name), actual, name) }
         }
 }

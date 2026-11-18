@@ -309,7 +309,7 @@ sealed interface CsvImportMutation {
     data class UpdateRowStatuses(
         val id: CsvImportId,
         val status: String,
-        val rowTransferMap: Map<Long, TransferId?>,
+        val rowIndexes: Collection<Long>,
     ) : CsvImportMutation
 
     /**

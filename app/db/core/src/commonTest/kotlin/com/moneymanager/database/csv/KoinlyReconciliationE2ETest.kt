@@ -10,6 +10,7 @@ import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.RelationshipMember
 import com.moneymanager.domain.model.RelationshipRole
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.Trade
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferId
@@ -516,7 +517,7 @@ class KoinlyReconciliationE2ETest : DbTest() {
             val newTransfer = koinlyDeposit()
             assertEquals(koinlyTransfer.id, newTransfer.id, "the re-import gave the transfer its id back")
             assertEquals(trade.id, newTrade.id, "the re-import gave the trade its id back")
-            val rebuilt = repositories.relationshipRepository.getHandMadeByTransactions(listOf(realTransfer)).single()
+            val rebuilt = repositories.relationshipRepository.getMadeByTransactions(listOf(realTransfer), SourceType.MANUAL).single()
             assertEquals(typeId, rebuilt.relationshipType.id)
             assertEquals(
                 setOf(newTrade.id.id, newTransfer.id.id, realTransfer.id),

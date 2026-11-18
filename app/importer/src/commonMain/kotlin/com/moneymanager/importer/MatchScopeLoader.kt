@@ -5,6 +5,7 @@ import com.moneymanager.domain.model.ApiCredentialId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.CsvImportId
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.calendar.BusinessDayCalendar
 import com.moneymanager.domain.model.calendar.WeekendOnlyCalendar
@@ -58,6 +59,14 @@ class MatchScopeLoader(
     private val accountAttributes: AccountAttributeReadRepository,
     private val attributeTypes: AttributeTypeReadRepository,
 ) {
+    /** The strategy family of an incoming record, using the same provenance as stored observations. */
+    suspend fun familyOf(source: Source): String? =
+        when (source) {
+            is Source.Csv -> csvFamily(source.importId)
+            is Source.Api -> apiFamily(source.sessionId)
+            else -> null
+        }
+
     /** Every stored observation naming one of [accountIds], with [families] supplying each family's identity types. */
     suspend fun load(
         accountIds: Collection<AccountId>,

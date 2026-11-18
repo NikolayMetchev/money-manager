@@ -260,6 +260,64 @@ object OracleCorpus {
         )
 
     /**
+     * The conduit statement against a card chain it splits (`PayPalCsvE2ETest`'s split payments): Uber authorises £21.58
+     * on the card then tops up £0.27 against PayPal's one £21.85 (paid on in USD), and £107.84 less a £0.03 refund
+     * against PayPal's £107.81.
+     */
+    val PAYPAL_SPLIT =
+        OracleScenario(
+            name = "Crypto.com card + PayPal CSV (split conduit)",
+            sources =
+                listOf(
+                    OracleSource(
+                        OracleFile.Csv(
+                            "card_transactions_record_20251116_103317.csv",
+                            CARD_HEADERS,
+                            listOf(
+                                cardRow("2025-10-20 19:14:56", "Crv*Paypal *Uber 40293", "-21.58"),
+                                cardRow("2025-10-21 10:02:38", "Crv*Paypal *Uber 40293", "-0.27"),
+                                cardRow("2025-04-08 21:32:48", "Crv*Paypal *Uber 40293", "-107.84"),
+                                cardRow("2025-04-08 21:40:54", "Refund: Crv*Paypal *Uber 40293", "0.03"),
+                            ),
+                        ),
+                    ),
+                    OracleSource(
+                        OracleFile.Csv(
+                            "2025-05-04-2026-05-03.CSV",
+                            PAYPAL_HEADERS,
+                            listOf(
+                                payPalRow(
+                                    "20/10/2025",
+                                    "20:53:44",
+                                    "Uber Technologies, Inc",
+                                    "Pre-approved Payment Bill User Payment",
+                                    "USD",
+                                    "-28.08",
+                                    "s1",
+                                    "BST",
+                                ),
+                                payPalRow("20/10/2025", "20:53:44", "", "General Credit Card Deposit", "GBP", "21.85", "s2", "BST"),
+                                payPalRow("20/10/2025", "20:53:44", "", "General Currency Conversion", "GBP", "-21.85", "s3", "BST"),
+                                payPalRow("20/10/2025", "20:53:44", "", "General Currency Conversion", "USD", "28.08", "s4", "BST"),
+                                payPalRow(
+                                    "08/04/2025",
+                                    "22:39:52",
+                                    "UBER PAYMENTS UK LIMITED",
+                                    "Pre-approved Payment Bill User Payment",
+                                    "GBP",
+                                    "-107.81",
+                                    "s5",
+                                    "BST",
+                                ),
+                                payPalRow("08/04/2025", "22:39:52", "", "General Credit Card Deposit", "GBP", "107.81", "s6", "BST"),
+                            ),
+                        ),
+                    ),
+                ),
+            changedStrategy = "PayPal CSV",
+        )
+
+    /**
      * PayPal's activity export and one PayPal API session of the same movements, as `PayPalImportE2ETest` stages the
      * API: a payment received with PayPal's fee on top, a payment sent, a GBP to USD conversion and a declined payment.
      * The export books into one "PayPal" account and the API into one account per balance currency, so today the two
@@ -607,6 +665,7 @@ object OracleCorpus {
             AMEX_SANTANDER,
             REVOLUT,
             PAYPAL_CARD,
+            PAYPAL_SPLIT,
             PAYPAL_CSV_API,
             CURVE,
             BINANCE_KOINLY,

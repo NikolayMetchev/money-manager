@@ -4,7 +4,6 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.CurrencyId
-import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvRowLink
 import com.moneymanager.domain.model.csv.PdfImportSource
 import com.moneymanager.domain.repository.CsvImportReadRepository
@@ -96,18 +95,17 @@ interface CsvImportWriteRepository : CsvImportReadRepository {
     )
 
     /**
-     * Updates the import status for multiple rows in a single database transaction. A row linked to a
-     * transaction it didn't create (any status but IMPORTED) is also recorded as a matched source of it, so
-     * re-importing the transaction's own file finds the row from its provenance.
+     * Updates the import status for multiple rows in a single database transaction. Which transaction a row
+     * stands for is not kept here: it comes from the row's import record and its observations.
      *
      * @param id The import ID
      * @param status The import status to set for all rows (IMPORTED, DUPLICATE, UPDATED)
-     * @param rowTransferMap Map of row index to optional transfer ID to link
+     * @param rowIndexes The rows to update
      */
     suspend fun updateRowStatusesBatch(
         id: CsvImportId,
         status: String,
-        rowTransferMap: Map<Long, TransferId?>,
+        rowIndexes: Collection<Long>,
     )
 
     /**

@@ -40,9 +40,9 @@ JOIN relationship ON relationship.id = member.relationship_id
 WHERE relationship.relationship_type_id = :typeId
   AND member.relationship_id IN (SELECT relationship_id FROM relationship_member WHERE transaction_id = :transactionId);
 
--- As selectByTransactions, only the relationships a person made: their provenance (entity_type_id 13) names
--- the MANUAL source (source_type_id 1). A re-import rebuilds these on the transactions it re-creates.
-selectHandMadeByTransactions:
+-- As selectByTransactions, only the relationships one kind of source made: their provenance (entity_type_id 13)
+-- names that source type (MANUAL: a person's; RECONCILER: the match's exclusion links).
+selectMadeByTransactions:
 SELECT
     relationship.id,
     relationship_type.id AS relationship_type_id,
@@ -62,6 +62,6 @@ WHERE relationship.id IN (SELECT relationship_id FROM relationship_member WHERE 
         -- Revision 1 (relationships are never revised) lets SQLite use the writer index; without it the
         -- check scans every MANUAL source row once per candidate relationship.
         AND entity_source.revision_id = 1
-        AND entity_source.source_type_id = 1
+        AND entity_source.source_type_id = :sourceTypeId
   )
 ORDER BY relationship_type.name, relationship.id, member.role, member.transaction_id;

@@ -31,7 +31,7 @@ class CsvTableManager(
         val columns = (0 until columnCount).joinToString("") { ", col_$it TEXT" }
         val sql =
             "CREATE TABLE IF NOT EXISTS $tableName " +
-                "(row_index INTEGER PRIMARY KEY AUTOINCREMENT, transaction_id TEXT, import_status TEXT$columns)"
+                "(row_index INTEGER PRIMARY KEY AUTOINCREMENT, import_status TEXT$columns)"
         database.execute(sql)
     }
 
@@ -97,26 +97,39 @@ class CsvTableManager(
             """
             SELECT
                 t.row_index,
-                COALESCE(NULLIF(t.transaction_id, '0'), source_rows.transaction_id) AS transaction_id,
+                source_rows.transaction_id,
                 t.import_status,
                 e.error_message$projectedColumns
             FROM $tableName t
             LEFT JOIN csv_import_error e ON e.csv_import_id = '$csvImportId' AND e.row_index = t.row_index
             LEFT JOIN (
-                SELECT
-                    csv_entity_source.csv_import_id,
-                    csv_entity_source.csv_row_index,
-                    MIN(entity_source.entity_id) AS transaction_id
-                FROM csv_entity_source
-                JOIN entity_source ON entity_source.id = csv_entity_source.id
-                -- entity_source outlives deleted transfers; without this a reset row would still
-                -- report a transfer that a re-import rewrite or an unimport removed.
-                JOIN transfer ON transfer.id = entity_source.entity_id
-                WHERE csv_entity_source.csv_import_id = '$csvImportId'
-                  AND entity_source.entity_type_id = 7
-                GROUP BY csv_entity_source.csv_import_id, csv_entity_source.csv_row_index
-            ) source_rows ON source_rows.csv_import_id = '$csvImportId'
-                AND source_rows.csv_row_index = t.row_index
+                -- A row's transaction is what its observations joined: those its record owns, and those of a group
+                -- (a trade's legs) it belongs to. Its own movement (or trade) speaks for it before its fee or chain.
+                SELECT row_index, transaction_id
+                FROM (
+                    SELECT
+                        owned.row_index,
+                        observation.transaction_id,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY owned.row_index
+                            ORDER BY CASE owned.slot WHEN 'main' THEN 0 WHEN 'trade' THEN 1 ELSE 2 END, observation.transaction_id
+                        ) AS rank
+                    FROM (
+                        SELECT r.row_index, o.observation_id, o.slot
+                        FROM csv_import_record r
+                        JOIN observation_record o ON o.record_id = r.record_id
+                        WHERE r.csv_import_id = '$csvImportId'
+                        UNION ALL
+                        SELECT r.row_index, g.observation_id, g.slot
+                        FROM csv_import_record r
+                        JOIN import_group_member m ON m.record_id = r.record_id
+                        JOIN observation_group g ON g.group_id = m.group_id
+                        WHERE r.csv_import_id = '$csvImportId'
+                    ) owned
+                    JOIN observation ON observation.id = owned.observation_id
+                )
+                WHERE rank = 1
+            ) source_rows ON source_rows.row_index = t.row_index
             ORDER BY t.row_index
             LIMIT $limit OFFSET $offset
             """.trimIndent()
@@ -144,25 +157,22 @@ class CsvTableManager(
     }
 
     /**
-     * Updates the import status and transfer ID for a specific row.
+     * Updates the import status of a specific row. Which transfer the row booked is not kept here: its observations say.
      *
      * @param tableName The name of the table
      * @param rowIndex The row index to update
      * @param status The import status to set
-     * @param transferId The transfer ID to set (optional)
      */
     suspend fun updateRowStatus(
         tableName: String,
         rowIndex: Long,
         status: String,
-        transferId: TransferId?,
     ) {
-        val transferIdClause = transferId?.let { ", transaction_id = '${it.id}'" }.orEmpty()
-        database.execute("UPDATE $tableName SET import_status = '$status'$transferIdClause WHERE row_index = $rowIndex")
+        database.execute("UPDATE $tableName SET import_status = '$status' WHERE row_index = $rowIndex")
     }
 
     /** Returns every row of [tableName] to the never-imported state, so a strategy re-run picks them up again. */
     suspend fun resetAllRowStatuses(tableName: String) {
-        database.execute("UPDATE $tableName SET import_status = NULL, transaction_id = NULL")
+        database.execute("UPDATE $tableName SET import_status = NULL")
     }
 }

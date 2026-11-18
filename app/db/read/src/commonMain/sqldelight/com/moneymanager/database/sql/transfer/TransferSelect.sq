@@ -50,33 +50,6 @@ AND id IN (
 )
 ORDER BY timestamp DESC;
 
--- The counted transfers of the given amounts in a time span, on any accounts: what may be the other side of a
--- transfer whose two records share no account. Never a fee, a pass-through chain's leg or a shadow account's:
--- those are parts of another movement, and a reconciliation source stays isolated. The relationship check starts from
--- the transfer's own memberships (idx_relationship_member_transaction): through relationship_pair it walked every
--- fee and pass-through relationship for each candidate, seconds per import on a large database.
-selectOtherSideCandidates:
-SELECT * FROM transfer_with_asset
-WHERE amount IN :amounts
-  AND timestamp >= :earliest AND timestamp <= :latest
-  AND NOT EXISTS (
-      SELECT 1 FROM transfer_attribute
-      WHERE transfer_attribute.transaction_id = transfer_with_asset.id
-        AND transfer_attribute.attribute_type_id = :exclusionTypeId
-  )
-  AND NOT EXISTS (
-      SELECT 1 FROM relationship_member
-      JOIN relationship ON relationship.id = relationship_member.relationship_id
-      WHERE relationship_member.transaction_id = transfer_with_asset.id
-        AND relationship.relationship_type_id IN :partOfAnotherMovementTypeIds
-  )
-  AND NOT EXISTS (
-      SELECT 1 FROM account_attribute
-      WHERE account_attribute.account_id IN (transfer_with_asset.source_account_id, transfer_with_asset.target_account_id)
-        AND account_attribute.attribute_type_id = :shadowAccountTypeId
-  )
-ORDER BY timestamp DESC;
-
 selectAllBalances:
 SELECT
     account_balance_materialized_view.account_id,

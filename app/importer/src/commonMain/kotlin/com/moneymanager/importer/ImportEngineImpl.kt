@@ -28,6 +28,7 @@ import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.TransactionKind
 import com.moneymanager.domain.model.Transfer
+import com.moneymanager.domain.model.TransferAttribute
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.calendar.BusinessDayCalendar
@@ -41,6 +42,7 @@ import com.moneymanager.domain.model.observation.MaterializedTransaction
 import com.moneymanager.domain.model.observation.Observation
 import com.moneymanager.domain.model.observation.ObservationContent
 import com.moneymanager.domain.model.observation.ObservationOwner
+import com.moneymanager.domain.model.observation.ObservedValues
 import com.moneymanager.domain.model.observation.TransferField
 import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.domain.model.rules.widen
@@ -210,9 +212,8 @@ class ImportEngineImpl(
      */
     private val holidayCalendarRepository: HolidayCalendarWriteRepository? = null,
     /**
-     * Read-only view of transfer relationships, used to see which existing legs a `reconciled` link
-     * already claims (see [ImportDeduper.claimedReconcileTargets]). Optional so the hand-built engines in
-     * tests need not wire it; the DI-built engine always supplies it.
+     * Read-only view of transfer relationships: the fee and `pass-through` links a duplicate row observes beside its
+     * twin. Optional so the hand-built engines in tests need not wire it; the DI-built engine always supplies it.
      */
     private val relationshipRepository: RelationshipWriteRepository? = null,
     private val editGate: EditGate = EditGate.AlwaysWritable,
@@ -1283,32 +1284,11 @@ class ImportEngineImpl(
         val calendars = settlementCalendars(batch.dedupePolicy)
         val existing = loadExisting(resolvedTransfers, batch, calendars)
         val existingRelationships = existingRelationships(existing)
-        val otherSideLegs = otherSideLegs(resolvedTransfers, batch, calendars)
         val onward = passThroughOnward(existing, existingRelationships)
-        val classified =
-            ImportDeduper(
-                batch.dedupePolicy,
-                existing,
-                // The other-side candidates lie on any accounts, so their claims are read too: a record another source
-                // already reconciled against has both its ends named and stands in for no one.
-                (existingRelationships + otherSideRelationships(otherSideLegs, existing))
-                    .filter { it.relationshipType.id.id == WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID }
-                    .mapNotNullTo(mutableSetOf()) { it.transferPair?.second },
-                reconciledInto =
-                    existingRelationships
-                        .filter { it.relationshipType.id.id == WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID }
-                        .mapNotNull { it.transferPair }
-                        .toMap(),
-                ownBatchAccounts = resolvedTransfers.flatMapTo(mutableSetOf()) { listOf(it.fromAccount, it.toAccount).map(::requireId) },
-                passThroughOnward = onward,
-                ownSourceLegs = ownSourceLegs(resolvedTransfers, existing),
-                calendars = calendars,
-                otherSideLegs = otherSideLegs,
-                otherSideStatementAccounts = csvImportRepository.getStatementAccounts(otherSideLegs.map { it.id }),
-            ).classify(resolvedTransfers)
+        val classified = ImportDeduper(batch.dedupePolicy, existing, ownSourceLegs(resolvedTransfers, existing)).classify(resolvedTransfers)
 
         val toImport = resolveReversalLinks(classified.filter { it.status == ImportStatus.IMPORTED })
-        val toUpdate = classified.filter { it.status == ImportStatus.UPDATED } + internalReconcileExclusions(classified)
+        val toUpdate = classified.filter { it.status == ImportStatus.UPDATED }
         val duplicates = classified.count { it.status == ImportStatus.DUPLICATE }
         val excluded = resolvedTransfers.count { it.excludedFromBalances }
 
@@ -1330,10 +1310,8 @@ class ImportEngineImpl(
                 toImport.mapNotNullTo(
                     mutableSetOf(),
                 ) { c -> c.transfer.takeIf { it.approximateUntil != null }?.observationKey() }
-            val rewritten = toImport.mapNotNull { c -> c.observed?.let { c.transfer.observationKey() to it } }.toMap()
             for ((leg, id) in createdLegs) {
-                val said = rewritten[leg.key]?.let { row -> leg.asSaidBy(row) } ?: leg
-                observer.record(leg.key, leg.provenance, id) { observer.transferContent(said, leg.key in approximate) }
+                observer.record(leg.key, leg.provenance, id) { observer.transferContent(leg, leg.key in approximate) }
             }
         }
         writeConversionTrades(toImport, observer)
@@ -2285,17 +2263,6 @@ class ImportEngineImpl(
         return repository.getByTransactions(existing.map { it.transferId })
     }
 
-    /** The relationships of the [otherSideLegs] that [existing] (whose own are read already) leaves out. */
-    private suspend fun otherSideRelationships(
-        otherSideLegs: List<Transfer>,
-        existing: List<ExistingTransferInfo>,
-    ): List<Relationship> {
-        val repository = relationshipRepository ?: return emptyList()
-        val loaded = existing.mapTo(mutableSetOf()) { it.transferId }
-        val ids = otherSideLegs.map { it.id }.filterNot { it in loaded }
-        return if (ids.isEmpty()) emptyList() else repository.getByTransactions(ids)
-    }
-
     /**
      * For every existing leg that a `pass-through` relationship continues, the legs after it along its
      * chain (main -> leg 1 -> leg 2 …), in order — see [ImportDeduper]'s `passThroughOnward`. A chain's
@@ -2421,25 +2388,6 @@ class ImportEngineImpl(
         return SettlementCalendars(locations, settingsRepository.getDefaultLocation().first(), repository.getAll().first())
     }
 
-    /** The candidates for [ImportDeduper]'s other-side match; a reconciliation source's data stays isolated. */
-    private suspend fun otherSideLegs(
-        transfers: List<ImportTransfer>,
-        batch: ImportBatch,
-        calendars: SettlementCalendars,
-    ): List<Transfer> {
-        if (batch.shadowSource != null) return emptyList()
-        val exclusionTypeId = batch.dedupePolicy.placeholderExclusionTypeId() ?: return emptyList()
-        val timestamps = transfers.mapNotNull { it.timestamp }
-        if (timestamps.isEmpty()) return emptyList()
-        val range = batch.dedupePolicy.windows().reach(timestamps.min()..timestamps.max(), calendars.strictest, times = 1)
-        return transactionRepository.getOtherSideCandidates(
-            transfers.mapNotNullTo(mutableSetOf()) { it.amount },
-            range.start,
-            range.endInclusive,
-            exclusionTypeId,
-        )
-    }
-
     private suspend fun loadExisting(
         transfers: List<ImportTransfer>,
         batch: ImportBatch,
@@ -2516,21 +2464,91 @@ class ImportEngineImpl(
 
         val uniqueKeyExtractor = batch.uniqueKeyExtractor
         val apiIdExtractor = batch.apiIdExtractor
-        return (rawTransfers + approximateLegs).distinctBy { it.id }.map { transfer ->
+        val candidates = sourceTransferSnapshots((rawTransfers + approximateLegs).distinctBy { it.id }, transfers, batch.strategyId)
+        return candidates.map { transfer ->
             ExistingTransferInfo(
                 transferId = transfer.id,
                 transfer = transfer,
                 attributes = transfer.attributes.associate { it.attributeType.id to it.value },
                 uniqueKey = uniqueKeyExtractor?.extract(transfer).orEmpty(),
                 apiId = apiIdExtractor?.extract(transfer),
-                approximateUntil =
-                    transfer.attributes
-                        .firstOrNull { it.attributeType.name == WellKnownIds.TIMESTAMP_APPROXIMATE_ATTR_TYPE_NAME }
-                        ?.value
-                        ?.toLongOrNull()
-                        ?.let { Instant.fromEpochMilliseconds(it) },
             )
         }
+    }
+
+    /** Recognize an unchanged source row even when another observation contributed attributes to its transaction. */
+    private suspend fun sourceTransferSnapshots(
+        candidates: List<Transfer>,
+        incoming: List<ImportTransfer>,
+        strategyId: String?,
+    ): List<Transfer> {
+        val observations = observationRepository ?: return candidates
+        val records = importRecordRepository ?: return candidates
+        val loader =
+            MatchScopeLoader(
+                observations,
+                records,
+                csvImportRepository,
+                apiSessionRepository,
+                accountAttributeRepository,
+                attributeTypeRepository,
+            )
+        val families =
+            incoming
+                .mapNotNull {
+                    when {
+                        strategyId == null -> loader.familyOf(it.source)
+                        it.source is Source.Csv -> MatchScopeLoader.csvFamily(strategyId)
+                        it.source is Source.Api -> MatchScopeLoader.apiFamily(strategyId)
+                        else -> null
+                    }
+                }.toSet()
+        val stored = candidates.flatMap { observations.getObservationsOfTransaction(it.id) }
+        val reserved = observations.getReserved().mapTo(mutableSetOf()) { it.transactionId }
+        val byId = candidates.associateBy { it.id }
+        val types = attributeTypeRepository.getAll().first().associateBy { it.id }
+        val snapshots =
+            loader.toMatch(stored, emptyMap()).mapNotNull { observation ->
+                // A re-run must reclaim its reserved slot through the normal update/create path.
+                if (observation.current in reserved) return@mapNotNull null
+                if (observation.family !in families || observation.ref.slot != ObservationSlot.MAIN) return@mapNotNull null
+                val values =
+                    observation.content.values as? ObservedValues.Transfer
+                        ?: return@mapNotNull null
+                val transfer = byId[observation.current] ?: return@mapNotNull null
+                if (transfer.amount.asset.id.id != values.assetId.id) return@mapNotNull null
+                transfer.copy(
+                    timestamp = values.timestamp,
+                    description = values.description,
+                    sourceAccountId = values.sourceAccountId,
+                    targetAccountId = values.targetAccountId,
+                    amount = transfer.amount.copy(amount = values.amount),
+                    attributes =
+                        observation.content.attributes.map { attribute ->
+                            TransferAttribute(
+                                0,
+                                transfer.id,
+                                types.getValue(attribute.typeId),
+                                attribute.value,
+                                attribute.groupKey,
+                            )
+                        },
+                )
+            }
+        val identical =
+            snapshots
+                .filter { snapshot ->
+                    incoming.any { row ->
+                        row.timestamp == snapshot.timestamp &&
+                            row.description == snapshot.description &&
+                            requireId(row.fromAccount) == snapshot.sourceAccountId &&
+                            requireId(row.toAccount) == snapshot.targetAccountId &&
+                            row.amount == snapshot.amount &&
+                            row.attributes.associate { it.typeId to it.value } ==
+                            snapshot.attributes.associate { it.attributeType.id to it.value }
+                    }
+                }.associateBy { it.id }
+        return candidates.map { identical[it.id] ?: it }
     }
 
     /**
@@ -2711,8 +2729,6 @@ class ImportEngineImpl(
         return map { classified ->
             ExpansionRow(
                 transfer = classified.transfer,
-                conduitStatement = classified.conduitStatement,
-                supersedesLegs = classified.supersededLegs.isNotEmpty(),
                 reversals =
                     classified.reversalLinks.mapValues { (_, link) ->
                         val target =
@@ -2786,33 +2802,6 @@ class ImportEngineImpl(
         val mainResultIndices = chunk.runningFold(0) { start, row -> start + row.legs.size }.dropLast(1)
         return CreatePayload(transfers, newAttributes, newRelationships, legs.map { it.provenance }, mainResultIndices)
     }
-
-    /**
-     * Synthetic UPDATE entries that tag the stale app-side legs of internal-transfer reconciliations
-     * excluded-from-balances (the movement is now carried by the rewritten incoming transfer). One per
-     * distinct existing transfer; the row fields are preserved and only the exclusion attribute is added.
-     */
-    private fun internalReconcileExclusions(classified: List<Classified>): List<Classified> =
-        classified
-            .flatMap { listOfNotNull(it.excludeExisting) + it.supersededLegs }
-            .distinctBy { it.transfer.id }
-            .map { ex ->
-                Classified(
-                    transfer =
-                        ImportTransfer(
-                            source = Source.System,
-                            rowKey = ImportRowKey.Manual(ex.transfer.id.id),
-                            fromAccount = AccountRef.Existing(ex.transfer.sourceAccountId),
-                            toAccount = AccountRef.Existing(ex.transfer.targetAccountId),
-                            timestamp = ex.transfer.timestamp,
-                            description = ex.transfer.description,
-                            amount = ex.transfer.amount,
-                            attributes = listOf(NewAttribute(ex.exclusionTypeId, "reconciled")),
-                        ),
-                    status = ImportStatus.UPDATED,
-                    existing = ex.transfer.id,
-                )
-            }
 
     private suspend fun buildUpdates(
         toUpdate: List<Classified>,
@@ -2931,14 +2920,6 @@ class ImportEngineImpl(
                 )
             }
         }
-
-    /** This main leg as [row] said it, before the deduper rewrote it: its own ends, and the attributes the rewrite dropped. */
-    private fun ExpandedTransfer.asSaidBy(row: ImportTransfer): ExpandedTransfer =
-        copy(
-            sourceAccountId = requireId(row.fromAccount),
-            targetAccountId = requireId(row.toAccount),
-            attributes = attributes + row.attributes.filter { said -> attributes.none { it.typeId == said.typeId } },
-        )
 
     private fun requireId(ref: AccountRef?): AccountId =
         when (ref) {
@@ -3260,7 +3241,7 @@ class ImportEngineImpl(
                 }
 
                 is CsvImportMutation.UpdateRowStatuses -> {
-                    csvImportRepository.updateRowStatusesBatch(m.id, m.status, m.rowTransferMap)
+                    csvImportRepository.updateRowStatusesBatch(m.id, m.status, m.rowIndexes)
                 }
 
                 is CsvImportMutation.Reserve -> {

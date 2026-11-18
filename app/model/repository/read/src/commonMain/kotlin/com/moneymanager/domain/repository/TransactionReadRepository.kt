@@ -46,17 +46,6 @@ interface TransactionReadRepository {
         attributeTypeName: String,
     ): List<Transfer>
 
-    /**
-     * Counted transfers of [amounts] between [earliest] and [latest] on any accounts, leaving out fees,
-     * pass-through chains' legs and shadow accounts: the candidates for the other side of a transfer.
-     */
-    suspend fun getOtherSideCandidates(
-        amounts: Set<Money>,
-        earliest: Instant,
-        latest: Instant,
-        exclusionTypeId: AttributeTypeId,
-    ): List<Transfer>
-
     /** Transfers on any of [accountIds] carrying an attribute (of any type) whose value is one of [values], at any date. */
     suspend fun getTransactionsByAccountsWithAttributeValues(
         accountIds: Collection<AccountId>,

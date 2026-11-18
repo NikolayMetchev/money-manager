@@ -58,7 +58,6 @@ kmp_library(
         "//app/model/observation",
         "//app/model/rules",
         "//app/observationmatcher",
-        "//utils/bigdecimal",
         "@maven_kmp//:kotlinx_coroutines_core",
     ],
 )

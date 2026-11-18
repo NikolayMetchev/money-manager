@@ -60,7 +60,7 @@ class CsvRedownloadPlannerTest {
 
         assertEquals(mapOf(1L to 1L, 2L to 2L), plan.rowIndexRemap)
         assertEquals(
-            listOf(CsvRowLink(1, ImportStatus.IMPORTED, TransferId(7)), CsvRowLink(2, ImportStatus.DUPLICATE, TransferId(8))),
+            listOf(CsvRowLink(1, ImportStatus.IMPORTED), CsvRowLink(2, ImportStatus.DUPLICATE)),
             plan.carriedRows,
         )
         assertEquals(listOf("Category"), plan.addedColumns)
@@ -92,7 +92,7 @@ class CsvRedownloadPlannerTest {
         val plan =
             assertIs<CsvRedownloadPlan.Replace>(planCsvRedownload(staged(headers), old, headers, listOf(coffee, coffee), checksum = "new"))
 
-        assertEquals(listOf(TransferId(7), TransferId(8)), plan.carriedRows.map { it.transferId })
+        assertEquals(mapOf(1L to 1L, 2L to 2L), plan.rowIndexRemap)
     }
 
     @Test
