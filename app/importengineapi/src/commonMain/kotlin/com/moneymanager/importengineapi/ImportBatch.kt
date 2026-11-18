@@ -19,6 +19,7 @@ import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TradeId
+import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.observation.ImportGroupKey
@@ -669,6 +670,13 @@ data class ImportBatch(
      * and every id a person overrode is brought to its new merge with the overrides on top. Reported as [ImportResult.materialization].
      */
     val settle: ReservedTransactions? = null,
+    /**
+     * Shadow transactions of a reconciliation source to copy onto the real accounts (#1475, "Copy to Money Manager"): each
+     * becomes a [Source.Reconciliation] transaction its record observes in a [ObservationSlot.copy] slot, its wallets mapped
+     * through `reconciliation_account_link` ([CopyEnds]). Every fee account a copy needs must exist. The copies come back,
+     * in order, as [ImportResult.copiedTransactionIds].
+     */
+    val reconciliationCopies: List<TransactionId> = emptyList(),
 ) {
     companion object {
         /**

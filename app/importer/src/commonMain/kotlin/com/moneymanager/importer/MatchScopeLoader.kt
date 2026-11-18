@@ -25,6 +25,7 @@ import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.ImportRecordReadRepository
 import com.moneymanager.domain.repository.ObservationReadRepository
 import com.moneymanager.importengineapi.MatchFamily
+import com.moneymanager.importengineapi.ObservationSlot
 import com.moneymanager.importengineapi.TradeDedupePolicy
 import com.moneymanager.observationmatcher.CrossSourceFacts
 import com.moneymanager.observationmatcher.CrossSourcePolicy
@@ -82,7 +83,14 @@ class MatchScopeLoader(
             records.getGroupsById(owners.filterIsInstance<ObservationOwner.Group>().map { it.groupId }).associateBy { it.id }
         val origins = mutableMapOf<ObservationOwner, Origin>()
         return stored.map { observation ->
-            val origin = origins.getOrPut(observation.owner) { originOf(observation.owner, recordsById, groupsById) }
+            // A copy (#1475) is a person's booking that its record keeps up to date: matched as a person's own transaction, never
+            // by the source's rules, which describe its shadow rows.
+            val origin =
+                if (observation.slot.startsWith(ObservationSlot.COPY_PREFIX)) {
+                    Origin(MANUAL_FAMILY, "$COPY_CONTAINER:${observation.owner}", observation.slot)
+                } else {
+                    origins.getOrPut(observation.owner) { originOf(observation.owner, recordsById, groupsById) }
+                }
             val family = families[origin.family]
             val attributes = observation.content.attributes
             MatchObservation(
@@ -182,6 +190,7 @@ class MatchScopeLoader(
         const val MANUAL_FAMILY = "manual"
         private const val UNKNOWN_FAMILY = "unknown"
         private const val CONDUIT_SLOT_PREFIX = "conduit/"
+        private const val COPY_CONTAINER = "copy"
 
         /**
          * A CSV strategy's family, by its id. Built-in CSV and API strategies share ids (Crypto.com's crypto export and

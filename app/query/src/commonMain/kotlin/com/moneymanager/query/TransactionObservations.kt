@@ -4,12 +4,11 @@ import com.moneymanager.domain.model.Asset
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.Money
-import com.moneymanager.domain.model.Source
-import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.observation.AttributeOverride
+import com.moneymanager.domain.model.observation.COPY_SLOT_PREFIX
 import com.moneymanager.domain.model.observation.ImportRecordKey
 import com.moneymanager.domain.model.observation.Observation
 import com.moneymanager.domain.model.observation.ObservationId
@@ -76,13 +75,12 @@ data class DetailOverride(
 )
 
 /**
- * Reads [TransactionObservations] for [transactionId]; [knownAssets] saves loading the assets its legs already hold, and
- * [sources] (its provenance rows) tell a person's own entry from one copied in reconciliation.
+ * Reads [TransactionObservations] for [transactionId]; [knownAssets] saves loading the assets its legs already hold. A
+ * reconciliation copy (#1475) is named after the source row it copies.
  */
 internal suspend fun ObservationReads.observationsOf(
     transactionId: TransactionId,
     knownAssets: Collection<Asset>,
-    sources: List<SourceRecord> = emptyList(),
 ): TransactionObservations {
     val observations = observationRepository.getObservationsOfTransaction(transactionId)
     val ids = observations.map { it.id }
@@ -100,7 +98,7 @@ internal suspend fun ObservationReads.observationsOf(
                 DetailSplit(mine, other, observationRepository.getObservation(other)?.transactionId)
             }
         }
-    val labels = ownerLabels(observations.map { it.owner }.toSet(), sources)
+    val labels = ownerLabels(observations.map { it.owner }.toSet())
     val assets = assetsById(observations, knownAssets)
     return TransactionObservations(
         observations =
@@ -109,7 +107,10 @@ internal suspend fun ObservationReads.observationsOf(
                 DetailObservation(
                     id = observation.id,
                     owner = observation.owner,
-                    ownerLabel = labels.getValue(observation.owner),
+                    ownerLabel =
+                        labels.getValue(observation.owner).let { owner ->
+                            if (observation.slot.startsWith(COPY_SLOT_PREFIX)) "copied in reconciliation from $owner" else owner
+                        },
                     slot = observation.slot,
                     timestamp = values.timestamp(),
                     description = values.description(),
@@ -142,10 +143,7 @@ private suspend fun ObservationReads.overridesOf(transactionId: TransactionId): 
 
 private fun TransferField.label(): String = name.lowercase().replace('_', ' ')
 
-private suspend fun ObservationReads.ownerLabels(
-    owners: Set<ObservationOwner>,
-    sources: List<SourceRecord>,
-): Map<ObservationOwner, String> {
+private suspend fun ObservationReads.ownerLabels(owners: Set<ObservationOwner>): Map<ObservationOwner, String> {
     if (owners.isEmpty()) return emptyMap()
     val records =
         importRecordRepository
@@ -175,11 +173,7 @@ private suspend fun ObservationReads.ownerLabels(
             }
 
             is ObservationOwner.Manual -> {
-                if (sources.any { it.id == owner.entitySourceId && it.source == Source.Reconciliation }) {
-                    "copied in reconciliation"
-                } else {
-                    "by hand"
-                }
+                "by hand"
             }
         }
     }

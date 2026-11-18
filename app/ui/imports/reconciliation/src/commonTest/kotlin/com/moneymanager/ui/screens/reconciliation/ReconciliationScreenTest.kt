@@ -35,6 +35,7 @@ import com.moneymanager.domain.model.RelationshipRole
 import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TradeId
+import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.reconciliation.IGNORED_IN_RECONCILIATION
@@ -728,7 +729,7 @@ class ReconciliationScreenTest {
             val engine =
                 importEngine { batch ->
                     batches += batch
-                    ImportResult(createdTradeIds = batch.trades.associate { it.key to TradeId(77) })
+                    ImportResult(copiedTransactionIds = batch.reconciliationCopies.map { TradeId(77) })
                 }
             showLegsWith(
                 engine,
@@ -746,12 +747,8 @@ class ReconciliationScreenTest {
             onNodeWithTag(PICKER_COPY_TAG).performClick()
             waitForIdle()
 
-            val trade = batches.first().trades.single()
-            assertEquals(Source.Reconciliation, trade.source)
-            assertEquals(binance, trade.fromAccountId)
-            assertEquals(binance, trade.toAccountId)
-            assertEquals(Money.fromDisplayValue(BigDecimal("5"), ada), trade.fromAmount)
-            assertEquals(Money.fromDisplayValue(BigDecimal("2"), eth), trade.toAmount)
+            // The engine books the copy from the source's own trade, on the account its wallet is linked to (#1475).
+            assertEquals(listOf<TransactionId>(TradeId(30)), batches.single { it.reconciliationCopies.isNotEmpty() }.reconciliationCopies)
             assertEquals(
                 listOf(TradeId(30), TradeId(77)),
                 batches

@@ -124,3 +124,6 @@ data class Observation(
     val transactionId: TransactionId,
     val content: ObservationContent,
 )
+
+/** What every slot of a reconciliation copy (#1475) starts with: `copy/<slot>` is the copy of the owner's `<slot>`. */
+const val COPY_SLOT_PREFIX = "copy/"

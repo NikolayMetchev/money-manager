@@ -37,6 +37,8 @@ import com.moneymanager.domain.model.observation.ObservationPin
 import com.moneymanager.domain.model.observation.ObservationSplit
 import com.moneymanager.domain.model.reconciliation.IGNORED_IN_RECONCILIATION
 import com.moneymanager.domain.model.reconciliation.LegTransactionKind
+import com.moneymanager.domain.model.rules.Condition
+import com.moneymanager.domain.model.rules.ConditionOp
 import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.RuleValue
 import com.moneymanager.domain.model.rules.StrategyRule
@@ -44,8 +46,10 @@ import com.moneymanager.importengineapi.AccountAttributeEdit
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportOperation
+import com.moneymanager.importengineapi.ImportPlan
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.ManualEntryInput
+import com.moneymanager.importengineapi.TradeAttributeMutation
 import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.importengineapi.createApiSession
 import com.moneymanager.importengineapi.createManualEntries
@@ -144,13 +148,14 @@ class OracleDatabase private constructor(
 
     /**
      * Re-imports each of [sources], one at a time in the order given, as the re-import dialog does for one file. A file
-     * that hasn't changed since its last import is skipped unless [force]d.
+     * that hasn't changed since its last import is skipped unless [force]d. Returns what the files' re-runs planned.
      */
     suspend fun reimport(
         sources: List<OracleSource>,
         force: Boolean = false,
-    ) {
+    ): ImportPlan {
         val reimports = db.reimports(skipUnchanged = !force)
+        var plan = ImportPlan()
         for (source in sources) {
             if (source.file is OracleFile.Api) {
                 reimportSession(source, source.file)
@@ -158,7 +163,9 @@ class OracleDatabase private constructor(
             }
             val result = reimports.reimportFile(requireNotNull(staged[source]) { "${source.file.fileName} was never imported" })
             check(result.filesFailed == 0) { "${source.file.fileName} did not re-import: $result" }
+            plan += result.plan
         }
+        return plan
     }
 
     /** Re-imports every one of [sources] in one run, as "Re-import all" does. */
@@ -354,14 +361,13 @@ class OracleDatabase private constructor(
     }
 
     /**
-     * Links each reconciliation source's wallets to the real account named like it, as the Reconciliation tab offers,
-     * then copies the first of the source's unmatched trades onto the real accounts (Copy to Money Manager). Returns
-     * the copies.
+     * Links each reconciliation source's wallets to the real account named like it, as the Reconciliation tab offers.
+     * Returns whether the database has a source.
      */
-    private suspend fun copySourceTrade(): List<TransactionId> {
+    suspend fun linkWallets(): Boolean {
         val reconciliation = db.reconciliationLinkRepository
         val sources = reconciliation.getSources().first()
-        if (sources.isEmpty()) return emptyList()
+        if (sources.isEmpty()) return false
         val accounts = db.accountRepository.getAllAccounts().first()
         val shadows = reconciliation.getShadowAccounts().first()
         val real = realAccounts(accounts, shadows)
@@ -373,6 +379,18 @@ class OracleDatabase private constructor(
                 }
             }
         }
+        return true
+    }
+
+    /**
+     * Links the wallets ([linkWallets]), then copies the first of the source's unmatched trades onto the real accounts
+     * (Copy to Money Manager). Returns the copies.
+     */
+    suspend fun copySourceTrade(): List<TransactionId> {
+        if (!linkWallets()) return emptyList()
+        val reconciliation = db.reconciliationLinkRepository
+        val accounts = db.accountRepository.getAllAccounts().first()
+        val shadows = reconciliation.getShadowAccounts().first()
         val links = reconciliation.getLinks().first()
         val result =
             reconcile(
@@ -390,6 +408,36 @@ class OracleDatabase private constructor(
         val plan = planCopy(movement, shadows, links, accounts.associate { it.id to it.name })
         check(plan is CopyPlan.Ready) { "the source's trade can't be copied: $plan" }
         return db.importEngine.copyToMoneyManager(movement, plan, db.observationRepository)
+    }
+
+    /**
+     * Assertion (h)'s change to [OracleScenario.copiedRow] at its source (#1475): a rule ahead of the strategy's own that
+     * sets the row's amount, or [drops] the row, as a new export of the source would.
+     */
+    suspend fun changeCopiedRow(drops: Boolean = false) {
+        val row = requireNotNull(scenario.copiedRow) { "${scenario.name} copies no row" }
+        val strategy =
+            db.csvImportStrategyRepository
+                .getAllStrategies()
+                .first()
+                .single { it.name == row.strategy }
+        val action = if (drops) RuleAction.Skip else RuleAction.SetValue(row.amountColumn, RuleValue.constant(row.changedAmount))
+        val rule = StrategyRule(conditions = listOf(Condition(row.idColumn, ConditionOp.EQUALS, row.id)), actions = listOf(action))
+        db.importEngine.updateCsvStrategy(strategy.copy(config = strategy.config.copy(rules = listOf(rule) + strategy.config.rules)))
+    }
+
+    /** The source of [OracleScenario.copiedRow]: the file its strategy imports. */
+    fun copiedRowSource(): OracleSource {
+        val row = requireNotNull(scenario.copiedRow) { "${scenario.name} copies no row" }
+        return scenario.sources.single { (it.file as? OracleFile.Csv)?.headers?.contains(row.idColumn) == true }
+    }
+
+    /** A person's note on each copied trade of [copies] (#1475): a hand edit that a change of the copied row must keep. */
+    suspend fun noteOnCopies(copies: List<TransactionId>) {
+        val trades = copies.filterIsInstance<TradeId>()
+        check(trades.isNotEmpty()) { "nothing copied to note" }
+        val noteType = db.importEngine.getOrCreateAttributeType(ORACLE_NOTE_TYPE)
+        db.importEngine.import(ImportBatch(tradeAttributeMutations = trades.map { TradeAttributeMutation.Set(it, noteType, ORACLE_NOTE) }))
     }
 
     private fun byValue(transfers: List<Transfer>): List<Transfer> =
