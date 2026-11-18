@@ -209,8 +209,8 @@ class AmexSantanderQifReconcileE2ETest : DbTest() {
         return card to secondCard
     }
 
-    /** The first payment into the card that a record with a reference starting [prefix] observes. */
-    private suspend fun transferObservedWithReference(prefix: String): Transfer {
+    /** The first payment into the card that a record of the second statement observes. */
+    private suspend fun transferObservedOnSecondStatement(): Transfer {
         val amexId = accountId(AMEX)
         return repositories.transactionRepository
             .getTransactionsByAccount(amexId)
@@ -218,7 +218,7 @@ class AmexSantanderQifReconcileE2ETest : DbTest() {
             .filter { it.targetAccountId == amexId }
             .first { transfer ->
                 repositories.observationRepository.getObservationsOfTransaction(transfer.id).any { observation ->
-                    observation.content.attributes.any { it.value.startsWith(prefix) }
+                    observation.content.attributes.any { it.value.startsWith(SECOND_STATEMENT_REFERENCE_PREFIX) }
                 }
             }
     }
@@ -275,7 +275,7 @@ class AmexSantanderQifReconcileE2ETest : DbTest() {
         runDbTest {
             val (card, _) = importBankAndBothCardStatements()
             // The second statement's placeholder is an observation of the payment's transaction, which the person edits.
-            val placeholder = transferObservedWithReference(SECOND_STATEMENT_REFERENCE_PREFIX)
+            val placeholder = transferObservedOnSecondStatement()
             repositories.importEngine.import(
                 ImportBatch.manualEdits(
                     transfers =
@@ -303,7 +303,7 @@ class AmexSantanderQifReconcileE2ETest : DbTest() {
                     .values
                     .single()
             assertEquals("Paid from Santander", kept.description, "the edit stays on the transaction's id")
-            assertEquals(placeholder.id, transferObservedWithReference(SECOND_STATEMENT_REFERENCE_PREFIX).id)
+            assertEquals(placeholder.id, transferObservedOnSecondStatement().id)
             assertEachPaymentCountedOnceFromTheBank(cardRecords = 2, step = "After re-importing the first statement: ")
         }
 
