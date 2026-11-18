@@ -47,10 +47,23 @@ data class OracleManualEntry(
 )
 
 /**
+ * The row of a reconciliation source that Copy to Money Manager copies (#1475): [strategy] reads it, [idColumn] holds
+ * [id], and the change of assertion (h) sets its [amountColumn] to [changedAmount].
+ */
+data class OracleCopiedRow(
+    val strategy: String,
+    val idColumn: String,
+    val id: String,
+    val amountColumn: String,
+    val changedAmount: String,
+)
+
+/**
  * Sources that interact (they record the same movements, or one completes another), imported together.
  *
  * [changedStrategy] is the CSV strategy assertion (c) edits. [cardLast4] registers a funding card on an account before
- * anything is imported (account name to last 4). [manualEntries] are typed in by assertion (d).
+ * anything is imported (account name to last 4). [manualEntries] are typed in by assertion (d). [copiedRow] is the row
+ * assertion (d) copies, which assertion (h) changes.
  */
 data class OracleScenario(
     val name: String,
@@ -59,6 +72,7 @@ data class OracleScenario(
     val accounts: List<String> = sources.mapNotNull { it.account }.distinct(),
     val cardLast4: Map<String, String> = emptyMap(),
     val manualEntries: List<OracleManualEntry> = emptyList(),
+    val copiedRow: OracleCopiedRow? = null,
 ) {
     override fun toString(): String = name
 }
@@ -388,6 +402,7 @@ object OracleCorpus {
                         amount = "0.00055",
                     ),
                 ),
+            copiedRow = OracleCopiedRow("Koinly", "ID (read-only)", "K2", "To Amount", "4100"),
         )
 
     /**

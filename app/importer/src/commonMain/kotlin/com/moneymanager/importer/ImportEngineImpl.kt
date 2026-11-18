@@ -41,6 +41,7 @@ import com.moneymanager.domain.model.observation.MaterializedTransaction
 import com.moneymanager.domain.model.observation.Observation
 import com.moneymanager.domain.model.observation.ObservationContent
 import com.moneymanager.domain.model.observation.ObservationOwner
+import com.moneymanager.domain.model.observation.ObservedValues
 import com.moneymanager.domain.model.observation.TransferField
 import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.domain.model.rules.widen
@@ -85,6 +86,8 @@ import com.moneymanager.importengineapi.ApiSessionMutation
 import com.moneymanager.importengineapi.ApiStrategyMutation
 import com.moneymanager.importengineapi.AssetAliasMutation
 import com.moneymanager.importengineapi.AttributeSlot
+import com.moneymanager.importengineapi.CopyEnd
+import com.moneymanager.importengineapi.CopyEnds
 import com.moneymanager.importengineapi.CsvImportMutation
 import com.moneymanager.importengineapi.CsvStrategyMutation
 import com.moneymanager.importengineapi.DedupePolicy
@@ -111,6 +114,7 @@ import com.moneymanager.importengineapi.LocalCryptoKey
 import com.moneymanager.importengineapi.LocalCurrencyKey
 import com.moneymanager.importengineapi.LocalPersonKey
 import com.moneymanager.importengineapi.LocalTradeKey
+import com.moneymanager.importengineapi.LocalTransactionKey
 import com.moneymanager.importengineapi.MaterializationReport
 import com.moneymanager.importengineapi.MaterializationRequest
 import com.moneymanager.importengineapi.Materializer
@@ -121,6 +125,7 @@ import com.moneymanager.importengineapi.ObservationKey
 import com.moneymanager.importengineapi.ObservationMutation
 import com.moneymanager.importengineapi.ObservationOwnerKey
 import com.moneymanager.importengineapi.ObservationSlot
+import com.moneymanager.importengineapi.ObservationTransaction
 import com.moneymanager.importengineapi.PassThroughMutation
 import com.moneymanager.importengineapi.PersonMatchKey
 import com.moneymanager.importengineapi.ReconciliationLinkMutation
@@ -608,6 +613,7 @@ class ImportEngineImpl(
         }
         val matchSync = batch.takeIf { it.syncMatches }?.let { matchSync()?.run() } ?: MaterializationReport()
         val settled = batch.settle?.let { settle(it) }
+        val copied = if (batch.reconciliationCopies.isEmpty()) emptyList() else copyToRealAccounts(batch.reconciliationCopies)
 
         return ImportResult(
             accountsCreated = accountResolution.created,
@@ -640,6 +646,7 @@ class ImportEngineImpl(
             materialization = settled ?: materialization,
             matchSync = matchSync,
             reserved = reserved,
+            copiedTransactionIds = copied,
         )
     }
 
@@ -677,7 +684,7 @@ class ImportEngineImpl(
         val vacatingIds = vacating.toSet()
         val alreadyVacant = observations.getVacantReserved().mapTo(mutableSetOf()) { it.id }
         // An observation a person pinned or split stays reserved for its record to take back: deleting it would drop the
-        // decision with it.
+        // decision with it. So does a copy (#1475): the settle books it again from what its record says now.
         val decided =
             personOverrideRepository
                 ?.let { o ->
@@ -689,7 +696,8 @@ class ImportEngineImpl(
         // only reserved observations say it, it is vacated with the rest, so the record takes the id back.
         val decidedAlone =
             reserved
-                .filter { it.id in decided && it.id !in alreadyVacant && it.transactionId !in vacatingIds }
+                .filter { it.id in decided || it.isCopy() }
+                .filter { it.id !in alreadyVacant && it.transactionId !in vacatingIds }
                 .map { it.transactionId }
                 .distinct()
                 .filter { id -> observations.getObservationsOfTransaction(id).all { it.id in reservedIds } }
@@ -720,7 +728,8 @@ class ImportEngineImpl(
      */
     private suspend fun settle(reserved: ReservedTransactions): MaterializationReport {
         val observations = observationRepository ?: return MaterializationReport()
-        val vacant = reserved.ids.filterTo(mutableSetOf()) { observations.getMaterialized(it) == null }
+        val recopied = recopy(reserved)
+        val vacant = reserved.ids.filterTo(mutableSetOf()) { it !in recopied.ids && observations.getMaterialized(it) == null }
         observations.releaseTransactions(vacant)
         val lost = mutableSetOf<TransactionId>()
         for (observation in observations.getReserved()) {
@@ -736,12 +745,146 @@ class ImportEngineImpl(
             }
         }
         val rebuild =
-            (reserved.priorMerges.keys - vacant) +
+            (reserved.priorMerges.keys - vacant - recopied.ids) +
                 lost.filter { observations.getObservationsOfTransaction(it).isNotEmpty() }
         val released = reserved.priorMerges.keys.filterTo(mutableSetOf()) { it in vacant }
-        if (rebuild.isEmpty()) return MaterializationReport(releasedOverridden = released)
-        return materialize(emptyList(), MaterializationRequest(Source.Manual, rebuild, priorMerges = reserved.priorMerges))
-            .copy(releasedOverridden = released)
+        if (rebuild.isEmpty()) return recopied.report.copy(releasedOverridden = released)
+        val report = materialize(emptyList(), MaterializationRequest(Source.Manual, rebuild, priorMerges = reserved.priorMerges))
+        return report.copy(
+            inserted = report.inserted + recopied.report.inserted,
+            updated = report.updated + recopied.report.updated,
+            conflicts = recopied.report.conflicts + report.conflicts,
+            releasedOverridden = released,
+        )
+    }
+
+    private class Recopied(
+        val ids: Set<TransactionId>,
+        val report: MaterializationReport,
+    )
+
+    /**
+     * Books again each copy (#1475) a re-run vacated, from what its record says now: the record said its slot again, on a
+     * transaction the source still counts, and the copy's wallets are still linked to one account each. The copy keeps its
+     * id, so the match and a person's edits stay on it, and a conflict compares with what it merged to before. A copy whose
+     * row is gone, excluded or no longer maps stays reserved, and the settle removes it like any record not said again.
+     */
+    private suspend fun recopy(reserved: ReservedTransactions): Recopied {
+        val observations = observationRepository ?: return Recopied(emptySet(), MaterializationReport())
+        val copies = observations.getReserved().filter { it.isCopy() && it.transactionId in reserved.ids }
+        if (copies.isEmpty()) return Recopied(emptySet(), MaterializationReport())
+        val ends = loadCopyAccounts()
+        val ids = mutableSetOf<TransactionId>()
+        for (copy in copies) {
+            val content = recopiedContent(copy, observations, ends) ?: continue
+            if (content != copy.content) observations.updateContent(copy.id, content)
+            observations.unreserve(copy.id)
+            ids += copy.transactionId
+        }
+        if (ids.isEmpty()) return Recopied(emptySet(), MaterializationReport())
+        val report =
+            materialize(
+                emptyList(),
+                MaterializationRequest(Source.Reconciliation, ids, priorMerges = reserved.priorMerges.filterKeys { it in ids }),
+            )
+        return Recopied(ids, report)
+    }
+
+    /** What [copy] books now: what its record says again at the copied slot, mapped onto the real accounts, or null when it says nothing there any more. */
+    private suspend fun recopiedContent(
+        copy: Observation,
+        observations: ObservationWriteRepository,
+        ends: CopyAccounts,
+    ): ObservationContent? {
+        val base = copy.slot.removePrefix(ObservationSlot.COPY_PREFIX)
+        val said =
+            observations.getObservationsOf(copy.owner).firstOrNull {
+                it.slot == base && (copy.owner is ObservationOwner.Group || !observations.isReserved(it.id))
+            } ?: return null
+        return ends.contentOf(said.transactionId)?.takeIf { it.values.kind == copy.content.values.kind }
+    }
+
+    /**
+     * Copies each of [shadowTransactions] onto the real accounts (#1475, [ImportBatch.reconciliationCopies]): the record that
+     * says the shadow transaction says its copy too, in the [ObservationSlot.copy] of its slot, and the copy is materialized
+     * as a [Source.Reconciliation] transaction.
+     */
+    private suspend fun copyToRealAccounts(shadowTransactions: List<TransactionId>): List<TransactionId> {
+        val observations = checkNotNull(observationRepository) { "This engine has no observation repository" }
+        val ends = loadCopyAccounts()
+        val keys = shadowTransactions.indices.map { LocalTransactionKey("copy-$it") }
+        val mutations =
+            shadowTransactions.mapIndexed { index, shadow ->
+                val said =
+                    observations
+                        .getObservationsOfTransaction(shadow)
+                        .filter { it.owner !is ObservationOwner.Manual && !it.isCopy() }
+                        .minWithOrNull(compareBy({ it.owner !is ObservationOwner.Record }, { it.id.id }))
+                requireNotNull(said) { "No record of a reconciliation source says $shadow" }
+                val slot = ObservationSlot.copy(said.slot)
+                require(observations.getObservationsOf(said.owner).none { it.slot == slot }) { "$shadow is copied already" }
+                val content = requireNotNull(ends.contentOf(shadow)) { "$shadow can't be copied onto the real accounts" }
+                ObservationMutation.Upsert(said.owner, slot, ObservationTransaction.New(keys[index]), content)
+            }
+        val report = materialize(mutations, MaterializationRequest(Source.Reconciliation))
+        return keys.map { requireNotNull(report.newTransactionIds[it]) { "A copy was not booked" } }
+    }
+
+    /** Where a copy's ends land ([CopyEnds]), with the real accounts' fee accounts, read once per settle or copy batch. */
+    private inner class CopyAccounts(
+        private val ends: CopyEnds,
+        private val feeAccountOf: Map<AccountId, AccountId>,
+    ) {
+        private fun accountOf(shadow: AccountId): AccountId? =
+            when (val end = ends.end(shadow)) {
+                is CopyEnd.Real -> end.account
+                is CopyEnd.FeeAccountOf -> feeAccountOf[end.account]
+                null -> null
+            }
+
+        /** What a copy of [shadow] says: its values on the real accounts, or null when it is excluded or doesn't map. */
+        suspend fun contentOf(shadow: TransactionId): ObservationContent? {
+            val materialized = observationRepository?.getMaterialized(shadow) ?: return null
+            if (materialized.attributes.any { it.typeId.id == WellKnownIds.EXCLUDED_ATTR_TYPE_ID }) return null
+            val values =
+                when (val v = materialized.values) {
+                    is ObservedValues.Transfer -> {
+                        v.copy(
+                            sourceAccountId = accountOf(v.sourceAccountId) ?: return null,
+                            targetAccountId = accountOf(v.targetAccountId) ?: return null,
+                        )
+                    }
+
+                    is ObservedValues.Trade -> {
+                        v.copy(
+                            fromAccountId = (ends.end(v.fromAccountId) as? CopyEnd.Real)?.account ?: return null,
+                            toAccountId = (ends.end(v.toAccountId) as? CopyEnd.Real)?.account ?: return null,
+                        )
+                    }
+                }
+            return ObservationContent(values)
+        }
+    }
+
+    private suspend fun loadCopyAccounts(): CopyAccounts {
+        val links = checkNotNull(reconciliationLinkRepository) { "Reconciliation links are not supported by this engine" }
+        val ends =
+            CopyEnds(
+                realOf = links.getLinks().first().groupBy({ it.shadowAccountId }, { it.realAccountId }),
+                walletOfFeeAccount =
+                    links
+                        .getShadowAccounts()
+                        .first()
+                        .mapNotNull { shadow -> shadow.feeAccountFor?.let { shadow.accountId to it } }
+                        .toMap(),
+            )
+        val feeAccountOf =
+            accountAttributeRepository
+                .getByType(FEE_ACCOUNT_FOR_TYPE)
+                .first()
+                .mapNotNull { attr -> attr.value.toLongOrNull()?.let { AccountId(it) to attr.accountId } }
+                .toMap()
+        return CopyAccounts(ends, feeAccountOf)
     }
 
     private suspend fun isOverridden(id: TransactionId): Boolean {
@@ -1033,7 +1176,7 @@ class ImportEngineImpl(
                     group(key)
                 }
 
-                (provenance == Source.Manual || provenance == Source.Reconciliation) &&
+                provenance == Source.Manual &&
                     (key == null || key is ObservationOwnerKey.Unrecorded) -> {
                     observations.getCreationSourceId(transactionId)?.let { ObservationOwner.Manual(it) to true }
                 }
@@ -3006,6 +3149,8 @@ class ImportEngineImpl(
                 batch.trades.count { it.operation != ImportOperation.CREATE } +
                 batch.accountsToCreate.count { it.operation != ImportOperation.CREATE }
         require(nonCreates == 0) { "Reconciliation import for '$source' may only create records ($nonCreates update/delete intents)" }
+        // A copy is the one write a source's row makes on the real accounts, and only a batch of its own makes it.
+        require(batch.reconciliationCopies.isEmpty()) { "Reconciliation import for '$source' may not copy onto real accounts" }
         val referenced = mutableSetOf<AccountId>()
 
         fun add(ref: AccountRef?) {
@@ -3468,3 +3613,6 @@ private fun AttributeTypeId.tradeOverride(value: String?): AttributeOverride =
     if (value == null) AttributeOverride.Removed(this, "") else AttributeOverride.Set(this, "", value)
 
 private fun Source.isImport(): Boolean = this is Source.Csv || this is Source.Api
+
+/** Whether this observation is a reconciliation copy (#1475): what its owner's record says on the real accounts. */
+private fun Observation.isCopy(): Boolean = slot.startsWith(ObservationSlot.COPY_PREFIX)

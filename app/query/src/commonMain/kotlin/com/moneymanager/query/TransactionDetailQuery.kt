@@ -32,11 +32,7 @@ class TransactionDetailQuery(
 
     /** What [transactionId] is made of, for a screen that shows it without the rest of the detail. */
     suspend fun observations(transactionId: TransactionId): TransactionObservations =
-        observationReads.observationsOf(
-            transactionId,
-            emptyList(),
-            (transactionId as? TransferId)?.let { sourceRepository.getSourcesForTransaction(it) }.orEmpty(),
-        )
+        observationReads.observationsOf(transactionId, emptyList())
 
     private suspend fun transferDetail(
         row: AccountRow,
@@ -62,7 +58,7 @@ class TransactionDetailQuery(
             attributes = transfer.attributes.map { DetailAttribute(it.attributeType.name, it.value) },
             links = links,
             sources = sources,
-            observations = observationReads.observationsOf(id, listOf(transfer.amount.asset), sources),
+            observations = observationReads.observationsOf(id, listOf(transfer.amount.asset)),
         )
     }
 
