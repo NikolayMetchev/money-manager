@@ -20,12 +20,6 @@ interface PersonOverrideReadRepository {
     /** A person's set and removed trade attributes, by type. */
     suspend fun getTradeAttributeOverrides(tradeId: TradeId): List<AttributeOverride>
 
-    /** Those of [transferIds] a person overrode a field or an attribute of. */
-    suspend fun getOverriddenTransfers(transferIds: Collection<TransferId>): Set<TransferId>
-
-    /** A person's set and removed attributes of each of [tradeIds] they overrode any of, by type. */
-    suspend fun getTradeAttributeOverrides(tradeIds: Collection<TradeId>): Map<TradeId, List<AttributeOverride>>
-
     /** The pins among [observationIds]. */
     suspend fun getPins(observationIds: Collection<ObservationId>): List<ObservationPin>
 

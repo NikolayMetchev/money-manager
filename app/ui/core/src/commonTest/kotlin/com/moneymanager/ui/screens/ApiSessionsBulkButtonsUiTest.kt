@@ -147,5 +147,18 @@ class ApiSessionsBulkButtonsUiTest : DbTest() {
             onNodeWithText("Done").performClick()
             waitUntilDoesNotExist(hasText("Re-import complete"), timeoutMillis = 10_000)
             waitForIdle()
+
+            // "Re-import all" re-runs every imported session of the connection and reports the plan the same way.
+            waitUntilAtLeastOneExists(hasText("Re-import all (1)") and isEnabled(), timeoutMillis = 10_000)
+            onNodeWithText("Re-import all (1)").performClick()
+            waitUntilAtLeastOneExists(hasText("Re-import all sessions"), timeoutMillis = 10_000)
+            onNodeWithText("already-imported session retroactively", substring = true).assertExists()
+            onNodeWithText("Re-import 1 session").performClick()
+            waitUntilAtLeastOneExists(hasText("Re-import complete"), timeoutMillis = 10_000)
+            onNodeWithText("Re-imported 1 session(s) under \"Monzo\".").assertExists()
+            onNodeWithText("no changes").assertExists()
+            onNodeWithText("Done").performClick()
+            waitUntilDoesNotExist(hasText("Re-import complete"), timeoutMillis = 10_000)
+            waitForIdle()
         }
 }
