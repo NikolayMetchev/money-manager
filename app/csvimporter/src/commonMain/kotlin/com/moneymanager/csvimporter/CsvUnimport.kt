@@ -20,7 +20,6 @@ import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalTradeKey
 import com.moneymanager.importengineapi.deleteEmptyImportCreatedAccounts
 import com.moneymanager.tasks.Progress
-import kotlinx.coroutines.flow.first
 
 /**
  * What unimporting a CSV file will do — a preview for the confirmation dialog, executed verbatim by

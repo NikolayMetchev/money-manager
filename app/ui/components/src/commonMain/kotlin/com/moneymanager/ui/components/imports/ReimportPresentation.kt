@@ -54,14 +54,12 @@ fun ReimportProgressIndicator(progress: Progress) {
 
 /**
  * One titled block of the re-import preview: a heading, a bullet per [lines] entry (truncated to
- * [limit] with an "…and N more" tail when one is given) and an optional explanatory [note].
+ * [limit] with an "…and N more" tail when one is given).
  */
-@Suppress("LongParameterList")
 @Composable
 fun ReimportPlanSection(
     title: String,
     lines: List<String>,
-    note: String? = null,
     limit: Int? = null,
     isError: Boolean = false,
     leadingSpacer: Boolean = true,
@@ -86,14 +84,6 @@ fun ReimportPlanSection(
     if (limit != null && lines.size > limit) {
         Text(
             text = "…and ${lines.size - limit} more",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-    if (note != null) {
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = note,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
