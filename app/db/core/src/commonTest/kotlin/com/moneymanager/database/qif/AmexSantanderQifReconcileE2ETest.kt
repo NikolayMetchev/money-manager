@@ -8,6 +8,7 @@ import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.calendar.testing.TestHolidayCalendars
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.importengineapi.AccountRef
@@ -202,10 +203,24 @@ class AmexSantanderQifReconcileE2ETest : DbTest() {
         apply(santanderStatement(), SANTANDER)
         val card = amexStatement()
         apply(card, AMEX)
-        val secondCard = amexStatement("amex-pdf.qif", referencePrefix = "8836181")
+        val secondCard = amexStatement("amex-pdf.qif", referencePrefix = SECOND_STATEMENT_REFERENCE_PREFIX)
         apply(secondCard, AMEX)
         assertEachPaymentCountedOnceFromTheBank(cardRecords = 2, step = "Before the re-import: ")
         return card to secondCard
+    }
+
+    /** The first payment into the card that a record of the second statement observes. */
+    private suspend fun transferObservedOnSecondStatement(): Transfer {
+        val amexId = accountId(AMEX)
+        return repositories.transactionRepository
+            .getTransactionsByAccount(amexId)
+            .first()
+            .filter { it.targetAccountId == amexId }
+            .first { transfer ->
+                repositories.observationRepository.getObservationsOfTransaction(transfer.id).any { observation ->
+                    observation.content.attributes.any { it.value.startsWith(SECOND_STATEMENT_REFERENCE_PREFIX) }
+                }
+            }
     }
 
     private suspend fun reimport(file: CsvImport): BulkReimportResult =
@@ -258,13 +273,9 @@ class AmexSantanderQifReconcileE2ETest : DbTest() {
     @Test
     fun reimportingTheFirstCardStatement_keepsHandEditsOfTheSecondsPlaceholders() =
         runDbTest {
-            val (card, secondCard) = importBankAndBothCardStatements()
-            val placeholder =
-                repositories.transferSourceRepository
-                    .getTransfersCreatedBy(Source.Csv(secondCard.id))
-                    .keys
-                    .let { repositories.transactionRepository.getTransactionsByIds(it).values }
-                    .first { it.description.startsWith("PAYMENT RECEIVED") }
+            val (card, _) = importBankAndBothCardStatements()
+            // The second statement's placeholder is an observation of the payment's transaction, which the person edits.
+            val placeholder = transferObservedOnSecondStatement()
             repositories.importEngine.import(
                 ImportBatch.manualEdits(
                     transfers =
@@ -286,12 +297,13 @@ class AmexSantanderQifReconcileE2ETest : DbTest() {
             val result = reimport(card)
 
             assertTrue(result.plan.releasedOverrides.isEmpty(), "the edit is an override on the kept id: ${result.plan}")
-            val recreated =
-                repositories.transferSourceRepository
-                    .getTransfersCreatedBy(Source.Csv(secondCard.id))
-                    .keys
-                    .let { repositories.transactionRepository.getTransactionsByIds(it).values }
-            assertEquals(1, recreated.count { it.description == "Paid from Santander" && it.amount == placeholder.amount })
+            val kept =
+                repositories.transactionRepository
+                    .getTransactionsByIds(listOf(placeholder.id))
+                    .values
+                    .single()
+            assertEquals("Paid from Santander", kept.description, "the edit stays on the transaction's id")
+            assertEquals(placeholder.id, transferObservedOnSecondStatement().id)
             assertEachPaymentCountedOnceFromTheBank(cardRecords = 2, step = "After re-importing the first statement: ")
         }
 
@@ -348,5 +360,6 @@ class AmexSantanderQifReconcileE2ETest : DbTest() {
         // The card account under the name Santander's payee resolves to, so both statements book onto it.
         const val AMEX = "AMERICAN EXPRESS"
         const val SANTANDER = "Santander"
+        const val SECOND_STATEMENT_REFERENCE_PREFIX = "8836181"
     }
 }

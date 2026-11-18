@@ -1292,6 +1292,7 @@ class ImportEngineImpl(
         val existing = loadExisting(resolvedTransfers, batch, calendars)
         val existingRelationships = existingRelationships(existing)
         val otherSideLegs = otherSideLegs(resolvedTransfers, batch, calendars)
+        val onward = passThroughOnward(existing, existingRelationships)
         val classified =
             ImportDeduper(
                 batch.dedupePolicy,
@@ -1307,7 +1308,7 @@ class ImportEngineImpl(
                         .mapNotNull { it.transferPair }
                         .toMap(),
                 ownBatchAccounts = resolvedTransfers.flatMapTo(mutableSetOf()) { listOf(it.fromAccount, it.toAccount).map(::requireId) },
-                passThroughOnward = passThroughOnward(existing, existingRelationships),
+                passThroughOnward = onward,
                 ownSourceLegs = ownSourceLegs(resolvedTransfers, existing),
                 calendars = calendars,
                 otherSideLegs = otherSideLegs,
@@ -1367,7 +1368,7 @@ class ImportEngineImpl(
         val rowOutcomes =
             classified.zip(orderedRowOutcomes).associate { (c, outcome) -> requireNotNull(c.transfer.rowKey) to outcome }
         val observedDuplicates =
-            if (observer != null) observeDuplicates(classified, orderedRowOutcomes, existingRelationships, observer) else emptySet()
+            if (observer != null) observeDuplicates(classified, orderedRowOutcomes, existingRelationships, onward, observer) else emptySet()
 
         return TransferOutcome(
             imported = toImport.size,
@@ -1392,6 +1393,7 @@ class ImportEngineImpl(
         classified: List<Classified>,
         outcomes: List<RowOutcome>,
         existingRelationships: List<Relationship>,
+        onward: Map<TransferId, List<Transfer>>,
         observer: SourceObservations,
     ): Set<TransactionId> {
         val duplicates =
@@ -1419,6 +1421,18 @@ class ImportEngineImpl(
             if (feeLeg != null && feeId != null) {
                 observed += observer.record(feeLeg.key, feeLeg.provenance, feeId) { observer.transferContent(feeLeg, approximate) } ?: feeId
             }
+            // Its chain's onward legs say what the twin's chain booked, leg for leg, so the onward movement outlives
+            // whichever of the two records is unimported first.
+            val onwardLegs = onward[id].orEmpty()
+            row.legs
+                .filter { it.key.slot.startsWith(ObservationSlot.CONDUIT_PREFIX) }
+                .zip(onwardLegs)
+                .takeWhile { (leg, booked) ->
+                    leg.sourceAccountId == booked.sourceAccountId && leg.targetAccountId == booked.targetAccountId
+                }.forEach { (leg, booked) ->
+                    observed +=
+                        observer.record(leg.key, leg.provenance, booked.id) { observer.transferContent(leg, approximate) } ?: booked.id
+                }
         }
         return observed
     }

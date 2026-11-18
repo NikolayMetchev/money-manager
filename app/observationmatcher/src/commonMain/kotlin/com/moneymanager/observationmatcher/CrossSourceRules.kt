@@ -116,6 +116,7 @@ object CrossSourceRules {
             SameAccountsRule(context),
             BridgeRule(context),
             UnidentifiedTwinRule(context),
+            PlaceholderTwinRule(context),
             OtherSideRule(context),
         )
     }
@@ -289,7 +290,10 @@ internal class SameAccountsRule(
     ): Boolean {
         val endA = a.content.facts.ownEnd ?: return false
         val endB = b.content.facts.ownEnd ?: return false
-        return endA != endB
+        // Two statements of one account (a PDF and a QIF export, each with its own references) carry the same line:
+        // the same time, accounts and amount. A line only one of them has at that time is another movement.
+        return endA != endB ||
+            (a.content.values as ObservedValues.Transfer).timestamp == (b.content.values as ObservedValues.Transfer).timestamp
     }
 
     override fun bucket(observation: MatchObservation): Any? {
@@ -380,6 +384,46 @@ internal class UnidentifiedTwinRule(
         if (!sharesOwnAccount || farEnd == p.at(end) || context.booksAccount(placeholder, farEnd)) return null
         return context.within(context.policy(incoming).placeholderWindow, incoming, existing)
     }
+}
+
+/**
+ * Two statements of one strategy that both stand in a placeholder for the same far end (two American Express
+ * statements that each say "PAYMENT RECEIVED"): the same amount moving the same way through the same own account,
+ * inside the family's placeholder window, is one payment, whatever reference each statement gives it (a reference on
+ * a placeholder doesn't identify the movement). Never two rows of one statement, and never two records that are each
+ * already one movement with a record naming the far end: two like payments stay two.
+ */
+internal class PlaceholderTwinRule(
+    private val context: Context,
+) : PairRule {
+    override val name = "placeholder twin"
+    override val joinsSameContainer = false
+
+    override fun bucket(observation: MatchObservation): Any? {
+        val values = context.eligible(observation) ?: return null
+        if (observation.crossSource.passThrough) return null
+        val end = placeholderEnd(observation) ?: return null
+        return listOf(observation.family, values.assetId, values.amount.toString(), end, values.at(end.other()))
+    }
+
+    override fun distance(
+        a: MatchObservation,
+        b: MatchObservation,
+    ): Long? {
+        if (a.family != b.family) return null
+        return context.within(context.policy(a).placeholderWindow, a, b)
+    }
+
+    override fun joinsGroups(
+        x: List<MatchObservation>,
+        y: List<MatchObservation>,
+    ): Boolean =
+        listOf(x, y).any { group ->
+            group.all {
+                it.content.facts.placeholderEnds
+                    .isNotEmpty()
+            }
+        }
 }
 
 /**
