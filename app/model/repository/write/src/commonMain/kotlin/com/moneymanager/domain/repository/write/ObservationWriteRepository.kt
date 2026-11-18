@@ -2,21 +2,29 @@ package com.moneymanager.domain.repository.write
 
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.ApiSessionId
+import com.moneymanager.domain.model.CsvImportId
+import com.moneymanager.domain.model.CsvImportStrategyId
+import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.MergeId
 import com.moneymanager.domain.model.TransactionId
+import com.moneymanager.domain.model.observation.ImportRecordId
 import com.moneymanager.domain.model.observation.MaterializedWrite
 import com.moneymanager.domain.model.observation.ObservationChange
 import com.moneymanager.domain.model.observation.ObservationContent
 import com.moneymanager.domain.model.observation.ObservationId
 import com.moneymanager.domain.model.observation.ObservationOwner
 import com.moneymanager.domain.repository.ObservationReadRepository
+import kotlin.time.Instant
 
 interface ObservationWriteRepository : ObservationReadRepository {
+    suspend fun changeToken(): Long
+
     /** Commits a plan's observation and effective row changes together, returning real ids for its provisional ids. */
     suspend fun applyObservationChanges(
         newTransactions: Collection<TransactionId>,
         observations: List<ObservationChange>,
         rows: List<MaterializedWrite>,
+        csv: CsvObservationCommit? = null,
     ): Map<TransactionId, TransactionId>
 
     /** Records what [owner] says about [slot], on [transactionId]; an owner's slot already recorded fails. */
@@ -75,3 +83,18 @@ interface ObservationWriteRepository : ObservationReadRepository {
         restoredAccountId: AccountId,
     )
 }
+
+/** The staging write-backs that must commit with the refreshed observations. */
+data class CsvObservationCommit(
+    val changeToken: Long,
+    val importId: CsvImportId,
+    val fileChecksum: String,
+    val strategyId: CsvImportStrategyId,
+    val strategyName: String,
+    val appliedAt: Instant,
+    val accountId: AccountId?,
+    val currencyId: CurrencyId?,
+    val hashes: Map<ImportRecordId, String>,
+)
+
+class StaleObservationCommitException : IllegalStateException("The database changed after observation planning")

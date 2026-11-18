@@ -57,6 +57,7 @@ import com.moneymanager.domain.repository.write.CategoryWriteRepository
 import com.moneymanager.domain.repository.write.CryptoWriteRepository
 import com.moneymanager.domain.repository.write.CsvImportStrategyWriteRepository
 import com.moneymanager.domain.repository.write.CsvImportWriteRepository
+import com.moneymanager.domain.repository.write.CsvObservationCommit
 import com.moneymanager.domain.repository.write.CurrencyWriteRepository
 import com.moneymanager.domain.repository.write.ExchangeOrderWriteRepository
 import com.moneymanager.domain.repository.write.HolidayCalendarWriteRepository
@@ -75,6 +76,7 @@ import com.moneymanager.domain.repository.write.RelationshipTypeWriteRepository
 import com.moneymanager.domain.repository.write.RelationshipWrite
 import com.moneymanager.domain.repository.write.RelationshipWriteRepository
 import com.moneymanager.domain.repository.write.SettingsWriteRepository
+import com.moneymanager.domain.repository.write.StaleObservationCommitException
 import com.moneymanager.domain.repository.write.TradeEdit
 import com.moneymanager.domain.repository.write.TradeWriteRepository
 import com.moneymanager.domain.repository.write.TransactionWriteRepository
@@ -91,6 +93,7 @@ import com.moneymanager.importengineapi.CopyEnd
 import com.moneymanager.importengineapi.CopyEnds
 import com.moneymanager.importengineapi.CsvImportMutation
 import com.moneymanager.importengineapi.CsvStrategyMutation
+import com.moneymanager.importengineapi.CsvTransferSync
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.EditGate
 import com.moneymanager.importengineapi.ExpandedRow
@@ -103,6 +106,7 @@ import com.moneymanager.importengineapi.ImportDirectoryMutation
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportOwnershipIntent
+import com.moneymanager.importengineapi.ImportPlanVersion
 import com.moneymanager.importengineapi.ImportResult
 import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTradeIntent
@@ -129,10 +133,12 @@ import com.moneymanager.importengineapi.ObservationSlot
 import com.moneymanager.importengineapi.ObservationTransaction
 import com.moneymanager.importengineapi.PassThroughMutation
 import com.moneymanager.importengineapi.PersonMatchKey
+import com.moneymanager.importengineapi.PreparedImport
 import com.moneymanager.importengineapi.ReconciliationLinkMutation
 import com.moneymanager.importengineapi.RelationshipMutation
 import com.moneymanager.importengineapi.ReservedTransactions
 import com.moneymanager.importengineapi.RowOutcome
+import com.moneymanager.importengineapi.StaleImportPlanException
 import com.moneymanager.importengineapi.TradeAttributeMutation
 import com.moneymanager.importengineapi.TradeDedupePolicy
 import com.moneymanager.importengineapi.WriteIntent
@@ -149,6 +155,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -235,18 +243,85 @@ class ImportEngineImpl(
      */
     private val importRecordRepository: ImportRecordWriteRepository? = null,
 ) : ImportEngine {
+    private val commitLock = Mutex()
     private val writes = MutableStateFlow(0L)
     override val writeVersion: StateFlow<Long> = writes.asStateFlow()
+
+    override suspend fun planVersion(): ImportPlanVersion? = commitLock.withLock { currentPlanVersion() }
+
+    private suspend fun currentPlanVersion(): ImportPlanVersion? =
+        observationRepository?.let { ImportPlanVersion(writes.value, it.changeToken()) }
+
+    override suspend fun plan(request: CsvTransferSync): PreparedImport? =
+        commitLock.withLock {
+            val observations = observationRepository ?: return@withLock null
+            val overrides = personOverrideRepository ?: return@withLock null
+            val records = importRecordRepository ?: return@withLock null
+            val relationships = relationshipRepository ?: return@withLock null
+            if (currentPlanVersion() != request.version) throw StaleImportPlanException()
+            require(request.application.id == request.id && request.records.id == request.id)
+            val materializer = ObservationMaterializationPlanner(observations, overrides, relationships, placeholderTypeId(), records)
+            val changes =
+                CsvTransferSyncPlanner(observations, records, csvImportRepository, transactionRepository, relationships, materializer)
+                    .plan(request) ?: return@withLock null
+            if (currentPlanVersion() != request.version) throw StaleImportPlanException()
+            CsvPreparedImport(this, request, changes)
+        }
+
+    override suspend fun apply(plan: PreparedImport): Boolean {
+        require(plan is CsvPreparedImport && plan.engine === this)
+        return commitLock.withLock {
+            editGate.ensureWritable()
+            if (currentPlanVersion() != plan.request.version) throw StaleImportPlanException()
+            val changes = plan.changes.materialization
+            if (changes.observations.isEmpty() && changes.rows.isEmpty() && plan.changes.hashes.isEmpty()) return@withLock false
+            val application = plan.request.application
+            try {
+                checkNotNull(observationRepository).applyObservationChanges(
+                    newTransactions = emptyList(),
+                    observations = changes.observations,
+                    rows = changes.rows,
+                    csv =
+                        CsvObservationCommit(
+                            plan.request.version.database,
+                            application.id,
+                            plan.request.fileChecksum,
+                            application.strategyId,
+                            application.strategyName,
+                            application.appliedAt,
+                            application.accountId,
+                            application.currencyId,
+                            plan.changes.hashes,
+                        ),
+                )
+                true
+            } catch (_: StaleObservationCommitException) {
+                throw StaleImportPlanException()
+            } finally {
+                writes.update { it + 1 }
+            }
+        }
+    }
+
+    private class CsvPreparedImport(
+        val engine: ImportEngineImpl,
+        val request: CsvTransferSync,
+        val changes: CsvTransferChanges,
+    ) : PreparedImport {
+        override val preview get() = changes.preview
+    }
 
     override suspend fun import(
         batch: ImportBatch,
         onProgress: (suspend (Progress) -> Unit)?,
         batchSize: Int,
     ): ImportResult =
-        try {
-            applyBatch(batch, onProgress, batchSize)
-        } finally {
-            writes.update { it + 1 }
+        commitLock.withLock {
+            try {
+                applyBatch(batch, onProgress, batchSize)
+            } finally {
+                writes.update { it + 1 }
+            }
         }
 
     private suspend fun applyBatch(

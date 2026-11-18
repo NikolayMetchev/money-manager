@@ -672,7 +672,7 @@ stdout carries only the result: prompts, warnings and errors go to stderr, and I
 - **Import commands** (`import dirs|apis|all`, `ImportRun`) resolve the names they're given, then run
   `SessionImports.run` (`app/session`), which the TUI's Imports tab runs too: `ImportDirectoryService.importAll` and
   `ApiImportService.downloadAndImportAll`, the same services the desktop screens use, built with one shared session
-  write lock (the engine doesn't serialize writes, and `import all` runs both at once). The services hand
+  write lock so that multi-batch imports do not interleave when `import all` runs both at once. The services hand
   back per-file, per-connection and per-session outcomes (`BulkApplyResult`, `ApiDownloadAndImportAllResult`) and
   everything a person must resolve (`NeedsAttention`, including unassigned card last-4). The CLI prints these and
   exits 3; it never guesses. Each run passes `refreshViews = false` and refreshes the materialized views once at the end.
