@@ -14,6 +14,7 @@ import com.moneymanager.domain.model.TransactionKind
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.observation.MaterializedWrite
 import com.moneymanager.domain.model.observation.ObservationAttribute
+import com.moneymanager.domain.model.observation.ObservationChange
 import com.moneymanager.domain.model.observation.ObservationContent
 import com.moneymanager.domain.model.observation.ObservationId
 import com.moneymanager.domain.model.observation.ObservationOwner
@@ -34,113 +35,165 @@ class ObservationWriteRepositoryImpl(
     private val queries = database.observationWriteQueries
     private val selectQueries = database.observationSelectQueries
 
-    override suspend fun allocateTransactionId(kind: TransactionKind): TransactionId =
-        withContext(coroutineContext) {
-            val transactionIds = database.transactionIdWriteQueries
-            val id =
-                transactionIds.transactionWithResult {
-                    transactionIds.insert()
-                    transactionIds.lastInsertedId().awaitAsOne()
+    override suspend fun applyObservationChanges(
+        newTransactions: Collection<TransactionId>,
+        observations: List<ObservationChange>,
+        rows: List<MaterializedWrite>,
+    ): Map<TransactionId, TransactionId> {
+        if (newTransactions.isEmpty() && observations.isEmpty() && rows.isEmpty()) return emptyMap()
+        return withContext(coroutineContext) {
+            queries.transactionWithResult {
+                val ids = newTransactions.associateWith { allocate(it.kind()) }
+                for (change in observations) {
+                    val before = change.before
+                    val after = change.after
+                    if (before != null && after?.storedId != before.id) queries.deleteObservation(before.id.id)
+                    if (after != null) {
+                        val target = ids[after.transactionId] ?: after.transactionId
+                        val storedId = after.storedId
+                        if (storedId == null) {
+                            insert(change.owner, change.slot, target, after.content)
+                        } else {
+                            checkNotNull(before)
+                            if (before.content != after.content) update(storedId, after.content)
+                            if (before.transactionId != target) assign(storedId, target)
+                        }
+                    }
                 }
-            when (kind) {
-                TransactionKind.TRANSFER -> TransferId(id)
-                TransactionKind.TRADE -> TradeId(id)
+                val allocated = ids.entries.associate { (local, stored) -> local.id to stored.id }
+                for (write in rows) {
+                    when (write) {
+                        is MaterializedWrite.Insert -> {
+                            insertRow(
+                                write.copy(
+                                    transactionId =
+                                        allocated[write.transactionId] ?: write.transactionId,
+                                ),
+                            )
+                        }
+
+                        is MaterializedWrite.Update -> {
+                            updateRow(write)
+                        }
+
+                        is MaterializedWrite.Delete -> {
+                            deleteRow(write)
+                        }
+                    }
+                }
+                ids
             }
         }
+    }
+
+    private suspend fun allocate(kind: TransactionKind): TransactionId {
+        val transactionIds = database.transactionIdWriteQueries
+        transactionIds.insert()
+        val id = transactionIds.lastInsertedId().awaitAsOne()
+        return when (kind) {
+            TransactionKind.TRANSFER -> TransferId(id)
+            TransactionKind.TRADE -> TradeId(id)
+        }
+    }
 
     override suspend fun insertObservation(
         owner: ObservationOwner,
         slot: String,
         transactionId: TransactionId,
         content: ObservationContent,
-    ): ObservationId =
-        withContext(coroutineContext) {
-            require(transactionId.kind() == content.values.kind) {
-                "a ${content.values.kind} observation can't be on transaction $transactionId"
-            }
-            queries.transactionWithResult {
-                queries.insertObservation(transactionId.id, content.values.kind.name)
-                val id = queries.lastInsertedId().awaitAsOne()
-                when (owner) {
-                    is ObservationOwner.Record -> queries.insertRecordOwner(id, owner.recordId.id, slot)
-                    is ObservationOwner.Group -> queries.insertGroupOwner(id, owner.groupId.id, slot)
-                    is ObservationOwner.Manual -> queries.insertManualOwner(id, owner.entitySourceId, slot)
-                }
-                when (val values = content.values) {
-                    is ObservedValues.Transfer -> {
-                        queries.insertTransferValues(
-                            id,
-                            values.timestamp.toEpochMilliseconds(),
-                            values.description,
-                            values.sourceAccountId.id,
-                            values.targetAccountId.id,
-                            values.assetId.id,
-                            values.amount.toString(),
-                        )
-                    }
+    ): ObservationId = withContext(coroutineContext) { queries.transactionWithResult { insert(owner, slot, transactionId, content) } }
 
-                    is ObservedValues.Trade -> {
-                        queries.insertTradeValues(
-                            id,
-                            values.timestamp.toEpochMilliseconds(),
-                            values.description,
-                            values.fromAccountId.id,
-                            values.fromAssetId.id,
-                            values.fromAmount.toString(),
-                            values.toAccountId.id,
-                            values.toAssetId.id,
-                            values.toAmount.toString(),
-                        )
-                    }
-                }
-                writeDetails(id, content)
-                ObservationId(id)
+    private suspend fun insert(
+        owner: ObservationOwner,
+        slot: String,
+        transactionId: TransactionId,
+        content: ObservationContent,
+    ): ObservationId {
+        require(transactionId.kind() == content.values.kind) {
+            "a ${content.values.kind} observation can't be on transaction $transactionId"
+        }
+        queries.insertObservation(transactionId.id, content.values.kind.name)
+        val id = queries.lastInsertedId().awaitAsOne()
+        when (owner) {
+            is ObservationOwner.Record -> queries.insertRecordOwner(id, owner.recordId.id, slot)
+            is ObservationOwner.Group -> queries.insertGroupOwner(id, owner.groupId.id, slot)
+            is ObservationOwner.Manual -> queries.insertManualOwner(id, owner.entitySourceId, slot)
+        }
+        when (val values = content.values) {
+            is ObservedValues.Transfer -> {
+                queries.insertTransferValues(
+                    id,
+                    values.timestamp.toEpochMilliseconds(),
+                    values.description,
+                    values.sourceAccountId.id,
+                    values.targetAccountId.id,
+                    values.assetId.id,
+                    values.amount.toString(),
+                )
+            }
+
+            is ObservedValues.Trade -> {
+                queries.insertTradeValues(
+                    id,
+                    values.timestamp.toEpochMilliseconds(),
+                    values.description,
+                    values.fromAccountId.id,
+                    values.fromAssetId.id,
+                    values.fromAmount.toString(),
+                    values.toAccountId.id,
+                    values.toAssetId.id,
+                    values.toAmount.toString(),
+                )
             }
         }
+        writeDetails(id, content)
+        return ObservationId(id)
+    }
 
     override suspend fun updateContent(
         id: ObservationId,
         content: ObservationContent,
-    ) {
-        withContext(coroutineContext) {
-            queries.transaction {
-                val kind = TransactionKind.valueOf(selectQueries.selectKind(id.id).awaitAsOne())
-                require(kind == content.values.kind) { "observation $id is a $kind, not a ${content.values.kind}" }
-                when (val values = content.values) {
-                    is ObservedValues.Transfer -> {
-                        queries.updateTransferValues(
-                            values.timestamp.toEpochMilliseconds(),
-                            values.description,
-                            values.sourceAccountId.id,
-                            values.targetAccountId.id,
-                            values.assetId.id,
-                            values.amount.toString(),
-                            id.id,
-                        )
-                    }
+    ): Unit = withContext(coroutineContext) { queries.transaction { update(id, content) } }
 
-                    is ObservedValues.Trade -> {
-                        queries.updateTradeValues(
-                            values.timestamp.toEpochMilliseconds(),
-                            values.description,
-                            values.fromAccountId.id,
-                            values.fromAssetId.id,
-                            values.fromAmount.toString(),
-                            values.toAccountId.id,
-                            values.toAssetId.id,
-                            values.toAmount.toString(),
-                            id.id,
-                        )
-                    }
-                }
-                queries.deleteAttributes(id.id)
-                queries.deleteApproximateTime(id.id)
-                queries.deletePlaceholderEnds(id.id)
-                queries.deleteGrossAmount(id.id)
-                queries.deleteOwnEnd(id.id)
-                writeDetails(id.id, content)
+    private suspend fun update(
+        id: ObservationId,
+        content: ObservationContent,
+    ) {
+        val kind = TransactionKind.valueOf(selectQueries.selectKind(id.id).awaitAsOne())
+        require(kind == content.values.kind) { "observation $id is a $kind, not a ${content.values.kind}" }
+        when (val values = content.values) {
+            is ObservedValues.Transfer -> {
+                queries.updateTransferValues(
+                    values.timestamp.toEpochMilliseconds(),
+                    values.description,
+                    values.sourceAccountId.id,
+                    values.targetAccountId.id,
+                    values.assetId.id,
+                    values.amount.toString(),
+                    id.id,
+                )
+            }
+
+            is ObservedValues.Trade -> {
+                queries.updateTradeValues(
+                    values.timestamp.toEpochMilliseconds(),
+                    values.description,
+                    values.fromAccountId.id,
+                    values.fromAssetId.id,
+                    values.fromAmount.toString(),
+                    values.toAccountId.id,
+                    values.toAssetId.id,
+                    values.toAmount.toString(),
+                    id.id,
+                )
             }
         }
+        queries.deleteAttributes(id.id)
+        queries.deleteApproximateTime(id.id)
+        queries.deletePlaceholderEnds(id.id)
+        queries.deleteGrossAmount(id.id)
+        queries.deleteOwnEnd(id.id)
+        writeDetails(id.id, content)
     }
 
     private suspend fun writeDetails(
@@ -157,14 +210,15 @@ class ObservationWriteRepositoryImpl(
     override suspend fun assignTransaction(
         id: ObservationId,
         transactionId: TransactionId,
+    ): Unit = withContext(coroutineContext) { queries.transaction { assign(id, transactionId) } }
+
+    private suspend fun assign(
+        id: ObservationId,
+        transactionId: TransactionId,
     ) {
-        withContext(coroutineContext) {
-            queries.transaction {
-                val kind = TransactionKind.valueOf(selectQueries.selectKind(id.id).awaitAsOne())
-                require(kind == transactionId.kind()) { "observation $id is a $kind, not on transaction $transactionId" }
-                queries.assignTransaction(transactionId.id, id.id)
-            }
-        }
+        val kind = TransactionKind.valueOf(selectQueries.selectKind(id.id).awaitAsOne())
+        require(kind == transactionId.kind()) { "observation $id is a $kind, not on transaction $transactionId" }
+        queries.assignTransaction(transactionId.id, id.id)
     }
 
     override suspend fun deleteObservation(id: ObservationId) {
@@ -220,21 +274,6 @@ class ObservationWriteRepositoryImpl(
             queries.transaction {
                 moveRecorded(mergeId, restoredAccountId)
                 queries.deleteMergeMoves(mergeId.id)
-            }
-        }
-    }
-
-    override suspend fun applyMaterialization(writes: List<MaterializedWrite>) {
-        if (writes.isEmpty()) return
-        withContext(coroutineContext) {
-            queries.transaction {
-                writes.forEach { write ->
-                    when (write) {
-                        is MaterializedWrite.Insert -> insertRow(write)
-                        is MaterializedWrite.Update -> updateRow(write)
-                        is MaterializedWrite.Delete -> deleteRow(write)
-                    }
-                }
             }
         }
     }

@@ -11,7 +11,6 @@ import com.moneymanager.domain.model.CurrencyScaleFactors
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
-import com.moneymanager.domain.model.TradeId
 import dev.mokkery.answering.returns
 import dev.mokkery.everySuspend
 import dev.mokkery.matcher.any
@@ -44,7 +43,7 @@ fun noObservations(): ObservationReads =
                 everySuspend { getPinsOnTransactions(any()) } returns emptyList()
                 everySuspend { getTransferOverrides(any()) } returns emptyMap()
                 everySuspend { getTransferAttributeOverrides(any()) } returns emptyList()
-                everySuspend { getTradeAttributeOverrides(any<TradeId>()) } returns emptyList()
+                everySuspend { getTradeAttributeOverrides(any()) } returns emptyList()
             },
         importRecordRepository = mock(),
         csvImportRepository = mock(),
