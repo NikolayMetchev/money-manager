@@ -8,7 +8,6 @@ import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DeviceId
-import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvRowLink
 import com.moneymanager.domain.model.csv.PdfImportSource
 import com.moneymanager.domain.repository.CsvImportReadRepository
@@ -153,7 +152,7 @@ class CsvImportWriteRepositoryImpl(
                 tableManager.createCsvTable(import.table_name, headers.size)
                 tableManager.insertRowsBatch(import.table_name, rows, headers.size)
                 carriedRows.forEach { link ->
-                    tableManager.updateRowStatus(import.table_name, link.rowIndex, link.status.name, link.transferId)
+                    tableManager.updateRowStatus(import.table_name, link.rowIndex, link.status.name)
                 }
 
                 csvImportWriteQueries.deleteColumnsByImportId(importId)
@@ -252,18 +251,18 @@ class CsvImportWriteRepositoryImpl(
     override suspend fun updateRowStatusesBatch(
         id: CsvImportId,
         status: String,
-        rowTransferMap: Map<Long, TransferId?>,
+        rowIndexes: Collection<Long>,
     ): Unit =
         withContext(coroutineContext) {
-            if (rowTransferMap.isEmpty()) return@withContext
+            if (rowIndexes.isEmpty()) return@withContext
 
             val import =
                 csvImportSelectQueries.selectImportById(id.id.toString()).awaitAsOneOrNull()
                     ?: return@withContext
 
             database.transaction {
-                rowTransferMap.forEach { (rowIndex, transferId) ->
-                    tableManager.updateRowStatus(import.table_name, rowIndex, status, transferId)
+                rowIndexes.forEach { rowIndex ->
+                    tableManager.updateRowStatus(import.table_name, rowIndex, status)
                 }
             }
         }

@@ -13,6 +13,7 @@ CREATE TABLE relationship (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     relationship_type_id INTEGER NOT NULL,
     created_at INTEGER NOT NULL,
+    excludes_related INTEGER NOT NULL DEFAULT 0 CHECK (excludes_related IN (0, 1)),
     FOREIGN KEY (relationship_type_id) REFERENCES relationship_type(id) ON DELETE RESTRICT
 );
 

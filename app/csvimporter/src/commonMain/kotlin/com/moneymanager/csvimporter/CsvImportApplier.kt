@@ -13,7 +13,6 @@ import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TradeId
-import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.codesByName
@@ -999,7 +998,7 @@ private fun ImportPreparation.skippedRowMutations(id: CsvImportId): List<CsvImpo
         emptyList()
     } else {
         listOf(
-            CsvImportMutation.UpdateRowStatuses(id, ImportStatus.SKIPPED.name, skippedRowIndexes.associateWith { null }),
+            CsvImportMutation.UpdateRowStatuses(id, ImportStatus.SKIPPED.name, skippedRowIndexes),
             CsvImportMutation.ClearErrors(id, skippedRowIndexes),
         )
     }
@@ -1160,7 +1159,7 @@ suspend fun runCsvImport(
             CsvImportMutation.UpdateRowStatuses(
                 csvImport.id,
                 ImportStatus.ERROR.name,
-                finalPrep.errorRows.associate { it.rowIndex to null },
+                finalPrep.errorRows.map { it.rowIndex },
             ),
             CsvImportMutation.SaveErrors(csvImport.id, finalPrep.errorRows.associate { it.rowIndex to it.errorMessage }),
         ) + finalPrep.skippedRowMutations(csvImport.id),
@@ -1419,11 +1418,20 @@ suspend fun runCsvImport(
                     attributes =
                         attributesFor(row.attributes) +
                             listOfNotNull(
-                                // Marks the persisted leg as the placeholder record, so a later import that
-                                // does name both ends knows which of the two to exclude.
+                                // Preserve the stand-in's end so the matcher and materializer can replace it
+                                // with the named end of another observation.
                                 unidentifiedCounterpartyTypeId
                                     ?.takeIf { row.unidentifiedCounterpartyAccountId != null }
-                                    ?.let { NewAttribute(it, "true") },
+                                    ?.let {
+                                        NewAttribute(
+                                            it,
+                                            if (row.unidentifiedCounterpartyAccountId == row.transfer.sourceAccountId) {
+                                                WellKnownIds.UNIDENTIFIED_SOURCE
+                                            } else {
+                                                WellKnownIds.UNIDENTIFIED_TARGET
+                                            },
+                                        )
+                                    },
                             ),
                     uniqueKey = uniqueKey,
                     ownedAttributes = ownedAttributes,
@@ -1488,6 +1496,7 @@ suspend fun runCsvImport(
             trades = importTrades,
             tradeDedupePolicy = strategy.tradeDedupePolicy(),
             dedupePolicy = strategy.dedupePolicy(unidentifiedCounterpartyTypeId),
+            strategyId = strategy.id.toString(),
             uniqueKeyExtractor =
                 if (uniqueIdTypeNames.isEmpty()) {
                     null
@@ -1506,15 +1515,15 @@ suspend fun runCsvImport(
     if (supersedingExclusions.isNotEmpty()) importEngine.import(ImportBatch(tradeAttributeMutations = supersedingExclusions))
 
     // Write back per-row CSV statuses from the engine outcome.
-    val importedStatuses = mutableMapOf<Long, TransferId?>()
-    val duplicateStatuses = mutableMapOf<Long, TransferId?>()
-    val updatedStatuses = mutableMapOf<Long, TransferId?>()
+    val importedStatuses = mutableSetOf<Long>()
+    val duplicateStatuses = mutableSetOf<Long>()
+    val updatedStatuses = mutableSetOf<Long>()
     for ((rowKey, outcome) in importResult.rowOutcomes) {
         val rowIndex = (rowKey as ImportRowKey.CsvRow).rowIndex
         when (outcome.status) {
-            ImportStatus.IMPORTED -> importedStatuses[rowIndex] = outcome.transferId
-            ImportStatus.DUPLICATE -> duplicateStatuses[rowIndex] = outcome.transferId
-            ImportStatus.UPDATED -> updatedStatuses[rowIndex] = outcome.transferId
+            ImportStatus.IMPORTED -> importedStatuses += rowIndex
+            ImportStatus.DUPLICATE -> duplicateStatuses += rowIndex
+            ImportStatus.UPDATED -> updatedStatuses += rowIndex
             ImportStatus.ERROR, ImportStatus.SKIPPED -> Unit
         }
     }
@@ -1533,41 +1542,37 @@ suspend fun runCsvImport(
     // them take the trade's outcome. A single-row conversion has no group and falls back to its own row.
     fun LocalTradeKey.rowIndexes(): List<Long> = assembledTradeRowIndexes[this] ?: listOfNotNull(rowIndexOrNull())
 
-    // The row records the trade's transaction id, exactly as a transfer row records its transfer's:
-    // it is what links the row to what it produced, and what lets a re-import find the trade again.
     val tradeRowsByStatus =
-        importResult.createdTradeIds.entries
-            .flatMap { (key, tradeId) -> key.rowIndexes().map { Triple(key, it, tradeId) } }
+        importResult.createdTradeIds.keys
+            .flatMap { key -> key.rowIndexes().map { key to it } }
             .groupBy(
-                keySelector = { (key, _, _) ->
+                keySelector = { (key, _) ->
                     if (key in importResult.dedupedTradeKeys) ImportStatus.DUPLICATE else ImportStatus.IMPORTED
                 },
-                valueTransform = { (_, rowIndex, tradeId) -> rowIndex to TransferId(tradeId.id) },
+                valueTransform = { (_, rowIndex) -> rowIndex },
             )
 
-    // Conversion legs suppressed as already-recorded record the trade they duplicate, so the rows read
-    // as duplicates of something rather than as rows that quietly produced nothing.
-    for ((rowIndex, tradeId) in reconciledConversionRows) {
-        duplicateStatuses[rowIndex] = TransferId(tradeId.id)
-    }
+    // Conversion legs suppressed as already-recorded read as duplicates, rather than as rows that quietly produced
+    // nothing.
+    duplicateStatuses += reconciledConversionRows.keys
 
     val statusMutations = mutableListOf<CsvImportMutation>()
     if (importedStatuses.isNotEmpty()) {
         statusMutations += CsvImportMutation.UpdateRowStatuses(csvImport.id, ImportStatus.IMPORTED.name, importedStatuses)
-        statusMutations += CsvImportMutation.ClearErrors(csvImport.id, importedStatuses.keys.toList())
+        statusMutations += CsvImportMutation.ClearErrors(csvImport.id, importedStatuses.toList())
     }
     for ((status, rows) in tradeRowsByStatus) {
-        statusMutations += CsvImportMutation.UpdateRowStatuses(csvImport.id, status.name, rows.toMap())
-        statusMutations += CsvImportMutation.ClearErrors(csvImport.id, rows.map { it.first })
+        statusMutations += CsvImportMutation.UpdateRowStatuses(csvImport.id, status.name, rows)
+        statusMutations += CsvImportMutation.ClearErrors(csvImport.id, rows)
     }
     if (duplicateStatuses.isNotEmpty()) {
         statusMutations += CsvImportMutation.UpdateRowStatuses(csvImport.id, ImportStatus.DUPLICATE.name, duplicateStatuses)
         // A row retried from ERROR can resolve as DUPLICATE; clear its stale error like imported/updated do.
-        statusMutations += CsvImportMutation.ClearErrors(csvImport.id, duplicateStatuses.keys.toList())
+        statusMutations += CsvImportMutation.ClearErrors(csvImport.id, duplicateStatuses.toList())
     }
     if (updatedStatuses.isNotEmpty()) {
         statusMutations += CsvImportMutation.UpdateRowStatuses(csvImport.id, ImportStatus.UPDATED.name, updatedStatuses)
-        statusMutations += CsvImportMutation.ClearErrors(csvImport.id, updatedStatuses.keys.toList())
+        statusMutations += CsvImportMutation.ClearErrors(csvImport.id, updatedStatuses.toList())
     }
     importEngine.applyCsvImportMutations(statusMutations)
     val newTradeCount = tradeRowsByStatus[ImportStatus.IMPORTED]?.size ?: 0

@@ -4,6 +4,7 @@ import com.moneymanager.csvimporter.BulkReimportResult
 import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.runCsvImport
 import com.moneymanager.database.di.DatabaseComponent
+import com.moneymanager.database.di.createImportEngine
 import com.moneymanager.database.di.openDatabaseComponent
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
@@ -30,11 +31,11 @@ import com.moneymanager.domain.model.rules.AccountNaming
 import com.moneymanager.domain.model.rules.AccountSide
 import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
+import com.moneymanager.importengineapi.EditGate
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.createAccountMapping
 import com.moneymanager.importengineapi.createCsvStrategy
 import com.moneymanager.importengineapi.updateCsvStrategy
-import com.moneymanager.importer.ImportEngineImpl
 import com.moneymanager.regex.compileRegex
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.createTestDatabaseLocation
@@ -283,30 +284,7 @@ class CsvReimportE2ETest {
             assertEquals(0, again.transfersCreated)
         }
 
-    private fun createImportEngine(dc: DatabaseComponent): ImportEngine =
-        ImportEngineImpl(
-            transactionRepository = dc.transactionRepository,
-            accountRepository = dc.accountRepository,
-            accountAttributeRepository = dc.accountAttributeRepository,
-            personRepository = dc.personRepository,
-            personAttributeRepository = dc.personAttributeRepository,
-            ownershipRepository = dc.personAccountOwnershipRepository,
-            categoryRepository = dc.categoryRepository,
-            currencyRepository = dc.currencyRepository,
-            cryptoRepository = dc.cryptoRepository,
-            tradeRepository = dc.tradeRepository,
-            exchangeOrderRepository = dc.exchangeOrderRepository,
-            attributeTypeRepository = dc.attributeTypeRepository,
-            relationshipTypeRepository = dc.relationshipTypeRepository,
-            csvImportStrategyRepository = dc.csvImportStrategyRepository,
-            apiImportStrategyRepository = dc.apiImportStrategyRepository,
-            accountMappingRepository = dc.accountMappingRepository,
-            csvImportRepository = dc.csvImportRepository,
-            apiSessionRepository = dc.apiSessionRepository,
-            settingsRepository = dc.settingsRepository,
-            importDirectoryRepository = dc.importDirectoryRepository,
-            passThroughAccountRepository = dc.passThroughAccountRepository,
-        )
+    private fun createImportEngine(dc: DatabaseComponent): ImportEngine = dc.createImportEngine(EditGate.AlwaysWritable)
 
     private fun createStrategy(
         sourceAccountId: AccountId,

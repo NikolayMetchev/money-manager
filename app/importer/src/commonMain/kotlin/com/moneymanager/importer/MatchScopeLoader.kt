@@ -5,6 +5,7 @@ import com.moneymanager.domain.model.ApiCredentialId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.CsvImportId
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.calendar.BusinessDayCalendar
 import com.moneymanager.domain.model.calendar.WeekendOnlyCalendar
@@ -24,6 +25,7 @@ import com.moneymanager.domain.repository.AttributeTypeReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.ImportRecordReadRepository
 import com.moneymanager.domain.repository.ObservationReadRepository
+import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.MatchFamily
 import com.moneymanager.importengineapi.ObservationSlot
 import com.moneymanager.importengineapi.TradeDedupePolicy
@@ -58,6 +60,14 @@ class MatchScopeLoader(
     private val accountAttributes: AccountAttributeReadRepository,
     private val attributeTypes: AttributeTypeReadRepository,
 ) {
+    /** The strategy family of an incoming record, using the same provenance as stored observations. */
+    suspend fun familyOf(source: Source): String? =
+        when (source) {
+            is Source.Csv -> csvFamily(source.importId)
+            is Source.Api -> apiFamily(source.sessionId)
+            else -> null
+        }
+
     /** Every stored observation naming one of [accountIds], with [families] supplying each family's identity types. */
     suspend fun load(
         accountIds: Collection<AccountId>,
@@ -227,7 +237,9 @@ class MatchScopeLoader(
                     .toMap()
             return ObservationMatcher(
                 SameFamilyRules.forPolicies(policies) +
-                    CrossSourceRules.forPolicies(policies, containerAccounts, calendarFor) +
+                    // A hand-made transfer is no source of its own: it is never the incoming record, but another source's record of the
+                    // same movement finds it, as the deduper found every transfer on its accounts.
+                    CrossSourceRules.forPolicies(mapOf(MANUAL_FAMILY to DedupePolicy.None) + policies, containerAccounts, calendarFor) +
                     TradeRules.forPolicies(tradePolicies),
                 TradeStages.forPolicies(tradePolicies, conversionWindows),
             )

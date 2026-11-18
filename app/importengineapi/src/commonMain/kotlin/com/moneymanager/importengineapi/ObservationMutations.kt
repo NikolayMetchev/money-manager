@@ -54,15 +54,13 @@ sealed interface ObservationMutation {
  * top and written as a diff, recorded as written by [source]. Then [candidateAccountIds] that nothing references
  * any more are deleted, each with its fee account.
  *
- * An exclusion link the matcher wrote (#1429) says which of its transactions are out of balances: [linkExcluded] are
- * excluded as reconciled, and [linkCounted] lose a reconciled exclusion they carry. Both are rebuilt.
+ * A transaction the primary of an exclusion link the matcher wrote (#1429) is excluded as reconciled: the link is
+ * where the match says so.
  */
 data class MaterializationRequest(
     val source: Source,
     val transactionIds: Set<TransactionId> = emptySet(),
     val candidateAccountIds: Set<AccountId> = emptySet(),
-    val linkExcluded: Set<TransactionId> = emptySet(),
-    val linkCounted: Set<TransactionId> = emptySet(),
     /** What a transaction merged to before a re-run (#1430): its conflicts compare against this rather than the stored merge. */
     val priorMerges: Map<TransactionId, MaterializedTransaction> = emptyMap(),
 )

@@ -83,7 +83,14 @@ class KrakenReimportE2ETest : DbTest() {
         val strategy = repositories.apiImportStrategyRepository.getStrategyByName("Kraken").first()
         assertNotNull(strategy, "built-in Kraken strategy should be installed")
         val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-os", "test-machine"))
-        val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null, credentialId)
+        // A download always runs under the strategy's credential, which is how its records are known to be Kraken's.
+        val sessionId =
+            repositories.apiSessionRepository.createSession(
+                deviceId,
+                now,
+                null,
+                credentialId ?: repositories.importEngine.ensureApiCredential(strategy.id, now),
+            )
 
         suspend fun stage(
             markerKey: String,
@@ -147,21 +154,16 @@ class KrakenReimportE2ETest : DbTest() {
                     Source.SampleGenerator,
                 )
             val monzoCredit =
-                repositories.transactionRepository
-                    .createTransfers(
-                        transfers =
-                            listOf(
-                                Transfer(
-                                    id = TransferId(0),
-                                    timestamp = Instant.fromEpochMilliseconds(1_700_000_003_000L),
-                                    description = "Kraken FPS credit",
-                                    sourceAccountId = fundingBefore.id,
-                                    targetAccountId = monzoId,
-                                    amount = Money.fromDisplayValue("1998.05", gbp),
-                                ),
-                            ),
-                        sources = listOf(Source.SampleGenerator),
-                    ).first()
+                createRecordedTransfer(
+                    Transfer(
+                        id = TransferId(0),
+                        timestamp = Instant.fromEpochMilliseconds(1_700_000_003_000L),
+                        description = "Kraken FPS credit",
+                        sourceAccountId = fundingBefore.id,
+                        targetAccountId = monzoId,
+                        amount = Money.fromDisplayValue("1998.05", gbp),
+                    ),
+                )
 
             // Configure the bridge — as if the user just added it in the strategy editor.
             val strategyBeforeBridge = repositories.apiImportStrategyRepository.getStrategyByName("Kraken").first()!!
@@ -215,34 +217,20 @@ class KrakenReimportE2ETest : DbTest() {
             val rewritten = withdrawalsAfter.first { it.id != monzoCredit && it.sourceAccountId != it.targetAccountId }
             assertEquals(monzoId, rewritten.targetAccountId, "the withdrawal should now be rewritten onto Monzo")
 
-            // The planned deletion really executed: the original withdrawal's row is replaced by the rewrite, and the only
-            // GBP legs left are the seeded credit plus that one rewrite.
+            // The planned deletion really executed, and the bank's record and the rewritten withdrawal are one movement: one
+            // GBP transaction, counted once, holding both records.
             assertEquals(
-                setOf(monzoCredit, rewritten.id),
+                setOf(rewritten.id),
                 withdrawalsAfter.map { it.id }.toSet(),
-                "after the re-import only the seeded credit and the rewritten withdrawal should be persisted",
+                "after the re-import the bank's credit and the rewritten withdrawal are one transaction",
             )
             // The session's item said the same slot again, so its transaction took its id back (#1429), as a staged file's does.
             assertEquals(withdrawalBefore.id, rewritten.id, "the rewritten withdrawal should keep the id the session gave it")
-
-            val monzoCreditAfter = repositories.transactionRepository.getTransactionsByIds(setOf(monzoCredit))[monzoCredit]
-            assertNotNull(monzoCreditAfter, "the seeded Monzo credit should still exist")
-            assertTrue(
-                monzoCreditAfter.attributes.any { it.attributeType.id.id == -1L },
-                "the Monzo credit should now be excluded (reconciled) rather than double-counting the withdrawal",
-            )
-            assertTrue(
-                repositories.relationshipRepository.getByTransactions(setOf(monzoCredit, rewritten.id)).isNotEmpty(),
-                "the rewritten withdrawal and the Monzo credit should be linked",
-            )
-
-            // Two legs target Monzo (the seeded credit + the rewritten withdrawal), but only one of them
-            // counts toward the balance — the other is excluded (reconciled), so no double-count.
-            assertEquals(2, withdrawalsAfter.count { it.targetAccountId == monzoId }, "both legs should still exist")
+            assertTrue(rewritten.attributes.none { it.attributeType.id.id == -1L }, "the withdrawal counts")
             assertEquals(
-                1,
-                withdrawalsAfter.count { it.targetAccountId == monzoId && it.attributes.none { attr -> attr.attributeType.id.id == -1L } },
-                "re-import must not double-count the withdrawal against Monzo's balance",
+                2,
+                repositories.observationRepository.getObservationsOfTransaction(rewritten.id).size,
+                "the session's record and the bank's are both kept",
             )
 
             // Re-importing again is idempotent: same shape, no crash on the second pass.
@@ -264,7 +252,6 @@ class KrakenReimportE2ETest : DbTest() {
                         endDate = Instant.fromEpochMilliseconds(1_700_000_004_000L),
                     ).first()
                     .filter { it.amount.asset.code == "GBP" }
-            assertEquals(2, withdrawalsFinal.count { it.targetAccountId == monzoId }, "still both legs after a second re-import")
             assertEquals(
                 1,
                 withdrawalsFinal.count { it.targetAccountId == monzoId && it.attributes.none { attr -> attr.attributeType.id.id == -1L } },
@@ -359,19 +346,15 @@ class KrakenReimportE2ETest : DbTest() {
                     .first()
                     .first { it.name == "Kraken Funding" }
             val gbp = assertNotNull(repositories.currencyRepository.getCurrencyByCode("GBP").first())
-            repositories.transactionRepository.createTransfers(
-                transfers =
-                    listOf(
-                        Transfer(
-                            id = TransferId(0),
-                            timestamp = Instant.fromEpochMilliseconds(1_700_000_003_000L),
-                            description = "Kraken FPS credit",
-                            sourceAccountId = funding.id,
-                            targetAccountId = monzoId,
-                            amount = Money.fromDisplayValue("1998.05", gbp),
-                        ),
-                    ),
-                sources = listOf(Source.SampleGenerator),
+            createRecordedTransfer(
+                Transfer(
+                    id = TransferId(0),
+                    timestamp = Instant.fromEpochMilliseconds(1_700_000_003_000L),
+                    description = "Kraken FPS credit",
+                    sourceAccountId = funding.id,
+                    targetAccountId = monzoId,
+                    amount = Money.fromDisplayValue("1998.05", gbp),
+                ),
             )
             repositories.importEngine.updateApiStrategy(
                 strategyBeforeBridge.copy(
@@ -414,7 +397,9 @@ class KrakenReimportE2ETest : DbTest() {
                         endDate = Instant.fromEpochMilliseconds(1_700_000_004_000L),
                     ).first()
                     .filter { it.amount.asset.code == "GBP" && it.targetAccountId == monzoId }
-            assertEquals(2, intoMonzo.size, "the re-imported withdrawal should land on the bridged account, beside the bank's credit")
-            assertEquals(1, intoMonzo.count { it.attributes.none { attr -> attr.attributeType.id.id == -1L } }, "only one of them counts")
+            // The re-imported withdrawal lands on the bridged account, as the bank's credit: one movement, holding both records.
+            val movement = intoMonzo.single()
+            assertTrue(movement.attributes.none { attr -> attr.attributeType.id.id == -1L }, "it counts")
+            assertEquals(2, repositories.observationRepository.getObservationsOfTransaction(movement.id).size, "both records")
         }
 }

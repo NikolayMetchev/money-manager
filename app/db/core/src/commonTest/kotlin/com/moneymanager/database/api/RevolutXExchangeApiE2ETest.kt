@@ -5,6 +5,7 @@ import com.moneymanager.bigdecimal.BigInteger
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.TransferAttribute
 import com.moneymanager.domain.model.WellKnownIds
+import com.moneymanager.importengineapi.ensureApiCredential
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
@@ -46,7 +47,9 @@ class RevolutXExchangeApiE2ETest : DbTest() {
     private suspend fun importApi() {
         val strategy = assertNotNull(repositories.apiImportStrategyRepository.getStrategyByName("Revolut X").first())
         val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-os", "test-machine"))
-        val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
+        // A download always runs under the strategy's credential, which is how its records are known to be the strategy's.
+        val credentialId = repositories.importEngine.ensureApiCredential(strategy.id, now)
+        val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null, credentialId)
 
         suspend fun stage(
             types: String,

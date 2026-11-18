@@ -1,17 +1,9 @@
 package com.moneymanager.database.repository
-import com.moneymanager.bigdecimal.BigDecimal
-import com.moneymanager.domain.model.Account
-import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportStrategyId
-import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Source
-import com.moneymanager.domain.model.Transfer
-import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.test.database.DbTest
-import com.moneymanager.test.database.createAccount
-import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -258,73 +250,6 @@ class CsvImportRepositoryImplTest : DbTest() {
 
             val matches = repositories.csvImportRepository.findImportsByChecksum("nonexistent")
             assertTrue(matches.isEmpty())
-        }
-
-    @Test
-    fun `getImportRows should resolve placeholder transfer id from CSV source records`() =
-        runDbTest {
-            val importId =
-                repositories.csvImportRepository.createImport(
-                    fileName = "test.csv",
-                    headers = headers,
-                    rows = rows,
-                    fileChecksum = "source_lookup_checksum",
-                    fileLastModified = lastModified,
-                )
-
-            val currencyId = repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
-            val currency = repositories.currencyRepository.getCurrencyById(currencyId).first()!!
-
-            repositories.accountRepository.createAccount(
-                Account(
-                    id = AccountId(0),
-                    name = "Source",
-                    openingDate = Clock.System.now(),
-                ),
-            )
-            repositories.accountRepository.createAccount(
-                Account(
-                    id = AccountId(0),
-                    name = "Target",
-                    openingDate = Clock.System.now(),
-                ),
-            )
-            val accounts = repositories.accountRepository.getAllAccounts().first()
-            val sourceAccount = accounts.first { it.name == "Source" }
-            val targetAccount = accounts.first { it.name == "Target" }
-
-            val createdTransfer =
-                createTransfer(
-                    Transfer(
-                        id = TransferId(0),
-                        timestamp = Clock.System.now(),
-                        description = "CSV transfer",
-                        sourceAccountId = sourceAccount.id,
-                        targetAccountId = targetAccount.id,
-                        amount = Money.fromDisplayValue(BigDecimal("12.34"), currency),
-                    ),
-                )
-
-            val createdSource =
-                repositories.transferSourceRepository.getSourceByRevision(
-                    transactionId = createdTransfer.id,
-                    revisionId = createdTransfer.revisionId,
-                )
-            assertNotNull(createdSource)
-            entitySourceQueries.insertCsvSource(
-                id = createdSource.id,
-                csv_import_id = importId.id.toString(),
-                csv_row_index = 1,
-            )
-            repositories.csvImportRepository.updateRowStatusesBatch(
-                id = importId,
-                status = "IMPORTED",
-                rowTransferMap = mapOf(1L to TransferId(0)),
-            )
-
-            val importRows = repositories.csvImportRepository.getImportRows(importId, limit = 10, offset = 0)
-
-            assertEquals(createdTransfer.id, importRows.first { it.rowIndex == 1L }.transferId)
         }
 
     private suspend fun createStrategy(name: String): CsvImportStrategy {

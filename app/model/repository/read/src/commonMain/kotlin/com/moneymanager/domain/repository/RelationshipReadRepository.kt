@@ -1,6 +1,7 @@
 package com.moneymanager.domain.repository
 
 import com.moneymanager.domain.model.Relationship
+import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.TransactionId
 import kotlinx.coroutines.flow.Flow
 
@@ -16,8 +17,11 @@ interface RelationshipReadRepository {
     suspend fun getByTransactions(transactionIds: Collection<TransactionId>): List<Relationship>
 
     /**
-     * As [getByTransactions], only the relationships a person made (their provenance is `Source.Manual`),
-     * which a re-import rebuilds on the transactions it re-creates.
+     * As [getByTransactions], only the relationships a [sourceType] made: a person's ([SourceType.MANUAL]), or the
+     * match's exclusion links ([SourceType.RECONCILER]).
      */
-    suspend fun getHandMadeByTransactions(transactionIds: Collection<TransactionId>): List<Relationship>
+    suspend fun getMadeByTransactions(
+        transactionIds: Collection<TransactionId>,
+        sourceType: SourceType,
+    ): List<Relationship>
 }

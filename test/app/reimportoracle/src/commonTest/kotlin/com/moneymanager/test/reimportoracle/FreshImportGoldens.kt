@@ -9,6 +9,70 @@ package com.moneymanager.test.reimportoracle
  */
 internal val FRESH_IMPORT_GOLDENS: Map<String, String> =
     mapOf(
+        "Crypto.com card + PayPal CSV (split conduit)" to
+            """
+            == accounts (7)
+            Crypto.com Card
+            Curve
+            PayPal
+            PayPal Card Funding
+            UBER PAYMENTS UK LIMITED
+            Uber 40293
+            Uber Technologies, Inc
+            == transfers (16)
+            2025-04-08T21:32:48Z | Crypto.com Card -> Curve | 107.84 GBP | Crv*Paypal *Uber 40293 [cryptocom-txn-amount=-107.84, cryptocom-txn-currency=GBP, cryptocom-usd-amount=0.0]
+            2025-04-08T21:32:48Z | Curve -> PayPal | 107.84 GBP | Paypal *Uber 40293
+            2025-04-08T21:32:48Z | PayPal -> Uber 40293 | 107.84 GBP | Uber 40293 [excluded=reconciled]
+            2025-04-08T21:39:52Z | PayPal -> UBER PAYMENTS UK LIMITED | 107.81 GBP | UBER PAYMENTS UK LIMITED [paypal-status=Completed, paypal-transaction-id=s5, paypal-type=Pre-approved Payment Bill User Payment]
+            2025-04-08T21:39:52Z | PayPal Card Funding -> PayPal | 107.81 GBP | General Credit Card Deposit [excluded=reconciled, paypal-status=Completed, paypal-transaction-id=s6, paypal-type=General Credit Card Deposit, unidentified-counterparty=source]
+            2025-04-08T21:40:54Z | Curve -> Crypto.com Card | 0.03 GBP | Refund: Crv*Paypal *Uber 40293 [cryptocom-txn-amount=0.03, cryptocom-txn-currency=GBP, cryptocom-usd-amount=0.0]
+            2025-04-08T21:40:54Z | PayPal -> Curve | 0.03 GBP | Paypal *Uber 40293
+            2025-04-08T21:40:54Z | Uber 40293 -> PayPal | 0.03 GBP | Uber 40293 [excluded=reconciled]
+            2025-10-20T19:14:56Z | Crypto.com Card -> Curve | 21.58 GBP | Crv*Paypal *Uber 40293 [cryptocom-txn-amount=-21.58, cryptocom-txn-currency=GBP, cryptocom-usd-amount=0.0]
+            2025-10-20T19:14:56Z | Curve -> PayPal | 21.58 GBP | Paypal *Uber 40293
+            2025-10-20T19:14:56Z | PayPal -> Uber 40293 | 21.58 GBP | Uber 40293 [excluded=reconciled]
+            2025-10-20T19:53:44Z | PayPal -> Uber Technologies, Inc | 28.08 USD | Uber Technologies, Inc [paypal-status=Completed, paypal-transaction-id=s1, paypal-type=Pre-approved Payment Bill User Payment]
+            2025-10-20T19:53:44Z | PayPal Card Funding -> PayPal | 21.85 GBP | General Credit Card Deposit [excluded=reconciled, paypal-status=Completed, paypal-transaction-id=s2, paypal-type=General Credit Card Deposit, unidentified-counterparty=source]
+            2025-10-21T10:02:38Z | Crypto.com Card -> Curve | 0.27 GBP | Crv*Paypal *Uber 40293 [cryptocom-txn-amount=-0.27, cryptocom-txn-currency=GBP, cryptocom-usd-amount=0.0]
+            2025-10-21T10:02:38Z | Curve -> PayPal | 0.27 GBP | Paypal *Uber 40293
+            2025-10-21T10:02:38Z | PayPal -> Uber 40293 | 0.27 GBP | Uber 40293 [excluded=reconciled]
+            == trades (1)
+            2025-10-20T19:53:44Z | PayPal 21.85 GBP -> PayPal 28.08 USD | Convert GBP to USD
+            == relationships (15)
+            pass-through: PRIMARY {2025-04-08T21:32:48Z | Crypto.com Card -> Curve | 107.84 GBP | Crv*Paypal *Uber 40293 [cryptocom-txn-amount=-107.84, cryptocom-txn-currency=GBP, cryptocom-usd-amount=0.0]} & RELATED {2025-04-08T21:32:48Z | Curve -> PayPal | 107.84 GBP | Paypal *Uber 40293}
+            pass-through: PRIMARY {2025-04-08T21:32:48Z | Curve -> PayPal | 107.84 GBP | Paypal *Uber 40293} & RELATED {2025-04-08T21:32:48Z | PayPal -> Uber 40293 | 107.84 GBP | Uber 40293 [excluded=reconciled]}
+            pass-through: PRIMARY {2025-04-08T21:39:52Z | PayPal Card Funding -> PayPal | 107.81 GBP | General Credit Card Deposit [excluded=reconciled, paypal-status=Completed, paypal-transaction-id=s6, paypal-type=General Credit Card Deposit, unidentified-counterparty=source]} & RELATED {2025-04-08T21:39:52Z | PayPal -> UBER PAYMENTS UK LIMITED | 107.81 GBP | UBER PAYMENTS UK LIMITED [paypal-status=Completed, paypal-transaction-id=s5, paypal-type=Pre-approved Payment Bill User Payment]}
+            pass-through: PRIMARY {2025-04-08T21:40:54Z | Curve -> Crypto.com Card | 0.03 GBP | Refund: Crv*Paypal *Uber 40293 [cryptocom-txn-amount=0.03, cryptocom-txn-currency=GBP, cryptocom-usd-amount=0.0]} & RELATED {2025-04-08T21:40:54Z | PayPal -> Curve | 0.03 GBP | Paypal *Uber 40293}
+            pass-through: PRIMARY {2025-04-08T21:40:54Z | PayPal -> Curve | 0.03 GBP | Paypal *Uber 40293} & RELATED {2025-04-08T21:40:54Z | Uber 40293 -> PayPal | 0.03 GBP | Uber 40293 [excluded=reconciled]}
+            pass-through: PRIMARY {2025-10-20T19:14:56Z | Crypto.com Card -> Curve | 21.58 GBP | Crv*Paypal *Uber 40293 [cryptocom-txn-amount=-21.58, cryptocom-txn-currency=GBP, cryptocom-usd-amount=0.0]} & RELATED {2025-10-20T19:14:56Z | Curve -> PayPal | 21.58 GBP | Paypal *Uber 40293}
+            pass-through: PRIMARY {2025-10-20T19:14:56Z | Curve -> PayPal | 21.58 GBP | Paypal *Uber 40293} & RELATED {2025-10-20T19:14:56Z | PayPal -> Uber 40293 | 21.58 GBP | Uber 40293 [excluded=reconciled]}
+            pass-through: PRIMARY {2025-10-21T10:02:38Z | Crypto.com Card -> Curve | 0.27 GBP | Crv*Paypal *Uber 40293 [cryptocom-txn-amount=-0.27, cryptocom-txn-currency=GBP, cryptocom-usd-amount=0.0]} & RELATED {2025-10-21T10:02:38Z | Curve -> PayPal | 0.27 GBP | Paypal *Uber 40293}
+            pass-through: PRIMARY {2025-10-21T10:02:38Z | Curve -> PayPal | 0.27 GBP | Paypal *Uber 40293} & RELATED {2025-10-21T10:02:38Z | PayPal -> Uber 40293 | 0.27 GBP | Uber 40293 [excluded=reconciled]}
+            reconciled: PRIMARY {2025-04-08T21:32:48Z | PayPal -> Uber 40293 | 107.84 GBP | Uber 40293 [excluded=reconciled]} & RELATED {2025-04-08T21:32:48Z | Curve -> PayPal | 107.84 GBP | Paypal *Uber 40293} & RELATED {2025-04-08T21:40:54Z | PayPal -> Curve | 0.03 GBP | Paypal *Uber 40293}
+            reconciled: PRIMARY {2025-04-08T21:39:52Z | PayPal Card Funding -> PayPal | 107.81 GBP | General Credit Card Deposit [excluded=reconciled, paypal-status=Completed, paypal-transaction-id=s6, paypal-type=General Credit Card Deposit, unidentified-counterparty=source]} & RELATED {2025-04-08T21:32:48Z | Curve -> PayPal | 107.84 GBP | Paypal *Uber 40293} & RELATED {2025-04-08T21:40:54Z | PayPal -> Curve | 0.03 GBP | Paypal *Uber 40293}
+            reconciled: PRIMARY {2025-04-08T21:40:54Z | Uber 40293 -> PayPal | 0.03 GBP | Uber 40293 [excluded=reconciled]} & RELATED {2025-04-08T21:32:48Z | Curve -> PayPal | 107.84 GBP | Paypal *Uber 40293} & RELATED {2025-04-08T21:40:54Z | PayPal -> Curve | 0.03 GBP | Paypal *Uber 40293}
+            reconciled: PRIMARY {2025-10-20T19:14:56Z | PayPal -> Uber 40293 | 21.58 GBP | Uber 40293 [excluded=reconciled]} & RELATED {2025-10-20T19:14:56Z | Curve -> PayPal | 21.58 GBP | Paypal *Uber 40293} & RELATED {2025-10-21T10:02:38Z | Curve -> PayPal | 0.27 GBP | Paypal *Uber 40293}
+            reconciled: PRIMARY {2025-10-20T19:53:44Z | PayPal Card Funding -> PayPal | 21.85 GBP | General Credit Card Deposit [excluded=reconciled, paypal-status=Completed, paypal-transaction-id=s2, paypal-type=General Credit Card Deposit, unidentified-counterparty=source]} & RELATED {2025-10-20T19:14:56Z | Curve -> PayPal | 21.58 GBP | Paypal *Uber 40293} & RELATED {2025-10-21T10:02:38Z | Curve -> PayPal | 0.27 GBP | Paypal *Uber 40293}
+            reconciled: PRIMARY {2025-10-21T10:02:38Z | PayPal -> Uber 40293 | 0.27 GBP | Uber 40293 [excluded=reconciled]} & RELATED {2025-10-20T19:14:56Z | Curve -> PayPal | 21.58 GBP | Paypal *Uber 40293} & RELATED {2025-10-21T10:02:38Z | Curve -> PayPal | 0.27 GBP | Paypal *Uber 40293}
+            == daily balances (17)
+            Crypto.com Card | 2025-04-08 | GBP | -107.81
+            Crypto.com Card | 2025-10-20 | GBP | -129.39
+            Crypto.com Card | 2025-10-21 | GBP | -129.66
+            Curve | 2025-04-08 | GBP | 0
+            Curve | 2025-10-20 | GBP | 0
+            Curve | 2025-10-21 | GBP | 0
+            PayPal Card Funding | 2025-04-08 | GBP | 0
+            PayPal Card Funding | 2025-10-20 | GBP | 0
+            PayPal | 2025-04-08 | GBP | 0
+            PayPal | 2025-10-20 | GBP | -0.27
+            PayPal | 2025-10-20 | USD | 0
+            PayPal | 2025-10-21 | GBP | 0
+            UBER PAYMENTS UK LIMITED | 2025-04-08 | GBP | 107.81
+            Uber 40293 | 2025-04-08 | GBP | 0
+            Uber 40293 | 2025-10-20 | GBP | 0
+            Uber 40293 | 2025-10-21 | GBP | 0
+            Uber Technologies, Inc | 2025-10-20 | USD | 28.08
+            """.trimIndent(),
         "Monzo personal + joint" to
             """
             == accounts (4)

@@ -10,7 +10,6 @@ import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
-import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.observation.ImportGroupKey
 import com.moneymanager.domain.model.observation.ImportRecordKey
@@ -114,29 +113,11 @@ class ObservationExpanderTest {
     }
 
     @Test
-    fun an_excluded_row_excludes_its_fee_and_spend_legs_unless_it_supersedes_them() {
+    fun an_excluded_row_excludes_its_fee_and_spend_legs() {
         val excludedRow = row(7, fee = fee, passThrough = chain, attributes = listOf(excluded))
 
         val legs = expand(ExpansionRow(excludedRow)).single().legs
         assertEquals(List(4) { listOf(excluded) }, legs.map { it.attributes })
-
-        val superseding = expand(ExpansionRow(excludedRow, supersedesLegs = true)).single().legs
-        assertEquals(listOf(listOf(excluded), listOf(excluded), emptyList(), emptyList()), superseding.map { it.attributes })
-    }
-
-    @Test
-    fun a_conduit_statement_reconciles_the_movement_into_it_and_excludes_the_legs_beyond() {
-        val statement = ConduitStatementMatch(1, TransferId(500), reconciledType, AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID))
-
-        val legs = expand(ExpansionRow(row(7, passThrough = chain), conduitStatement = statement)).single().legs
-
-        val toStatement = LegLink(LegLinkTarget.Existing(TransferId(500)), reconciledType)
-        assertEquals(
-            listOf(emptyList(), emptyList(), listOf(NewAttribute(statement.exclusionTypeId, "reconciled"))),
-            legs.map { it.attributes },
-        )
-        assertEquals(listOf(LegLink(LegLinkTarget.Expanded(key(7, "conduit/1")), passThroughType), toStatement), legs[1].links)
-        assertEquals(listOf(toStatement), legs[2].links)
     }
 
     @Test

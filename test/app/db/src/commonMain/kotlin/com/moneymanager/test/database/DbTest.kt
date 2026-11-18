@@ -10,6 +10,10 @@ import com.moneymanager.domain.model.CryptoRegistry
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
+import com.moneymanager.domain.model.TransferId
+import com.moneymanager.importengineapi.AccountRef
+import com.moneymanager.importengineapi.ImportBatch
+import com.moneymanager.importengineapi.ImportTransfer
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestResult
 import kotlinx.coroutines.test.TestScope
@@ -95,5 +99,32 @@ open class DbTest {
                     endDate = transfer.timestamp,
                 ).first()
         return allTransfers.first { it.description == transfer.description }
+    }
+
+    /**
+     * Records [transfer] as a person's entry, through the engine: unlike [createTransfer], it is an observation, so the
+     * matcher sees it as another source's record of the movement. Returns its transaction's id.
+     */
+    protected suspend fun createRecordedTransfer(transfer: Transfer): TransferId {
+        repositories.importEngine.import(
+            ImportBatch(
+                transfers =
+                    listOf(
+                        ImportTransfer(
+                            source = Source.Manual,
+                            fromAccount = AccountRef.Existing(transfer.sourceAccountId),
+                            toAccount = AccountRef.Existing(transfer.targetAccountId),
+                            timestamp = transfer.timestamp,
+                            description = transfer.description,
+                            amount = transfer.amount,
+                        ),
+                    ),
+            ),
+        )
+        return repositories.transactionRepository
+            .getTransactionsByDateRange(startDate = transfer.timestamp, endDate = transfer.timestamp)
+            .first()
+            .first { it.description == transfer.description }
+            .id
     }
 }

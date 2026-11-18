@@ -1,30 +1,14 @@
 package com.moneymanager.importengineapi
 
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
+import com.moneymanager.domain.model.observation.ObservationEnd
 import kotlin.time.Instant
-
-/**
- * A pass-through chain whose conduit [conduitIndex] already has its own statement imported: an existing
- * placeholder leg ([statementLegId], e.g. a PayPal export's "General Credit Card Deposit", which cannot
- * name the card) records the same money arriving in (or, for a refund, leaving) the conduit as the chain's
- * movement into it — the main transfer for conduit 0, spend leg `conduitIndex - 1` otherwise. The engine
- * links that movement to [statementLegId] (`reconciled`), and creates every spend leg from the conduit
- * onward excluded: those legs are the card statement's guess at what the conduit did with the money, and
- * the conduit's statement records what it actually did (the real payee, a currency conversion first, …).
- */
-data class ConduitStatementMatch(
-    val conduitIndex: Int,
-    val statementLegId: TransferId,
-    val relationshipTypeId: RelationshipTypeId,
-    val exclusionTypeId: AttributeTypeId,
-)
 
 /** What an expanded leg links to: a transfer already stored, or another leg expanded from the same batch. */
 sealed interface LegLinkTarget {
@@ -47,16 +31,10 @@ data class LegLink(
  * One transfer to import, with what the match step decided about it, ready to expand. [transfer]'s accounts are
  * resolved ([AccountRef.Existing]).
  *
- * @property conduitStatement Set when its chain runs through a conduit whose own statement is already imported.
- * @property supersedesLegs True when its chain's movement into a conduit was reconciled away while it superseded
- *   another record's onward legs: this record is then the record of what the conduit did with the money, so its
- *   spend legs stay counted even when the row itself is excluded.
  * @property reversals Per spend-leg index, the earlier spend leg that leg reverses.
  */
 data class ExpansionRow(
     val transfer: ImportTransfer,
-    val conduitStatement: ConduitStatementMatch? = null,
-    val supersedesLegs: Boolean = false,
     val reversals: Map<Int, LegLink> = emptyMap(),
 )
 
@@ -72,6 +50,11 @@ data class ExpandedTransfer(
     val provenance: Source,
     val attributes: List<NewAttribute>,
     val links: List<LegLink>,
+    /**
+     * The end a stand-in account holds, when the importer said so without tagging the row (an exchange's generic funding
+     * account: its feed never names the far end of a deposit or withdrawal).
+     */
+    val placeholderEnd: ObservationEnd? = null,
 )
 
 /** One trade an observation says (a conversion its own account settled a movement with). */
@@ -157,7 +140,6 @@ object ObservationExpander {
         val passThrough = t.passThrough
         val feeKey = ObservationKey(mainKey.owner, ObservationSlot.FEE)
         val spendKeys = passThrough?.conduits?.indices?.map { ObservationKey(mainKey.owner, ObservationSlot.conduit(it)) }
-        val conduitStatement = row.conduitStatement
 
         fun leg(
             key: ObservationKey,
@@ -197,9 +179,6 @@ object ObservationExpander {
                 if (passThrough != null && spendKeys != null) {
                     add(LegLink(LegLinkTarget.Expanded(spendKeys.first()), passThrough.relationshipTypeId))
                 }
-                conduitStatement?.takeIf { it.conduitIndex == 0 }?.let {
-                    add(LegLink(LegLinkTarget.Existing(it.statementLegId), it.relationshipTypeId))
-                }
                 t.batchRelationships.forEach { br ->
                     val target = mainKeyByRowKey[br.relatedRowKey]
                     val typeId = relationshipTypeIds[br.typeName]
@@ -207,12 +186,20 @@ object ObservationExpander {
                 }
             }
         val legs = mutableListOf<ExpandedTransfer>()
-        legs += leg(mainKey, t.description, t.fromAccount, t.toAccount, requireNotNull(t.amount), rowKey, t.attributes, mainLinks)
+        legs +=
+            leg(mainKey, t.description, t.fromAccount, t.toAccount, requireNotNull(t.amount), rowKey, t.attributes, mainLinks)
+                .let { main ->
+                    when (t.unidentifiedCounterpartyAccountId) {
+                        null -> main
+                        main.sourceAccountId -> main.copy(placeholderEnd = ObservationEnd.SOURCE)
+                        main.targetAccountId -> main.copy(placeholderEnd = ObservationEnd.TARGET)
+                        else -> main
+                    }
+                }
 
         // Legs derived from an excluded movement (e.g. a cancelled/deleted row) are excluded with it, or its fee and
         // spend legs would still move balances.
         val exclusion = t.attributes.filter { it.typeId.id == WellKnownIds.EXCLUDED_ATTR_TYPE_ID }
-        val spendExclusion = exclusion.takeUnless { row.supersedesLegs }.orEmpty()
         // The fee is a real movement out of the main transfer's account; counts in balances.
         if (fee != null) {
             legs += leg(feeKey, fee.description, fee.source, fee.target, fee.amount, fee.rowKey, exclusion, emptyList())
@@ -224,30 +211,10 @@ object ObservationExpander {
         if (passThrough != null && spendKeys != null) {
             val nodes = passThrough.conduits + passThrough.merchantTarget
             for (legIndex in passThrough.conduits.indices) {
-                val attributes =
-                    when {
-                        spendExclusion.isNotEmpty() -> {
-                            spendExclusion
-                        }
-
-                        // Beyond a conduit whose own statement is imported: that statement is the record.
-                        conduitStatement != null && legIndex >= conduitStatement.conduitIndex -> {
-                            listOf(NewAttribute(conduitStatement.exclusionTypeId, "reconciled"))
-                        }
-
-                        else -> {
-                            emptyList()
-                        }
-                    }
                 val links =
                     buildList {
                         if (legIndex < spendKeys.lastIndex) {
                             add(LegLink(LegLinkTarget.Expanded(spendKeys[legIndex + 1]), passThrough.relationshipTypeId))
-                        }
-                        // The chain's movement into the conduit whose statement it reconciled with, and every leg the
-                        // statement supersedes beyond it, link to that statement row: the exclusions stay explained.
-                        if (conduitStatement != null && legIndex >= conduitStatement.conduitIndex - 1) {
-                            add(LegLink(LegLinkTarget.Existing(conduitStatement.statementLegId), conduitStatement.relationshipTypeId))
                         }
                         row.reversals[legIndex]?.let(::add)
                     }
@@ -259,7 +226,7 @@ object ObservationExpander {
                         if (passThrough.incoming) nodes[legIndex] else nodes[legIndex + 1],
                         passThrough.amount,
                         passThrough.rowKey,
-                        attributes,
+                        exclusion,
                         links,
                     )
             }

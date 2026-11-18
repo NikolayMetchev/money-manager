@@ -15,6 +15,8 @@ data class Relationship(
     val id: RelationshipId,
     val relationshipType: RelationshipType,
     val members: List<RelationshipMember>,
+    /** A conduit match also excludes the superseded legs this link points to. */
+    val excludesRelated: Boolean = false,
 ) {
     val primary: TransactionId? get() = members.firstOrNull { it.role == RelationshipRole.PRIMARY }?.transactionId
     val related: TransactionId? get() = members.firstOrNull { it.role == RelationshipRole.RELATED }?.transactionId

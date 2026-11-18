@@ -13,7 +13,6 @@ import com.moneymanager.domain.model.RelationshipMember
 import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TradeId
-import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.calendar.HolidayCalendar
@@ -309,7 +308,7 @@ sealed interface CsvImportMutation {
     data class UpdateRowStatuses(
         val id: CsvImportId,
         val status: String,
-        val rowTransferMap: Map<Long, TransferId?>,
+        val rowIndexes: Collection<Long>,
     ) : CsvImportMutation
 
     /**

@@ -58,7 +58,6 @@ kmp_library(
         "//app/model/observation",
         "//app/model/rules",
         "//app/observationmatcher",
-        "//utils/bigdecimal",
         "@maven_kmp//:kotlinx_coroutines_core",
     ],
 )
@@ -90,8 +89,6 @@ kmp_test(
         "//app/model/passthrough",
         "//app/model/rules",
         "//bazel/kmp/deps:kotlin_test",
-        "//test/app/model/calendar",
         "//utils/bigdecimal",
-        "@maven_kmp//:kotlinx_datetime",
     ],
 )

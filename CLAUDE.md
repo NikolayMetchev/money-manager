@@ -469,7 +469,7 @@ What isn't a per-record decision stays structural config:
 | Multi-row grouping | `LegGroupRule` (name, key, window) with `Trade`, `ThroughAccount` or `Linked` assembly; a `Trade` with `acrossFiles` pairs its legs with those of the other staged files that have the same columns (Revolut keeps each currency in its own statement): the file applied first books the trade, the other dedupes onto it, and a leg with no partner staged yet is held back rather than booked; with `unpairedAsset` set, such a leg instead books a placeholder trade against that asset, tagged `manual-entry` (Manual Entries lists it for a person to name the currency and amount, and the real trade excludes it once its other side is staged); Manual Entries also offers the matching trade of a reconciliation source (same instant, same known leg) as the other side, and taking it books the trade, stores the reconciliation match and links the wallet; a Withdrawal fee entry is likewise offered the fee a source charged on the same movement (its net transfer plus its fee transfer equal the withdrawal exactly), booked and matched the same way; these suggestions are found once and kept in memory (`ManualEntrySuggestionCache`, redone only when the pending entries or the database change, like `ReconciliationCache`), name the source and wallet they come from, show a progress bar while they are being found, and link to the source's file row and to the Reconciliation tab (a navigation step of its own, so Back returns to Manual Entries), which finds the movement (`ReconciliationFocus`), opens its tree, scrolls it to the middle and marks it, as the CSV screen does for its row; a suggestion needs the source's wallet to be the account (linked, or named for it), and a fee already matched is not offered again; rows join it through `Leg` actions (no accounts + `fundingWhen` = link two rows as one pass-through, e.g. PayPal's card deposit → payment; `Linked` = every row of a key (the `Member` leg side) gets a relationship to the group's one anchor row, for a source whose rows name their parent, e.g. Koinly's `Parent ID`. `ThroughAccount`'s linking-only mode pairs two rows and `Linked` fans many onto one: kept apart because merging them would change PayPal's outcomes) | `ConversionConfig`, `TradeGroupConfig` |
 | API fetching | One pipeline: `ApiAccountsSource` (`Downloaded`/`Single`) × `ApiDateWindowing` × `ApiPaging` (single/offset/before-cursor/forward-id/token), walked by one `PageWalker` | separate bank vs exchange paths and three hand-written pagination loops |
 | API ledger trades | `ApiLedgerTrades` (which rows join one is `LedgerTradeLeg`) | `reconcileTradeAmounts*`, `unpairedTradeLeg*` |
-| Transfer reconciliation | `ImportDeduper.reconcile()` over an ordered `ReconcileRule` table. Each rule only says how to find the existing record; one ranking decides which record stays counted (precise > approximate, named > placeholder, itemised > gross, ties keep the existing one) | nine cross-source classifiers |
+| Transfer reconciliation | Decided over stored observations, never at import time: `MatchSync` (`app/importer`) runs the `ShapeMatcher` (records that disagree on shape: a conduit's statement, gross vs itemised, a split conduit movement, a fee row) and then the `ObservationMatcher`'s ordered `CrossSourceRules` (approximate twin, same accounts, bridge, unidentified counterparty, placeholder twin, other side), so either import order reaches the same result. Twins become one transaction with several observations (the named end wins the merge); a shape-changing match is an `ExclusionLink`, a `reconciled` relationship `Source.Reconciler` owns, whose primary is excluded and whose related ends can mark legs the conduit statement supersedes. An import only records what its own source says (`ImportDeduper` is left with same-source dedupe) | nine cross-source classifiers, `ImportDeduper.reconcile()` |
 
 **PDF statements** are CSV strategies with `CsvStrategyConfig.pdfLines` (`PdfLineConfig`): one more rule list, run over
 the statement's text lines (`text`, `page`, `line`) by the same `RuleEngine`, whose `Capture` rules `PdfRowAssembler`
@@ -492,26 +492,24 @@ endpoint, numbered as the Endpoints tab numbers them).
 
 **Pass-through chains and conduit statements:** when a conduit's own export (PayPal) records money arriving
 from or leaving to an unidentified card (a placeholder leg) and that matches a pass-through chain's leg into
-the conduit, the chain's legs *beyond* the conduit are excluded (`Classified.supersededLegs` /
-`ConduitStatementMatch`), because the conduit's statement names the real payee and currency. Both import
-orders reach the same result. A post-pass (`reconcileSplitConduitMovements`) also pairs one placeholder with
-2–4 chain movements to the same merchant that sum to it (Uber authorises £21.58, tops up £0.27; PayPal records
-£21.85). Curve's export has no deposit rows, so each row is its own chain (a `ThroughConduit` rule), funded by a
-per-card placeholder (`Curve card 7721`) that reconciles against the card's movement into Curve: by its
-`fundingAttributeMatch` card, or by the unidentified-counterparty rule. Whenever a conduit's record of a payment
-reconciles its movement into the conduit, the conduit's onward legs stay counted and supersede the card chain's
-guessed ones, in either import order, so a conduit always nets to zero.
+the conduit, the `ShapeMatcher` (`ShapeReason.CONDUIT_STATEMENT`) excludes the placeholder and the chain's legs *beyond*
+the conduit, because the conduit's statement names the real payee and currency. It also pairs one placeholder with
+2–4 chain movements to the same merchant that sum to it (`SPLIT_CONDUIT`: Uber authorises £21.58, tops up £0.27; PayPal
+records £21.85). Curve's export has no deposit rows, so each row is its own chain (a `ThroughConduit` rule), funded by a
+per-card placeholder (`Curve card 7721`) that matches the card's movement into Curve the same way. The match is recomputed
+from the stored observations on every sync, so both import orders reach the same result, and the conduit's onward legs stay
+counted and supersede the card chain's guessed ones: a conduit always nets to zero.
 
 **Two records of one transfer with no account in common:** a broker's `Freetrade Top Ups -> Freetrade ISA` and a bank's
-`Monzo -> Freetrade Limited`. When no other rule pairs a row, `ImportDeduper.otherSideOf` matches on asset, amount and time
-alone, inside the placeholder window (business days included), and the nearest record wins. One side must be a placeholder
-(`unidentified-counterparty`, whose value says which end it is: `source` or `target`). The incoming row becomes the whole
-transfer, real end to real end, and the other record is excluded and linked, so either import order books `Monzo -> ISA`.
-Fees, pass-through chain legs and shadow accounts are never candidates (`selectOtherSideCandidates`), and nor is anything on
-an account the batch itself books, a record of the same source, or a record another row already reconciled against. The
-identified record must hold its own account where the placeholder stands in (`ownEndsMeet`): a bank line `Santander -> Marcus`
-is never PayPal's withdrawal to an unknown bank, whatever the amounts and times say. Every import records each transfer's own
-account, its statement account (`ImportTransfer.statementAccount`, stored in `entity_source_statement_account`; a merge
+`Monzo -> Freetrade Limited`. When no other rule pairs them, the matcher's `OtherSideRule` (`app/observationmatcher`, ranked
+last) pairs them on asset, amount and time alone, inside the placeholder window (business days included), and the nearest
+record wins. One side must be a placeholder (the observation's placeholder end: the `unidentified-counterparty` tag, whose
+value says which end it is, or the end an exchange's generic funding account holds). The two are one transaction, real end
+to real end, so either import order books `Monzo -> ISA`. Pass-through chain legs are never candidates, nor is a record
+touching an account the other's source books, nor a movement two sources already record end to end. The named record must
+hold its own account where the placeholder stands in (`ObservationFacts.ownEnd`, from its statement account): a bank line
+`Santander -> Marcus` is never PayPal's withdrawal to an unknown bank, whatever the amounts and times say. Every import records
+each transfer's statement account (`ImportTransfer.statementAccount`, stored in `entity_source_statement_account`; a merge
 moves it to the survivor and `account_merge_statement_source` lets the unmerge move it back), and a record with none is
 never a candidate.
 

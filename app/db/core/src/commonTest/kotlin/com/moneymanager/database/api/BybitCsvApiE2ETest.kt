@@ -8,6 +8,7 @@ import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.observation.ImportRecordKey
 import com.moneymanager.domain.model.observation.ObservationOwner
+import com.moneymanager.importengineapi.ensureApiCredential
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
@@ -178,7 +179,9 @@ class BybitCsvApiE2ETest : DbTest() {
     private suspend fun importApi() {
         val strategy = assertNotNull(repositories.apiImportStrategyRepository.getStrategyByName("Bybit").first())
         val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-os", "test-machine"))
-        val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
+        // A download always runs under the strategy's credential, which is how its records are known to be the strategy's.
+        val credentialId = repositories.importEngine.ensureApiCredential(strategy.id, now)
+        val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null, credentialId)
 
         suspend fun stage(
             marker: String,
@@ -243,6 +246,22 @@ class BybitCsvApiE2ETest : DbTest() {
             .count { it.relationshipType.id.id == WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID }
     }
 
+    // The deposit's two records (the export's and the API's) are one transaction; the withdrawal the export books gross
+    // and the API net plus its fee stays apart, linked once.
+    private suspend fun assertReconciledOnce() {
+        assertEquals(1, reconciledLinkCount(), "the withdrawal is linked once")
+        val bybit = assertNotNull(bybitAccount())
+        val deposit =
+            repositories.transactionRepository
+                .getTransactionsByAccount(bybit.id)
+                .first()
+                .single {
+                    it.amount.asset.code == "USDT" && it.targetAccountId == bybit.id &&
+                        it.timestamp.toString() == "2022-01-02T14:36:12Z"
+                }
+        assertEquals(2, repositories.observationRepository.getObservationsOfTransaction(deposit.id).size, "both records of the deposit")
+    }
+
     private suspend fun countedDepositTimestamps(): List<String> {
         val bybit = assertNotNull(bybitAccount())
         return repositories.transactionRepository
@@ -284,7 +303,7 @@ class BybitCsvApiE2ETest : DbTest() {
 
             assertEquals(exportBalances, bybitBalances())
             assertEquals(listOf("2022-01-02T14:36:12Z"), countedDepositTimestamps(), "the deposit keeps its real time")
-            assertEquals(2, reconciledLinkCount(), "the deposit and the withdrawal are each linked once")
+            assertReconciledOnce()
         }
 
     @Test
@@ -299,7 +318,7 @@ class BybitCsvApiE2ETest : DbTest() {
                 countedDepositTimestamps(),
                 "the export's precise deposit supersedes the API's window-start placeholder",
             )
-            assertEquals(2, reconciledLinkCount(), "the deposit and the withdrawal are each linked once")
+            assertReconciledOnce()
         }
 
     @Test

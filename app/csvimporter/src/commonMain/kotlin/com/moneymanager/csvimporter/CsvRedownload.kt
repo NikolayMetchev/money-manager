@@ -134,7 +134,7 @@ fun planCsvRedownload(
             // The new table numbers its rows from 1 in file order.
             val newIndex = position + 1L
             remap[old.rowIndex] = newIndex
-            old.carriedStatus()?.let { carried += CsvRowLink(newIndex, it, old.transferId) }
+            old.carriedStatus()?.let { carried += CsvRowLink(newIndex, it) }
         }
     }
 

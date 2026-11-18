@@ -2,11 +2,11 @@ package com.moneymanager.importer
 
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
-import com.moneymanager.domain.model.Relationship
 import com.moneymanager.domain.model.RelationshipMember
 import com.moneymanager.domain.model.RelationshipRole
 import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
@@ -92,7 +92,6 @@ internal class MatchSync(
                 .match(scope.filter { it.storedId !in pinned })
                 .links
                 .filterNot { it.holdsApart(apart) }
-        orientLinks(links, scope)
         val involved = links.flatMapTo(mutableSetOf()) { it.matched + it.excluded }
         val twins = scope.filter { it.ref !in involved }
         val result =
@@ -103,17 +102,10 @@ internal class MatchSync(
                     calendarFor,
                 ).match(twins, pins, splits)
         val moved = result.changes.mapTo(mutableSetOf()) { it.ref }
-        val linked =
-            writeLinks(
-                (links + result.exclusions.filter { it.reason in WRITTEN_STAGE_REASONS && !it.holdsApart(apart) })
-                    .filter { link -> (link.matched + link.excluded).none { it in moved } },
-                scope,
-            )
-        val inScope = scope.mapNotNullTo(mutableSetOf()) { it.current?.id }
-        val shaped = scope.filter { it.ref in involved }.mapNotNullTo(mutableSetOf()) { it.current?.id }
-        val headless = dropHeadlessLinks(scope.mapNotNullTo(mutableSetOf()) { it.current }, inScope - shaped)
-        val separated = dropSplitLinks(apart, scope, involved)
-        if (result.changes.isEmpty() && linked.isEmpty && headless.isEmpty() && separated.isEmpty()) return MaterializationReport()
+        val wanted = links + result.exclusions.filter { it.reason in WRITTEN_STAGE_REASONS && !it.holdsApart(apart) }
+        val (writable, held) = wanted.partition { link -> (link.matched + link.excluded).none { it in moved } }
+        val relinked = syncLinks(writable, held, scope)
+        if (result.changes.isEmpty() && relinked.isEmpty()) return MaterializationReport()
 
         val contentOf = scope.associate { it.ref to it.content }
         val mutations =
@@ -129,176 +121,109 @@ internal class MatchSync(
 
         val known = destinations.mapNotNull { (from, to) -> (to as? TransactionTarget.Existing)?.let { from to it.id } }.toMap()
         moveRelationships(known)
-        val touched =
-            result.changes
-                .flatMap { listOfNotNull(it.from, (it.to as? TransactionTarget.Existing)?.id) }
-                .mapTo(mutableSetOf()) { known[it] ?: it }
-        val unlinked = dropStaleLinks(touched, inScope - shaped) + headless + separated
-
         val report =
             materialize(
                 mutations,
-                MaterializationRequest(Source.Reconciler, unlinked, linkExcluded = linked.excluded, linkCounted = linked.counted),
+                MaterializationRequest(Source.Reconciler, relinked),
             )
         val resolved = known + destinations.mapNotNull { (from, to) -> newIdOf(to, report)?.let { from to it } }
         relinkRows(result.changes, resolved)
         return report
     }
 
-    /** The transactions exclusion links take out of balances, and those they keep counted. */
-    private class LinkExclusions(
-        val excluded: Set<TransactionId>,
-        val counted: Set<TransactionId>,
-    ) {
-        val isEmpty: Boolean get() = excluded.isEmpty() && counted.isEmpty()
-    }
-
-    private class PlannedLink(
+    /** One stored exclusion link, optionally excluding the superseded legs it points to as well. */
+    private data class PlannedLink(
         val primary: TransactionId,
-        val excluded: List<TransactionId>,
-        val counted: List<TransactionId>,
-        // What the relationship records besides the primary: a fee the counted record charges goes with it unnamed, as the
-        // deduper writes the link, unless the fee is all the link keeps counted.
-        val related: List<TransactionId>,
-    ) {
-        val ids: Set<Long> = (excluded + counted).mapTo(mutableSetOf()) { it.id }
-    }
+        val related: Set<TransactionId>,
+        val excludesRelated: Boolean = false,
+    )
 
     /**
-     * Writes each of [links] that no `reconciled` relationship records yet as one, by `Source.Reconciler`, over all its
-     * transactions with the one it excludes in its place as primary, and returns what the materializer must exclude and
-     * count for them. An import found these one row at a time, so the order the records came in decided whether it saw
-     * the match (a Binance withdrawal booked gross by the export and net plus fee by the API); the matcher sees the
-     * whole scope, so the link is the same whichever came first. Like the deduper's, the link names the primary and what
-     * it keeps counted, but not the fee a counted record charges: that goes with its record. One the deduper already wrote
-     * stays as it is.
+     * Makes the Reconciler's `reconciled` relationships among the scope's transactions what the match says, and returns
+     * the ends of every one it wrote or deleted, to rebuild. The materializer reads exclusions from these links.
+     *
+     * Every other Reconciler link whose ends are all in scope goes: its records changed, an unimport took one away, or a
+     * person split two of its observations, so it explains no exclusion any more. What [held] links cover (their records
+     * move this run, so they are written on the next) stays as it is, and so does a link touching a frozen record.
      */
-    private suspend fun writeLinks(
-        links: List<ExclusionLink>,
+    private suspend fun syncLinks(
+        writable: List<ExclusionLink>,
+        held: List<ExclusionLink>,
         scope: List<MatchObservation>,
-    ): LinkExclusions {
-        val repository = relationships ?: return LinkExclusions(emptySet(), emptySet())
-        if (links.isEmpty()) return LinkExclusions(emptySet(), emptySet())
+    ): Set<TransactionId> {
+        val repository = relationships ?: return emptySet()
         val transactionOf = scope.mapNotNull { o -> o.current?.let { o.ref to it } }.toMap()
-        val planned =
-            links.mapNotNull { link ->
-                val excluded = link.excluded.map { transactionOf[it] ?: return@mapNotNull null }.distinctBy { it.id }
-                val excludedIds = excluded.mapTo(mutableSetOf()) { it.id }
-                val countedRefs = link.matched - link.excluded
-                if (countedRefs.any { it !in transactionOf }) return@mapNotNull null
-                val countedOf = { refs: Collection<ObservationRef> ->
-                    refs.map { transactionOf.getValue(it) }.distinctBy { it.id }.filter { it.id !in excludedIds }
-                }
-                val counted = countedOf(countedRefs)
-                val related = countedOf(countedRefs.filter { it.slot != ObservationSlot.FEE }).ifEmpty { counted }
-                val primary =
-                    (link.matched intersect link.excluded)
-                        .sortedWith(compareBy({ it.slot != ObservationSlot.MAIN }, { it.toString() }))
-                        .firstNotNullOfOrNull { transactionOf[it] }
-                if (primary == null || counted.isEmpty()) null else PlannedLink(primary, excluded, counted, related)
-            }
-        if (planned.isEmpty()) return LinkExclusions(emptySet(), emptySet())
+        val inScope = transactionOf.values.mapTo(mutableSetOf()) { it.id }
+        if (inScope.isEmpty()) return emptySet()
+        val planned = writable.flatMapTo(mutableSetOf()) { plan(it, transactionOf) }
+        val heldIds = held.map { link -> (link.matched + link.excluded).mapNotNullTo(mutableSetOf()) { transactionOf[it]?.id } }
         val stored =
             repository
-                .getByTransactions(planned.flatMap { it.excluded + it.counted }.distinctBy { it.id })
+                .getMadeByTransactions(transactionOf.values.distinctBy { it.id }, SourceType.RECONCILER)
                 .filter { it.relationshipType.id.id == WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID }
-        val writes = mutableListOf<RelationshipWrite>()
-        val excluded = mutableSetOf<TransactionId>()
-        val counted = mutableSetOf<TransactionId>()
-        for (link in planned) {
-            // Recorded or not, the link decides which side counts: the deduper excluded whichever record came second.
-            excluded += link.excluded
-            counted += link.counted
-            val relatedIds = link.related.mapTo(mutableSetOf()) { it.id }
-            val recorded =
-                stored.any { relationship ->
-                    val members = relationship.members.map { it.transactionId.id }
-                    link.primary.id in members && members.containsAll(relatedIds)
-                }
-            if (recorded) continue
-            stored.filter { relationship -> relationship.members.all { it.transactionId.id in link.ids } }.forEach {
-                writes += RelationshipWrite.Delete(it.id)
+        val kept = mutableSetOf<PlannedLink>()
+        val deletes =
+            stored.filter { relationship ->
+                val ends = relationship.members.mapTo(mutableSetOf()) { it.transactionId.id }
+                val asPlanned =
+                    relationship.primary?.let { primary ->
+                        PlannedLink(
+                            primary,
+                            relationship.members.filter { it.role == RelationshipRole.RELATED }.mapTo(mutableSetOf()) { it.transactionId },
+                            relationship.excludesRelated,
+                        )
+                    }
+                val keep =
+                    asPlanned in planned ||
+                        ends.any { it !in inScope } ||
+                        heldIds.any { it.containsAll(ends) }
+                if (keep && asPlanned != null) kept += asPlanned
+                !keep
             }
-            val members =
-                listOf(RelationshipMember(link.primary, RelationshipRole.PRIMARY)) +
-                    (link.excluded + link.related)
-                        .filter { it.id != link.primary.id }
-                        .distinctBy { it.id }
-                        .map { RelationshipMember(it, RelationshipRole.RELATED) }
-            writes += RelationshipWrite.Create(RelationshipTypeId(WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID), members, Source.Reconciler)
-        }
-        if (writes.isNotEmpty()) repository.apply(writes.distinct())
-        return LinkExclusions(excluded, counted)
-    }
-
-    /**
-     * Points every `reconciled` relationship within a shape match away from the record the match excludes in its
-     * place (the placeholder, the gross leg), whichever import wrote it: the deduper links an incoming row to the
-     * record it found, so the other import order wrote the same pair the other way round.
-     */
-    private suspend fun orientLinks(
-        links: List<ExclusionLink>,
-        scope: List<MatchObservation>,
-    ) {
-        val repository = relationships ?: return
-        if (links.isEmpty()) return
-        val transactionOf = scope.mapNotNull { o -> o.current?.let { o.ref to it } }.toMap()
-        val primaries = mutableMapOf<Long, TransactionId>()
-        val members = mutableMapOf<Long, Set<Long>>()
-        for (link in links) {
-            val ids = (link.matched + link.excluded).mapNotNull { transactionOf[it] }
-            val primary =
-                (link.matched intersect link.excluded)
-                    .sortedWith(compareBy({ it.slot != ObservationSlot.MAIN }, { it.toString() }))
-                    .firstNotNullOfOrNull { transactionOf[it] } ?: continue
-            val idSet = ids.mapTo(mutableSetOf()) { it.id }
-            for (id in idSet) {
-                primaries[id] = primary
-                members[id] = idSet
-            }
-        }
-        val writes =
-            repository
-                .getByTransactions(primaries.values.distinctBy { it.id })
-                .flatMap { reorient(it, primaries, members) }
-        if (writes.isNotEmpty()) repository.apply(writes)
-    }
-
-    /** [relationship] rewritten with its link's primary as its primary, or nothing when it is no such link or already is. */
-    private fun reorient(
-        relationship: Relationship,
-        primaries: Map<Long, TransactionId>,
-        members: Map<Long, Set<Long>>,
-    ): List<RelationshipWrite> {
-        val ends = relationship.members
-        val primary = ends.firstOrNull()?.let { primaries[it.transactionId.id] }
-        val current = ends.firstOrNull { it.role == RelationshipRole.PRIMARY }
-        val applies =
-            relationship.relationshipType.id.id == WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID &&
-                ends.size == 2 &&
-                primary != null &&
-                current != null &&
-                ends.all { it.transactionId.id in members[primary.id].orEmpty() } &&
-                current.transactionId.id != primary.id &&
-                ends.any { it.transactionId.id == primary.id }
-        if (!applies) return emptyList()
-        val roles =
-            ends.map {
-                RelationshipMember(
-                    it.transactionId,
-                    if (it.transactionId.id ==
-                        primary.id
-                    ) {
-                        RelationshipRole.PRIMARY
-                    } else {
-                        RelationshipRole.RELATED
-                    },
-                )
-            }
-        return listOf(
-            RelationshipWrite.Delete(relationship.id),
-            RelationshipWrite.Create(relationship.relationshipType.id, roles, Source.Reconciler),
+        val creates = planned - kept
+        if (deletes.isEmpty() && creates.isEmpty()) return emptySet()
+        repository.apply(
+            deletes.map { RelationshipWrite.Delete(it.id) } +
+                creates.map { link ->
+                    RelationshipWrite.Create(
+                        RelationshipTypeId(WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID),
+                        listOf(RelationshipMember(link.primary, RelationshipRole.PRIMARY)) +
+                            link.related.sortedBy { it.id }.map { RelationshipMember(it, RelationshipRole.RELATED) },
+                        Source.Reconciler,
+                        excludesRelated = link.excludesRelated,
+                    )
+                },
         )
+        return deletes.flatMapTo(mutableSetOf()) { link -> link.members.map { it.transactionId } } +
+            creates.flatMap { it.related + it.primary }
+    }
+
+    /** The stored links [link] makes: one per transaction it excludes, none when a record it names has none yet. */
+    private fun plan(
+        link: ExclusionLink,
+        transactionOf: Map<ObservationRef, TransactionId>,
+    ): List<PlannedLink> {
+        val excluded = link.excluded.map { transactionOf[it] ?: return emptyList() }.distinctBy { it.id }
+        val excludedIds = excluded.mapTo(mutableSetOf()) { it.id }
+        val countedRefs = link.matched - link.excluded
+        if (countedRefs.any { it !in transactionOf }) return emptyList()
+        val countedOf = { refs: Collection<ObservationRef> ->
+            refs.map { transactionOf.getValue(it) }.distinctBy { it.id }.filter { it.id !in excludedIds }
+        }
+        val counted = countedOf(countedRefs)
+        if (counted.isEmpty()) return emptyList()
+        val related = countedOf(countedRefs.filter { it.slot != ObservationSlot.FEE }).ifEmpty { counted }.toSet()
+        if (link.reason == ShapeReason.CONDUIT_STATEMENT) {
+            val statement = (link.matched intersect link.excluded).singleOrNull()?.let(transactionOf::get)
+            if (statement != null) {
+                // Keep the two links visible from the statement: the funding it matches and each onward leg it replaces.
+                val onward = (link.excluded - link.matched).filter { it.slot.startsWith(ObservationSlot.CONDUIT_PREFIX) }
+                val superseded = onward.mapTo(mutableSetOf(), transactionOf::getValue) - statement
+                return (excluded - superseded).map { PlannedLink(it, related) } +
+                    superseded.map { PlannedLink(statement, setOf(it), excludesRelated = true) }
+            }
+        }
+        return excluded.map { PlannedLink(it, related) }
     }
 
     /** Relationships of each released transaction other than its link to the one it joins, moved onto that one. */
@@ -310,86 +235,20 @@ internal class MatchSync(
         for (relationship in repository.getByTransactions(moves.keys)) {
             val members =
                 relationship.members
-                    .map { member -> byId[member.transactionId.id]?.let { RelationshipMember(it, member.role) } ?: member }
+                    .map { member -> byId[member.transactionId.id]?.let { member.copy(transactionId = it) } ?: member }
                     .distinctBy { it.transactionId.id }
             writes += RelationshipWrite.Delete(relationship.id)
-            if (members.size >= 2) writes += RelationshipWrite.Create(relationship.relationshipType.id, members, Source.Reconciler)
+            if (members.size >= 2) {
+                writes +=
+                    RelationshipWrite.Create(
+                        relationship.relationshipType.id,
+                        members,
+                        Source.Reconciler,
+                        excludesRelated = relationship.excludesRelated,
+                    )
+            }
         }
         if (writes.isNotEmpty()) repository.apply(writes)
-    }
-
-    /**
-     * Deletes each `reconciled` link between transactions the match keeps apart, and returns their ends to rebuild. The
-     * deduper linked a record to the other side it found, and excluded one end for it; where the matcher pairs that
-     * record elsewhere, nothing explains the exclusion any more, so the end it hid counts again. Only links whose every
-     * end is a [free] transaction (in scope, and in no shape match, whose links stay) go.
-     */
-    private suspend fun dropStaleLinks(
-        touched: Set<TransactionId>,
-        free: Set<Long>,
-    ): Set<TransactionId> {
-        val repository = relationships ?: return emptySet()
-        if (touched.isEmpty()) return emptySet()
-        val stale =
-            repository.getByTransactions(touched).filter { link ->
-                val ends = link.members.map { it.transactionId.id }.distinct()
-                link.relationshipType.id.id == WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID && ends.size >= 2 && ends.all { it in free }
-            }
-        if (stale.isEmpty()) return emptySet()
-        repository.apply(stale.map { RelationshipWrite.Delete(it.id) })
-        return stale.flatMapTo(mutableSetOf()) { link -> link.members.map { it.transactionId } }
-    }
-
-    /**
-     * Deletes each `reconciled` link between the transactions of two observations a person split, and returns their ends
-     * to rebuild: the deduper reconciled one record against the other and excluded an end for it, which the person said
-     * is wrong, so both count. A link a shape match still holds stays.
-     */
-    private suspend fun dropSplitLinks(
-        apart: List<Pair<ObservationRef, ObservationRef>>,
-        scope: List<MatchObservation>,
-        involved: Set<ObservationRef>,
-    ): Set<TransactionId> {
-        val repository = relationships ?: return emptySet()
-        val transactionOf = scope.mapNotNull { o -> o.current?.let { o.ref to it } }.toMap()
-        val pairs =
-            apart
-                .filter { (a, b) -> a !in involved && b !in involved }
-                .mapNotNull { (a, b) -> transactionOf[a]?.let { x -> transactionOf[b]?.let { y -> setOf(x.id, y.id) } } }
-                .filter { it.size == 2 }
-        if (pairs.isEmpty()) return emptySet()
-        val ends = pairs.flatMapTo(mutableSetOf()) { pair -> transactionOf.values.filter { it.id in pair } }
-        val stale =
-            repository.getByTransactions(ends).filter { link ->
-                val ids = link.members.mapTo(mutableSetOf()) { it.transactionId.id }
-                link.relationshipType.id.id == WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID && pairs.any { ids.containsAll(it) }
-            }
-        if (stale.isEmpty()) return emptySet()
-        repository.apply(stale.map { RelationshipWrite.Delete(it.id) })
-        return stale.flatMapTo(mutableSetOf()) { link -> link.members.map { it.transactionId } }
-    }
-
-    /**
-     * Deletes each `reconciled` link an unimport left headless: without its primary, the transaction it excluded in
-     * another's place, or with nothing but its primary, nothing left counted in its place. Returns their ends to rebuild:
-     * what remains stands on its own, as a fresh import without the deleted records holds it. Only links whose every end
-     * is a [free] transaction go.
-     */
-    private suspend fun dropHeadlessLinks(
-        current: Set<TransactionId>,
-        free: Set<Long>,
-    ): Set<TransactionId> {
-        val repository = relationships ?: return emptySet()
-        if (current.isEmpty()) return emptySet()
-        val headless =
-            repository.getByTransactions(current).filter { link ->
-                link.relationshipType.id.id == WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID &&
-                    (link.primary == null || link.members.all { it.role == RelationshipRole.PRIMARY }) &&
-                    link.members.all { it.transactionId.id in free }
-            }
-        if (headless.isEmpty()) return emptySet()
-        repository.apply(headless.map { RelationshipWrite.Delete(it.id) })
-        return headless.flatMapTo(mutableSetOf()) { link -> link.members.map { it.transactionId } }
     }
 
     /** Each staged row that observed a released transfer, marked a duplicate of the transfer that took its place. */
@@ -399,16 +258,14 @@ internal class MatchSync(
     ) {
         val relinked =
             changes.mapNotNull { change ->
-                val to = change.from?.let { resolved[it] } as? TransferId
                 val owner = change.ref.owner as? ObservationOwner.Record
-                if (to != null && owner != null) owner.recordId to to else null
+                owner?.recordId?.takeIf { change.from?.let { resolved[it] } is TransferId }
             }
         if (relinked.isEmpty()) return
-        val keys = records.getRecords(relinked.map { it.first }).associate { it.id to it.key }
-        val links = mutableMapOf<CsvImportId, MutableMap<Long, TransferId?>>()
-        for ((recordId, to) in relinked) {
-            val key = keys[recordId] as? ImportRecordKey.CsvRow
-            if (key != null) links.getOrPut(key.csvImportId) { mutableMapOf() }[key.rowIndex] = to
+        val links = mutableMapOf<CsvImportId, MutableSet<Long>>()
+        for (record in records.getRecords(relinked)) {
+            val key = record.key as? ImportRecordKey.CsvRow
+            if (key != null) links.getOrPut(key.csvImportId) { mutableSetOf() } += key.rowIndex
         }
         links.forEach { (csvImportId, rows) -> csvImports.updateRowStatusesBatch(csvImportId, ImportStatus.DUPLICATE.name, rows) }
     }
