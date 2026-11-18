@@ -31,8 +31,8 @@
       "androidx-test-uiautomator": "androidx.test.uiautomator:uiautomator:2.4.1",
       "atomicfu": "org.jetbrains.kotlinx:atomicfu:0.33.0",
       "bignum": "com.ionspin.kotlin:bignum:0.4.0",
-      "clikt": "com.github.ajalt.clikt:clikt:5.2.0",
-      "clikt-core": "com.github.ajalt.clikt:clikt-core:5.2.0",
+      "clikt": "com.github.ajalt.clikt:clikt:5.2.1",
+      "clikt-core": "com.github.ajalt.clikt:clikt-core:5.2.1",
       "compose-animation-core-desktop": "org.jetbrains.compose.animation:animation-core-desktop:1.12.2",
       "compose-animation-desktop": "org.jetbrains.compose.animation:animation-desktop:1.12.2",
       "compose-charts": "io.github.ehsannarmani:compose-charts:1.0.0",
@@ -9813,11 +9813,11 @@
     },
     "com.github.ajalt.clikt:clikt": {
       "android": {
-        "version": "5.2.0",
+        "version": "5.2.1",
         "files": [
           {
-            "name": "clikt-mordant-jvm-5.2.0.jar",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-jvm/5.2.0/clikt-jvm-5.2.0.jar",
+            "name": "clikt-mordant-jvm-5.2.1.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-jvm/5.2.1/clikt-jvm-5.2.1.jar",
             "sha256": "7381e8313b52337f80dfff01dac82443ebaff232433f4b94f3cd28bb0865def7"
           }
         ],
@@ -9827,11 +9827,11 @@
         ]
       },
       "js": {
-        "version": "5.2.0",
+        "version": "5.2.1",
         "files": [
           {
-            "name": "clikt-mordant-js-5.2.0.klib",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-js/5.2.0/clikt-js-5.2.0.klib",
+            "name": "clikt-mordant-js-5.2.1.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-js/5.2.1/clikt-js-5.2.1.klib",
             "sha256": "5096c709c74310c7df459f50842ca853fc7c2a279a95c699037493996b05dc5c"
           }
         ],
@@ -9842,11 +9842,11 @@
         ]
       },
       "jvm": {
-        "version": "5.2.0",
+        "version": "5.2.1",
         "files": [
           {
-            "name": "clikt-mordant-jvm-5.2.0.jar",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-jvm/5.2.0/clikt-jvm-5.2.0.jar",
+            "name": "clikt-mordant-jvm-5.2.1.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-jvm/5.2.1/clikt-jvm-5.2.1.jar",
             "sha256": "7381e8313b52337f80dfff01dac82443ebaff232433f4b94f3cd28bb0865def7"
           }
         ],
@@ -9856,11 +9856,11 @@
         ]
       },
       "linuxArm64": {
-        "version": "5.2.0",
+        "version": "5.2.1",
         "files": [
           {
-            "name": "clikt-mordant-linuxArm64Main-5.2.0.klib",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-linuxarm64/5.2.0/clikt-linuxarm64-5.2.0.klib",
+            "name": "clikt-mordant-linuxArm64Main-5.2.1.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-linuxarm64/5.2.1/clikt-linuxarm64-5.2.1.klib",
             "sha256": "a41046c6f451610630fa069ecbed1da1b9289949bae28d3b83e3852e46403a97"
           }
         ],
@@ -9870,11 +9870,11 @@
         ]
       },
       "linuxX64": {
-        "version": "5.2.0",
+        "version": "5.2.1",
         "files": [
           {
-            "name": "clikt-mordant-linuxX64Main-5.2.0.klib",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-linuxx64/5.2.0/clikt-linuxx64-5.2.0.klib",
+            "name": "clikt-mordant-linuxX64Main-5.2.1.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-linuxx64/5.2.1/clikt-linuxx64-5.2.1.klib",
             "sha256": "1e519347e8a6582b6ffd81711e1549a44e336485aaf169d2977c12d4da671d72"
           }
         ],
@@ -9884,11 +9884,11 @@
         ]
       },
       "macosArm64": {
-        "version": "5.2.0",
+        "version": "5.2.1",
         "files": [
           {
-            "name": "clikt-mordant-macosArm64Main-5.2.0.klib",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-macosarm64/5.2.0/clikt-macosarm64-5.2.0.klib",
+            "name": "clikt-mordant-macosArm64Main-5.2.1.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-macosarm64/5.2.1/clikt-macosarm64-5.2.1.klib",
             "sha256": "9ff43f0d6ab023ffe1b9e9292855691518100529827b0dd32c6879a960f6347e"
           }
         ],
@@ -9898,11 +9898,11 @@
         ]
       },
       "metadata": {
-        "version": "5.2.0",
+        "version": "5.2.1",
         "files": [
           {
-            "name": "clikt-mordant-metadata-5.2.0.jar",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt/5.2.0/clikt-5.2.0.jar",
+            "name": "clikt-mordant-metadata-5.2.1.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt/5.2.1/clikt-5.2.1.jar",
             "sha256": "e71ce3badc2cb02863708af77550a104063a65fff3863649dfe970062b6a0aba"
           }
         ],
@@ -9915,11 +9915,11 @@
         ]
       },
       "metadataWeb": {
-        "version": "5.2.0",
+        "version": "5.2.1",
         "files": [
           {
-            "name": "clikt-mordant-metadata-5.2.0.jar",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt/5.2.0/clikt-5.2.0.jar",
+            "name": "clikt-mordant-metadata-5.2.1.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt/5.2.1/clikt-5.2.1.jar",
             "sha256": "e71ce3badc2cb02863708af77550a104063a65fff3863649dfe970062b6a0aba"
           }
         ],
@@ -9932,11 +9932,11 @@
         ]
       },
       "mingwX64": {
-        "version": "5.2.0",
+        "version": "5.2.1",
         "files": [
           {
-            "name": "clikt-mordant-mingwX64Main-5.2.0.klib",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-mingwx64/5.2.0/clikt-mingwx64-5.2.0.klib",
+            "name": "clikt-mordant-mingwX64Main-5.2.1.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-mingwx64/5.2.1/clikt-mingwx64-5.2.1.klib",
             "sha256": "2320ba1e182439a7dfbc1492bb4ba0579d54c369eb4c85b80d2bb6879319369b"
           }
         ],
@@ -9946,11 +9946,11 @@
         ]
       },
       "wasmJs": {
-        "version": "5.2.0",
+        "version": "5.2.1",
         "files": [
           {
-            "name": "clikt-mordant-wasm-js-5.2.0.klib",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-wasm-js/5.2.0/clikt-wasm-js-5.2.0.klib",
+            "name": "clikt-mordant-wasm-js-5.2.1.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-wasm-js/5.2.1/clikt-wasm-js-5.2.1.klib",
             "sha256": "0b5fee9b34c88a8954105b23512f5a7d868a930a2b129246290ace993249fff2"
           }
         ],
@@ -9962,21 +9962,21 @@
     },
     "com.github.ajalt.clikt:clikt-core": {
       "android": {
-        "version": "5.2.0",
+        "version": "5.2.1",
         "files": [
           {
-            "name": "clikt-jvm-5.2.0.jar",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-jvm/5.2.0/clikt-core-jvm-5.2.0.jar",
-            "sha256": "1c91a8b8b2467a7eef913f3746834b1b90fec7d5cef378ccdea373761fd55fa8"
+            "name": "clikt-jvm-5.2.1.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-jvm/5.2.1/clikt-core-jvm-5.2.1.jar",
+            "sha256": "472ad043f73174d7b9063c70eba7434cec1d254197d1ccb808e0ea8cd8fb30cc"
           }
         ]
       },
       "js": {
-        "version": "5.2.0",
+        "version": "5.2.1",
         "files": [
           {
-            "name": "clikt-js-5.2.0.klib",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-js/5.2.0/clikt-core-js-5.2.0.klib",
+            "name": "clikt-js-5.2.1.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-js/5.2.1/clikt-core-js-5.2.1.klib",
             "sha256": "aa54114b9c063dc5d3c56e81965582a8899c185f61b207477cf93ee23a6b9dd7"
           }
         ],
@@ -9985,51 +9985,51 @@
         ]
       },
       "jvm": {
-        "version": "5.2.0",
+        "version": "5.2.1",
         "files": [
           {
-            "name": "clikt-jvm-5.2.0.jar",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-jvm/5.2.0/clikt-core-jvm-5.2.0.jar",
-            "sha256": "1c91a8b8b2467a7eef913f3746834b1b90fec7d5cef378ccdea373761fd55fa8"
+            "name": "clikt-jvm-5.2.1.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-jvm/5.2.1/clikt-core-jvm-5.2.1.jar",
+            "sha256": "472ad043f73174d7b9063c70eba7434cec1d254197d1ccb808e0ea8cd8fb30cc"
           }
         ]
       },
       "linuxArm64": {
-        "version": "5.2.0",
+        "version": "5.2.1",
         "files": [
           {
-            "name": "clikt-linuxArm64Main-5.2.0.klib",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-linuxarm64/5.2.0/clikt-core-linuxarm64-5.2.0.klib",
+            "name": "clikt-linuxArm64Main-5.2.1.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-linuxarm64/5.2.1/clikt-core-linuxarm64-5.2.1.klib",
             "sha256": "7e451d80ee263e8a8fea612cab8f86dc5cdaa52dab313e1fb11b1b76a2420525"
           }
         ]
       },
       "linuxX64": {
-        "version": "5.2.0",
+        "version": "5.2.1",
         "files": [
           {
-            "name": "clikt-linuxX64Main-5.2.0.klib",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-linuxx64/5.2.0/clikt-core-linuxx64-5.2.0.klib",
+            "name": "clikt-linuxX64Main-5.2.1.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-linuxx64/5.2.1/clikt-core-linuxx64-5.2.1.klib",
             "sha256": "dff4b7676ec44801d4b01791d2d2d738c0e9d555a0f6b17cd78ddc9ef7d96e66"
           }
         ]
       },
       "macosArm64": {
-        "version": "5.2.0",
+        "version": "5.2.1",
         "files": [
           {
-            "name": "clikt-macosArm64Main-5.2.0.klib",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-macosarm64/5.2.0/clikt-core-macosarm64-5.2.0.klib",
+            "name": "clikt-macosArm64Main-5.2.1.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-macosarm64/5.2.1/clikt-core-macosarm64-5.2.1.klib",
             "sha256": "7557f3399f960037656cf88855f96f5700ba27138fca0cbf4fe647580d8c6000"
           }
         ]
       },
       "metadata": {
-        "version": "5.2.0",
+        "version": "5.2.1",
         "files": [
           {
-            "name": "clikt-metadata-5.2.0.jar",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core/5.2.0/clikt-core-5.2.0.jar",
+            "name": "clikt-metadata-5.2.1.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core/5.2.1/clikt-core-5.2.1.jar",
             "sha256": "6c52c18ed73696834ac4433d3d4e31359eb7ad889ff65d0b40ec7492f256dc6c"
           }
         ],
@@ -10038,11 +10038,11 @@
         ]
       },
       "metadataWeb": {
-        "version": "5.2.0",
+        "version": "5.2.1",
         "files": [
           {
-            "name": "clikt-metadata-5.2.0.jar",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core/5.2.0/clikt-core-5.2.0.jar",
+            "name": "clikt-metadata-5.2.1.jar",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core/5.2.1/clikt-core-5.2.1.jar",
             "sha256": "6c52c18ed73696834ac4433d3d4e31359eb7ad889ff65d0b40ec7492f256dc6c"
           }
         ],
@@ -10051,21 +10051,21 @@
         ]
       },
       "mingwX64": {
-        "version": "5.2.0",
+        "version": "5.2.1",
         "files": [
           {
-            "name": "clikt-mingwX64Main-5.2.0.klib",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-mingwx64/5.2.0/clikt-core-mingwx64-5.2.0.klib",
+            "name": "clikt-mingwX64Main-5.2.1.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-mingwx64/5.2.1/clikt-core-mingwx64-5.2.1.klib",
             "sha256": "de97a65102b04c2409c0d9212010fedf7b3baf55da1d95649ac931ea74c7ba31"
           }
         ]
       },
       "wasmJs": {
-        "version": "5.2.0",
+        "version": "5.2.1",
         "files": [
           {
-            "name": "clikt-wasm-js-5.2.0.klib",
-            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-wasm-js/5.2.0/clikt-core-wasm-js-5.2.0.klib",
+            "name": "clikt-wasm-js-5.2.1.klib",
+            "url": "https://repo1.maven.org/maven2/com/github/ajalt/clikt/clikt-core-wasm-js/5.2.1/clikt-core-wasm-js-5.2.1.klib",
             "sha256": "b16b0c1d4a84183f6208023e07244f96409f182f12c9d4550e289fff7e024171"
           }
         ]
