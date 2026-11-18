@@ -279,21 +279,7 @@ enum class Assertion {
 }
 
 /**
- * The cases that fail today, by (scenario, assertion), each with the epic #1419 subtask that should fix it.
- *
- * Both are reconciles only `ImportDeduper` makes, while a file imports, so the outcome depends on which file came when
- * (#1432 moves them into the matcher):
- * - Two Amex statements' placeholders of one payment carry different references, and no matcher rule pairs two
- *   placeholders: the deduper's `reconciled` link between them is all that excludes the second.
- * - The second Curve export's row is a twin of the first's, but only the first's carries the onward `Curve -> merchant`
- *   leg, so unimporting the first loses it.
+ * The cases that fail today, by (scenario, assertion), each with the epic #1419 subtask that should fix it. Empty since
+ * staged files derive, match and materialize (#1428): every scenario converges.
  */
-val BASELINE: Map<Pair<String, Assertion>, Int> =
-    mapOf(
-        ("Santander QIF + two American Express statements" to Assertion.FILE_ORDER) to 1432,
-        ("Santander QIF + two American Express statements" to Assertion.STRATEGY_CHANGE) to 1432,
-        ("Santander QIF + two American Express statements" to Assertion.HAND_WORK_STRATEGY_CHANGE) to 1432,
-        ("Santander QIF + two American Express statements" to Assertion.UNIMPORT) to 1432,
-        ("Santander QIF + two American Express statements" to Assertion.FORCED_REIMPORT) to 1432,
-        ("Crypto.com card + two overlapping Curve exports" to Assertion.UNIMPORT) to 1432,
-    )
+val BASELINE: Map<Pair<String, Assertion>, Int> = emptyMap()

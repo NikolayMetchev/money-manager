@@ -407,33 +407,20 @@ internal val FRESH_IMPORT_GOLDENS: Map<String, String> =
             PAYMENT RECEIVED - THANK YOU
             SAINSBURY'S
             Santander
-            == transfers (10)
-            2020-02-02T12:00:00Z | PAYMENT RECEIVED - THANK YOU -> AMERICAN EXPRESS | 1239.68 GBP | PAYMENT RECEIVED - THANK YOU [amex-process-date=02/02/2020, amex-reference=99361810, unidentified-counterparty=source]
+            == transfers (5)
             2020-02-04T12:00:00Z | Santander -> AMERICAN EXPRESS | 1239.68 GBP | DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 3746-935125-04002, MANDATE NO 0013 [amex-process-date=02/02/2020, amex-reference=88361810, santander-mandate=0013, santander-reference=3746-935125-04002, santander-transaction-type=DIRECT_DEBIT]
-            2020-03-04T12:00:00Z | PAYMENT RECEIVED - THANK YOU -> AMERICAN EXPRESS | 738.42 GBP | PAYMENT RECEIVED - THANK YOU [amex-process-date=04/03/2020, amex-reference=99361811, unidentified-counterparty=source]
             2020-03-04T12:00:00Z | Santander -> AMERICAN EXPRESS | 738.42 GBP | DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 3746-935125-04002, MANDATE NO 0013 [amex-process-date=04/03/2020, amex-reference=88361811, santander-mandate=0013, santander-reference=3746-935125-04002, santander-transaction-type=DIRECT_DEBIT]
-            2020-03-19T12:00:00Z | AMERICAN EXPRESS -> SAINSBURY'S | 16.1 GBP | SAINSBURY'S [amex-merchant-type=GOODS, amex-process-date=19/03/2020, amex-reference=88361819, excluded=reconciled]
-            2020-03-19T12:00:00Z | AMERICAN EXPRESS -> SAINSBURY'S | 16.1 GBP | SAINSBURY'S [amex-merchant-type=GOODS, amex-process-date=19/03/2020, amex-reference=99361819]
-            2020-04-02T12:00:00Z | PAYMENT RECEIVED - THANK YOU -> AMERICAN EXPRESS | 1574.62 GBP | PAYMENT RECEIVED - THANK YOU [amex-process-date=02/04/2020, amex-reference=88361812, excluded=reconciled, unidentified-counterparty=source]
-            2020-04-02T12:00:00Z | Santander -> AMERICAN EXPRESS | 1574.62 GBP | DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 3746-935125-04002, MANDATE NO 0013 [amex-process-date=02/04/2020, amex-reference=99361812, santander-mandate=0013, santander-reference=3746-935125-04002, santander-transaction-type=DIRECT_DEBIT]
-            2020-05-03T12:00:00Z | PAYMENT RECEIVED - THANK YOU -> AMERICAN EXPRESS | 1801.13 GBP | PAYMENT RECEIVED - THANK YOU [amex-process-date=03/05/2020, amex-reference=99361813, unidentified-counterparty=source]
+            2020-03-19T12:00:00Z | AMERICAN EXPRESS -> SAINSBURY'S | 16.1 GBP | SAINSBURY'S [amex-merchant-type=GOODS, amex-process-date=19/03/2020, amex-reference=88361819]
+            2020-04-02T12:00:00Z | Santander -> AMERICAN EXPRESS | 1574.62 GBP | DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 3746-935125-04002, MANDATE NO 0013 [amex-process-date=02/04/2020, amex-reference=88361812, santander-mandate=0013, santander-reference=3746-935125-04002, santander-transaction-type=DIRECT_DEBIT]
             2020-05-06T12:00:00Z | Santander -> AMERICAN EXPRESS | 1801.13 GBP | DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 3746-935125-04002, MANDATE NO 0013 [amex-process-date=03/05/2020, amex-reference=88361813, santander-mandate=0013, santander-reference=3746-935125-04002, santander-transaction-type=DIRECT_DEBIT]
             == trades (0)
-            == relationships (2)
-            reconciled: PRIMARY {2020-03-19T12:00:00Z | AMERICAN EXPRESS -> SAINSBURY'S | 16.1 GBP | SAINSBURY'S [amex-merchant-type=GOODS, amex-process-date=19/03/2020, amex-reference=88361819, excluded=reconciled]} & RELATED {2020-03-19T12:00:00Z | AMERICAN EXPRESS -> SAINSBURY'S | 16.1 GBP | SAINSBURY'S [amex-merchant-type=GOODS, amex-process-date=19/03/2020, amex-reference=99361819]}
-            reconciled: PRIMARY {2020-04-02T12:00:00Z | PAYMENT RECEIVED - THANK YOU -> AMERICAN EXPRESS | 1574.62 GBP | PAYMENT RECEIVED - THANK YOU [amex-process-date=02/04/2020, amex-reference=88361812, excluded=reconciled, unidentified-counterparty=source]} & RELATED {2020-04-02T12:00:00Z | Santander -> AMERICAN EXPRESS | 1574.62 GBP | DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 3746-935125-04002, MANDATE NO 0013 [amex-process-date=02/04/2020, amex-reference=99361812, santander-mandate=0013, santander-reference=3746-935125-04002, santander-transaction-type=DIRECT_DEBIT]}
-            == daily balances (16)
-            AMERICAN EXPRESS | 2020-02-02 | GBP | 1239.68
-            AMERICAN EXPRESS | 2020-02-04 | GBP | 2479.36
-            AMERICAN EXPRESS | 2020-03-04 | GBP | 3956.2
-            AMERICAN EXPRESS | 2020-03-19 | GBP | 3940.1
-            AMERICAN EXPRESS | 2020-04-02 | GBP | 5514.72
-            AMERICAN EXPRESS | 2020-05-03 | GBP | 7315.85
-            AMERICAN EXPRESS | 2020-05-06 | GBP | 9116.98
-            PAYMENT RECEIVED - THANK YOU | 2020-02-02 | GBP | -1239.68
-            PAYMENT RECEIVED - THANK YOU | 2020-03-04 | GBP | -1978.1
-            PAYMENT RECEIVED - THANK YOU | 2020-04-02 | GBP | -1978.1
-            PAYMENT RECEIVED - THANK YOU | 2020-05-03 | GBP | -3779.23
+            == relationships (0)
+            == daily balances (10)
+            AMERICAN EXPRESS | 2020-02-04 | GBP | 1239.68
+            AMERICAN EXPRESS | 2020-03-04 | GBP | 1978.1
+            AMERICAN EXPRESS | 2020-03-19 | GBP | 1962
+            AMERICAN EXPRESS | 2020-04-02 | GBP | 3536.62
+            AMERICAN EXPRESS | 2020-05-06 | GBP | 5337.75
             SAINSBURY'S | 2020-03-19 | GBP | 16.1
             Santander | 2020-02-04 | GBP | -1239.68
             Santander | 2020-03-04 | GBP | -1978.1

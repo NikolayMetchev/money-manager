@@ -19,7 +19,10 @@ object ObservationSlot {
      * A pass-through chain's onward movement out of conduit [index] (outermost first): `conduit/0` is the first
      * conduit paying the next one, or the merchant.
      */
-    fun conduit(index: Int): String = "conduit/$index"
+    fun conduit(index: Int): String = "$CONDUIT_PREFIX$index"
+
+    /** What every [conduit] slot starts with. */
+    const val CONDUIT_PREFIX = "conduit/"
 
     /** The trade the record or group reports, or the conversion its own account settled the movement with. */
     const val TRADE = "trade"
