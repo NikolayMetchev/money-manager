@@ -126,7 +126,7 @@
     "forces": {
       "com.google.code.findbugs:jsr305": "3.0.2",
       "com.google.errorprone:error_prone_annotations": "2.52.0",
-      "com.ionspin.kotlin:bignum-mingwx64": "0.3.10",
+      "com.ionspin.kotlin:bignum-mingwx64": "0.4.0",
       "com.squareup:javawriter": "2.5.1",
       "commons-io:commons-io": "2.22.0",
       "dev.drewhamilton.poko:poko-annotations": "0.23.2",
@@ -10907,12 +10907,12 @@
         ]
       },
       "mingwX64": {
-        "version": "0.3.10",
+        "version": "0.4.0",
         "files": [
           {
-            "name": "bignum.klib",
-            "url": "https://repo1.maven.org/maven2/com/ionspin/kotlin/bignum-mingwx64/0.3.10/bignum-mingwx64-0.3.10.klib",
-            "sha256": "c4e5cfe254f7246af325b46ae17c0a5e03edbc6b9fb318a42f3d6b011dfae649"
+            "name": "bignum-mingwX64Main-0.4.0.klib",
+            "url": "https://repo1.maven.org/maven2/com/ionspin/kotlin/bignum-mingwx64/0.4.0/bignum-mingwx64-0.4.0.klib",
+            "sha256": "da374773b501dd7e2717df72070e5d81810020a19c3af6098f6d57b4fa0d00a5"
           }
         ]
       },
