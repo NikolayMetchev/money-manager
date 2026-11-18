@@ -16,6 +16,7 @@ import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csv.CsvImport
+import com.moneymanager.domain.model.observation.COPY_SLOT_PREFIX
 import com.moneymanager.domain.model.observation.ObservationOwner
 import com.moneymanager.domain.model.reconciliation.IGNORED_IN_RECONCILIATION
 import com.moneymanager.importengineapi.AccountRef
@@ -701,10 +702,10 @@ class KoinlyReconciliationE2ETest : DbTest() {
                 listOf(Source.Reconciliation),
                 repositories.transferSourceRepository.getSourcesForTransaction(fee).map { it.source },
             )
-            // A copy is the reconciliation's own observation, and the match pins every member's observations in place.
+            // A copy is said by the source row it copies (#1475), in a copy slot, and the match pins every member's observations.
             val copied = copies.flatMap { repositories.observationRepository.getObservationsOfTransaction(it) }
             assertEquals(copies.size, copied.size)
-            assertTrue(copied.all { it.owner is ObservationOwner.Manual }, "$copied")
+            assertTrue(copied.all { it.owner is ObservationOwner.Record && it.slot.startsWith(COPY_SLOT_PREFIX) }, "$copied")
             val members = movement.map { it.transactionRef }.distinct() + copies
             assertEquals(
                 members.flatMap { repositories.observationRepository.getObservationsOfTransaction(it) }.map { it.id }.toSet(),

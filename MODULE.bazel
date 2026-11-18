@@ -43,15 +43,16 @@ register_toolchains("//bazel/kmp:kotlin_toolchain")
 # bundles (//bazel/kmp/deps:jdk_jmods: jlink and ProGuard read them). Azul Zulu, because it ships jmods/: Temurin
 # hasn't since 24. rules_java only knows the LTS releases it was built with, so each platform's archive is listed here.
 # Renovate bumps JDK to every release, LTS or not; bazel/renovate/repin.sh then rewrites the archives, their SHA-256s
-# and .bazelrc's runtime version (repo-scripts repin jdk).
-JDK = "27.0.1"
+# and .bazelrc's runtime version (repo-scripts repin jdk). Each platform uses its newest available build
+# up to JDK within the same major.minor.patch release; lagging platforms are rechecked on every repin.
+JDK = "27.0.1.1"
 
 JDK_ARCHIVES = {
-    "linux_aarch64": ["zulu27.30.109-ca-jdk27.0.1.0.3-linux_aarch64.tar.gz", "4b4d2fb4a6bff5fa4d3a1f22ac5933c87d83e41d5f78bcd88df878326342d507"],
-    "linux_x86_64": ["zulu27.30.109-ca-jdk27.0.1.0.3-linux_x64.tar.gz", "c128817926e4eebb30868b6ba082028f493afa716e459e34049bde0ab49a9829"],
+    "linux_aarch64": ["zulu27.30.201-ca-jdk27.0.1.1-linux_aarch64.tar.gz", "18875b92ad2535230a13175f718933f7cc0593b4affa2dab442815ec245dacbb"],
+    "linux_x86_64": ["zulu27.30.201-ca-jdk27.0.1.1-linux_x64.tar.gz", "c4d7bf4c80a21e935187ecdcb111e4b2f14e1fdd18364974fe7f7da54b12bea0"],
     "macos_aarch64": ["zulu27.30.109-ca-jdk27.0.1.0.3-macosx_aarch64.tar.gz", "88dec2f8609e7c4162778cbaef5437f00febd3c498a7c0e77277d1f4ac8f839d"],
     "macos_x86_64": ["zulu27.30.109-ca-jdk27.0.1.0.3-macosx_x64.tar.gz", "88cf4b1d04ed677d88e53716fb0c960b89917a0234cea6555ba9aa5d37961b83"],
-    "windows_x86_64": ["zulu27.30.109-ca-jdk27.0.1.0.3-win_x64.zip", "70e0aff2bfc1a9468ef464f97c96b295188c15f5a6f7fec3429a4b924b8b338d"],
+    "windows_x86_64": ["zulu27.30.201-ca-jdk27.0.1.1-win_x64.zip", "f5424ea36f832aa28a0441a57ffb1dfe2cd3d903802c0a36d22576b1acc430ec"],
 }
 
 java_repository = use_extension("@rules_java//java:extensions.bzl", "java_repository")

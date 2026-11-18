@@ -566,7 +566,7 @@ source** (built-ins: Koinly, Accointing). Its data never touches real accounts:
 - The External Account Reconciliation screen has two tabs. **Unmatched**: near matches (**Accept** stores one),
   the source's rows Money Manager lacks (**Ignore** excludes them with the reason `"ignored in reconciliation"`,
   outside the source's owned set; **Select matching transactions…** picks real legs from around that time that no
-  match claims, `pickerCandidates`; **Copy to Money Manager**, for a row the real accounts' own source never reported, books its trades and transfers on the real accounts as `Source.Reconciliation` (each wallet as its one linked account, a wallet's fee account as that account's fee account) and stores them as the row's match, `planCopy` and `copyToMoneyManager` in `app/reconciliation`), and real legs the source lacks (read-only). **Matched**: exact and stored
+  match claims, `pickerCandidates`; **Copy to Money Manager**, for a row the real accounts' own source never reported, books its trades and transfers on the real accounts as `Source.Reconciliation` (each wallet as its one linked account, a wallet's fee account as that account's fee account) and stores them as the row's match, `planCopy` and `copyToMoneyManager` in `app/reconciliation`. A copy is an observation of the source row's own record, in a `copy/<slot>` slot (`ImportBatch.reconciliationCopies`), so a re-import of the source updates it when the row changed, removes it when the row is gone or excluded (a hand edit on it is reported in `releasedOverrides`) and writes nothing when the row is unchanged; the source's own matching never reads it), and real legs the source lacks (read-only). **Matched**: exact and stored
   matches (**Unmatch** deletes a stored one) and the ignored rows (**Un-ignore**).
 - Rows the source marks deleted are imported **excluded** (an `Exclude` rule), like
   declined card payments. Trades can be excluded too (`trade_attribute`, honoured by
@@ -847,7 +847,10 @@ set of writes.
 1. **Java**: everything runs on, and the desktop app bundles, `MODULE.bazel`'s `JDK` (Azul Zulu 27, which Bazel
    downloads; Zulu because it ships the `jmods/` jlink and ProGuard read, which Temurin dropped in 24). Renovate bumps
    it to every release, LTS or not, and `repin.sh` (`repo-scripts repin jdk`) rewrites the archives and `.bazelrc`'s
-   `remotejdk_<n>`, and `.tool-versions` (for asdf/mise) to the same Zulu build. Javac runs on it through `//bazel/kmp/java:java_toolchain`. Code compiles for that JDK, or for the newest
+   `remotejdk_<n>`, and `.tool-versions` (for asdf/mise) to the Linux x64 Zulu build. `JDK` keeps the full Java
+   version, including security build components. Each platform pins its newest available build up to that version
+   within the same major.minor.patch release; a platform with no build in that release fails the repin. Lagging
+   platforms are checked again on every repin. Javac runs on it through `//bazel/kmp/java:java_toolchain`. Code compiles for that JDK, or for the newest
    Java the Kotlin compiler targets if that is older. `repo-scripts repin bytecode` sets it after every JDK
    or Kotlin bump in `.bazelrc`'s `java_language_version`s, the Java toolchain's `source_version`/`target_version` and
    the Kotlin toolchain's `jvm_target` (`bazel/kmp/BUILD.bazel`); `jvm_target.patch` drops rules_kotlin's value lists,

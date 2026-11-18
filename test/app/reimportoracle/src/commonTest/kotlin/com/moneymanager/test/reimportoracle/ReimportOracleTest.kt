@@ -2,6 +2,7 @@ package com.moneymanager.test.reimportoracle
 
 import app.cash.sqldelight.async.coroutines.awaitAsList
 import com.moneymanager.domain.model.TradeId
+import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.test.database.read.testReads
 import kotlinx.coroutines.flow.first
@@ -157,6 +158,110 @@ class ReimportOracleTest {
             }
         }
 
+    /**
+     * Copy to Money Manager is what the source row's own record says on the real accounts (#1475): re-importing the
+     * source with the row unchanged changes nothing (and, unforced, writes nothing), forced or not.
+     */
+    @Test
+    fun h_a_copy_survives_reimporting_its_unchanged_source() =
+        oracle(Assertion.COPY_UNCHANGED) { scenario ->
+            if (scenario.copiedRow == null) return@oracle null
+            OracleDatabase.with(scenario) {
+                import()
+                expectCopies(copySourceTrade())
+                val expected = db.canonicalSnapshot()
+                val source = copiedRowSource()
+                val before = auditCounts()
+                reimport(listOf(source))
+                val grown = auditCounts().filter { (table, count) -> count != before[table] }
+                if (grown.isNotEmpty()) return@with "re-importing ${source.file.fileName} unchanged wrote audit rows: ${grown.keys}"
+                difference(expected, db.canonicalSnapshot(), "re-import of ${source.file.fileName}")
+                    ?: run {
+                        reimport(listOf(source), force = true)
+                        difference(expected, db.canonicalSnapshot(), "forced re-import of ${source.file.fileName}")
+                    }
+            }
+        }
+
+    /** A copied row whose amount changed at its source: the re-import updates the copy, as a fresh import and copy would book it. */
+    @Test
+    fun h_a_copy_follows_its_changed_row() =
+        oracle(Assertion.COPY_CHANGED) { scenario ->
+            if (scenario.copiedRow == null) return@oracle null
+            val expected =
+                OracleDatabase.with(scenario) {
+                    changeCopiedRow()
+                    import()
+                    expectCopies(copySourceTrade())
+                    db.canonicalSnapshot()
+                }
+            OracleDatabase.with(scenario) {
+                import()
+                val copies = expectCopies(copySourceTrade())
+                expectChange(expected)
+                changeCopiedRow()
+                reimport(listOf(copiedRowSource()))
+                lostCopies(copies) ?: difference(expected, db.canonicalSnapshot(), "re-import after the copied row changed")
+            }
+        }
+
+    /** A copied row its source no longer reports: the re-import removes the copy, leaving the wallets linked and nothing copied. */
+    @Test
+    fun h_a_copy_goes_with_its_deleted_row() =
+        oracle(Assertion.COPY_DELETED) { scenario ->
+            if (scenario.copiedRow == null) return@oracle null
+            val expected =
+                OracleDatabase.with(scenario) {
+                    changeCopiedRow(drops = true)
+                    import()
+                    linkWallets()
+                    db.canonicalSnapshot()
+                }
+            OracleDatabase.with(scenario) {
+                import()
+                expectCopies(copySourceTrade())
+                expectChange(expected)
+                changeCopiedRow(drops = true)
+                reimport(listOf(copiedRowSource()))
+                difference(expected, db.canonicalSnapshot(), "re-import after the copied row was deleted")
+            }
+        }
+
+    /** A copy a person edited, whose row then changed: the copy keeps its id and the person's note, and takes the new amount. */
+    @Test
+    fun h_a_hand_edited_copy_follows_its_changed_row() =
+        oracle(Assertion.COPY_HAND_EDITED) { scenario ->
+            if (scenario.copiedRow == null) return@oracle null
+            val expected =
+                OracleDatabase
+                    .with(scenario) {
+                        changeCopiedRow()
+                        import()
+                        noteOnCopies(expectCopies(copySourceTrade()))
+                        db.canonicalSnapshot()
+                    }.also { snapshot -> check(snapshot.trades.any { "$ORACLE_NOTE_TYPE=$ORACLE_NOTE" in it }) { "the note is missing" } }
+            OracleDatabase.with(scenario) {
+                import()
+                val copies = expectCopies(copySourceTrade())
+                noteOnCopies(copies)
+                expectChange(expected)
+                changeCopiedRow()
+                reimport(listOf(copiedRowSource()))
+                lostCopies(copies) ?: difference(expected, db.canonicalSnapshot(), "re-import after the copied row changed")
+            }
+        }
+
+    private fun expectCopies(copies: List<TransactionId>): List<TransactionId> =
+        copies.also { check(it.isNotEmpty()) { "nothing was copied" } }
+
+    /** Fails unless the database differs from [changed], so the change of the copied row can never hold vacuously. */
+    private suspend fun OracleDatabase.expectChange(changed: CanonicalSnapshot) =
+        check(db.canonicalSnapshot() != changed) { "the change of the copied row reached nothing" }
+
+    /** Which of [copies] a re-import gave a new id rather than keeping: the match and a person's edits hang off the old one. */
+    private suspend fun OracleDatabase.lostCopies(copies: List<TransactionId>): String? =
+        lostIds(HandWork(transfers = emptySet(), trades = emptySet(), copies = copies), "the re-import")
+
     /** Fails unless the strategy change of (c) reached the database, so (c) can never hold vacuously. */
     private fun CanonicalSnapshot.expectStrategyChange() =
         check((transfers + trades).any { "$ORACLE_STRATEGY_ATTRIBUTE=v2" in it }) { "the strategy change tagged nothing" }
@@ -276,6 +381,10 @@ enum class Assertion {
     NO_AUDIT_WRITES,
     UNIMPORT,
     FORCED_REIMPORT,
+    COPY_UNCHANGED,
+    COPY_CHANGED,
+    COPY_DELETED,
+    COPY_HAND_EDITED,
 }
 
 /**

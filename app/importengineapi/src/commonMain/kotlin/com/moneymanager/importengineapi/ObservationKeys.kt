@@ -1,6 +1,7 @@
 package com.moneymanager.importengineapi
 
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.observation.COPY_SLOT_PREFIX
 import com.moneymanager.domain.model.observation.ImportGroupKey
 import com.moneymanager.domain.model.observation.ImportRecordKey
 
@@ -29,6 +30,15 @@ object ObservationSlot {
 
     /** A placeholder for what only a person can say: a `manual-entry` trade standing in for an unseen leg. */
     const val MANUAL_ENTRY = "manual-entry"
+
+    /**
+     * What "Copy to Money Manager" books for the owner's [slot] (#1475): the reconciliation source's record says it too, on the
+     * real accounts its wallets are linked to, so a re-import of the source updates or removes the copy with the row.
+     */
+    fun copy(slot: String): String = "$COPY_PREFIX$slot"
+
+    /** What every [copy] slot starts with. */
+    const val COPY_PREFIX = COPY_SLOT_PREFIX
 }
 
 /** Who an observation belongs to, before anything is written: no ids, only what the source itself says. */

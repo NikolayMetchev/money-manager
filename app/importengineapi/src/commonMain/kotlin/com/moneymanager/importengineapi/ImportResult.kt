@@ -15,6 +15,7 @@ import com.moneymanager.domain.model.ImportDirectoryId
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.TradeId
+import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.ImportStatus
 
@@ -83,4 +84,6 @@ data class ImportResult(
     val matchSync: MaterializationReport = MaterializationReport(),
     /** The transactions a [CsvImportMutation.Reserve] vacated for the re-run to take back; pass them to [ImportBatch.settle]. */
     val reserved: ReservedTransactions = ReservedTransactions(),
+    /** The copies of [ImportBatch.reconciliationCopies], in the same order. */
+    val copiedTransactionIds: List<TransactionId> = emptyList(),
 )
