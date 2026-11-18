@@ -13,6 +13,8 @@ import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.TransactionKind
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.observation.ImportRecordId
+import com.moneymanager.domain.model.observation.ImportRecordKey
 import com.moneymanager.domain.model.observation.MaterializedWrite
 import com.moneymanager.domain.model.observation.ObservationAttribute
 import com.moneymanager.domain.model.observation.ObservationChange
@@ -23,6 +25,7 @@ import com.moneymanager.domain.model.observation.ObservedValues
 import com.moneymanager.domain.repository.ObservationReadRepository
 import com.moneymanager.domain.repository.write.CsvObservationCommit
 import com.moneymanager.domain.repository.write.ObservationWriteRepository
+import com.moneymanager.domain.repository.write.RecordObservationInsert
 import com.moneymanager.domain.repository.write.StaleObservationCommitException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -40,13 +43,29 @@ class ObservationWriteRepositoryImpl(
 
     override suspend fun changeToken(): Long = withContext(coroutineContext) { database.dataChangeToken() }
 
+    override suspend fun insertRecordObservations(
+        contentHash: String,
+        observations: List<RecordObservationInsert>,
+    ): Map<ImportRecordKey, ImportRecordId> =
+        withContext(coroutineContext) {
+            queries.transactionWithResult {
+                val records = mutableMapOf<ImportRecordKey, ImportRecordId>()
+                for (observation in observations) {
+                    val recordId = records.getOrPut(observation.record) { database.insertImportRecord(observation.record, contentHash) }
+                    insert(ObservationOwner.Record(recordId), observation.slot, observation.transactionId, observation.content)
+                }
+                records
+            }
+        }
+
     override suspend fun applyObservationChanges(
         newTransactions: Collection<TransactionId>,
         observations: List<ObservationChange>,
         rows: List<MaterializedWrite>,
         csv: CsvObservationCommit?,
+        reclaimed: Collection<ObservationId>,
     ): Map<TransactionId, TransactionId> {
-        if (csv == null && newTransactions.isEmpty() && observations.isEmpty() && rows.isEmpty()) return emptyMap()
+        if (csv == null && newTransactions.isEmpty() && observations.isEmpty() && rows.isEmpty() && reclaimed.isEmpty()) return emptyMap()
         return withContext(coroutineContext) {
             queries.transactionWithResult {
                 if (csv != null) verifyCsvCommit(csv, observations, rows)
@@ -67,6 +86,7 @@ class ObservationWriteRepositoryImpl(
                         }
                     }
                 }
+                reclaimed.forEach { queries.unreserve(it.id) }
                 val allocated = ids.entries.associate { (local, stored) -> local.id to stored.id }
                 for (write in rows) {
                     when (write) {

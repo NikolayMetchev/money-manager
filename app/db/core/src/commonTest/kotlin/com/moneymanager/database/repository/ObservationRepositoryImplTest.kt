@@ -113,7 +113,7 @@ class ObservationRepositoryImplTest : DbTest() {
             assertEquals(listOf(first, second), records.getCsvImportRecords(importId).map { it.id })
             assertFailsWith<Exception> { records.insertRecord(ImportRecordKey.CsvRow(importId, 1), "again") }
 
-            records.updateContentHash(first, "hash-1b")
+            records.writeRecords(emptyMap(), mapOf(first to "hash-1b"))
             assertEquals("hash-1b", records.getRecord(first)!!.contentHash)
 
             val key = ImportGroupKey("strategy", "trade", "order-7")

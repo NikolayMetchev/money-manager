@@ -146,6 +146,7 @@ suspend fun <R> ImportEngine.executeRerun(
     refreshViews: Boolean = true,
     run: suspend () -> R,
 ): RerunOutcome<R> {
+    onProgress?.invoke(Progress("Reading transactions for the re-import report", fraction = 0f))
     val before =
         TransactionSnapshot.read(
             files.flatMap { it.createdTransfers.entries }.associate { it.key to it.value },
@@ -191,16 +192,29 @@ suspend fun <R> ImportEngine.executeRerun(
 
     onProgress?.invoke(Progress("Re-importing"))
     // Applying a staged file deletes the accounts it left empty itself, so those the run removed count as cleaned up too.
-    val created = files.flatMap { it.createdAccountIds }.distinct()
+    val created = files.flatMapTo(mutableSetOf()) { it.createdAccountIds }
     val createdNames =
-        created.mapNotNull { id ->
+        if (created.isEmpty()) {
+            emptyMap()
+        } else {
             reads.accountRepository
-                .getAccountById(id)
+                .getAllAccounts()
                 .first()
-                ?.let { id to it.name }
+                .filter { it.id in created }
+                .associate { it.id to it.name }
         }
     val result = run()
-    val emptiedByRun = createdNames.filter { (id, _) -> reads.accountRepository.getAccountById(id).first() == null }.map { it.second }
+    val emptiedByRun =
+        if (createdNames.isEmpty()) {
+            emptyList()
+        } else {
+            val surviving =
+                reads.accountRepository
+                    .getAllAccounts()
+                    .first()
+                    .mapTo(mutableSetOf()) { it.id }
+            createdNames.filterKeys { it !in surviving }.values.toList()
+        }
 
     // The records took their old ids back, so a person's overrides, pins and links on them still hold: settling releases
     // the ids no record took back and rebuilds the overridden ones (#1430). A hand edit on a released id is reported.

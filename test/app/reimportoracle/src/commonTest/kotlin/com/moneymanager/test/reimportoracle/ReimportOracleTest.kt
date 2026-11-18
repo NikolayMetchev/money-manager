@@ -163,6 +163,18 @@ class ReimportOracleTest {
      * source with the row unchanged changes nothing (and, unforced, writes nothing), forced or not.
      */
     @Test
+    fun g_forcing_a_bulk_reimport_of_csv_files_changes_nothing() =
+        oracle(Assertion.FORCED_BULK_CSV_REIMPORT) { scenario ->
+            val sources = scenario.sources.filterNot { it.file is OracleFile.Api }
+            if (sources.size < 2) return@oracle null
+            OracleDatabase.with(scenario) {
+                val expected = importAndSnapshot()
+                reimportAll(sources, force = true)
+                difference(expected, db.canonicalSnapshot(), "forced bulk re-import of ${sources.names()}")
+            }
+        }
+
+    @Test
     fun h_a_copy_survives_reimporting_its_unchanged_source() =
         oracle(Assertion.COPY_UNCHANGED) { scenario ->
             if (scenario.copiedRow == null) return@oracle null
@@ -381,6 +393,7 @@ enum class Assertion {
     NO_AUDIT_WRITES,
     UNIMPORT,
     FORCED_REIMPORT,
+    FORCED_BULK_CSV_REIMPORT,
     COPY_UNCHANGED,
     COPY_CHANGED,
     COPY_DELETED,

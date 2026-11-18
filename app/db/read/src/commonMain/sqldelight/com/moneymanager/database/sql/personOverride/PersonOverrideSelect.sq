@@ -25,6 +25,17 @@ FROM trade_attribute_removal
 WHERE transaction_id = ?
 ORDER BY attribute_type_id;
 
+selectOverriddenTransactions:
+SELECT transaction_id, 'TRANSFER' AS kind FROM transfer_override
+UNION
+SELECT transaction_id, 'TRANSFER' FROM transfer_attribute_override
+UNION
+SELECT transaction_id, 'TRANSFER' FROM transfer_attribute_removal
+UNION
+SELECT transaction_id, 'TRADE' FROM trade_attribute_override
+UNION
+SELECT transaction_id, 'TRADE' FROM trade_attribute_removal;
+
 -- The pin's transaction kind is its observation's.
 selectPins:
 SELECT observation_pin.observation_id, observation_pin.transaction_id, observation.kind

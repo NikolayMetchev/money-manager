@@ -125,5 +125,13 @@ data class Observation(
     val content: ObservationContent,
 )
 
+/** A reserved observation whose transaction row has been vacated for a re-import. */
+data class VacantObservation(
+    val id: ObservationId,
+    val owner: ObservationOwner,
+    val slot: String,
+    val transactionId: TransactionId,
+)
+
 /** What every slot of a reconciliation copy (#1475) starts with: `copy/<slot>` is the copy of the owner's `<slot>`. */
 const val COPY_SLOT_PREFIX = "copy/"

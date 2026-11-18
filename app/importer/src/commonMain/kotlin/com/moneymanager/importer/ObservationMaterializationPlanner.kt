@@ -61,13 +61,11 @@ internal class ObservationMaterializationPlanner(
         val affected = request.transactionIds + overlay.affected
         val changes = observationChanges.groupBy { it.after?.transactionId }
         val stored =
-            affected.associateWith { id ->
-                if (overlay.isNew(id)) emptyList() else observations.getObservationsOfTransaction(id)
-            }
+            observations.getObservationsOfTransactions(affected.filterNot(overlay::isNew)).groupBy { it.transactionId }
         val replaced = observationChanges.mapNotNullTo(mutableSetOf()) { it.before?.id }
         val merged =
-            stored.mapValues { (id, existing) ->
-                val remaining = existing.filterNot { it.id in replaced }.map { it.content }
+            affected.associateWith { id ->
+                val remaining = stored[id].orEmpty().filterNot { it.id in replaced }.map { it.content }
                 val incoming = changes[id].orEmpty().map { checkNotNull(it.after).content }
                 Materializer.merge(remaining + incoming, placeholderTypeId)
             }
@@ -84,14 +82,14 @@ internal class ObservationMaterializationPlanner(
             val source =
                 if (current == null && effective != null && request.source == Source.Reconciler) {
                     val owners =
-                        stored.getValue(id).filterNot { it.id in replaced }.map { it.owner } + changes[id].orEmpty().map { it.owner }
+                        stored[id].orEmpty().filterNot { it.id in replaced }.map { it.owner } + changes[id].orEmpty().map { it.owner }
                     creatorOf(owners) ?: request.source
                 } else {
                     request.source
                 }
             Materializer.write(id.id, id.kind(), current, effective, source)?.let(writes::add)
             if (!personal.isEmpty) {
-                val before = request.priorMerges[id] ?: Materializer.merge(stored.getValue(id).map { it.content }, placeholderTypeId)
+                val before = request.priorMerges[id] ?: Materializer.merge(stored[id].orEmpty().map { it.content }, placeholderTypeId)
                 conflicts += Materializer.conflicts(id.id, before, merge, personal)
             }
         }

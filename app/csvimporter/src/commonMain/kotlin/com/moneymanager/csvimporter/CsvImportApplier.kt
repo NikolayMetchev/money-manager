@@ -229,15 +229,40 @@ suspend fun ensureCryptoAssets(
     currencies: List<Currency>,
     importEngine: ImportEngine,
     cryptoRepository: CryptoReadRepository?,
+): List<CryptoAsset> =
+    ensureScannedCryptoAssets(strategy, importEngine, cryptoRepository, currencies) {
+        collectAssetCodes(strategy, columns, fileName) { rows }
+    }
+
+private suspend fun ensureScannedCryptoAssets(
+    strategy: CsvImportStrategy,
+    importEngine: ImportEngine,
+    cryptoRepository: CryptoReadRepository?,
+    currencies: List<Currency>,
+    readCodes: suspend () -> Set<String>,
 ): List<CryptoAsset> {
     if (cryptoRepository == null) return emptyList()
-    val known = KnownAssets(currencies, cryptoRepository.getAllCryptoAssets().first(), cryptoRepository.assetAliasMap())
-    createCryptoAssets(
-        collectCryptoCodes(strategy, columns, fileName, rows, known),
-        importEngine,
-    )
+    val assets = cryptoRepository.getAllCryptoAssets().first()
+    val known = KnownAssets(currencies, assets, cryptoRepository.assetAliasMap())
+    val missing = known.missingCodes(strategy, readCodes())
+    if (missing.isEmpty()) return assets
+    createCryptoAssets(missing, importEngine)
     return cryptoRepository.getAllCryptoAssets().first()
 }
+
+internal data class PreparedAssetScan(
+    val staged: CsvImport,
+    val strategy: CsvImportStrategy,
+    val codes: Set<String>,
+)
+
+private fun CsvImport.hasSameRowsAs(other: CsvImport): Boolean =
+    id == other.id &&
+        tableName == other.tableName &&
+        originalFileName == other.originalFileName &&
+        fileChecksum == other.fileChecksum &&
+        columns == other.columns &&
+        rowCount == other.rowCount
 
 /**
  * Prepares a whole batch of [imports] before any file is imported, the files in parallel: stages each file as the
@@ -246,10 +271,10 @@ suspend fun ensureCryptoAssets(
  * processed before the crypto file that introduces a ticker would fail with "Currency not found". Creating
  * everything up front removes that ordering dependency. Restaging is written one file at a time, as the engine
  * doesn't serialize writes. [onPrepared] hears of each file, with its index in [imports], as it's done, in the
- * order they finish. Returns the full crypto-asset set (empty without [cryptoRepository]).
+ * order they finish. Returns the scanned codes and their file and strategy so bulk apply can reuse the scan.
  */
 @Suppress("LongParameterList")
-suspend fun prepareImports(
+internal suspend fun prepareImports(
     imports: List<CsvImport>,
     strategies: List<CsvImportStrategy>,
     currencies: List<Currency>,
@@ -257,37 +282,34 @@ suspend fun prepareImports(
     importEngine: ImportEngine,
     cryptoRepository: CryptoReadRepository?,
     onPrepared: suspend (index: Int, file: CsvImport) -> Unit = { _, _ -> },
-): List<CryptoAsset> {
+): Map<CsvImportId, PreparedAssetScan> {
     val known = cryptoRepository?.let { KnownAssets(currencies, it.getAllCryptoAssets().first(), it.assetAliasMap()) }
     val writes = Mutex()
     val reports = Mutex()
-    val codes =
+    val scans =
         coroutineScope {
             imports
                 .mapIndexed { index, listed ->
                     async(Dispatchers.Default) {
                         val staged = stageForStrategy(listed, strategies, csvImportRepository, importEngine, writes)
-                        val fileCodes =
+                        val scan =
                             if (staged == null || known == null) {
-                                emptySet()
+                                null
                             } else {
-                                cryptoCodesForImport(
+                                PreparedAssetScan(
                                     staged.first,
                                     staged.second,
-                                    csvImportRepository,
-                                    known,
+                                    assetCodesForImport(staged.first, staged.second, csvImportRepository),
                                 )
                             }
                         reports.withLock { onPrepared(index, listed) }
-                        fileCodes
+                        scan
                     }
                 }.awaitAll()
-                .flatten()
-                .toSet()
+                .filterNotNull()
         }
-    if (cryptoRepository == null) return emptyList()
-    createCryptoAssets(codes, importEngine)
-    return cryptoRepository.getAllCryptoAssets().first()
+    if (known != null) createCryptoAssets(scans.flatMapTo(mutableSetOf()) { known.missingCodes(it.strategy, it.codes) }, importEngine)
+    return scans.associateBy { it.staged.id }
 }
 
 // [listed] staged as the strategy it matches reads it, with that strategy; null when none matches. [writes] keeps
@@ -313,18 +335,17 @@ private suspend fun stageForStrategy(
     return staged to strategy
 }
 
-// The crypto tickers [csvImport]'s rows name that aren't assets yet.
-private suspend fun cryptoCodesForImport(
+private suspend fun assetCodesForImport(
     csvImport: CsvImport,
     strategy: CsvImportStrategy,
     csvImportRepository: CsvImportReadRepository,
-    known: KnownAssets,
 ): Set<String> {
     // Scan ALL rows, not just importable ones: a re-import remaps already-IMPORTED rows too (value
     // updates, transfer→trade conversions), and their tickers must resolve at plan time. For a fresh
     // import every row is unimported, so this is the same set.
-    val allRows = csvImportRepository.getImportRows(csvImport.id, limit = csvImport.rowCount.coerceAtLeast(1), offset = 0)
-    return collectCryptoCodes(strategy, csvImport.columns, csvImport.originalFileName, allRows, known)
+    return collectAssetCodes(strategy, csvImport.columns, csvImport.originalFileName) {
+        csvImportRepository.getImportRows(csvImport.id, limit = csvImport.rowCount.coerceAtLeast(1), offset = 0)
+    }
 }
 
 // The database's assets as [resolveAssetCode] reads them: codes, aliases and names (currencies first).
@@ -334,24 +355,29 @@ private class KnownAssets(
     private val aliases: Map<String, String>,
 ) {
     private val codes = (currencies.map { it.code } + crypto.map { it.code }).mapTo(mutableSetOf()) { it.uppercase() }
-    private val codeByName = codesByName(currencies.map { it.code to it.name } + crypto.map { it.code to it.name })
+    private val codeByName = lazy { codesByName(currencies.map { it.code to it.name } + crypto.map { it.code to it.name }) }
 
-    fun isAsset(code: String): Boolean = code in codes
+    private fun isAsset(code: String): Boolean = code in codes
 
-    fun resolve(code: String): String = resolveAssetCode(code, aliases, codeByName, ::isAsset)
+    fun missingCodes(
+        strategy: CsvImportStrategy,
+        rawCodes: Set<String>,
+    ): Set<String> =
+        rawCodes.mapNotNullTo(mutableSetOf()) { raw ->
+            val code = resolveAssetCode(strategy.config.assetCodes.canonical(raw), aliases, codeByName, ::isAsset)
+            code.takeIf { it.isNotEmpty() && !isAsset(it) }
+        }
 }
 
 /**
- * Scans [rows] of [strategy]'s currency-lookup columns and returns every non-fiat ticker not already
- * a [known] asset. Any non-fiat code qualifies (unconditional — no per-strategy flag).
- * Pure; does not create anything.
+ * Reads the distinct values the strategy uses as asset codes, after its record rewrites.
+ * The values can be resolved again against a newer asset catalog without reopening the staged rows.
  */
-private fun collectCryptoCodes(
+private suspend fun collectAssetCodes(
     strategy: CsvImportStrategy,
     columns: List<CsvColumn>,
     fileName: String,
-    rows: List<CsvRow>,
-    known: KnownAssets,
+    readRows: suspend () -> List<CsvRow>,
 ): Set<String> {
     val indexByName = columnIndexWithRuleColumns(columns, strategy.config)
 
@@ -368,22 +394,26 @@ private fun collectCryptoCodes(
 
     val rules = RuleEvaluator()
     val engine = RuleEngine(rules)
+    // Only rewrites and actions that control evaluation affect the record left for the currency expressions.
+    val recordRules =
+        strategy.config.rules.mapNotNull { rule ->
+            val actions =
+                rule.actions.filter { action ->
+                    when (action) {
+                        is RuleAction.SwapValues, is RuleAction.SetValue, is RuleAction.Capture, RuleAction.Skip -> true
+                        else -> false
+                    }
+                }
+            rule.copy(actions = actions).takeIf { actions.isNotEmpty() }
+        }
     val codes = mutableSetOf<String>()
-    for (row in rows) {
+    for (row in readRows()) {
         // The code is read as the strategy's rules leave the row, as the mapper reads it.
-        val record =
-            engine
-                .evaluate(
-                    strategy.config.rules,
-                    ColumnRecord(row.values.withFileName(indexByName, fileName), indexByName),
-                ).record
+        val base = ColumnRecord(row.values.withFileName(indexByName, fileName), indexByName)
+        val record = if (recordRules.isEmpty()) base else engine.evaluate(recordRules, base).record
         for (expr in readableExprs) {
             val raw = rules.resolve(expr) { record.text(it)?.trim() }
-            if (raw.isBlank()) continue
-            val code = known.resolve(strategy.config.assetCodes.canonical(raw))
-            if (code.isNotEmpty() && !known.isAsset(code)) {
-                codes += code
-            }
+            if (raw.isNotBlank()) codes += raw
         }
     }
     return codes
@@ -450,9 +480,10 @@ suspend fun bulkApplyCsv(
 
     // Stage every file and create every crypto asset the batch needs up front, sized to the batch-wide max precision
     // per ticker, so cross-file ordering never leaves a ticker missing or a scale factor too small.
-    prepareImports(imports, strategies, currencies, csvImportRepository, importEngine, cryptoRepository) { index, file ->
-        tracker.prepared(index, "Prepared", fileLabel(file))
-    }
+    val scans =
+        prepareImports(imports, strategies, currencies, csvImportRepository, importEngine, cryptoRepository) { index, file ->
+            tracker.prepared(index, "Prepared", fileLabel(file))
+        }
 
     imports.forEachIndexed { index, listedImport ->
         // Once stopped, every remaining file is counted rather than started.
@@ -506,6 +537,10 @@ suspend fun bulkApplyCsv(
                     attributeAccountMatchers = attributeAccountMatchers,
                     tradeRepository = tradeRepository,
                     syncMatches = false,
+                    preparedAssetCodes =
+                        scans[csvImport.id]
+                            ?.takeIf { it.strategy == matched && it.staged.hasSameRowsAs(csvImport) }
+                            ?.codes,
                 )
             if (result == null) {
                 outcome(BulkFileStatus.NOTHING_TO_IMPORT)
@@ -560,12 +595,15 @@ suspend fun applyStagedCsv(
     attributeAccountMatchers: Map<String, AttributeAccountMatcher> = emptyMap(),
     tradeRepository: TradeReadRepository? = null,
     syncMatches: Boolean = true,
+    // Raw codes from the batch preflight for this file and strategy.
+    preparedAssetCodes: Set<String>? = null,
 ): CsvImportResult? {
     // The staged rows must be the ones the strategy reads: an Excel import is initially staged from the workbook's
     // FIRST worksheet, but the strategy may target a different sheet, and a PDF import's rows are whatever its
     // strategy's line rules assemble. Re-stage before reading rows so everything downstream sees those.
     val stagedImport = restageForStrategy(csvImport, strategy, csvImportRepository, importEngine)
 
+    onProgress?.invoke(Progress("Loading rows"))
     val allRows = csvImportRepository.getImportRows(stagedImport.id, limit = stagedImport.rowCount.coerceAtLeast(1), offset = 0)
     val unprocessedRows = allRows.filter { it.importStatus == null || it.importStatus == ImportStatus.ERROR }
     // A strategy that assembles a trade from a whole row group must see the group whole: mapping only
@@ -596,8 +634,12 @@ suspend fun applyStagedCsv(
     // On-demand: create a crypto asset for every non-fiat ticker appearing in the strategy's currency
     // column, so rows denominated in crypto resolve to a real crypto asset (upsert = idempotent on
     // re-import). No-op unless a CryptoReadRepository is supplied and the currency column carries crypto.
+    onProgress?.invoke(Progress("Mapping rows"))
     val cryptoAssets =
-        ensureCryptoAssets(strategy, stagedImport.columns, stagedImport.originalFileName, rows, currencies, importEngine, cryptoRepository)
+        ensureScannedCryptoAssets(strategy, importEngine, cryptoRepository, currencies) {
+            preparedAssetCodes?.takeIf { stagedImport === csvImport && rows.size == allRows.size }
+                ?: collectAssetCodes(strategy, stagedImport.columns, stagedImport.originalFileName) { rows }
+        }
     val assetAliases = cryptoRepository?.assetAliasMap().orEmpty()
 
     // Re-fetch accounts so payee accounts created by earlier files in the same scan are seen.
@@ -674,6 +716,7 @@ suspend fun applyStagedCsv(
             .mapNotNullTo(mutableSetOf()) { it.transferId }
     val booked = result.copy(createdTransferIds = created)
     if (!syncMatches) return booked
+    onProgress?.invoke(Progress("Matching observations"))
     return booked.foldedInto(importEngine.import(ImportBatch(syncMatches = true)).matchSync.deleted)
 }
 
@@ -1009,8 +1052,8 @@ suspend fun runCsvImport(
     // some of its legs missing; transfers are then still emitted only for the rows named here.
     unprocessedRowIndexes: Set<Long> = rows.mapTo(mutableSetOf()) { it.rowIndex },
     tradeRepository: TradeReadRepository? = null,
-    // The accounts the strategy sees, when the caller has just read them to build [basePrep].
     foreignFiles: List<ForeignFile> = emptyList(),
+    // Supplies the account snapshot used by a freshly computed basePrep for these exact rows and settings.
     visibleAccounts: List<Account>? = null,
 ): CsvImportResult {
     logger.i { "Starting CSV import with ${basePrep.validTransfers.size} valid transfers" }
@@ -1050,49 +1093,50 @@ suspend fun runCsvImport(
     // so these would be redundant (and, stored globally, would leak across strategies). Only explicit
     // "map to existing account" selections are persisted (above), since those are not re-derivable.
 
-    // Re-map with new account IDs
-    logger.i { "Re-mapping transfers with updated account IDs" }
-    val updatedAccounts = if (accountsToCreate.isEmpty()) knownAccounts else accountRepository.accountsVisibleTo(strategy)
-    val accountsByName = updatedAccounts.associateBy { it.name }
-    val currenciesById = currencies.associateBy { it.id }
-    val currenciesByCode = currencies.associateBy { it.code.uppercase() }
-
-    // Duplicate detection now happens inside the central import engine, which
-    // loads existing transfers itself — the mapper only maps rows to transfers.
-    val latestAccountMappings =
-        accountMappingRepository.getAllMappings().first()
-    val historicalAccountNames = accountRepository.getPreviousAccountNames()
-
-    val accountOwnerNames = accountRepository.getAccountOwnerNames()
-
-    // A row's `(file name)` is its own file's, so another staged file's legs are mapped with that file's name.
-    fun mapperFor(fileName: String) =
-        CsvTransferMapper(
-            strategy = strategy,
-            columns = columns,
-            existingAccounts = accountsByName,
-            existingCurrencies = currenciesById,
-            existingCurrenciesByCode = currenciesByCode,
-            existingCryptoByCode = cryptoAssets.associateBy { it.code.uppercase() },
-            assetAliases = assetAliases,
-            accountMappings = latestAccountMappings,
-            historicalAccountNames = historicalAccountNames,
-            sourceAccountOverride = selectedSourceAccountId,
-            passThroughDetector = passThroughAccounts.takeIf { it.isNotEmpty() }?.let { PassThroughDetector(it) },
-            attributeAccountMatchers = attributeAccountMatchers,
-            fileName = fileName,
-            accountOwnerNames = accountOwnerNames,
-        )
-
-    val mapper = mapperFor(csvImport.originalFileName)
-
     // Handle case when all rows are already processed (rows is already filtered by the caller)
     if (rows.isEmpty()) {
         logger.i { "No rows to process - all rows already imported" }
         return CsvImportResult(successCount = 0, failedRows = emptyList())
     }
 
-    val mappedPrep = mapper.prepareImport(rows).withUnresolvedAccountsAsErrors()
+    // An interactive preview may use different settings from the final import. The unattended path just
+    // prepared these rows with the final settings, so it only needs to remap when account resolution changed.
+    val reusePreparation = visibleAccounts != null && accountsToCreate.isEmpty() && selectedMappingsToPersist.isEmpty()
+    val updatedAccounts = if (accountsToCreate.isEmpty()) knownAccounts else accountRepository.accountsVisibleTo(strategy)
+    val accountsByName = updatedAccounts.associateBy { it.name }
+    val mapperFor: ((String) -> CsvTransferMapper)? =
+        if (reusePreparation && foreignFiles.isEmpty()) {
+            null
+        } else {
+            val currenciesById = currencies.associateBy { it.id }
+            val currenciesByCode = currencies.associateBy { it.code.uppercase() }
+            val cryptoByCode = cryptoAssets.associateBy { it.code.uppercase() }
+            val latestAccountMappings = accountMappingRepository.getAllMappings().first()
+            val historicalAccountNames = accountRepository.getPreviousAccountNames()
+            val accountOwnerNames = accountRepository.getAccountOwnerNames()
+            // Rules see the name of the file each row came from, including rows from other staged files.
+            val buildMapper: (String) -> CsvTransferMapper = { fileName ->
+                CsvTransferMapper(
+                    strategy = strategy,
+                    columns = columns,
+                    existingAccounts = accountsByName,
+                    existingCurrencies = currenciesById,
+                    existingCurrenciesByCode = currenciesByCode,
+                    existingCryptoByCode = cryptoByCode,
+                    assetAliases = assetAliases,
+                    accountMappings = latestAccountMappings,
+                    historicalAccountNames = historicalAccountNames,
+                    sourceAccountOverride = selectedSourceAccountId,
+                    passThroughDetector = passThroughAccounts.takeIf { it.isNotEmpty() }?.let { PassThroughDetector(it) },
+                    attributeAccountMatchers = attributeAccountMatchers,
+                    fileName = fileName,
+                    accountOwnerNames = accountOwnerNames,
+                )
+            }
+            buildMapper
+        }
+    val preparation = if (reusePreparation) basePrep else checkNotNull(mapperFor)(csvImport.originalFileName).prepareImport(rows)
+    val mappedPrep = preparation.withUnresolvedAccountsAsErrors()
     // Each account a row charges a fee to pays it into its own fee account (per-row fees are their own movements, linked to
     // the main transfer), and so does a row that is itself a fee (its `Fee` is all of its amount). The engine resolves them.
     val feeAccountOf: Map<AccountId, AccountId> =
@@ -1109,6 +1153,7 @@ suspend fun runCsvImport(
         if (foreignFiles.isEmpty()) {
             emptyList()
         } else {
+            val foreignMapper = checkNotNull(mapperFor)
             val crossFileRules =
                 strategy.config.legGroups
                     .withIndex()
@@ -1118,7 +1163,7 @@ suspend fun runCsvImport(
                     .toSet()
             foreignFiles
                 .flatMap { file ->
-                    mapperFor(file.fileName).prepareImport(file.rows).validTransfers.filter { it.groupLeg?.ruleIndex in crossFileRules }
+                    foreignMapper(file.fileName).prepareImport(file.rows).validTransfers.filter { it.groupLeg?.ruleIndex in crossFileRules }
                 }.distinctForeignLegs(finalPrep.validTransfers, strategy.config.uniqueIdentifierAttributeTypes().toSet())
         }
     val validCount = finalPrep.validTransfers.size

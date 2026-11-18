@@ -326,6 +326,78 @@ class ShapeMatcherTest {
         assertEquals(ExclusionLinkChanges(add = emptyList(), remove = listOf(link)), exclusionLinkChanges(listOf(link), after))
     }
 
+    @Test
+    fun `elapsed bounds skip unrelated conduit history without changing split links`() {
+        val records =
+            (0 until 256).flatMap { index ->
+                val hour = index * 48
+                listOf(
+                    record("deposit-$index", "statement", leg(MAIN, PLACEHOLDER, PAYPAL, 30, ObservationEnd.SOURCE, hour)),
+                    record("first-$index", "card", chain(CARD, PAYPAL, MERCHANT, 13, hour = hour)),
+                    record("second-$index", "card", chain(CARD, PAYPAL, MERCHANT, 17, hour = hour - 1)),
+                )
+            }
+        val scope = records.flatMap { it.observations }
+        val elapsed = ShapeWindow.elapsed(2.hours)
+        var fullChecks = 0
+        val full =
+            ShapeMatcher { a, b ->
+                fullChecks++
+                elapsed.holds(a, b)
+            }.match(scope)
+        var indexedChecks = 0
+        val indexed =
+            ShapeMatcher(
+                object : ShapeWindow by elapsed {
+                    override fun holds(
+                        a: MatchObservation,
+                        b: MatchObservation,
+                    ): Boolean {
+                        indexedChecks++
+                        return elapsed.holds(a, b)
+                    }
+                },
+            ).match(scope)
+        assertEquals(full.links, indexed.links)
+        assertEquals(256, indexed.links.size)
+        assertEquals(256 * 512, fullChecks)
+        assertEquals(512, indexedChecks)
+    }
+
+    @Test
+    fun `bounds keep a chain whose approximate time overlaps the conduit statement`() {
+        val statement = record("deposit", "statement", leg(MAIN, PLACEHOLDER, PAYPAL, 30, ObservationEnd.SOURCE))
+        val early = record("first", "card", chain(CARD, PAYPAL, MERCHANT, 13, hour = -48))
+        val nearby = record("second", "card", chain(CARD, PAYPAL, MERCHANT, 17))
+        val scope =
+            statement.observations + nearby.observations +
+                early.observations.map { it.copy(crossSource = CrossSourceFacts(approximateUntil = T0)) }
+        val window =
+            object : ShapeWindow {
+                private fun start(observation: MatchObservation): Instant =
+                    (observation.content.values as ObservedValues.Transfer).timestamp
+
+                private fun end(observation: MatchObservation): Instant =
+                    maxOf(start(observation), observation.crossSource.approximateUntil ?: start(observation))
+
+                override fun candidateBounds(
+                    observation: MatchObservation,
+                    otherFamily: String,
+                ): ClosedRange<Instant> = (start(observation) - 2.hours)..(end(observation) + 2.hours)
+
+                override fun holds(
+                    a: MatchObservation,
+                    b: MatchObservation,
+                ): Boolean = maxOf(start(a) - end(b), start(b) - end(a)) <= 2.hours
+            }
+        val link = ShapeMatcher(window).match(scope).links.single()
+        assertEquals(ShapeReason.SPLIT_CONDUIT, link.reason)
+        assertEquals(
+            setOf(key("deposit", MAIN), key("first", MAIN), key("second", MAIN)),
+            link.matched.keys(listOf(statement, early, nearby)),
+        )
+    }
+
     // ---- fixtures ----
 
     private class Leg(

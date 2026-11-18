@@ -155,7 +155,16 @@ internal class Context(
         val y = b.content.values as ObservedValues.Transfer
         val untilA = a.crossSource.approximateUntil
         val untilB = b.crossSource.approximateUntil
-        val calendar = calendarFor(listOf(x.sourceAccountId, x.targetAccountId, y.sourceAccountId, y.targetAccountId).distinct())
+        val calendar =
+            when (window) {
+                is SettlementWindow.Elapsed -> {
+                    WeekendOnlyCalendar
+                }
+
+                is SettlementWindow.BusinessDays -> {
+                    calendarFor(listOf(x.sourceAccountId, x.targetAccountId, y.sourceAccountId, y.targetAccountId).distinct())
+                }
+            }
         if (!window.meets(x.timestamp, untilA, y.timestamp, untilB, calendar)) return null
         return spanGap(x.timestamp, untilA, y.timestamp, untilB)
     }
@@ -186,7 +195,12 @@ private fun spanGap(
 private fun nearest(
     a: Long?,
     b: Long?,
-): Long? = listOfNotNull(a, b).minOrNull()
+): Long? =
+    when {
+        a == null -> b
+        b == null -> a
+        else -> minOf(a, b)
+    }
 
 private fun ObservedValues.Transfer.at(end: ObservationEnd): AccountId =
     when (end) {
@@ -317,11 +331,22 @@ internal class BridgeRule(
     context: Context,
 ) : CrossSourceRule(context) {
     override val name = "internal-transfer bridge"
+    private val appAccounts =
+        context.policies.values
+            .flatMap { it.bridges }
+            .mapTo(mutableSetOf()) { it.appAccountId }
+    private val exchangeAccounts =
+        context.policies.mapValues { (_, policy) ->
+            policy.bridges.mapTo(mutableSetOf()) { it.exchangeAccountId }
+        }
 
     override fun bucket(observation: MatchObservation): Any? {
         val values = context.eligible(observation) ?: return null
-        if (context.policies.values.none { it.bridges.isNotEmpty() }) return null
-        return values.assetId
+        val exchanges = exchangeAccounts[observation.family].orEmpty()
+        val canBridge =
+            values.sourceAccountId in exchanges || values.targetAccountId in exchanges ||
+                values.sourceAccountId in appAccounts || values.targetAccountId in appAccounts
+        return values.assetId.takeIf { canBridge }
     }
 
     override fun oneWay(

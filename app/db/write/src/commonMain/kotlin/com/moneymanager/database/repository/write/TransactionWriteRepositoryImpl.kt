@@ -22,6 +22,8 @@ import com.moneymanager.domain.repository.write.TransferUpdate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+private const val MAX_TRANSFER_DELETE_IDS = 999
+
 class TransactionWriteRepositoryImpl(
     private val database: MoneyManagerDatabaseWrapper,
     private val deviceId: DeviceId,
@@ -268,12 +270,12 @@ class TransactionWriteRepositoryImpl(
                         }
                     }
                     // Record the source against the new revision.
-                    val persisted = transferSelectQueries.selectById(updatedTransfer.id.id, TransferMapper::mapRaw).awaitAsOne()
+                    val revision = transferSelectQueries.selectRevisionById(updatedTransfer.id.id).awaitAsOne()
                     database.recordSource(
                         deviceId,
                         EntityType.TRANSFER,
-                        persisted.id.id,
-                        persisted.revisionId,
+                        updatedTransfer.id.id,
+                        revision,
                         updateSources[index],
                     )
                 }
@@ -353,8 +355,11 @@ class TransactionWriteRepositoryImpl(
 
     override suspend fun deleteTransactions(ids: Collection<TransferId>): Unit =
         withContext(Dispatchers.Default) {
+            if (ids.isEmpty()) return@withContext
             transferWriteQueries.transaction {
-                ids.forEach { transferWriteQueries.delete(it.id) }
+                ids.chunked(MAX_TRANSFER_DELETE_IDS).forEach { chunk ->
+                    transferWriteQueries.deleteByIds(chunk.map { it.id })
+                }
             }
         }
 }

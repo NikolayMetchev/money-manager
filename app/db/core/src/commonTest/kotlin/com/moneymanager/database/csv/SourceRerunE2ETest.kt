@@ -369,7 +369,8 @@ class SourceRerunE2ETest : DbTest() {
             val second = stage("MonzoDataExport-later.csv", listOf(row("tx_2", "Bakery", "-2.00", "Bread")))
             apply(second, monzo)
 
-            val reimports = repositories.reimports(maintenance)
+            val before = transfersOn(monzo).map { it.id }.toSet()
+            val reimports = repositories.reimports(maintenance, skipUnchanged = false)
             val progress = mutableListOf<Progress>()
             reimports.reimportAll(
                 reimports.planAll(listOf(reload(first.id), reload(second.id))),
@@ -393,6 +394,8 @@ class SourceRerunE2ETest : DbTest() {
             assertEquals(0f, files.first().fraction, "the files start the bar again: $files")
             assertProgressesTo(files, "Refreshing views")
             assertEquals(1f, files.last().fraction, "the steps after the last file keep the files' bar full")
+            assertEquals(1, files.count { it.detail == "Matching observations" })
+            assertEquals(before, transfersOn(monzo).map { it.id }.toSet())
         }
 
     private fun assertProgressesTo(

@@ -877,7 +877,7 @@ suspend fun importApiSessionExchange(
     val existingCrypto = cryptoRepository.getAllCryptoAssets().first()
     val fiatByCode = fiat.associateBy { it.code.uppercase() }
     val existingCryptoCodes = existingCrypto.mapTo(mutableSetOf()) { it.code.uppercase() }
-    val assetCodeByName = codesByName(fiat.map { it.code to it.name } + existingCrypto.map { it.code to it.name })
+    val assetCodeByName = lazy { codesByName(fiat.map { it.code to it.name } + existingCrypto.map { it.code to it.name }) }
     val assetAliases = cryptoRepository.assetAliasMap()
 
     // Normalize provider-specific asset codes before any currency/crypto lookup — strip a sub-holding

@@ -21,7 +21,14 @@ class AssetAliasTest {
         aliases: Map<String, String> = emptyMap(),
         assets: Set<String> = emptySet(),
         codeByName: Map<String, String> = emptyMap(),
-    ) = resolveAssetCode(code, aliases, codeByName) { it in assets }
+    ) = resolveAssetCode(code, aliases, lazyOf(codeByName)) { it in assets }
+
+    @Test
+    fun `known codes and aliases resolve without indexing names`() {
+        val names = lazy<Map<String, String>> { error("A code lookup must not build the name index") }
+        assertEquals("GBP", resolveAssetCode("GBP", emptyMap(), names) { it == "GBP" })
+        assertEquals("GBP", resolveAssetCode("STERLING", mapOf("STERLING" to "GBP"), names) { it == "GBP" })
+    }
 
     private val currencyNames = codesByName(listOf("EUR" to "Euro", "USD" to "US Dollar", "GBP" to "British Pound", "XAU" to "Gold"))
 

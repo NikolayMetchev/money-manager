@@ -31,6 +31,9 @@ WHERE id = ?;
 delete:
 DELETE FROM transfer WHERE id = ?;
 
+deleteByIds:
+DELETE FROM transfer WHERE id IN :ids;
+
 bumpRevisionOnly:
 UPDATE transfer
 SET revision_id = revision_id + 1

@@ -100,9 +100,10 @@ internal class MatchSync(
                     families,
                     MatchScopeLoader.containerAccounts(scope),
                     calendarFor,
+                    stageReasons = WRITTEN_STAGE_REASONS,
                 ).match(twins, pins, splits)
         val moved = result.changes.mapTo(mutableSetOf()) { it.ref }
-        val wanted = links + result.exclusions.filter { it.reason in WRITTEN_STAGE_REASONS && !it.holdsApart(apart) }
+        val wanted = links + result.exclusions.filterNot { it.holdsApart(apart) }
         val (writable, held) = wanted.partition { link -> (link.matched + link.excluded).none { it in moved } }
         val relinked = syncLinks(writable, held, scope)
         if (result.changes.isEmpty() && relinked.isEmpty()) return MaterializationReport()

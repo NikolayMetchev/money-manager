@@ -13,7 +13,7 @@ import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
 
 class ImportRecordWriteRepositoryImpl(
-    database: MoneyManagerDatabaseWrapper,
+    private val database: MoneyManagerDatabaseWrapper,
     reader: ImportRecordReadRepository,
     private val coroutineContext: CoroutineContext = Dispatchers.Default,
 ) : ImportRecordWriteRepository,
@@ -26,22 +26,20 @@ class ImportRecordWriteRepositoryImpl(
         contentHash: String,
     ): ImportRecordId =
         withContext(coroutineContext) {
-            queries.transactionWithResult {
-                queries.insertRecord(contentHash)
-                val id = queries.lastInsertedId().awaitAsOne()
-                when (key) {
-                    is ImportRecordKey.CsvRow -> queries.insertCsvRecord(id, key.csvImportId.id.toString(), key.rowIndex)
-                    is ImportRecordKey.ApiItem -> queries.insertApiRecord(id, key.sessionId.id, key.requestId.id, key.jsonPath)
-                }
-                ImportRecordId(id)
-            }
+            queries.transactionWithResult { database.insertImportRecord(key, contentHash) }
         }
 
-    override suspend fun updateContentHash(
-        id: ImportRecordId,
-        contentHash: String,
+    override suspend fun writeRecords(
+        inserts: Map<ImportRecordKey, String>,
+        hashes: Map<ImportRecordId, String>,
     ) {
-        withContext(coroutineContext) { queries.updateContentHash(contentHash, id.id) }
+        if (inserts.isEmpty() && hashes.isEmpty()) return
+        withContext(coroutineContext) {
+            queries.transaction {
+                inserts.forEach { (key, hash) -> database.insertImportRecord(key, hash) }
+                hashes.forEach { (id, hash) -> queries.updateContentHash(hash, id.id) }
+            }
+        }
     }
 
     override suspend fun deleteRecord(id: ImportRecordId) {
@@ -71,4 +69,18 @@ class ImportRecordWriteRepositoryImpl(
     override suspend fun deleteGroup(groupId: ImportGroupId) {
         withContext(coroutineContext) { queries.deleteGroup(groupId.id) }
     }
+}
+
+internal suspend fun MoneyManagerDatabaseWrapper.insertImportRecord(
+    key: ImportRecordKey,
+    contentHash: String,
+): ImportRecordId {
+    val queries = importRecordWriteQueries
+    queries.insertRecord(contentHash)
+    val id = queries.lastInsertedId().awaitAsOne()
+    when (key) {
+        is ImportRecordKey.CsvRow -> queries.insertCsvRecord(id, key.csvImportId.id.toString(), key.rowIndex)
+        is ImportRecordKey.ApiItem -> queries.insertApiRecord(id, key.sessionId.id, key.requestId.id, key.jsonPath)
+    }
+    return ImportRecordId(id)
 }

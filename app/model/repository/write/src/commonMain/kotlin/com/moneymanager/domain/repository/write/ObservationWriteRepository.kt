@@ -8,6 +8,7 @@ import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.MergeId
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.observation.ImportRecordId
+import com.moneymanager.domain.model.observation.ImportRecordKey
 import com.moneymanager.domain.model.observation.MaterializedWrite
 import com.moneymanager.domain.model.observation.ObservationChange
 import com.moneymanager.domain.model.observation.ObservationContent
@@ -19,12 +20,19 @@ import kotlin.time.Instant
 interface ObservationWriteRepository : ObservationReadRepository {
     suspend fun changeToken(): Long
 
-    /** Commits a plan's observation and effective row changes together, returning real ids for its provisional ids. */
+    /** Creates each new record and its observations in one transaction. */
+    suspend fun insertRecordObservations(
+        contentHash: String,
+        observations: List<RecordObservationInsert>,
+    ): Map<ImportRecordKey, ImportRecordId>
+
+    /** Commits observation and effective row changes together, clearing reclaimed reservations and resolving provisional ids. */
     suspend fun applyObservationChanges(
         newTransactions: Collection<TransactionId>,
         observations: List<ObservationChange>,
         rows: List<MaterializedWrite>,
         csv: CsvObservationCommit? = null,
+        reclaimed: Collection<ObservationId> = emptyList(),
     ): Map<TransactionId, TransactionId>
 
     /** Records what [owner] says about [slot], on [transactionId]; an owner's slot already recorded fails. */
@@ -83,6 +91,13 @@ interface ObservationWriteRepository : ObservationReadRepository {
         restoredAccountId: AccountId,
     )
 }
+
+data class RecordObservationInsert(
+    val record: ImportRecordKey,
+    val slot: String,
+    val transactionId: TransactionId,
+    val content: ObservationContent,
+)
 
 /** The staging write-backs that must commit with the refreshed observations. */
 data class CsvObservationCommit(

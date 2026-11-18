@@ -4,8 +4,10 @@ import com.moneymanager.bigdecimal.BigInteger
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.observation.ObservationEnd
 import com.moneymanager.domain.model.observation.ObservationOwner
+import com.moneymanager.domain.model.observation.ObservedAssetId
 import com.moneymanager.domain.model.observation.ObservedValues
 import kotlin.time.Duration
+import kotlin.time.Instant
 
 /** Whether two observations are close enough in time to be records of one movement. Must be symmetric. */
 fun interface ShapeWindow {
@@ -14,12 +16,29 @@ fun interface ShapeWindow {
         b: MatchObservation,
     ): Boolean
 
+    /** A candidate's time span must intersect these bounds, if a conservative bound is available. */
+    fun candidateBounds(
+        observation: MatchObservation,
+        otherFamily: String,
+    ): ClosedRange<Instant>? = null
+
     companion object {
         /** Clock time: at most [limit] apart. */
         fun elapsed(limit: Duration): ShapeWindow =
-            ShapeWindow { a, b ->
-                (a.transfer().timestamp - b.transfer().timestamp).absoluteValue <=
-                    limit
+            object : ShapeWindow {
+                override fun holds(
+                    a: MatchObservation,
+                    b: MatchObservation,
+                ): Boolean = (a.transfer().timestamp - b.transfer().timestamp).absoluteValue <= limit
+
+                override fun candidateBounds(
+                    observation: MatchObservation,
+                    otherFamily: String,
+                ): ClosedRange<Instant> {
+                    val timestamp = observation.transfer().timestamp
+                    val reach = limit.coerceAtLeast(Duration.ZERO)
+                    return (timestamp - reach)..(timestamp + reach)
+                }
             }
     }
 }
@@ -190,12 +209,23 @@ class ShapeMatcher(
         chains: List<ChainMovement>,
         byOwner: Map<ObservationOwner, List<MatchObservation>>,
     ): List<Candidate> {
-        val byConduit = chains.groupBy { it.conduit to it.observation.transfer().assetId }
+        val byConduit =
+            chains
+                .withIndex()
+                .groupBy { (_, chain) -> chain.conduit to chain.observation.transfer().assetId }
+                .mapValues { (_, entries) ->
+                    entries.groupBy { it.value.observation.family }.mapValues { (_, family) -> ChainHistory(family) }
+                }
         return placeholders.flatMap { p ->
             val values = p.observation.transfer()
             byConduit[p.conduit to values.assetId]
                 .orEmpty()
-                .filter { apart(p.observation, it.observation) && window.holds(p.observation, it.observation) }
+                .flatMap { (family, history) ->
+                    history
+                        .candidates(window.candidateBounds(p.observation, family))
+                        .filter { (_, chain) -> apart(p.observation, chain.observation) && window.holds(p.observation, chain.observation) }
+                }.sortedBy { it.index }
+                .map { it.value }
                 .groupBy { it.merchant }
                 .values
                 .flatMap { group ->
@@ -229,6 +259,51 @@ class ShapeMatcher(
         }
     }
 
+    private class ChainHistory(
+        private val chains: List<IndexedValue<ChainMovement>>,
+    ) {
+        private val byStart =
+            chains.sortedBy {
+                it.value.observation
+                    .transfer()
+                    .timestamp
+            }
+        private val longestSpan =
+            chains.maxOf { (_, chain) ->
+                val start = chain.observation.transfer().timestamp
+                maxOf(start, chain.observation.crossSource.approximateUntil ?: start) - start
+            }
+
+        fun candidates(bounds: ClosedRange<Instant>?): List<IndexedValue<ChainMovement>> {
+            if (bounds == null) return chains
+            // A chain that starts before the window can still overlap it if its time is approximate.
+            val lower = bounds.start - longestSpan
+            val first = lowerBound { it >= lower }
+            val end = lowerBound { it > bounds.endInclusive }
+            return byStart.subList(first, end)
+        }
+
+        private inline fun lowerBound(reached: (Instant) -> Boolean): Int {
+            var low = 0
+            var high = byStart.size
+            while (low < high) {
+                val mid = low + (high - low) / 2
+                if (reached(
+                        byStart[mid]
+                            .value.observation
+                            .transfer()
+                            .timestamp,
+                    )
+                ) {
+                    high = mid
+                } else {
+                    low = mid + 1
+                }
+            }
+            return low
+        }
+    }
+
     /**
      * Every net leg with its fee against a single leg of another container through the same account, same direction,
      * that moves the account's balance by exactly as much. The single leg's far end is a placeholder or the net leg's.
@@ -237,10 +312,23 @@ class ShapeMatcher(
         transfers: List<MatchObservation>,
         byOwner: Map<ObservationOwner, List<MatchObservation>>,
     ): List<Candidate> {
+        data class Flow(
+            val account: AccountId,
+            val inflow: Boolean,
+            val asset: ObservedAssetId,
+            val amount: BigInteger,
+        )
+
         val singles =
             transfers
                 .filter { it.ref.slot == MAIN && byOwner.getValue(it.ref.owner).none { o -> o.ref.slot == FEE } }
-                .groupBy { it.transfer().assetId }
+                .flatMap { gross ->
+                    val values = gross.transfer()
+                    listOf(
+                        Flow(values.targetAccountId, true, values.assetId, values.amount) to gross,
+                        Flow(values.sourceAccountId, false, values.assetId, values.amount) to gross,
+                    )
+                }.groupBy({ it.first }, { it.second })
         return byOwner.values.flatMap { observations ->
             val net = observations.firstOrNull { it.ref.slot == MAIN } ?: return@flatMap emptyList()
             val fee = observations.firstOrNull { it.ref.slot == FEE } ?: return@flatMap emptyList()
@@ -257,15 +345,13 @@ class ShapeMatcher(
                 }
             val effect = (if (inflow) n.amount else -n.amount) - f.amount
             val netFar = if (inflow) n.sourceAccountId else n.targetAccountId
-            singles[n.assetId].orEmpty().mapNotNull { gross ->
+            val flow = Flow(owned, inflow, n.assetId, if (inflow) effect else -effect)
+            singles[flow].orEmpty().mapNotNull { gross ->
                 val g = gross.transfer()
-                val grossOwned = if (inflow) g.targetAccountId else g.sourceAccountId
                 val grossFar = if (inflow) g.sourceAccountId else g.targetAccountId
                 val farEnd = if (inflow) ObservationEnd.SOURCE else ObservationEnd.TARGET
                 val matches =
-                    grossOwned == owned &&
-                        (if (inflow) g.amount else -g.amount) == effect &&
-                        (grossFar == netFar || farEnd in gross.content.facts.placeholderEnds) &&
+                    (grossFar == netFar || farEnd in gross.content.facts.placeholderEnds) &&
                         gross.content.facts.placeholderEnds
                             .none { it != farEnd } &&
                         apart(gross, net) &&

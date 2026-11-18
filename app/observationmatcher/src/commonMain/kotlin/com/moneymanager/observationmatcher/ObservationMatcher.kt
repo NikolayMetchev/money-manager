@@ -165,21 +165,42 @@ class ObservationMatcher(
 
     /** Every pair a rule finds, best first; [Candidate.a] is before [Candidate.b] in the matcher's order. */
     private fun candidatePairs(observations: List<MatchObservation>): List<Candidate> =
-        rules
-            .flatMapIndexed { rank, rule ->
-                observations.indices
-                    .mapNotNull { i -> rule.bucket(observations[i])?.let { it to i } }
-                    .groupBy({ it.first }, { it.second })
-                    .values
-                    .flatMap { bucket ->
-                        bucket.flatMapIndexed { position, a ->
-                            bucket.drop(position + 1).mapNotNull { b ->
-                                if (!admits(rule, observations[a], observations[b])) return@mapNotNull null
-                                rule.distance(observations[a], observations[b])?.let { Candidate(rank, it, a, b) }
+        buildList {
+            rules.forEachIndexed { rank, rule ->
+                val buckets = mutableMapOf<Any, MutableList<Int>>()
+                for ((index, observation) in observations.withIndex()) {
+                    val key = rule.bucket(observation) ?: continue
+                    buckets.getOrPut(key) { mutableListOf() }.add(index)
+                }
+
+                fun addPair(
+                    first: Int,
+                    second: Int,
+                ) {
+                    val a = minOf(first, second)
+                    val b = maxOf(first, second)
+                    rule.distance(observations[a], observations[b])?.let { add(Candidate(rank, it, a, b)) }
+                }
+                for (bucket in buckets.values) {
+                    if (bucket.size < 2) continue
+                    if (rule.joinsSameContainer) {
+                        for (i in bucket.indices) {
+                            for (j in i + 1 until bucket.size) addPair(bucket[i], bucket[j])
+                        }
+                    } else {
+                        // A large bucket can consist entirely of rows of one statement, especially for bridge rules.
+                        val containers = bucket.groupBy { observations[it].container }.values.toList()
+                        for (i in containers.indices) {
+                            for (j in i + 1 until containers.size) {
+                                for (a in containers[i]) {
+                                    for (b in containers[j]) addPair(a, b)
+                                }
                             }
                         }
                     }
-            }.sortedWith(compareBy(Candidate::rank, Candidate::distance, Candidate::a, Candidate::b))
+                }
+            }
+        }.sortedWith(compareBy(Candidate::rank, Candidate::distance, Candidate::a, Candidate::b))
 
     private fun admits(
         rule: PairRule,

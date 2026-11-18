@@ -42,9 +42,16 @@ class TradeReadRepositoryImpl(
 
     override fun getTradeById(id: TradeId): Flow<Trade?> =
         selectQueries
-            .selectById(id.id, TradeMapper::mapRaw)
+            .selectByIds(listOf(id.id), TradeMapper::mapRaw)
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
+
+    override suspend fun getTradesByIds(ids: Collection<TradeId>): List<Trade> =
+        withContext(Dispatchers.Default) {
+            queryInChunks(ids.map { it.id }, MAX_IDS_PER_QUERY) { chunk ->
+                selectQueries.selectByIds(chunk, TradeMapper::mapRaw).awaitAsList()
+            }
+        }
 
     override fun getTradesByAccount(accountId: AccountId): Flow<List<Trade>> =
         selectQueries

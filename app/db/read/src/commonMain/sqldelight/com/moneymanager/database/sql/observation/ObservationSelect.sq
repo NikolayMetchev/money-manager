@@ -11,12 +11,44 @@ JOIN observation_owner ON observation_owner.observation_id = observation.id
 WHERE observation_owner.owner_kind = ? AND observation_owner.owner_id = ?
 ORDER BY observation_owner.slot;
 
-selectHeadersByTransaction:
+selectHeadersByTransactions:
 SELECT observation.id, observation.transaction_id, observation.kind, observation_owner.owner_kind, observation_owner.owner_id, observation_owner.slot
 FROM observation
 JOIN observation_owner ON observation_owner.observation_id = observation.id
-WHERE observation.transaction_id = ?
+WHERE observation.transaction_id IN ?
 ORDER BY observation.id;
+
+selectHeadersByRecords:
+SELECT observation.id, observation.transaction_id, observation.kind, 'RECORD' AS owner_kind, observation_record.record_id, observation_record.slot
+FROM observation_record
+JOIN observation ON observation.id = observation_record.observation_id
+WHERE observation_record.record_id IN ?;
+
+selectReservedIds:
+SELECT observation_id FROM observation_reserved WHERE observation_id IN ?;
+
+selectRecordTransactionsByCsvImports:
+SELECT DISTINCT observation.transaction_id, observation.kind
+FROM csv_import_record
+JOIN observation_record USING (record_id)
+JOIN observation ON observation.id = observation_record.observation_id
+WHERE csv_import_record.csv_import_id IN ?;
+
+selectRecordTransactionsByApiSessions:
+SELECT DISTINCT observation.transaction_id, observation.kind
+FROM api_import_record
+JOIN observation_record USING (record_id)
+JOIN observation ON observation.id = observation_record.observation_id
+WHERE api_import_record.api_session_id IN ?;
+
+selectUnreservedRecordSourcesByTransactions:
+SELECT DISTINCT observation.transaction_id, observation.kind, csv_import_record.csv_import_id, api_import_record.api_session_id
+FROM observation
+JOIN observation_record ON observation_record.observation_id = observation.id
+LEFT JOIN csv_import_record USING (record_id)
+LEFT JOIN api_import_record USING (record_id)
+WHERE observation.transaction_id IN ?
+  AND observation.id NOT IN (SELECT observation_id FROM observation_reserved);
 
 -- Every observation naming one of :accountIds, by id: the stored observations a match over those accounts may pair.
 selectHeadersOnAccounts:
@@ -33,28 +65,28 @@ AND observation.id NOT IN (SELECT observation_id FROM observation_reserved)
 ORDER BY observation.id;
 
 selectTransferValues:
-SELECT * FROM transfer_observation WHERE observation_id = ?;
+SELECT * FROM transfer_observation WHERE observation_id IN ?;
 
 selectTradeValues:
-SELECT * FROM trade_observation WHERE observation_id = ?;
+SELECT * FROM trade_observation WHERE observation_id IN ?;
 
 selectAttributes:
-SELECT attribute_type_id, group_key, attribute_value
+SELECT observation_id, attribute_type_id, group_key, attribute_value
 FROM observation_attribute
-WHERE observation_id = ?
-ORDER BY attribute_type_id, group_key;
+WHERE observation_id IN ?
+ORDER BY observation_id, attribute_type_id, group_key;
 
-countApproximateTime:
-SELECT COUNT(*) FROM observation_approximate_time WHERE observation_id = ?;
+selectApproximateTime:
+SELECT observation_id FROM observation_approximate_time WHERE observation_id IN ?;
 
 selectPlaceholderEnds:
-SELECT end_name FROM observation_placeholder_end WHERE observation_id = ? ORDER BY end_name;
+SELECT observation_id, end_name FROM observation_placeholder_end WHERE observation_id IN ? ORDER BY observation_id, end_name;
 
-countGrossAmount:
-SELECT COUNT(*) FROM observation_gross_amount WHERE observation_id = ?;
+selectGrossAmount:
+SELECT observation_id FROM observation_gross_amount WHERE observation_id IN ?;
 
-selectOwnEnd:
-SELECT end_name FROM observation_own_end WHERE observation_id = ?;
+selectOwnEnds:
+SELECT observation_id, end_name FROM observation_own_end WHERE observation_id IN ?;
 
 selectKind:
 SELECT kind FROM observation WHERE id = ?;
@@ -94,6 +126,12 @@ FROM trade WHERE id = ?;
 
 selectMaterializedTradeAttributes:
 SELECT attribute_type_id, attribute_value FROM trade_attribute WHERE trade_id = ?;
+
+selectMaterializedTransferIds:
+SELECT id FROM transfer WHERE id IN ?;
+
+selectMaterializedTradeIds:
+SELECT id FROM trade WHERE id IN ?;
 
 -- The transactions the records of one staged file observe, with each one's kind, that a staged file or the match
 -- created (source types 2 and 10): those unimporting the file withdraws its observations from, and deletes once nothing
@@ -244,6 +282,23 @@ JOIN observation_owner ON observation_owner.observation_id = observation.id
 WHERE NOT EXISTS (SELECT 1 FROM transfer WHERE transfer.id = observation.transaction_id)
   AND NOT EXISTS (SELECT 1 FROM trade WHERE trade.id = observation.transaction_id)
 ORDER BY observation.id;
+
+selectVacantReservedRecords:
+SELECT observation.id, observation.transaction_id, observation.kind, 'RECORD', observation_record.record_id, observation_record.slot
+FROM observation_record
+JOIN observation_reserved USING (observation_id)
+JOIN observation ON observation.id = observation_record.observation_id
+WHERE observation_record.record_id IN ?
+  AND NOT EXISTS (SELECT 1 FROM transfer WHERE transfer.id = observation.transaction_id)
+  AND NOT EXISTS (SELECT 1 FROM trade WHERE trade.id = observation.transaction_id);
+
+selectVacantReservedGroups:
+SELECT observation.id, observation.transaction_id, observation.kind, 'GROUP', observation_group.group_id, observation_group.slot
+FROM observation_group
+JOIN observation_reserved USING (observation_id)
+JOIN observation ON observation.id = observation_group.observation_id
+WHERE NOT EXISTS (SELECT 1 FROM transfer WHERE transfer.id = observation.transaction_id)
+  AND NOT EXISTS (SELECT 1 FROM trade WHERE trade.id = observation.transaction_id);
 
 -- Every observation still reserved, with its transaction: what settling a re-run resolves.
 selectReserved:

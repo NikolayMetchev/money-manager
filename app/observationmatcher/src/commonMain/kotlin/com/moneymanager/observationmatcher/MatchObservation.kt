@@ -53,7 +53,7 @@ data class MatchObservation(
     val legGroup: LegGroupMembership? = null,
 ) {
     /** Whether its source excluded it from balances (a declined payment, a row the source marks deleted). */
-    val excluded: Boolean get() = content.attributes.any { it.typeId.id == WellKnownIds.EXCLUDED_ATTR_TYPE_ID }
+    val excluded: Boolean = content.attributes.any { it.typeId.id == WellKnownIds.EXCLUDED_ATTR_TYPE_ID }
 }
 
 /**
