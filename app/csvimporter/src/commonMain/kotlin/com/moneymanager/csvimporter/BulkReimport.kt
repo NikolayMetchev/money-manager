@@ -2,8 +2,6 @@ package com.moneymanager.csvimporter
 
 import co.touchlab.kermit.Logger
 import com.moneymanager.importengineapi.ImportPlan
-import com.moneymanager.importengineapi.ManualEdit
-import com.moneymanager.importengineapi.ReappliedLinks
 import com.moneymanager.tasks.Progress
 import com.moneymanager.tasks.WeightedProgress
 import kotlinx.coroutines.CancellationException
@@ -25,10 +23,6 @@ data class BulkReimportResult(
     val cascadedFiles: Int = 0,
     /** Such files whose transactions the run deleted but couldn't import again (no strategy, a failed or stopped run). */
     val cascadedFilesNotRerun: Int = 0,
-    val reappliedEdits: Int = 0,
-    /** Hand edits whose transaction the re-import didn't create again, so they were dropped. */
-    val unmatchedEdits: List<ManualEdit> = emptyList(),
-    val reappliedLinks: ReappliedLinks = ReappliedLinks(),
     override val filesNotStarted: Int = 0,
     /** Picked files the run left alone: nothing they read changed since they were last imported. */
     val filesUnchanged: Int = 0,
@@ -40,9 +34,7 @@ data class BulkReimportResult(
             append("Re-imported $filesImported file${if (filesImported == 1) "" else "s"}")
             append(" · $transfersCreated imported")
             if (filesUnchanged > 0) append(" · $filesUnchanged unchanged")
-            if (reappliedEdits > 0) append(" · $reappliedEdits manual edit${if (reappliedEdits == 1) "" else "s"} re-applied")
-            if (unmatchedEdits.isNotEmpty()) append(" · ${unmatchedEdits.size} manual edits not re-applied")
-            append(reappliedLinks.summary(" · "))
+            if (plan.releasedOverrides.isNotEmpty()) append(" · ${plan.releasedOverrides.size} hand-edited no longer imported")
             if (cascadedFiles > 0) append(" · $cascadedFiles other file${if (cascadedFiles == 1) "" else "s"} re-imported along")
             if (cascadedFilesNotRerun > 0) {
                 append(" · $cascadedFilesNotRerun other file${if (cascadedFilesNotRerun == 1) "" else "s"} left for their own re-import")

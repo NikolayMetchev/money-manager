@@ -27,16 +27,13 @@ import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
-import com.moneymanager.domain.repository.AttributeTypeReadRepository
 import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.ImportRecordReadRepository
-import com.moneymanager.domain.repository.ObservationReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
-import com.moneymanager.domain.repository.PersonOverrideReadRepository
 import com.moneymanager.domain.repository.RelationshipReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
@@ -93,9 +90,6 @@ class ImportDirectoryService(
     private val transactionRepository: TransactionReadRepository,
     private val relationshipRepository: RelationshipReadRepository,
     private val transferSourceRepository: TransferSourceReadRepository,
-    personOverrideRepository: PersonOverrideReadRepository,
-    observationRepository: ObservationReadRepository,
-    attributeTypeRepository: AttributeTypeReadRepository,
     private val maintenance: Maintenance,
     private val importEngine: ImportEngine,
     private val fileSourceFactory: ImportFileSourceFactory?,
@@ -111,9 +105,6 @@ class ImportDirectoryService(
                     transactionRepository = transactionRepository,
                     transferSourceRepository = transferSourceRepository,
                     relationshipRepository = relationshipRepository,
-                    personOverrideRepository = personOverrideRepository,
-                    observationRepository = observationRepository,
-                    attributeTypeRepository = attributeTypeRepository,
                     accountRepository = accountRepository,
                     csvImportRepository = csvImportRepository,
                     tradeRepository = tradeRepository,

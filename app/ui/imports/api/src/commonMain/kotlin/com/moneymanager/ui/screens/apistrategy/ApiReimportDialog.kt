@@ -36,8 +36,6 @@ import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.components.LoadingTextButton
 import com.moneymanager.ui.components.imports.ImportPlanReport
 import com.moneymanager.ui.components.imports.SourceRerunPreview
-import com.moneymanager.ui.components.imports.UnmatchedEditsReport
-import com.moneymanager.ui.components.imports.UnmatchedLinksReport
 import com.moneymanager.ui.components.imports.rememberAccountNamer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -95,8 +93,6 @@ fun ApiReimportDialog(
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         ImportPlanReport(result.plan, accountName)
-                        UnmatchedEditsReport(result.unmatchedEdits, accountName)
-                        UnmatchedLinksReport(result.reappliedLinks)
                     }
 
                     currentPlan == null -> {
@@ -109,7 +105,7 @@ fun ApiReimportDialog(
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         Spacer(modifier = Modifier.height(8.dp))
-                        SourceRerunPreview(currentPlan, recordNoun = "item", accountName = accountName)
+                        SourceRerunPreview(currentPlan, recordNoun = "item")
                         if (isRunning) {
                             Spacer(modifier = Modifier.height(12.dp))
                             ApiReimportProgress(executeProgress ?: Progress("Starting re-import"))

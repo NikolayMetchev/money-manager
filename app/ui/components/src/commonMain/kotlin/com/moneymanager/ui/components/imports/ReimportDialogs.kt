@@ -136,8 +136,6 @@ fun ReimportDialog(
         report = { finished ->
             Text(finished.toSummary(), style = MaterialTheme.typography.bodyMedium)
             ImportPlanReport(finished.plan, accountName)
-            UnmatchedEditsReport(finished.unmatchedEdits, accountName)
-            UnmatchedLinksReport(finished.reappliedLinks)
         },
         onStop = { stopRequested = true },
         stopping = stopRequested,
@@ -201,12 +199,6 @@ fun ReimportDialog(
                 onCurrencySelected = { currencyId = it },
                 repositories = repositories,
                 enabled = !isRunning,
-            )
-            ManualEditsSection(
-                title = "Manual edits to re-apply (${planned.manualEdits.size}):",
-                edits = planned.manualEdits,
-                accountName = accountName,
-                note = "Edits whose transaction isn't imported again are dropped and listed afterwards.",
             )
         }
         progress?.let {

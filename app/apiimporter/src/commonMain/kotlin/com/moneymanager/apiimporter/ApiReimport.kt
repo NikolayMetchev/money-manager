@@ -14,8 +14,6 @@ import com.moneymanager.importengineapi.CascadeRerunner
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportPlan
-import com.moneymanager.importengineapi.ManualEdit
-import com.moneymanager.importengineapi.ReappliedLinks
 import com.moneymanager.importengineapi.RerunReads
 import com.moneymanager.importengineapi.SourceRerunPlan
 import com.moneymanager.importengineapi.SourceRerunResult
@@ -31,7 +29,7 @@ import kotlin.time.Clock
 
 private val logger = Logger.withTag("ApiReimport")
 
-/** Plans re-importing an API session: what it created, the files matched against that, and its hand edits. */
+/** Plans re-importing an API session: what it created and the files matched against that. */
 suspend fun planApiReimport(
     sessionId: ApiSessionId,
     apiSessionRepository: ApiSessionReadRepository,
@@ -87,8 +85,6 @@ suspend fun executeApiReimport(
             unhiddenTransfers = 0,
             cascaded = emptyList(),
             notRerun = emptyList(),
-            reappliedEdits = emptyList(),
-            unmatchedEdits = emptyList(),
             deletedEmptyAccounts = emptyList(),
         )
     }
@@ -141,10 +137,6 @@ data class ApiBulkReimportResult(
     /** Sessions that completed — failed ones are in [failures], not counted here. */
     val sessionsReimported: Int,
     val failures: List<ApiSessionReimportFailure> = emptyList(),
-    val reappliedEdits: Int = 0,
-    /** Hand edits whose transaction the re-import didn't create again, so they were dropped. */
-    val unmatchedEdits: List<ManualEdit> = emptyList(),
-    val reappliedLinks: ReappliedLinks = ReappliedLinks(),
     /** Other staged files re-imported along with a session (see `SourceRerunResult.cascaded`). */
     val cascadedFiles: Int = 0,
     /** Files a session's re-import deleted but couldn't import again: they wait for their own re-import. */
@@ -188,9 +180,6 @@ suspend fun bulkReimportApiSessions(
             .filter { it.id in importedSessionIds }
             .sortedBy { it.createdAt }
 
-    var reapplied = 0
-    val unmatched = mutableListOf<ManualEdit>()
-    var links = ReappliedLinks()
     var cascaded = 0
     var notRerun = 0
     var importPlan = ImportPlan()
@@ -210,16 +199,10 @@ suspend fun bulkReimportApiSessions(
                 onProgress = sessionProgress,
                 refreshViews = false,
             )
-        reapplied += result.reappliedEdits.size
-        unmatched += result.unmatchedEdits
-        links += result.reappliedLinks
         cascaded += result.cascaded.size
         notRerun += result.notRerun.size
         importPlan += result.plan
     }.copy(
-        reappliedEdits = reapplied,
-        unmatchedEdits = unmatched,
-        reappliedLinks = links,
         cascadedFiles = cascaded,
         cascadedFilesNotRerun = notRerun,
         plan = importPlan,

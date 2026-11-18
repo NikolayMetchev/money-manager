@@ -309,7 +309,6 @@ class KrakenReimportE2ETest : DbTest() {
             val strategy = repositories.apiImportStrategyRepository.getStrategyByName("Kraken").first()!!
             val reimports = repositories.reimports(testMaintenance)
             val plan = planApiReimport(sessionId, repositories.apiSessionRepository, reimports.reads)
-            assertEquals("Rent to savings", plan.manualEdits.single().description, "the plan lists the hand edit")
             val result =
                 executeApiReimport(
                     plan = plan,
@@ -330,9 +329,8 @@ class KrakenReimportE2ETest : DbTest() {
                     cascadeRerunner = reimports,
                 )
 
-            // An API session's re-run still deletes and re-creates its transactions, so the edit is replayed (#1432 retires it).
-            assertEquals(1, result.reappliedEdits.size, "the hand edit is re-applied")
-            assertTrue(result.unmatchedEdits.isEmpty())
+            // The session's items take their old ids back, so the hand edit is an override on the kept id: nothing is replayed.
+            assertTrue(result.plan.releasedOverrides.isEmpty(), "released: ${result.plan.releasedOverrides}")
             val recreated =
                 repositories.transactionRepository
                     .getTransactionsByDateRange(
@@ -340,6 +338,7 @@ class KrakenReimportE2ETest : DbTest() {
                         endDate = Instant.fromEpochMilliseconds(1_700_000_004_000L),
                     ).first()
                     .single { it.amount.asset.code == "GBP" }
+            assertEquals(withdrawal.id, recreated.id, "the edited transfer keeps its id")
             assertEquals("Rent to savings", recreated.description)
             assertEquals(listOf("moved by hand"), recreated.attributes.filter { it.attributeType.name == "note" }.map { it.value })
         }

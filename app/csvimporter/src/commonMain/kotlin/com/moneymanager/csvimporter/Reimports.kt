@@ -22,14 +22,10 @@ import com.moneymanager.domain.repository.assetAliasMap
 import com.moneymanager.importengineapi.CascadeRerunner
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
-import com.moneymanager.importengineapi.ManualEdit
 import com.moneymanager.importengineapi.RerunBlockedException
 import com.moneymanager.importengineapi.RerunFile
-import com.moneymanager.importengineapi.RerunLinks
 import com.moneymanager.importengineapi.RerunReads
-import com.moneymanager.importengineapi.captureRerunLinks
 import com.moneymanager.importengineapi.executeRerun
-import com.moneymanager.importengineapi.manualEditsOf
 import com.moneymanager.tasks.PhasedProgress
 import com.moneymanager.tasks.Progress
 import kotlinx.coroutines.CancellationException
@@ -81,9 +77,6 @@ data class ReimportAllPlan(
     val imported: Map<Source, ImportedSettings>,
     /** What the run deletes and imports again: every file of [files] that can be. */
     val rerunFiles: List<RerunFile>,
-    /** Every hand edit the run will put back. */
-    val manualEdits: List<ManualEdit>,
-    val links: RerunLinks = RerunLinks(),
 ) {
     val skippedNoStrategy: Int get() = strategies.count { it.value == null }
 
@@ -101,7 +94,7 @@ data class ReimportAllPlan(
  * the strategy, account and currency it was imported with. Also the [CascadeRerunner] every re-import (API
  * sessions included) re-imports the other files it takes along with, whole.
  * Each re-import holds [writeLock], the session's write lock, throughout: its delete, import, re-runs
- * and edits are separate writes, and an import between them would dedupe against a half-done state.
+ * and settle are separate writes, and an import between them would dedupe against a half-done state.
  */
 @Suppress("LongParameterList", "TooManyFunctions")
 class Reimports(
@@ -142,7 +135,7 @@ class Reimports(
             }
         val selected = files.mapTo(mutableSetOf()) { it.id }
         // Each file is read once, all of them at once (reads don't block one another), off the caller's
-        // dispatcher (a dialog's is the UI thread); the hand edits across them all are then loaded in one go.
+        // dispatcher (a dialog's is the UI thread).
         val progressLock = Mutex()
         var filesRead = 0
         // The caller's files first: files imported at the same instant keep the order they were given.
@@ -179,25 +172,19 @@ class Reimports(
             }
         val loaded = fileReads.map { it.first }
         val rerunFiles = fileReads.mapNotNull { it.second }
-        val editsBase = PLAN_ALL_CLOSURE_SPAN + PLAN_ALL_READ_SPAN
-        progress.emit(base = editsBase, detail = "Reading manual edits")
-        val manualEdits =
-            manualEditsOf(rerunFiles.associate { it.file to it.createdTransfers }, reads).values.flatten()
         return ReimportAllPlan(
             files = loaded,
             cascaded = loaded.filter { it.id in closure && it.id !in selected }.mapTo(mutableSetOf()) { it.source },
             strategies = loaded.associate { it.source to strategyFor(it, strategies) },
             imported = loaded.associate { it.source to it.importedSettings },
             rerunFiles = rerunFiles,
-            manualEdits = manualEdits,
-            links = captureRerunLinks(rerunFiles, reads),
         )
     }
 
     /**
      * Re-imports every file of [plan]: one batch deletes what they all created and resets their rows, then each
-     * file is imported again in the order it was first imported, as a fresh import of its rows, and finally the
-     * hand edits are put back, the empty accounts deleted and the materialized views refreshed, once each.
+     * file is imported again in the order it was first imported, as a fresh import of its rows, each row taking its
+     * old ids back, and finally the ids no row took back are released, the empty accounts deleted and the materialized views refreshed, once each.
      * [accountId] and [currencyId] are for the files whose last import didn't record them. Progress names each
      * file by [fileLabel], and once [stopRequested] says yes no further file starts (see [runBulkReimport]): what
      * those files created is already deleted, so their rows wait, reset, for their next import.
@@ -271,7 +258,7 @@ class Reimports(
         val rerun = mutableSetOf<Source>()
         val reimported = mutableSetOf<Source>()
         // Three phases, each filling the bar from empty: the one delete batch, then runBulkReimport's two (preparing
-        // the files, re-importing them). The steps after the last file (hand edits, empty accounts, views) keep the
+        // the files, re-importing them). The steps after the last file (settling, empty accounts, views) keep the
         // files' bar where the run left it.
         var lastFileProgress: Progress? = null
         val onFileProgress: suspend (Progress) -> Unit = { inner ->
@@ -282,8 +269,6 @@ class Reimports(
         val outcome =
             importEngine.executeRerun(
                 files = plan.rerunFiles,
-                manualEdits = plan.manualEdits,
-                links = plan.links,
                 resetRecords = ImportBatch(),
                 reads = reads,
                 maintenance = maintenance,
@@ -357,9 +342,6 @@ class Reimports(
             emptyAccountsDeleted = outcome.deletedEmptyAccounts.size,
             cascadedFiles = cascadedRerun,
             cascadedFilesNotRerun = plan.cascaded.size - cascadedRerun,
-            reappliedEdits = outcome.reappliedEdits.size,
-            unmatchedEdits = outcome.unmatchedEdits,
-            reappliedLinks = outcome.reappliedLinks,
             plan = outcome.plan,
         )
     }
@@ -488,6 +470,6 @@ class Reimports(
 
 private val REMOVAL_PHASE = Progress.Phase(1, 3, "Removing what the files created")
 
-// Reading each file is nearly all of "re-import all" planning; finding them and their hand edits are the rest.
+// Reading each file is nearly all of "re-import all" planning; finding them is the rest.
 private const val PLAN_ALL_CLOSURE_SPAN = 0.05f
-private const val PLAN_ALL_READ_SPAN = 0.85f
+private const val PLAN_ALL_READ_SPAN = 0.95f

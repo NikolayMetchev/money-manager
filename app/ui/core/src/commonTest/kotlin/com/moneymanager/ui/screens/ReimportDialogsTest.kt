@@ -131,7 +131,7 @@ class ReimportDialogsTest {
         }
 
     @Test
-    fun reimportDialog_oneFile_previewsTheHandEdit_andKeepsIt() =
+    fun reimportDialog_oneFile_keepsTheHandEdit() =
         runMoneyManagerComposeUiTest {
             val fixture = setUp()
 
@@ -147,12 +147,9 @@ class ReimportDialogsTest {
                 }
             }
 
-            waitUntilAtLeastOneExists(hasText("Manual edits to re-apply (1):"), timeoutMillis = 15_000)
+            waitUntilAtLeastOneExists(hasText("Deletes the 2 transactions they created."), timeoutMillis = 15_000)
             onNodeWithText("Re-import MonzoDataExport.csv").assertExists()
             onNodeWithText("Strategy: ", substring = true).assertExists()
-            onNodeWithText("Deletes the 2 transactions they created.").assertExists()
-            onNodeWithText("Description → \"Flat white\"", substring = true).assertExists()
-            onNodeWithText("note → work trip", substring = true).assertExists()
 
             onNodeWithText("Re-import 1 file").performClick()
 
@@ -161,11 +158,11 @@ class ReimportDialogsTest {
                 timeoutMillis = 15_000,
             )
             // The edit is an override on the kept id (#1430): nothing is replayed, and nothing is lost.
-            onNodeWithText("not re-applied", substring = true).assertDoesNotExist()
+            onNodeWithText("no longer imported", substring = true).assertDoesNotExist()
         }
 
     @Test
-    fun reimportDialog_reportsAHandEditItCouldNotReapply() =
+    fun reimportDialog_reportsAHandEditNoRowMakesAnyMore() =
         runMoneyManagerComposeUiTest {
             val fixture = setUp()
             // The strategy now skips the edited row, so its transaction isn't created again.
@@ -202,11 +199,10 @@ class ReimportDialogsTest {
                 }
             }
 
-            waitUntilAtLeastOneExists(hasText("Manual edits to re-apply (1):"), timeoutMillis = 15_000)
+            waitUntilAtLeastOneExists(hasText("Deletes the 2 transactions they created."), timeoutMillis = 15_000)
             onNodeWithText("Re-import 1 file").performClick()
 
-            waitUntilAtLeastOneExists(hasText("Manual edits not re-applied (1):"), timeoutMillis = 15_000)
-            onNodeWithText("Description → \"Flat white\"", substring = true).assertExists()
+            waitUntilAtLeastOneExists(hasText("Hand-edited transactions no longer imported (1)"), timeoutMillis = 15_000)
             // The plan: the skipped row's transaction is gone.
             onNodeWithText("Removed (1)").assertExists()
             onNodeWithText("1 removed", substring = true).assertExists()

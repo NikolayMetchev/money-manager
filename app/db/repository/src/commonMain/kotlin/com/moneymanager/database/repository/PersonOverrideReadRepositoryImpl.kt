@@ -52,30 +52,6 @@ class PersonOverrideReadRepositoryImpl(
         return (set + removed).sortedWith(BY_TYPE_AND_GROUP)
     }
 
-    override suspend fun getOverriddenTransfers(transferIds: Collection<TransferId>): Set<TransferId> =
-        queryInChunks(transferIds.map { it.id }, MAX_IDS_PER_QUERY / OVERRIDE_TABLES) { chunk ->
-            queries.selectOverriddenTransferIds(chunk).awaitAsList()
-        }.mapTo(mutableSetOf()) { TransferId(it) }
-
-    override suspend fun getTradeAttributeOverrides(tradeIds: Collection<TradeId>): Map<TradeId, List<AttributeOverride>> {
-        val ids = tradeIds.map { it.id }
-        val set =
-            queryInChunks(ids, MAX_IDS_PER_QUERY) { chunk ->
-                queries
-                    .selectTradeAttributeOverridesOf(chunk) { tradeId, typeId, value ->
-                        TradeId(tradeId) to AttributeOverride.Set(AttributeTypeId(typeId), "", value)
-                    }.awaitAsList()
-            }
-        val removed =
-            queryInChunks(ids, MAX_IDS_PER_QUERY) { chunk ->
-                queries
-                    .selectTradeAttributeRemovalsOf(chunk) { tradeId, typeId ->
-                        TradeId(tradeId) to AttributeOverride.Removed(AttributeTypeId(typeId), "")
-                    }.awaitAsList()
-            }
-        return (set + removed).groupBy({ it.first }, { it.second }).mapValues { (_, overrides) -> overrides.sortedWith(BY_TYPE_AND_GROUP) }
-    }
-
     override suspend fun getPins(observationIds: Collection<ObservationId>): List<ObservationPin> =
         queries
             .selectPins(observationIds.map { it.id }) { observationId, transactionId, kind ->
@@ -112,8 +88,5 @@ class PersonOverrideReadRepositoryImpl(
 
     private companion object {
         val BY_TYPE_AND_GROUP = compareBy<AttributeOverride>({ it.typeId.id }, { it.groupKey })
-
-        // selectOverriddenTransferIds binds its ids once per override table.
-        const val OVERRIDE_TABLES = 3
     }
 }
