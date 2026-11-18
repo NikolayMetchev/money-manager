@@ -557,8 +557,8 @@ class FreetradeCsvE2ETest : DbTest() {
                     Account(id = AccountId(0), name = "Freetrade Limited", openingDate = now),
                 )
             applyBankStatement(bank, payee)
-            // Only the first top-up takes its other side from the bank's record. Re-run on its own, it would claim its
-            // twin a day later as a duplicate of itself: only a run over the whole file knows the twin is its own row.
+            // Only the first top-up takes its other side from the bank's record. The bank statement's re-run deletes that record
+            // and makes it again on its kept id; the Freetrade export isn't re-run, and its twin a day later stays its own.
             apply(listOf(stage(listOf(topUp, cash("Top up", "TOP_UP", "2026-03-02T10:28:23.178Z", "1000.00")))))
             val before = listOf("Freetrade ISA", "Bank", "Freetrade Limited", "Freetrade Top Ups").associateWith { balances(it) }
             assertEquals(mapOf("GBP" to "2000"), before.getValue("Freetrade ISA"))
@@ -569,9 +569,8 @@ class FreetradeCsvE2ETest : DbTest() {
                     .getAllImports()
                     .first()
                     .single { it.originalFileName == "bank.csv" }
-            val result = reimports.reimportFile(bankFile.id)
+            reimports.reimportFile(bankFile.id)
 
-            assertEquals(1, result.cascadedFiles, "the Freetrade export is re-imported whole: $result")
             assertEquals(before, before.keys.associateWith { balances(it) })
         }
 

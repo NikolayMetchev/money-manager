@@ -1,7 +1,5 @@
 package com.moneymanager.domain.repository
 
-import com.moneymanager.domain.model.ApiSessionId
-import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.model.TradeId
@@ -44,23 +42,4 @@ interface TransferSourceReadRepository {
      * the same one whenever the source is imported again.
      */
     suspend fun getTradesCreatedBy(importSource: Source): Map<TradeId, Source>
-
-    /**
-     * The staged rows currently linked to any of [transferIds] or
-     * [tradeIds] without having created it: those that matched it as a duplicate or updated it. Read from
-     * their provenance, so no import's staged rows are read.
-     */
-    suspend fun getImportRecordsMatchedTo(
-        transferIds: Set<TransferId>,
-        tradeIds: Set<TradeId>,
-    ): List<Source.Csv>
-
-    /**
-     * The staged files a re-import of [imports] and [sessions] takes along, transitively, with [imports] themselves:
-     * every file that depends on what they created (see `selectRerunClosure`). One query, however many files join.
-     */
-    suspend fun getRerunClosure(
-        imports: Set<CsvImportId>,
-        sessions: Set<ApiSessionId> = emptySet(),
-    ): Set<CsvImportId>
 }

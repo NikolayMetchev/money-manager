@@ -83,7 +83,6 @@ BEGIN
           SELECT 1 FROM entity_source
           WHERE entity_source.entity_type_id = 13
             AND entity_source.entity_id = relationship_member.relationship_id
-            AND entity_source.matched = 0
             AND entity_source.source_type_id IN (1, 9)
         )
       );
@@ -103,7 +102,6 @@ BEGIN
           SELECT 1 FROM entity_source
           WHERE entity_source.entity_type_id = 13
             AND entity_source.entity_id = relationship_member.relationship_id
-            AND entity_source.matched = 0
             AND entity_source.source_type_id IN (1, 9)
         )
       );

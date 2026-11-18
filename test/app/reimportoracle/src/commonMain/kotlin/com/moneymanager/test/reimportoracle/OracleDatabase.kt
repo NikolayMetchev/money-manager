@@ -183,8 +183,6 @@ class OracleDatabase private constructor(
                         db.apiSessionRepository,
                     ),
                 accountRepository = db.accountRepository,
-                transactionRepository = db.transactionRepository,
-                relationshipRepository = db.relationshipRepository,
                 tradeRepository = db.tradeRepository,
                 maintenance = db.maintenanceService,
                 importEngine = db.importEngine,
@@ -196,13 +194,10 @@ class OracleDatabase private constructor(
             planCsvUnimport(
                 requireNotNull(staged[source]) { "${source.file.fileName} was never imported" },
                 db.csvImportRepository,
-                db.transferSourceRepository,
             )
         executeCsvUnimport(
             plan = plan,
             accountRepository = db.accountRepository,
-            transactionRepository = db.transactionRepository,
-            relationshipRepository = db.relationshipRepository,
             tradeRepository = db.tradeRepository,
             maintenance = db.maintenanceService,
             importEngine = db.importEngine,
@@ -461,7 +456,6 @@ class OracleDatabase private constructor(
             reads = reimports.reads,
             maintenance = db.maintenanceService,
             importEngine = db.importEngine,
-            cascadeRerunner = reimports,
             passThroughAccounts = db.passThroughAccountRepository.getAll().first(),
             refreshViews = false,
         )

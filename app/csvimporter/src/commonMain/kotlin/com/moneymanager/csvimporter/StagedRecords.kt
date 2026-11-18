@@ -61,25 +61,12 @@ suspend fun rowContentHashes(
     inputsHash: String,
 ): Map<Long, String> = rows.associate { it.rowIndex to recordContentHash(it.values, inputsHash) }
 
-/**
- * The write that records [rows]' content hashes as [file]'s import records. A file re-imported only because another
- * re-import took it along is not [settled]: the delete + re-run that took it along can leave it short of where a fresh
- * import would (an end it created and lost is deleted as empty), and its own re-import is what puts that right. Its
- * rows are then recorded with a hash no content has, so that re-import still runs.
- */
+/** The write that records [rows]' content hashes as [file]'s import records. */
 suspend fun recordRowsMutation(
     file: CsvImport,
     rows: List<CsvRow>,
     inputsHash: String,
-    settled: Boolean = true,
-): CsvImportMutation.RecordRows =
-    CsvImportMutation.RecordRows(
-        file.id,
-        if (settled) rowContentHashes(rows, inputsHash) else rows.associate { it.rowIndex to UNSETTLED_HASH },
-    )
-
-/** A content hash no row hashes to ([recordContentHash] is hex). */
-private const val UNSETTLED_HASH = "unsettled"
+): CsvImportMutation.RecordRows = CsvImportMutation.RecordRows(file.id, rowContentHashes(rows, inputsHash))
 
 /**
  * True when importing [file] again would change nothing: it was imported, no row failed, and every row's recorded

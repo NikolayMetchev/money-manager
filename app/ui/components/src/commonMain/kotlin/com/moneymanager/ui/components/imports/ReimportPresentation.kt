@@ -54,14 +54,12 @@ fun ReimportProgressIndicator(progress: Progress) {
 
 /**
  * One titled block of the re-import preview: a heading, a bullet per [lines] entry (truncated to
- * [limit] with an "…and N more" tail when one is given) and an optional explanatory [note].
+ * [limit] with an "…and N more" tail when one is given).
  */
-@Suppress("LongParameterList")
 @Composable
 fun ReimportPlanSection(
     title: String,
     lines: List<String>,
-    note: String? = null,
     limit: Int? = null,
     isError: Boolean = false,
     leadingSpacer: Boolean = true,
@@ -90,19 +88,11 @@ fun ReimportPlanSection(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
-    if (note != null) {
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = note,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
 }
 
 /**
  * The preview every re-import dialog shows (staged files and API sessions): what the source created and will create
- * again, and the other files that depend on it, which are re-imported too. [recordNoun] names the source's records
+ * again. [recordNoun] names the source's records
  * ("row", "record", "item").
  */
 @Composable
@@ -122,16 +112,6 @@ fun SourceRerunPreview(
                 },
             style = MaterialTheme.typography.bodySmall,
         )
-        if (plan.cascade.isNotEmpty()) {
-            val files = plan.cascade.size
-            ReimportPlanSection(
-                title = "Other files to re-import too ($files):",
-                lines = emptyList(),
-                note =
-                    "$files other file${plural(files)} matched or reconciled against these transactions. They are " +
-                        "re-imported whole after this one, so they reconcile against the new transactions.",
-            )
-        }
         Spacer(modifier = Modifier.height(12.dp))
         Text(
             text =

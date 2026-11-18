@@ -203,7 +203,6 @@ class KrakenReimportE2ETest : DbTest() {
                 reads = reimports.reads,
                 maintenance = testMaintenance,
                 importEngine = repositories.importEngine,
-                cascadeRerunner = reimports,
             )
 
             val withdrawalsAfter =
@@ -257,7 +256,6 @@ class KrakenReimportE2ETest : DbTest() {
                 reads = reimports.reads,
                 maintenance = testMaintenance,
                 importEngine = repositories.importEngine,
-                cascadeRerunner = reimports,
             )
             val withdrawalsFinal =
                 repositories.transactionRepository
@@ -326,7 +324,6 @@ class KrakenReimportE2ETest : DbTest() {
                     reads = reimports.reads,
                     maintenance = testMaintenance,
                     importEngine = repositories.importEngine,
-                    cascadeRerunner = reimports,
                 )
 
             // The session's items take their old ids back, so the hand edit is an override on the kept id: nothing is replayed.
@@ -406,12 +403,10 @@ class KrakenReimportE2ETest : DbTest() {
                     reads = reimports.reads,
                     maintenance = testMaintenance,
                     importEngine = repositories.importEngine,
-                    cascadeRerunner = reimports,
                 )
 
             assertEquals(1, result.sessionsReimported, "the connection's one imported session should be re-imported")
             assertEquals(emptyList(), result.failures)
-            assertEquals(0, result.cascadedFiles, "no staged file depends on the session")
             val intoMonzo =
                 repositories.transactionRepository
                     .getTransactionsByDateRange(

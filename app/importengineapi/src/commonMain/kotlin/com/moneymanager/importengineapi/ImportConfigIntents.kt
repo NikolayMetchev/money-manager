@@ -313,16 +313,7 @@ sealed interface CsvImportMutation {
     ) : CsvImportMutation
 
     /**
-     * Clears the rows' import status + transfer link so a re-import re-runs them from scratch (used
-     * after their previously-imported transfers were deleted). Null [rowIndexes] resets every row.
-     */
-    data class ResetRowStatuses(
-        val id: CsvImportId,
-        val rowIndexes: Collection<Long>?,
-    ) : CsvImportMutation
-
-    /**
-     * Gets a file ready to re-run in place (#1430): like [ResetRowStatuses] for every row, but its import records and their
+     * Gets a file ready to re-run in place (#1430): its rows return to never-imported, but its import records and their
      * observations stay, reserved for the run, so a row that says a slot again takes its old transaction back. The
      * batch's deletes of the transactions the file created keep their ids for that. [ImportBatch.settle] ends the run.
      */

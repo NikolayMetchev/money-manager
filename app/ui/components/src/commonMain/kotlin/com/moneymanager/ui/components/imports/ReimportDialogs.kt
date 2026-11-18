@@ -47,10 +47,10 @@ data class ReimportRepositories(
 
 /**
  * Re-imports the staged [files] (CSV, QIF, OFX, Excel or PDF; one or many, the same dialog either way) so strategy and mapping
- * changes take effect retroactively: what they created is deleted and they are imported again, together with every other
- * file that depends on what they created ([Reimports.planAll]), and the hand edits are put back. Each file keeps the strategy,
+ * changes take effect retroactively: what they created is deleted and they are imported again, each record taking its
+ * transactions' ids back, so hand edits stay. Each file keeps the strategy,
  * account and currency it was imported with; the pickers only appear for files that created nothing to read them from.
- * Every file, the cascaded ones too, is named by its path (its import directory, then its name), whichever screen opened
+ * Every file is named by its path (its import directory, then its name), whichever screen opened
  * the dialog, and Cancel stops the run once the file under way is done.
  */
 @Suppress("LongMethod")
@@ -169,17 +169,6 @@ fun ReimportDialog(
                 style = MaterialTheme.typography.bodySmall,
             )
             Spacer(modifier = Modifier.height(12.dp))
-            if (planned.cascaded.isNotEmpty()) {
-                val count = planned.cascaded.size
-                Text(
-                    text =
-                        "$count other file${if (count == 1) "" else "s"} depend${if (count == 1) "s" else ""} on " +
-                            "${if (files.size == 1) "it" else "these"} and will be re-imported too.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-            }
             if (planned.skippedNoStrategy > 0) {
                 Text(
                     text =

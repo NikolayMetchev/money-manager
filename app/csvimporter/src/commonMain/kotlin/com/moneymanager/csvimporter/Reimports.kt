@@ -1,6 +1,5 @@
 package com.moneymanager.csvimporter
 
-import co.touchlab.kermit.Logger
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
@@ -17,9 +16,7 @@ import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.ImportRecordReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
-import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.domain.repository.assetAliasMap
-import com.moneymanager.importengineapi.CascadeRerunner
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.RerunBlockedException
@@ -28,7 +25,6 @@ import com.moneymanager.importengineapi.RerunReads
 import com.moneymanager.importengineapi.executeRerun
 import com.moneymanager.tasks.PhasedProgress
 import com.moneymanager.tasks.Progress
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -36,8 +32,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-
-private val logger = Logger.withTag("Reimports")
 
 /**
  * The source account and currency a file was last imported with, as its latest application recorded
@@ -65,14 +59,9 @@ fun CsvImportStrategy.withCurrency(currencyId: CurrencyId?): CsvImportStrategy {
 /** The source a staged file's records are recorded under. */
 val CsvImport.source: Source get() = Source.Csv(id)
 
-/**
- * What a "re-import all" will do: [files] are the files picked plus every file that depends on what they create
- * ([cascaded]), in the order they were imported.
- */
+/** What a "re-import all" will do: [files] are the files picked, in the order they were imported. */
 data class ReimportAllPlan(
     val files: List<CsvImport>,
-    /** The files no one picked that the run re-imports because they depend on the picked ones. */
-    val cascaded: Set<Source>,
     val strategies: Map<Source, CsvImportStrategy?>,
     val imported: Map<Source, ImportedSettings>,
     /** What the run deletes and imports again: every file of [files] that can be. */
@@ -89,10 +78,10 @@ data class ReimportAllPlan(
 }
 
 /**
- * The one way to re-import staged files (CSV, QIF, OFX, Excel or PDF), one or many: [planAll] finds every file that depends on
- * them and [reimportAll] deletes what they all created and runs their records through the normal import again, each with
- * the strategy, account and currency it was imported with. Also the [CascadeRerunner] every re-import (API
- * sessions included) re-imports the other files it takes along with, whole.
+ * The one way to re-import staged files (CSV, QIF, OFX, Excel or PDF), one or many: [planAll] reads what they created and
+ * [reimportAll] deletes it and runs their records through the normal import again, each with the strategy, account and
+ * currency it was imported with. Other files are never re-run with them: what another file matched or reconciled
+ * against is matched again by the engine (`MatchSync`), and the records keep their ids.
  * Each re-import holds [writeLock], the session's write lock, throughout: its delete, import, re-runs
  * and settle are separate writes, and an import between them would dedupe against a half-done state.
  */
@@ -110,15 +99,13 @@ class Reimports(
     /** The import records a file's last import left, so a run can skip picked files nothing changed for; null always runs them. */
     private val importRecords: ImportRecordReadRepository? = null,
     private val writeLock: Mutex = Mutex(),
-) : CascadeRerunner {
+) {
     /** Runs [block] holding the session's write lock, for the re-imports that run outside this class (API sessions). */
     suspend fun <T> exclusively(block: suspend () -> T): T = writeLock.withLock { block() }
 
     /**
-     * Plans a "re-import all" over [files]: one query finds every other file that depends on what they create,
-     * transitively ([TransferSourceReadRepository.getRerunClosure]), and the run re-imports all of them, in the
-     * order they were imported. What each file created is read before any of it is deleted. [onProgress] counts
-     * files read.
+     * Plans a "re-import all" over [files], to run in the order they were imported. What each file created is read before
+     * any of it is deleted. [onProgress] counts files read.
      */
     suspend fun planAll(
         files: List<CsvImport>,
@@ -126,20 +113,14 @@ class Reimports(
     ): ReimportAllPlan {
         val progress = PhasedProgress(onProgress)
         val strategies = csvImportStrategyRepository.getAllStrategies().first()
-        progress.emit(base = 0f, detail = "Finding the files that depend on them")
-        // A file with nothing to run over is left alone, unless another file's re-import takes it along.
-        val runnable = files.filter { it.rowCount > 0 && strategyFor(it.reloaded(), strategies) != null }
-        val closure =
-            withContext(Dispatchers.Default) {
-                reads.transferSourceRepository.getRerunClosure(runnable.mapTo(mutableSetOf()) { it.id })
-            }
-        val selected = files.mapTo(mutableSetOf()) { it.id }
+        // A file with nothing to run over is left alone.
+        val runnable = files.filter { it.rowCount > 0 && strategyFor(it.reloaded(), strategies) != null }.mapTo(mutableSetOf()) { it.id }
         // Each file is read once, all of them at once (reads don't block one another), off the caller's
         // dispatcher (a dialog's is the UI thread).
         val progressLock = Mutex()
         var filesRead = 0
-        // The caller's files first: files imported at the same instant keep the order they were given.
-        val ids = files.map { it.id } + closure.filterNot { it in selected }
+        // Files imported at the same instant keep the order they were given.
+        val ids = files.map { it.id }
         val count = ids.size
         val fileReads =
             withContext(Dispatchers.Default) {
@@ -148,7 +129,7 @@ class Reimports(
                         async {
                             val file = reads.csvImportRepository.getImport(id).first()
                             val read =
-                                file?.takeIf { id in closure }?.let {
+                                file?.takeIf { id in runnable }?.let {
                                     RerunFile(
                                         file = it.source,
                                         createdTransfers = reads.transferSourceRepository.getTransfersCreatedBy(it.source),
@@ -160,7 +141,7 @@ class Reimports(
                             progressLock.withLock {
                                 filesRead++
                                 progress.emit(
-                                    base = PLAN_ALL_CLOSURE_SPAN + PLAN_ALL_READ_SPAN * filesRead / count,
+                                    base = filesRead.toFloat() / count,
                                     detail = "File $filesRead of $count: ${file?.originalFileName.orEmpty()}",
                                 )
                             }
@@ -174,7 +155,6 @@ class Reimports(
         val rerunFiles = fileReads.mapNotNull { it.second }
         return ReimportAllPlan(
             files = loaded,
-            cascaded = loaded.filter { it.id in closure && it.id !in selected }.mapTo(mutableSetOf()) { it.source },
             strategies = loaded.associate { it.source to strategyFor(it, strategies) },
             imported = loaded.associate { it.source to it.importedSettings },
             rerunFiles = rerunFiles,
@@ -242,21 +222,17 @@ class Reimports(
         val run = plan.runFiles()
         checkReimportable(plan, accountId, currencyId)
         val skipped = plan.files.count { it.rowCount > 0 && plan.strategies[it.source] == null && it !in run }
-        val picked = run.filterNot { it.source in plan.cascaded }
-        if (picked.isNotEmpty() && picked.all { isUnchanged(it, plan, accountId, currencyId) }) {
-            // Nothing any picked file reads changed, so importing them again would book what they booked: the run
-            // writes nothing, and nothing that depends on them needs re-importing either.
+        if (run.isNotEmpty() && run.all { isUnchanged(it, plan, accountId, currencyId) }) {
+            // Nothing any file reads changed, so importing them again would book what they booked: the run writes nothing.
             return BulkReimportResult(
                 filesImported = 0,
                 transfersCreated = 0,
                 duplicatesSkipped = 0,
                 filesSkippedNoStrategy = skipped,
                 filesFailed = 0,
-                filesUnchanged = picked.size,
+                filesUnchanged = run.size,
             )
         }
-        val rerun = mutableSetOf<Source>()
-        val reimported = mutableSetOf<Source>()
         // Three phases, each filling the bar from empty: the one delete batch, then runBulkReimport's two (preparing
         // the files, re-importing them). The steps after the last file (settling, empty accounts, views) keep the
         // files' bar where the run left it.
@@ -303,7 +279,6 @@ class Reimports(
                     when {
                         // An empty file has nothing to re-import, and (unlike a missing strategy) is not counted.
                         file.rowCount == 0 -> {
-                            rerun += file.source
                             BulkReimportFileOutcome.NoWork
                         }
 
@@ -314,18 +289,7 @@ class Reimports(
                         else -> {
                             val imported = plan.imported.getValue(file.source)
                             val settings = ImportedSettings(imported.accountId ?: accountId, imported.currencyId ?: currencyId)
-                            val result =
-                                runStaged(
-                                    file,
-                                    strategy,
-                                    settings,
-                                    currencies,
-                                    onFileProgress,
-                                    settled =
-                                        file.source !in plan.cascaded,
-                                )
-                            rerun += file.source
-                            reimported += file.source
+                            val result = runStaged(file, strategy, settings, currencies, onFileProgress)
                             BulkReimportFileOutcome.Reimported(
                                 successCount = result?.successCount ?: 0,
                                 duplicateCount = result?.duplicateCount ?: 0,
@@ -334,49 +298,11 @@ class Reimports(
                     }
                 }
             }
-        val cascadedRerun = plan.cascaded.count { it in rerun }
         return outcome.result.copy(
-            // The files picked; those taken along are counted on their own.
-            filesImported = outcome.result.filesImported - plan.cascaded.count { it in reimported },
             filesSkippedNoStrategy = outcome.result.filesSkippedNoStrategy + skipped,
             emptyAccountsDeleted = outcome.deletedEmptyAccounts.size,
-            cascadedFiles = cascadedRerun,
-            cascadedFilesNotRerun = plan.cascaded.size - cascadedRerun,
             plan = outcome.plan,
         )
-    }
-
-    /** Imports the [files] a re-import cascaded into again, whole and in order, each as it was last imported. */
-    override suspend fun prepare(files: List<Source>): suspend (onProgress: (suspend (Progress) -> Unit)?) -> Set<Source> {
-        val strategies = csvImportStrategyRepository.getAllStrategies().first()
-        val imports =
-            files
-                .mapNotNull { file ->
-                    (file as? Source.Csv)?.let { reads.csvImportRepository.getImport(it.importId).first() }
-                }.map { file ->
-                    file to strategyFor(file, strategies)
-                }
-        // Nobody is asked about a file taken along, so one that can't run stops the re-import before it deletes anything.
-        refuseUnrunnable(imports.map { (file, strategy) -> Triple(file, strategy, file.importedSettings) })
-        return { onProgress ->
-            val currencies = currencies()
-            val notRerun = files.toMutableSet()
-            imports.forEach { (file, strategy) ->
-                // One file failing leaves it to its next import rather than failing the re-import that took it
-                // along, whose own work is already done.
-                try {
-                    if (strategy != null) {
-                        runStaged(file, strategy, file.importedSettings, currencies, onProgress, settled = false)
-                        notRerun -= file.source
-                    }
-                } catch (expected: CancellationException) {
-                    throw expected
-                } catch (expected: Exception) {
-                    logger.e(expected) { "Re-importing ${file.originalFileName} along with another re-import failed" }
-                }
-            }
-            notRerun
-        }
     }
 
     /**
@@ -408,14 +334,13 @@ class Reimports(
         file.lastAppliedStrategyId?.let { id -> strategies.find { it.id == id } }
             ?: strategies.selectForImport(file, reads.csvImportRepository)
 
-    // Runs [strategy] over the file's records that are not yet imported or errored; [settled] as [applyStagedCsv] takes it.
+    // Runs [strategy] over the file's records that are not yet imported or errored.
     private suspend fun runStaged(
         file: CsvImport,
         strategy: CsvImportStrategy,
         settings: ImportedSettings,
         currencies: List<Currency>,
         onProgress: (suspend (Progress) -> Unit)?,
-        settled: Boolean,
     ): CsvImportResult? =
         applyStagedCsv(
             csvImport = file,
@@ -434,7 +359,6 @@ class Reimports(
             cryptoRepository = cryptoRepository,
             attributeAccountMatchers = AttributeAccountMatcher.registry(accountAttributeRepository.getAll().first()),
             tradeRepository = reads.tradeRepository,
-            settled = settled,
         )
 
     /**
@@ -469,7 +393,3 @@ class Reimports(
 }
 
 private val REMOVAL_PHASE = Progress.Phase(1, 3, "Removing what the files created")
-
-// Reading each file is nearly all of "re-import all" planning; finding them is the rest.
-private const val PLAN_ALL_CLOSURE_SPAN = 0.05f
-private const val PLAN_ALL_READ_SPAN = 0.95f

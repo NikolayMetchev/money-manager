@@ -63,6 +63,5 @@ WHERE relationship.id IN (SELECT relationship_id FROM relationship_member WHERE 
         -- check scans every MANUAL source row once per candidate relationship.
         AND entity_source.revision_id = 1
         AND entity_source.source_type_id = 1
-        AND entity_source.matched = 0
   )
 ORDER BY relationship_type.name, relationship.id, member.role, member.transaction_id;

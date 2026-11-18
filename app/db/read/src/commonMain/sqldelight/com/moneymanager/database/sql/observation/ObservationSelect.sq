@@ -121,7 +121,6 @@ WHERE (
     WHERE entity_source.entity_type_id = CASE observation.kind WHEN 'TRADE' THEN 11 ELSE 7 END
       AND entity_source.entity_id = observation.transaction_id
       AND entity_source.revision_id = 1
-      AND entity_source.matched = 0
       AND entity_source.source_type_id IN (2, 10)
   );
 
@@ -179,7 +178,6 @@ WHERE (
     WHERE entity_source.entity_type_id = CASE observation.kind WHEN 'TRADE' THEN 11 ELSE 7 END
       AND entity_source.entity_id = observation.transaction_id
       AND entity_source.revision_id = 1
-      AND entity_source.matched = 0
       AND entity_source.source_type_id IN (2, 5, 10)
   );
 

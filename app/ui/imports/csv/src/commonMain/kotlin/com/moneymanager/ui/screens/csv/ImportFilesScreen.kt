@@ -38,10 +38,7 @@ import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.ImportTimelineReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
-import com.moneymanager.domain.repository.RelationshipReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
-import com.moneymanager.domain.repository.TransactionReadRepository
-import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importdirectory.ImportDirectoryService
 import com.moneymanager.importdirectory.canDownload
 import com.moneymanager.importdirectory.startDownload
@@ -87,7 +84,6 @@ import kotlin.time.Clock
 fun ImportFilesScreen(
     importDirectoryService: ImportDirectoryService,
     csvImportRepository: CsvImportReadRepository,
-    transferSourceRepository: TransferSourceReadRepository,
     importTimelineRepository: ImportTimelineReadRepository,
     importDirectoryRepository: ImportDirectoryReadRepository,
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
@@ -95,8 +91,6 @@ fun ImportFilesScreen(
     categoryRepository: CategoryReadRepository,
     currencyRepository: CurrencyReadRepository,
     personRepository: PersonReadRepository,
-    transactionRepository: TransactionReadRepository,
-    relationshipRepository: RelationshipReadRepository,
     tradeRepository: TradeReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
@@ -231,10 +225,7 @@ fun ImportFilesScreen(
                 UnimportDialog(
                     csvImport = target,
                     csvImportRepository = csvImportRepository,
-                    transferSourceRepository = transferSourceRepository,
                     accountRepository = accountRepository,
-                    transactionRepository = transactionRepository,
-                    relationshipRepository = relationshipRepository,
                     tradeRepository = tradeRepository,
                     maintenance = maintenance,
                     importEngine = importEngine,
@@ -251,10 +242,7 @@ fun ImportFilesScreen(
                 CsvUnimportAllDialog(
                     imports = scoped,
                     csvImportRepository = csvImportRepository,
-                    transferSourceRepository = transferSourceRepository,
                     accountRepository = accountRepository,
-                    transactionRepository = transactionRepository,
-                    relationshipRepository = relationshipRepository,
                     tradeRepository = tradeRepository,
                     maintenance = maintenance,
                     importEngine = importEngine,

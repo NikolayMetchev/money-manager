@@ -14,7 +14,11 @@ import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImport
+import com.moneymanager.importengineapi.AccountRef
+import com.moneymanager.importengineapi.ImportBatch
+import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.createAccount
+import com.moneymanager.importengineapi.separateObservations
 import com.moneymanager.tasks.Progress
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.reimportFile
@@ -332,6 +336,53 @@ class CryptoComCsvE2ETest : DbTest() {
             assertEquals("-3446.03", cashBalance.balance.toDisplayValue().toString(), "the deposit counts once")
         }
 
+    /**
+     * The bank's record of an FPS deposit into Crypto.com Cash, then the fiat export's own: returns the wallet and its
+     * two deposits, the wallet's and the bank's.
+     */
+    private suspend fun importBankDepositThenTheWalletsRecord(): Triple<AccountId, Transfer, Transfer> {
+        repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
+        val gbp = repositories.currencyRepository.getCurrencyByCode("GBP").first()!!
+        val bankId =
+            repositories.importEngine.createAccount(Account(id = AccountId(0), name = "Monzo", openingDate = now), Source.Manual)
+        val cashId =
+            repositories.importEngine.createAccount(
+                Account(id = AccountId(0), name = "Crypto.com Cash", openingDate = now),
+                Source.Manual,
+            )
+        // The bank's own record, stamped nine hours before crypto.com's (statement exports and bank
+        // feeds rarely agree to the minute).
+        repositories.importEngine.import(
+            ImportBatch(
+                transfers =
+                    listOf(
+                        ImportTransfer(
+                            source = Source.Manual,
+                            fromAccount = AccountRef.Existing(bankId),
+                            toAccount = AccountRef.Existing(cashId),
+                            timestamp = Instant.parse("2023-11-17T02:18:14Z"),
+                            description = "BI6055443",
+                            amount = Money.fromDisplayValue(BigDecimal("2000.00"), gbp),
+                        ),
+                    ),
+            ),
+        )
+
+        val fiat = stage("fiat_transactions_record_20231120_085814.csv", fiatRows)
+        assertEquals(1, applyAll(listOf(fiat)).filesImported)
+        repositories.maintenanceService.refreshMaterializedViews()
+
+        val deposits = depositsOf2000(cashId)
+        assertEquals(2, deposits.size, "both records are kept")
+        return Triple(cashId, deposits.single { it.sourceAccountId != bankId }, deposits.single { it.sourceAccountId == bankId })
+    }
+
+    private suspend fun depositsOf2000(cashId: AccountId): List<Transfer> =
+        repositories.transactionRepository
+            .getTransactionsByAccount(cashId)
+            .first()
+            .filter { it.targetAccountId == cashId && it.amount.toDisplayValue().compareTo(BigDecimal("2000.00")) == 0 }
+
     @Test
     fun bankLegAlreadyImported_reconcilesTheWalletsOwnDepositRecord() =
         runDbTest {
@@ -340,40 +391,7 @@ class CryptoComCsvE2ETest : DbTest() {
             // placeholder counterparty. Nothing links the two records but the wallet account, the
             // direction and the amount — so without the unidentified-counterparty reconcile the deposit
             // lands in the wallet twice.
-            repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
-            val gbp = repositories.currencyRepository.getCurrencyByCode("GBP").first()!!
-            val bankId =
-                repositories.importEngine.createAccount(Account(id = AccountId(0), name = "Monzo", openingDate = now), Source.Manual)
-            val cashId =
-                repositories.importEngine.createAccount(
-                    Account(id = AccountId(0), name = "Crypto.com Cash", openingDate = now),
-                    Source.Manual,
-                )
-            // The bank's own record, stamped nine hours before crypto.com's (statement exports and bank
-            // feeds rarely agree to the minute).
-            createTransfer(
-                Transfer(
-                    id = TransferId(0),
-                    timestamp = Instant.parse("2023-11-17T02:18:14Z"),
-                    description = "BI6055443",
-                    sourceAccountId = bankId,
-                    targetAccountId = cashId,
-                    amount = Money.fromDisplayValue(BigDecimal("2000.00"), gbp),
-                ),
-            )
-
-            val fiat = stage("fiat_transactions_record_20231120_085814.csv", fiatRows)
-            assertEquals(1, applyAll(listOf(fiat)).filesImported)
-            repositories.maintenanceService.refreshMaterializedViews()
-
-            val deposits =
-                repositories.transactionRepository
-                    .getTransactionsByAccount(cashId)
-                    .first()
-                    .filter { it.targetAccountId == cashId && it.amount.toDisplayValue().compareTo(BigDecimal("2000.00")) == 0 }
-            assertEquals(2, deposits.size, "both records are kept")
-            val walletRecord = deposits.single { it.sourceAccountId != bankId }
-            val bankRecord = deposits.single { it.sourceAccountId == bankId }
+            val (cashId, walletRecord, bankRecord) = importBankDepositThenTheWalletsRecord()
             assertTrue(
                 walletRecord.attributes.any { it.attributeType.name == "excluded" && it.value == "reconciled" },
                 "the wallet's placeholder record is excluded, so the deposit is counted once",
@@ -395,6 +413,29 @@ class CryptoComCsvE2ETest : DbTest() {
                     .first()
                     .single { it.accountId == cashId && it.balance.asset.code == "GBP" }
             assertEquals("-3446.03", cashBalance.balance.toDisplayValue().toString())
+        }
+
+    // "These are different" on the two records the deposit reconciled: the person says they are two movements, so the
+    // reconciled link goes and the wallet's own record counts again beside the bank's.
+    @Test
+    fun separatingTheReconciledDepositRecords_dropsTheLink_andBothCount() =
+        runDbTest {
+            val (cashId, walletRecord, bankRecord) = importBankDepositThenTheWalletsRecord()
+            val observations = repositories.observationRepository
+            repositories.importEngine.separateObservations(
+                observations.getObservationsOfTransaction(walletRecord.id).single().id,
+                observations.getObservationsOfTransaction(bankRecord.id).single().id,
+            )
+
+            val reconciled =
+                repositories.relationshipRepository
+                    .getByTransaction(walletRecord.id)
+                    .first()
+                    .filter { it.relationshipType.name == "reconciled" }
+            assertTrue(reconciled.isEmpty(), "$reconciled")
+            val deposits = depositsOf2000(cashId)
+            assertEquals(2, deposits.size, "$deposits")
+            assertTrue(deposits.none { d -> d.attributes.any { it.attributeType.name == "excluded" } }, "both records count: $deposits")
         }
 
     @Test

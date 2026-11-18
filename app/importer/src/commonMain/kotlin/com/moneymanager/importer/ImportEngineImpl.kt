@@ -660,10 +660,9 @@ class ImportEngineImpl(
     /**
      * What a [CsvImportMutation.Reserve] or an [ApiSessionMutation.Reserve] keeps (#1430, #1429). Of [vacating] (the deletes no other source still observes), each a
      * reserved observation is on keeps its observations, pointing at an id with no row, for the re-run to take back. A
-     * reserved observation on any other transaction that keeps its row (one the file shared with another source) goes now,
-     * as a reset's did, and that transaction is rebuilt from what is left, unless a group owns it: the group's other files
-     * still say it (a cross-file trade another file booked), so it stays reserved for the re-run to say again, and the
-     * settle releases it. Ids a previous, stopped re-run left vacant stay.
+     * reserved observation on a transaction that keeps its row (one the file shared with another source) stays reserved on
+     * it too, so the record says it again there and a person's edits of it hold (#1432): the settle deletes it if the record
+     * doesn't. Ids a previous, stopped re-run left vacant stay.
      */
     private suspend fun reserveVacated(
         batch: ImportBatch,
@@ -684,7 +683,6 @@ class ImportEngineImpl(
                 ?.let { o ->
                     o.getAllPins().mapTo(mutableSetOf()) { it.observationId } + o.getAllSplits().flatMap { listOf(it.first, it.second) }
                 }.orEmpty()
-        val kept = mutableSetOf<TransactionId>()
         val reserved = observations.getReserved()
         val reservedIds = reserved.mapTo(mutableSetOf()) { it.id }
         // A split gives an observation a transaction of its own, which no source created and so no re-run deletes: when
@@ -698,15 +696,10 @@ class ImportEngineImpl(
                 .toSet()
         transactionRepository.deleteTransactions(decidedAlone.filterIsInstance<TransferId>())
         tradeRepository.deleteTrades(decidedAlone.filterIsInstance<TradeId>())
-        for (observation in reserved) {
-            when {
-                observation.transactionId in vacatingIds || observation.transactionId in decidedAlone -> kept += observation.transactionId
-                observation.id in alreadyVacant -> Unit
-                observation.owner is ObservationOwner.Group -> Unit
-                observation.id in decided -> Unit
-                else -> observations.deleteObservation(observation.id)
-            }
-        }
+        val kept =
+            reserved
+                .filter { it.transactionId in vacatingIds || it.transactionId in decidedAlone }
+                .mapTo(mutableSetOf()) { it.transactionId }
         val placeholderTypeId = placeholderTypeId()
         val priorMerges =
             kept
@@ -770,7 +763,6 @@ class ImportEngineImpl(
         val resetIds =
             batch.csvImportMutations.mapNotNullTo(mutableSetOf()) {
                 when (it) {
-                    is CsvImportMutation.ResetRowStatuses -> it.id
                     is CsvImportMutation.ResetToUnimported -> it.id
                     is CsvImportMutation.Reserve -> it.id
                     else -> null
@@ -3269,10 +3261,6 @@ class ImportEngineImpl(
 
                 is CsvImportMutation.UpdateRowStatuses -> {
                     csvImportRepository.updateRowStatusesBatch(m.id, m.status, m.rowTransferMap)
-                }
-
-                is CsvImportMutation.ResetRowStatuses -> {
-                    csvImportRepository.resetRowStatuses(m.id, m.rowIndexes)
                 }
 
                 is CsvImportMutation.Reserve -> {

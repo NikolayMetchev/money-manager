@@ -43,10 +43,8 @@ import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.ReconciliationReadRepository
-import com.moneymanager.domain.repository.RelationshipReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
-import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importdirectory.ImportDirectoryService
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.setCsvImportIgnored
@@ -85,7 +83,6 @@ fun ImportsScreen(
     apiImportService: ApiImportService,
     driveFolderBrowser: DriveFolderBrowser?,
     csvImportRepository: CsvImportReadRepository,
-    transferSourceRepository: TransferSourceReadRepository,
     csvImportStrategyRepository: CsvImportStrategyReadRepository,
     accountMappingRepository: AccountMappingReadRepository,
     accountMappingExportService: AccountMappingExportService,
@@ -100,7 +97,6 @@ fun ImportsScreen(
     cryptoRepository: CryptoReadRepository,
     importRecordRepository: ImportRecordReadRepository,
     transactionRepository: TransactionReadRepository,
-    relationshipRepository: RelationshipReadRepository,
     tradeRepository: TradeReadRepository,
     maintenance: Maintenance,
     observationRepository: ObservationReadRepository,
@@ -143,7 +139,6 @@ fun ImportsScreen(
                 ImportFilesScreen(
                     importDirectoryService = importDirectoryService,
                     csvImportRepository = csvImportRepository,
-                    transferSourceRepository = transferSourceRepository,
                     importTimelineRepository = importTimelineRepository,
                     importDirectoryRepository = importDirectoryRepository,
                     csvImportStrategyRepository = csvImportStrategyRepository,
@@ -151,8 +146,6 @@ fun ImportsScreen(
                     categoryRepository = categoryRepository,
                     currencyRepository = currencyRepository,
                     personRepository = personRepository,
-                    transactionRepository = transactionRepository,
-                    relationshipRepository = relationshipRepository,
                     tradeRepository = tradeRepository,
                     maintenance = maintenance,
                     importEngine = importEngine,
@@ -174,10 +167,8 @@ fun ImportsScreen(
                                     onOpenAudit = onImportDirectoryAuditClick,
                                     unimportCsv = { id ->
                                         executeCsvUnimport(
-                                            plan = planCsvUnimport(id, csvImportRepository, transferSourceRepository),
+                                            plan = planCsvUnimport(id, csvImportRepository),
                                             accountRepository = accountRepository,
-                                            transactionRepository = transactionRepository,
-                                            relationshipRepository = relationshipRepository,
                                             tradeRepository = tradeRepository,
                                             maintenance = maintenance,
                                             importEngine = importEngine,

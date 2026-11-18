@@ -114,7 +114,6 @@ class CsvTableManager(
                 JOIN transfer ON transfer.id = entity_source.entity_id
                 WHERE csv_entity_source.csv_import_id = '$csvImportId'
                   AND entity_source.entity_type_id = 7
-                  AND entity_source.matched = 0
                 GROUP BY csv_entity_source.csv_import_id, csv_entity_source.csv_row_index
             ) source_rows ON source_rows.csv_import_id = '$csvImportId'
                 AND source_rows.csv_row_index = t.row_index
@@ -156,31 +155,13 @@ class CsvTableManager(
         tableName: String,
         rowIndex: Long,
         status: String,
-        transferId: TransferId? = null,
+        transferId: TransferId?,
     ) {
         val transferIdClause = transferId?.let { ", transaction_id = '${it.id}'" }.orEmpty()
         database.execute("UPDATE $tableName SET import_status = '$status'$transferIdClause WHERE row_index = $rowIndex")
     }
 
-    /**
-     * Clears the import status + transfer link for the given rows, returning them to the
-     * never-imported state so a strategy re-run picks them up again.
-     *
-     * @param tableName The name of the table
-     * @param rowIndexes The row indexes to reset
-     */
-    suspend fun resetRowStatuses(
-        tableName: String,
-        rowIndexes: Collection<Long>,
-    ) {
-        if (rowIndexes.isEmpty()) return
-        database.execute(
-            "UPDATE $tableName SET import_status = NULL, transaction_id = NULL " +
-                "WHERE row_index IN (${rowIndexes.joinToString(",")})",
-        )
-    }
-
-    /** Returns every row of [tableName] to the never-imported state (see [resetRowStatuses]). */
+    /** Returns every row of [tableName] to the never-imported state, so a strategy re-run picks them up again. */
     suspend fun resetAllRowStatuses(tableName: String) {
         database.execute("UPDATE $tableName SET import_status = NULL, transaction_id = NULL")
     }

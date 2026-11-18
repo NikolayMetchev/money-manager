@@ -54,7 +54,7 @@ suspend fun Reimports.planFile(
     return if (strategy == null) plan else plan.copy(strategies = plan.strategies + (file.source to strategy))
 }
 
-/** Re-imports the staged file [id], and every file that depends on it, as the re-import dialog does. */
+/** Re-imports the staged file [id] as the re-import dialog does. */
 suspend fun Reimports.reimportFile(
     id: CsvImportId,
     accountId: AccountId? = null,
