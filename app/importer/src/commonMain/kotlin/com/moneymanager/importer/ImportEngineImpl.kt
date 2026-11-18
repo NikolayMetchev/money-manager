@@ -653,16 +653,19 @@ class ImportEngineImpl(
     private suspend fun materialize(
         mutations: List<ObservationMutation>,
         request: MaterializationRequest,
-    ): MaterializationReport =
-        ObservationMaterialization(
-            observations = checkNotNull(observationRepository) { "This engine has no observation repository" },
-            overrides = checkNotNull(personOverrideRepository) { "This engine has no person override repository" },
-            accounts = accountRepository,
-            trades = tradeRepository,
-            relationships = relationshipRepository,
-            placeholderTypeId = attributeTypeRepository.getByName(WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME).first()?.id,
-            records = importRecordRepository,
-        ).run(mutations, request)
+    ): MaterializationReport {
+        val observations = checkNotNull(observationRepository) { "This engine has no observation repository" }
+        val overrides = checkNotNull(personOverrideRepository) { "This engine has no person override repository" }
+        val plan =
+            ObservationMaterializationPlanner(
+                observations = observations,
+                overrides = overrides,
+                relationships = relationshipRepository,
+                placeholderTypeId = placeholderTypeId(),
+                records = importRecordRepository,
+            ).plan(mutations, request)
+        return ObservationMaterialization(observations, accountRepository, tradeRepository).apply(plan)
+    }
 
     /**
      * What a [CsvImportMutation.Reserve] or an [ApiSessionMutation.Reserve] keeps (#1430, #1429). Of [vacating] (the deletes no other source still observes), each a

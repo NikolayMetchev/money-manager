@@ -1,220 +1,29 @@
 package com.moneymanager.importer
 
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.AttributeTypeId
-import com.moneymanager.domain.model.JsonPath
-import com.moneymanager.domain.model.RelationshipRole
-import com.moneymanager.domain.model.Source
-import com.moneymanager.domain.model.SourceType
-import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransactionId
-import com.moneymanager.domain.model.TransactionKind
-import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
-import com.moneymanager.domain.model.observation.ImportRecordKey
-import com.moneymanager.domain.model.observation.MaterializedTransaction
-import com.moneymanager.domain.model.observation.MaterializedWrite
-import com.moneymanager.domain.model.observation.Observation
-import com.moneymanager.domain.model.observation.ObservationAttribute
-import com.moneymanager.domain.model.observation.ObservationOwner
-import com.moneymanager.domain.repository.ImportRecordReadRepository
-import com.moneymanager.domain.repository.PersonOverrideReadRepository
-import com.moneymanager.domain.repository.RelationshipReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.write.AccountWriteRepository
 import com.moneymanager.domain.repository.write.ObservationWriteRepository
-import com.moneymanager.importengineapi.LocalTransactionKey
-import com.moneymanager.importengineapi.MaterializationConflict
 import com.moneymanager.importengineapi.MaterializationReport
-import com.moneymanager.importengineapi.MaterializationRequest
-import com.moneymanager.importengineapi.Materializer
-import com.moneymanager.importengineapi.ObservationMutation
-import com.moneymanager.importengineapi.ObservationTransaction
-import com.moneymanager.importengineapi.TransactionOverrides
 
-private val EXCLUDED_TYPE = AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID)
-
-/** The materialized reason for excluding a transaction through a Reconciler link. */
-private const val RECONCILED_EXCLUSION = "reconciled"
-
-/**
- * The materializer's database half, run by [ImportEngineImpl]: applies a batch's observation mutations, then brings
- * every transaction they touched to the rank-merge of its observations with the person's overrides on top, writing
- * only what changed ([Materializer] decides what). A transaction left without observations loses its row, and what
- * pointed at it is reported rather than guessed at. Accounts the request names that nothing references any more
- * go too, each with its fee account.
- */
+/** Applies the observation and effective row changes computed by [ObservationMaterializationPlanner]. */
 internal class ObservationMaterialization(
     private val observations: ObservationWriteRepository,
-    private val overrides: PersonOverrideReadRepository,
     private val accounts: AccountWriteRepository,
     private val trades: TradeReadRepository,
-    private val relationships: RelationshipReadRepository?,
-    private val placeholderTypeId: AttributeTypeId?,
-    private val records: ImportRecordReadRepository?,
 ) {
-    suspend fun run(
-        mutations: List<ObservationMutation>,
-        request: MaterializationRequest,
-    ): MaterializationReport {
-        val bySlot = mutableMapOf<ObservationOwner, MutableMap<String, Observation>>()
+    suspend fun apply(plan: ObservationMaterializationPlan): MaterializationReport {
+        val ids = observations.applyObservationChanges(plan.newTransactions.values, plan.observations, plan.rows)
 
-        suspend fun slotsOf(owner: ObservationOwner) =
-            bySlot.getOrPut(owner) { observations.getObservationsOf(owner).associateByTo(mutableMapOf()) { it.slot } }
-
-        // Every transaction an observation leaves or joins, keyed by its id (a transfer's and a trade's never clash).
-        val affected = LinkedHashMap<Long, TransactionId>()
-        request.transactionIds.forEach { affected[it.id] = it }
-        for (mutation in mutations) {
-            slotsOf(mutation.owner)[mutation.slot]?.let { affected[it.transactionId.id] = it.transactionId }
-            ((mutation as? ObservationMutation.Upsert)?.transaction as? ObservationTransaction.Existing)?.let {
-                affected[it.id.id] = it.id
-            }
-        }
-        val before = affected.mapValues { (_, id) -> request.priorMerges[id] ?: mergeOf(id) }
-
-        val newIds = LinkedHashMap<LocalTransactionKey, TransactionId>()
-        for (mutation in mutations) {
-            val slots = slotsOf(mutation.owner)
-            val existing = slots[mutation.slot]
-            when (mutation) {
-                is ObservationMutation.Upsert -> {
-                    val target =
-                        when (val transaction = mutation.transaction) {
-                            is ObservationTransaction.Existing -> {
-                                transaction.id
-                            }
-
-                            is ObservationTransaction.New -> {
-                                newIds.getOrPut(transaction.key) {
-                                    observations.allocateTransactionId(mutation.content.values.kind)
-                                }
-                            }
-                        }
-                    affected[target.id] = target
-                    slots[mutation.slot] =
-                        if (existing == null) {
-                            val id = observations.insertObservation(mutation.owner, mutation.slot, target, mutation.content)
-                            Observation(id, mutation.owner, mutation.slot, target, mutation.content)
-                        } else {
-                            if (existing.content != mutation.content) observations.updateContent(existing.id, mutation.content)
-                            if (existing.transactionId.id != target.id) observations.assignTransaction(existing.id, target)
-                            existing.copy(transactionId = target, content = mutation.content)
-                        }
-                }
-
-                is ObservationMutation.Delete -> {
-                    if (existing != null) {
-                        observations.deleteObservation(existing.id)
-                        slots.remove(mutation.slot)
-                    }
-                }
-            }
-        }
-
-        val mergedByKey = affected.mapValues { (_, id) -> mergeOf(id) }
-        val gone = mergedByKey.filterValues { it == null }.keys
-        val excludedByLink = excludedByLinks(affected.filterKeys { it !in gone }.values, gone)
-        val writes = mutableListOf<MaterializedWrite>()
-        val conflicts = mutableListOf<MaterializationConflict>()
-        for ((key, id) in affected) {
-            val current = observations.getMaterialized(id)
-            val merged =
-                mergedByKey[key]?.let {
-                    if (key in excludedByLink) it.excludedAsReconciled() else it
-                }
-            val personal = overridesOf(id)
-            val effective = merged?.let { Materializer.applyOverrides(it, personal) }
-            val source = if (current == null && request.source == Source.Reconciler) creatorOf(id) ?: request.source else request.source
-            Materializer.write(key, id.kind(), current, effective, source)?.let(writes::add)
-            conflicts += Materializer.conflicts(key, before[key], merged, personal)
-        }
-
-        val deleted = writes.filterIsInstance<MaterializedWrite.Delete>().map { affected.getValue(it.transactionId) }
-        // Read before the rows go, while every member still resolves.
-        val pins = if (deleted.isEmpty()) emptyList() else overrides.getPinsOnTransactions(deleted)
-        val lostMembers = if (deleted.isEmpty()) emptyList() else relationships?.getByTransactions(deleted).orEmpty()
-        val (matches, others) =
-            lostMembers.partition { it.relationshipType.id.id == WellKnownIds.RECONCILIATION_MATCH_RELATIONSHIP_TYPE_ID }
-
-        if (writes.isNotEmpty()) observations.applyMaterialization(writes)
-
-        return MaterializationReport(
-            newTransactionIds = newIds,
-            inserted = writes.idsOf<MaterializedWrite.Insert>(affected),
-            updated = writes.idsOf<MaterializedWrite.Update>(affected),
-            deleted = deleted.toSet(),
-            conflicts = conflicts,
-            orphanedPins = pins,
-            orphanedMatches = matches,
-            orphanedRelationships = others,
-            deletedAccountIds = collectAccounts(request.candidateAccountIds),
+        fun resolved(id: TransactionId): TransactionId = ids[id] ?: id
+        return plan.report.copy(
+            newTransactionIds = plan.newTransactions.mapValues { (_, id) -> resolved(id) },
+            inserted = plan.report.inserted.mapTo(mutableSetOf(), ::resolved),
+            deletedAccountIds = collectAccounts(plan.candidateAccountIds),
         )
     }
-
-    /**
-     * The ids of [live] transactions an exclusion link takes out of balances: each is the primary of a `reconciled`
-     * relationship the Reconciler wrote, with something that outlives this run ([gone] are what it deletes) counted in
-     * its place. No observation says so (each record reports only itself), so the link is where the match says it.
-     */
-    private suspend fun excludedByLinks(
-        live: Collection<TransactionId>,
-        gone: Set<Long>,
-    ): Set<Long> {
-        if (live.isEmpty()) return emptySet()
-        val liveIds = live.mapTo(mutableSetOf()) { it.id }
-        return relationships
-            ?.getMadeByTransactions(live, SourceType.RECONCILER)
-            .orEmpty()
-            .filter { link ->
-                link.relationshipType.id.id == WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID &&
-                    link.members.any { it.role == RelationshipRole.RELATED && it.transactionId.id !in gone }
-            }.flatMapTo(mutableSetOf()) { link ->
-                val primary = link.primary ?: return@flatMapTo emptyList()
-                if (primary.id in gone) return@flatMapTo emptyList()
-                val excluded = if (link.excludesRelated) link.members.map { it.transactionId } else listOf(primary)
-                excluded.mapNotNull { it.id.takeIf(liveIds::contains) }
-            }
-    }
-
-    private fun MaterializedTransaction.excludedAsReconciled(): MaterializedTransaction =
-        if (attributes.any { it.typeId == EXCLUDED_TYPE }) {
-            this
-        } else {
-            copy(
-                attributes =
-                    attributes + ObservationAttribute(EXCLUDED_TYPE, "", RECONCILED_EXCLUSION),
-            )
-        }
-
-    /**
-     * The record a transaction the matcher splits off is created by, when every observation it carries is that one
-     * record's: it is then the record's own movement, as a fresh import books it, so the record's re-import replaces it
-     * and carries its hand edits over. Null for a transaction several records or a group make up.
-     */
-    private suspend fun creatorOf(id: TransactionId): Source? {
-        val owner =
-            observations
-                .getObservationsOfTransaction(id)
-                .map { it.owner }
-                .distinct()
-                .singleOrNull() as? ObservationOwner.Record ?: return null
-        return when (val key = records?.getRecord(owner.recordId)?.key) {
-            is ImportRecordKey.CsvRow -> Source.Csv(key.csvImportId, key.rowIndex)
-            is ImportRecordKey.ApiItem -> Source.Api(key.sessionId, key.requestId, JsonPath(key.jsonPath))
-            null -> null
-        }
-    }
-
-    private suspend fun mergeOf(id: TransactionId): MaterializedTransaction? =
-        Materializer.merge(observations.getObservationsOfTransaction(id).map { it.content }, placeholderTypeId)
-
-    private suspend fun overridesOf(id: TransactionId): TransactionOverrides =
-        when (id) {
-            is TransferId -> TransactionOverrides(overrides.getTransferOverrides(id), overrides.getTransferAttributeOverrides(id))
-            is TradeId -> TransactionOverrides(attributes = overrides.getTradeAttributeOverrides(id))
-            else -> error("transaction $id is neither a transfer nor a trade")
-        }
 
     /**
      * Deletes the [candidates] nothing references (no transfer, trade or observation), then the fee accounts of those
@@ -240,15 +49,4 @@ internal class ObservationMaterialization(
             trades.accountsWithTrades(accountIds) -
             observations.getAccountsWithObservations(accountIds)
     }
-
-    private inline fun <reified W : MaterializedWrite> List<MaterializedWrite>.idsOf(
-        affected: Map<Long, TransactionId>,
-    ): Set<TransactionId> = filterIsInstance<W>().mapTo(mutableSetOf()) { affected.getValue(it.transactionId) }
-
-    private fun TransactionId.kind(): TransactionKind =
-        when (this) {
-            is TransferId -> TransactionKind.TRANSFER
-            is TradeId -> TransactionKind.TRADE
-            else -> error("transaction $this is neither a transfer nor a trade")
-        }
 }

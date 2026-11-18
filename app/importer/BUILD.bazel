@@ -86,9 +86,12 @@ kmp_test(
         "//app/importengineapi",
         "//app/model/core",
         "//app/model/csv",
+        "//app/model/observation",
         "//app/model/passthrough",
+        "//app/model/repository/read",
         "//app/model/rules",
         "//bazel/kmp/deps:kotlin_test",
         "//utils/bigdecimal",
+        "@maven_kmp//:kotlinx_coroutines_test",
     ],
 )

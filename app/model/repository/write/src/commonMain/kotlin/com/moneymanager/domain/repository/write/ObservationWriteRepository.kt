@@ -4,16 +4,20 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.MergeId
 import com.moneymanager.domain.model.TransactionId
-import com.moneymanager.domain.model.TransactionKind
 import com.moneymanager.domain.model.observation.MaterializedWrite
+import com.moneymanager.domain.model.observation.ObservationChange
 import com.moneymanager.domain.model.observation.ObservationContent
 import com.moneymanager.domain.model.observation.ObservationId
 import com.moneymanager.domain.model.observation.ObservationOwner
 import com.moneymanager.domain.repository.ObservationReadRepository
 
 interface ObservationWriteRepository : ObservationReadRepository {
-    /** A new, empty transaction of [kind] for observations to land on; the materializer writes its row. */
-    suspend fun allocateTransactionId(kind: TransactionKind): TransactionId
+    /** Commits a plan's observation and effective row changes together, returning real ids for its provisional ids. */
+    suspend fun applyObservationChanges(
+        newTransactions: Collection<TransactionId>,
+        observations: List<ObservationChange>,
+        rows: List<MaterializedWrite>,
+    ): Map<TransactionId, TransactionId>
 
     /** Records what [owner] says about [slot], on [transactionId]; an owner's slot already recorded fails. */
     suspend fun insertObservation(
@@ -70,11 +74,4 @@ interface ObservationWriteRepository : ObservationReadRepository {
         mergeId: MergeId,
         restoredAccountId: AccountId,
     )
-
-    /**
-     * Writes the materializer's [writes] in one database transaction: inserts a row under its existing `transaction_id`,
-     * updates one as a new revision (its attributes too, in that same revision), or deletes one. Each insert and update
-     * records its source against the revision it made.
-     */
-    suspend fun applyMaterialization(writes: List<MaterializedWrite>)
 }

@@ -1,6 +1,7 @@
 package com.moneymanager.domain.model.observation
 
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.TransactionKind
 
 /**
@@ -37,3 +38,17 @@ sealed interface MaterializedWrite {
         val kind: TransactionKind,
     ) : MaterializedWrite
 }
+
+/** A slot's stored observation and its planned replacement. */
+data class ObservationChange(
+    val owner: ObservationOwner,
+    val slot: String,
+    val before: Observation?,
+    val after: ObservationBooking?,
+)
+
+data class ObservationBooking(
+    val storedId: ObservationId?,
+    val transactionId: TransactionId,
+    val content: ObservationContent,
+)

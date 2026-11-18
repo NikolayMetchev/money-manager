@@ -38,6 +38,7 @@ import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFails
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -132,6 +133,33 @@ class MaterializerDbTest : DbTest() {
             val again = materialize(upsert(record, ObservationTransaction.Existing(id), content(bank, shop, gbp))).materialization
             assertFalse(again.wroteRows)
             assertEquals(first, transfer(id))
+        }
+
+    @Test
+    fun `a rejected observation rolls back the whole materialization`() =
+        runDbTest {
+            val gbp = gbp()
+            val bank = account("Bank")
+            val shop = account("Shop")
+            val (first, second) = records(2)
+            val id =
+                materialize(upsert(first, ObservationTransaction.New(key), content(bank, shop, gbp)))
+                    .materialization.newTransactionIds
+                    .getValue(key)
+            val saved = transfer(id)
+            val firstOwner = ObservationOwner.Record(first)
+            val firstObservation = repositories.observationRepository.getObservationsOf(firstOwner).single()
+
+            assertFails {
+                materialize(
+                    upsert(first, ObservationTransaction.Existing(id), content(bank, shop, gbp, description = "Changed")),
+                    upsert(second, ObservationTransaction.New(LocalTransactionKey("invalid")), content(bank, bank, gbp)),
+                )
+            }
+
+            assertEquals(saved, transfer(id))
+            assertEquals(listOf(firstObservation), repositories.observationRepository.getObservationsOf(firstOwner))
+            assertTrue(repositories.observationRepository.getObservationsOf(ObservationOwner.Record(second)).isEmpty())
         }
 
     @Test
