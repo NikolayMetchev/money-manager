@@ -512,14 +512,20 @@ object BuiltInApiStrategies {
                                 endpoint =
                                     ApiEndpointConfig(
                                         // {account.defaultCategory} resolves the account's defaultCategory from its raw
-                                        // JSON; the feed endpoint returns the full history in a single response.
-                                        path = "/api/v2/feed/account/{account.id}/category/{account.defaultCategory}",
+                                        // JSON. Bound each request: changesSince=1970 exceeds Starling's range limit.
+                                        path = "/api/v2/feed/account/{account.id}/category/{account.defaultCategory}/transactions-between",
                                         responseArrayKey = "feedItems",
-                                        // Starling requires a mandatory `changesSince` ISO-8601 bound; anchoring it to
-                                        // the epoch returns the account's entire feed history in one response.
-                                        queryParams =
-                                            listOf(
-                                                ApiQueryParam(name = "changesSince", value = "1970-01-01T00:00:00.000Z"),
+                                        pagination =
+                                            ApiPaginationConfig(
+                                                sendLimitParam = false,
+                                                window =
+                                                    ApiDateWindowing(
+                                                        startParam = "minTransactionTimestamp",
+                                                        endParam = "maxTransactionTimestamp",
+                                                        windowDays = 365,
+                                                        lookbackDays = 365 * 20,
+                                                        boundFormat = WindowBoundFormat.ISO_8601,
+                                                    ),
                                             ),
                                     ),
                                 kind = ApiEndpointKind.BANK_TRANSACTIONS,

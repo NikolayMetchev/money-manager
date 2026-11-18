@@ -344,13 +344,10 @@ class BuiltInApiStrategyInstallTest : DbTest() {
             val starlingAccounts = assertIs<ApiAccountsSource.Downloaded>(starling.config.accounts)
             assertEquals("/api/v2/accounts", starlingAccounts.endpoint.path)
             assertEquals("accounts", starlingAccounts.endpoint.responseArrayKey)
-            assertEquals(
-                "/api/v2/feed/account/{account.id}/category/{account.defaultCategory}",
-                checkNotNull(starling.config.bankTransactions).endpoint.path,
-            )
-            assertEquals("feedItems", checkNotNull(starling.config.bankTransactions).endpoint.responseArrayKey)
-            // Full history is returned in one response, so no pagination is configured.
-            assertEquals(null, checkNotNull(starling.config.bankTransactions).endpoint.pagination)
+            val feedEndpoint = checkNotNull(starling.config.bankTransactions).endpoint
+            assertEquals("/api/v2/feed/account/{account.id}/category/{account.defaultCategory}/transactions-between", feedEndpoint.path)
+            assertEquals("feedItems", feedEndpoint.responseArrayKey)
+            assertEquals(365, feedEndpoint.pagination?.window?.windowDays)
 
             assertEquals("accountUid", starlingAccounts.mappings.idField)
             assertEquals("currency", starlingAccounts.mappings.currencyField)
