@@ -8,6 +8,7 @@ import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
+import com.moneymanager.domain.model.observation.ObservationEnd
 import kotlin.time.Instant
 
 /**
@@ -72,6 +73,11 @@ data class ExpandedTransfer(
     val provenance: Source,
     val attributes: List<NewAttribute>,
     val links: List<LegLink>,
+    /**
+     * The end a stand-in account holds, when the importer said so without tagging the row (an exchange's generic funding
+     * account: its feed never names the far end of a deposit or withdrawal).
+     */
+    val placeholderEnd: ObservationEnd? = null,
 )
 
 /** One trade an observation says (a conversion its own account settled a movement with). */
@@ -208,6 +214,14 @@ object ObservationExpander {
             }
         val legs = mutableListOf<ExpandedTransfer>()
         legs += leg(mainKey, t.description, t.fromAccount, t.toAccount, requireNotNull(t.amount), rowKey, t.attributes, mainLinks)
+            .let { main ->
+                when (t.unidentifiedCounterpartyAccountId) {
+                    null -> main
+                    main.sourceAccountId -> main.copy(placeholderEnd = ObservationEnd.SOURCE)
+                    main.targetAccountId -> main.copy(placeholderEnd = ObservationEnd.TARGET)
+                    else -> main
+                }
+            }
 
         // Legs derived from an excluded movement (e.g. a cancelled/deleted row) are excluded with it, or its fee and
         // spend legs would still move balances.

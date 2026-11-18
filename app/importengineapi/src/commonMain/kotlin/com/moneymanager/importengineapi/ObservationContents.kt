@@ -41,7 +41,8 @@ fun ExpandedTransfer.observationContent(
                 placeholderEnds =
                     attributes
                         .filter { it.typeId == unidentifiedCounterpartyTypeId }
-                        .mapNotNullTo(mutableSetOf()) { it.value.placeholderEnd() },
+                        .mapNotNullTo(mutableSetOf()) { it.value.placeholderEnd() } +
+                        listOfNotNull(placeholderEnd),
                 ownEnd = provenance.ownEnd(sourceAccountId, targetAccountId),
             ),
     )
