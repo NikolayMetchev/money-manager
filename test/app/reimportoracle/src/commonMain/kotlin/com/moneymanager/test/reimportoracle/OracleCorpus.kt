@@ -502,8 +502,106 @@ object OracleCorpus {
             changedStrategy = "Monzo CSV",
         )
 
+    /**
+     * Two statements of the card that each record every payment (its QIF's and its PDF's, say): the second's
+     * placeholders reconcile against the first's, which lost to the bank's records, so re-running the first alone
+     * must leave the second's excluded as before.
+     */
+    val AMEX_TWO_STATEMENTS =
+        OracleScenario(
+            name = "Santander QIF + two American Express statements",
+            sources =
+                listOf(
+                    OracleSource(OracleFile.Qif("santander.qif", santanderAmexPayments()), account = "Santander"),
+                    OracleSource(OracleFile.Qif("amex.qif", amexStatement("9936181")), account = "AMERICAN EXPRESS"),
+                    OracleSource(OracleFile.Qif("amex-pdf.qif", amexStatement("8836181")), account = "AMERICAN EXPRESS"),
+                ),
+            changedStrategy = "American Express (QIF)",
+        )
+
+    /**
+     * A card movement into Curve, then two of Curve's own exports that repeat the same rows: the later export's rows
+     * match the first's records, and the card's movement reconciles the per-card placeholder.
+     */
+    val CURVE_OVERLAP =
+        OracleScenario(
+            name = "Crypto.com card + two overlapping Curve exports",
+            sources =
+                listOf(
+                    OracleSource(
+                        OracleFile.Csv(
+                            "card_transactions_record_20260510_100000.csv",
+                            CARD_HEADERS,
+                            listOf(cardRow("2026-05-02 11:05:08", "Crv*Lastpasscom London", "-32.31")),
+                        ),
+                    ),
+                    OracleSource(OracleFile.Csv("Transactions 20260101-20260505.csv", CURVE_TRANSACTIONS_HEADERS, CURVE_TRANSACTIONS)),
+                    OracleSource(
+                        OracleFile.Csv("Transactions 20260101-20260601.csv", CURVE_TRANSACTIONS_HEADERS, CURVE_TRANSACTIONS.reversed()),
+                    ),
+                ),
+            changedStrategy = "Curve CSV",
+            accounts = listOf("Crypto.com Card"),
+            cardLast4 = mapOf("Crypto.com Card" to "7721"),
+        )
+
+    /**
+     * Two like top-ups a day apart, only the first of which the bank's payment to Freetrade explains: re-running the
+     * bank's statement alone must not let the first top-up claim its twin as a duplicate of itself.
+     */
+    val FREETRADE_TWO_TOP_UPS =
+        OracleScenario(
+            name = "Monzo + Freetrade ISA with two like top-ups",
+            sources =
+                listOf(
+                    OracleSource(
+                        monzoFile(
+                            "MonzoDataExport.csv",
+                            monzoRow("tx_ft_1", "01/03/2026", "09:00:00", "Freetrade Limited", "-1000.00", "FREETRADE"),
+                        ),
+                        account = "Monzo",
+                    ),
+                    OracleSource(
+                        OracleFile.Csv(
+                            "freetrade_ISA_all_activity_max_07-11-2026.csv",
+                            FREETRADE_HEADERS,
+                            listOf(
+                                freetradeCash("Top up", "TOP_UP", "2026-03-01T10:28:23.178Z", "1000.00"),
+                                freetradeCash("Top up", "TOP_UP", "2026-03-02T10:28:23.178Z", "1000.00"),
+                            ),
+                        ),
+                    ),
+                ),
+            changedStrategy = "Freetrade",
+        )
+
+    /** Two overlapping statements of one account: the later one's rows are all duplicates of the earlier one's records. */
+    val SANTANDER_OVERLAP =
+        OracleScenario(
+            name = "Two overlapping Santander QIF statements",
+            sources =
+                listOf(
+                    OracleSource(
+                        OracleFile.Qif(
+                            "santander.qif",
+                            qif(listOf(SANTANDER_VANGUARD_1, SANTANDER_VANGUARD_2, SANTANDER_AMEX_DEBIT)),
+                        ),
+                        account = "Santander",
+                    ),
+                    OracleSource(
+                        OracleFile.Qif("santander-later.qif", qif(listOf(SANTANDER_VANGUARD_1, SANTANDER_AMEX_DEBIT))),
+                        account = "Santander",
+                    ),
+                ),
+            changedStrategy = "Santander (QIF)",
+        )
+
     val ALL: List<OracleScenario> =
         listOf(
+            AMEX_TWO_STATEMENTS,
+            CURVE_OVERLAP,
+            FREETRADE_TWO_TOP_UPS,
+            SANTANDER_OVERLAP,
             MONZO_JOINT,
             FREETRADE_MONZO,
             AMEX_SANTANDER,
@@ -617,6 +715,71 @@ private val AMEX_PAYMENTS =
     )
 
 private fun qif(records: List<String>): String = "!Type:Bank\n" + records.joinToString("")
+
+/** One statement of the card: every [AMEX_PAYMENTS] payment and a purchase, its references starting [referencePrefix]. */
+private fun amexStatement(referencePrefix: String): String =
+    qif(
+        AMEX_PAYMENTS.mapIndexed { i, (date, _, amount) ->
+            qifRecord(date, amount, "PAYMENT RECEIVED - THANK YOU", "  Process Date $date", "$referencePrefix$i")
+        } + qifRecord("19/03/2020", "-16.10", "SAINSBURY'S", " GOODS Process Date 19/03/2020", "${referencePrefix}9"),
+    )
+
+/** The bank's direct debits paying each of [AMEX_PAYMENTS]. */
+private fun santanderAmexPayments(): String =
+    qif(
+        AMEX_PAYMENTS.map { (_, date, amount) ->
+            qifRecord(date, "-$amount", "DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 3746-935125-04002, MANDATE NO 0013, $amount")
+        },
+    )
+
+private val SANTANDER_VANGUARD_1 =
+    qifRecord("27/03/2021", "-7.32", "CARD PAYMENT TO VANGUARD,7.32 GBP, RATE 1.00/GBP ON 27-03-2021, 7.32")
+private val SANTANDER_VANGUARD_2 =
+    qifRecord("28/03/2021", "-10.00", "CARD PAYMENT TO VANGUARD,10.00 GBP, RATE 1.00/GBP ON 28-03-2021, 10.00")
+private val SANTANDER_AMEX_DEBIT =
+    qifRecord("01/03/2021", "-1352.23", "DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 374693512504002, MANDATE NO 0013, 1352.23")
+
+/** The columns of Curve's newer "Transactions" export. */
+private val CURVE_TRANSACTIONS_HEADERS =
+    listOf(
+        "Export Format",
+        "Date (YYYY-MM-DD as UTC)",
+        "Time (HH:MM:SS as UTC)",
+        "Merchant",
+        "Txn Amount (Funding Card)",
+        "Txn Currency (Funding Card)",
+        "Txn Amount (Foreign Spend)",
+        "Txn Currency (Foreign Spend)",
+        "Card Name",
+        "Card Last 4 Digits",
+        "Type",
+        "Category",
+        "Notes",
+        "Fees",
+    )
+
+/** A foreign card spend funded by card 7721, Curve Cash earned, and Curve Cash spent. */
+private val CURVE_TRANSACTIONS =
+    listOf(
+        listOf(
+            "CSV",
+            "2026-05-02",
+            "11:05:01",
+            "Lastpass.com",
+            "32.31",
+            "GBP",
+            "43.2",
+            "USD",
+            "Visa Debit",
+            "7721",
+            "Personal",
+            "General",
+            "",
+            "Weekend Currency Conversion Fee: £0.48",
+        ),
+        listOf("CSV", "2026-05-03", "09:00:00", "Curve Cash: Deliveroo", "25", "CPT", "", "", "Curve Cash", "", "", "General", "", ""),
+        listOf("CSV", "2026-05-04", "09:00:00", "Amazon", "208", "CPT", "2.08", "GBP", "Curve Cash", "", "Personal", "General", "", ""),
+    )
 
 private fun qifRecord(
     date: String,
