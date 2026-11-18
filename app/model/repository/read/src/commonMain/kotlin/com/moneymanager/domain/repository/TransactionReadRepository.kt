@@ -3,7 +3,6 @@ package com.moneymanager.domain.repository
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
-import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.PageWithTargetIndex

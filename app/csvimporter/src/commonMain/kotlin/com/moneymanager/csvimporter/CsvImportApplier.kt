@@ -13,7 +13,6 @@ import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TradeId
-import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.codesByName

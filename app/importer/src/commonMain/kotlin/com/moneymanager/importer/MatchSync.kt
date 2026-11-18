@@ -2,7 +2,6 @@ package com.moneymanager.importer
 
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
-import com.moneymanager.domain.model.Relationship
 import com.moneymanager.domain.model.RelationshipMember
 import com.moneymanager.domain.model.RelationshipRole
 import com.moneymanager.domain.model.RelationshipTypeId
@@ -122,10 +121,6 @@ internal class MatchSync(
 
         val known = destinations.mapNotNull { (from, to) -> (to as? TransactionTarget.Existing)?.let { from to it.id } }.toMap()
         moveRelationships(known)
-        val touched =
-            result.changes
-                .flatMap { listOfNotNull(it.from, (it.to as? TransactionTarget.Existing)?.id) }
-                .mapTo(mutableSetOf()) { known[it] ?: it }
         val report =
             materialize(
                 mutations,
@@ -136,22 +131,16 @@ internal class MatchSync(
         return report
     }
 
-    /** One exclusion link as stored: [primary] is out of balances in place of [related]. */
+    /** One stored exclusion link, optionally excluding the superseded legs it points to as well. */
     private data class PlannedLink(
         val primary: TransactionId,
         val related: Set<TransactionId>,
-    ) {
-        val ids: Set<Long> = (related + primary).mapTo(mutableSetOf()) { it.id }
-    }
+        val excludesRelated: Boolean = false,
+    )
 
     /**
      * Makes the Reconciler's `reconciled` relationships among the scope's transactions what the match says, and returns
-     * the ends of every one it wrote or deleted, to rebuild. Each transaction an exclusion link takes out of balances is
-     * the primary of one relationship whose related members are what the link keeps counted in its place (not the fee a
-     * counted record charges, which goes with its record, unless the fee is all it keeps counted): the materializer
-     * reads exclusions back from these alone. An import found a match one row at a time, so the order the records came
-     * in decided whether it saw it (a Binance withdrawal booked gross by the export and net plus fee by the API); the
-     * matcher sees the whole scope, so the links are the same whichever came first.
+     * the ends of every one it wrote or deleted, to rebuild. The materializer reads exclusions from these links.
      *
      * Every other Reconciler link whose ends are all in scope goes: its records changed, an unimport took one away, or a
      * person split two of its observations, so it explains no exclusion any more. What [held] links cover (their records
@@ -181,6 +170,7 @@ internal class MatchSync(
                         PlannedLink(
                             primary,
                             relationship.members.filter { it.role == RelationshipRole.RELATED }.mapTo(mutableSetOf()) { it.transactionId },
+                            relationship.excludesRelated,
                         )
                     }
                 val keep =
@@ -200,6 +190,7 @@ internal class MatchSync(
                         listOf(RelationshipMember(link.primary, RelationshipRole.PRIMARY)) +
                             link.related.sortedBy { it.id }.map { RelationshipMember(it, RelationshipRole.RELATED) },
                         Source.Reconciler,
+                        excludesRelated = link.excludesRelated,
                     )
                 },
         )
@@ -222,6 +213,16 @@ internal class MatchSync(
         val counted = countedOf(countedRefs)
         if (counted.isEmpty()) return emptyList()
         val related = countedOf(countedRefs.filter { it.slot != ObservationSlot.FEE }).ifEmpty { counted }.toSet()
+        if (link.reason == ShapeReason.CONDUIT_STATEMENT) {
+            val statement = (link.matched intersect link.excluded).singleOrNull()?.let(transactionOf::get)
+            if (statement != null) {
+                // Keep the two links visible from the statement: the funding it matches and each onward leg it replaces.
+                val onward = (link.excluded - link.matched).filter { it.slot.startsWith(ObservationSlot.CONDUIT_PREFIX) }
+                val superseded = onward.mapTo(mutableSetOf(), transactionOf::getValue) - statement
+                return (excluded - superseded).map { PlannedLink(it, related) } +
+                    superseded.map { PlannedLink(statement, setOf(it), excludesRelated = true) }
+            }
+        }
         return excluded.map { PlannedLink(it, related) }
     }
 
@@ -234,10 +235,18 @@ internal class MatchSync(
         for (relationship in repository.getByTransactions(moves.keys)) {
             val members =
                 relationship.members
-                    .map { member -> byId[member.transactionId.id]?.let { RelationshipMember(it, member.role) } ?: member }
+                    .map { member -> byId[member.transactionId.id]?.let { member.copy(transactionId = it) } ?: member }
                     .distinctBy { it.transactionId.id }
             writes += RelationshipWrite.Delete(relationship.id)
-            if (members.size >= 2) writes += RelationshipWrite.Create(relationship.relationshipType.id, members, Source.Reconciler)
+            if (members.size >= 2) {
+                writes +=
+                    RelationshipWrite.Create(
+                        relationship.relationshipType.id,
+                        members,
+                        Source.Reconciler,
+                        excludesRelated = relationship.excludesRelated,
+                    )
+            }
         }
         if (writes.isNotEmpty()) repository.apply(writes)
     }

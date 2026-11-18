@@ -23,6 +23,7 @@ suspend fun MoneyManagerDatabaseWrapper.insertRelationship(
     typeId: Long,
     members: List<Pair<Long, RelationshipRole>>,
     source: Source,
+    excludesRelated: Boolean = false,
 ): Long? {
     require(members.map { it.first }.toSet().size == members.size) { "a transaction is a member at most once" }
     require(members.size >= 2) { "a relationship relates at least two transactions" }
@@ -54,7 +55,7 @@ suspend fun MoneyManagerDatabaseWrapper.insertRelationship(
             members
         }
     if (exclusive) existing.keys.forEach { relationshipWriteQueries.deleteById(it) }
-    relationshipWriteQueries.insertRelationship(typeId, Clock.System.now().toEpochMilliseconds())
+    relationshipWriteQueries.insertRelationship(typeId, Clock.System.now().toEpochMilliseconds(), if (excludesRelated) 1 else 0)
     val relationshipId = relationshipWriteQueries.lastInsertedId().awaitAsOne()
     merged.forEach { (transactionId, role) -> relationshipWriteQueries.insertMember(relationshipId, transactionId, role.id) }
     recordSource(deviceId, EntityType.RELATIONSHIP, relationshipId, RELATIONSHIP_REVISION, source)

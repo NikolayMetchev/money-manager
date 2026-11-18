@@ -27,8 +27,8 @@ class RelationshipReadRepositoryImpl(
 
     override fun getByTransaction(transactionId: TransactionId): Flow<List<Relationship>> =
         selectQueries
-            .selectByTransaction(transactionId.id) { id, typeId, typeName, memberId, role, kind ->
-                MemberRow(id, typeId, typeName, memberId, role, kind)
+            .selectByTransaction(transactionId.id) { id, typeId, typeName, memberId, role, excludesRelated, kind ->
+                MemberRow(id, typeId, typeName, memberId, role, excludesRelated != 0L, kind)
             }.asFlow()
             .mapToList(Dispatchers.Default)
             .map(::toRelationships)
@@ -38,8 +38,8 @@ class RelationshipReadRepositoryImpl(
             val rows =
                 queryInChunks(transactionIds.map { it.id }.distinct(), MAX_IDS_PER_QUERY) { chunk ->
                     selectQueries
-                        .selectByTransactions(chunk) { id, typeId, typeName, memberId, role, kind ->
-                            MemberRow(id, typeId, typeName, memberId, role, kind)
+                        .selectByTransactions(chunk) { id, typeId, typeName, memberId, role, excludesRelated, kind ->
+                            MemberRow(id, typeId, typeName, memberId, role, excludesRelated != 0L, kind)
                         }.awaitAsList()
                 }
             // A relationship whose members fall into different chunks is returned by each of them.
@@ -54,8 +54,11 @@ class RelationshipReadRepositoryImpl(
             val rows =
                 queryInChunks(transactionIds.map { it.id }.distinct(), MAX_IDS_PER_QUERY) { chunk ->
                     selectQueries
-                        .selectMadeByTransactions(chunk, sourceType.id.toLong()) { id, typeId, typeName, memberId, role, kind ->
-                            MemberRow(id, typeId, typeName, memberId, role, kind)
+                        .selectMadeByTransactions(
+                            chunk,
+                            sourceType.id.toLong(),
+                        ) { id, typeId, typeName, memberId, role, excludesRelated, kind ->
+                            MemberRow(id, typeId, typeName, memberId, role, excludesRelated != 0L, kind)
                         }.awaitAsList()
                 }
             toRelationships(rows.distinct())
@@ -67,6 +70,7 @@ class RelationshipReadRepositoryImpl(
         val typeName: String,
         val memberId: Long,
         val role: Long,
+        val excludesRelated: Boolean,
         val kind: String,
     )
 
@@ -78,6 +82,7 @@ class RelationshipReadRepositoryImpl(
                 Relationship(
                     id = RelationshipId(id),
                     relationshipType = RelationshipType(RelationshipTypeId(first.typeId), first.typeName),
+                    excludesRelated = first.excludesRelated,
                     members =
                         members.map { row ->
                             val transactionId: TransactionId = if (row.kind == "TRADE") TradeId(row.memberId) else TransferId(row.memberId)

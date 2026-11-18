@@ -7,6 +7,7 @@ SELECT
     relationship_type.name AS relationship_type_name,
     member.transaction_id,
     member.role,
+    relationship.excludes_related,
     CASE WHEN trade.id IS NOT NULL THEN 'TRADE' ELSE 'TRANSFER' END AS transaction_kind
 FROM relationship
 JOIN relationship_type ON relationship.relationship_type_id = relationship_type.id
@@ -23,6 +24,7 @@ SELECT
     relationship_type.name AS relationship_type_name,
     member.transaction_id,
     member.role,
+    relationship.excludes_related,
     CASE WHEN trade.id IS NOT NULL THEN 'TRADE' ELSE 'TRANSFER' END AS transaction_kind
 FROM relationship
 JOIN relationship_type ON relationship.relationship_type_id = relationship_type.id
@@ -49,6 +51,7 @@ SELECT
     relationship_type.name AS relationship_type_name,
     member.transaction_id,
     member.role,
+    relationship.excludes_related,
     CASE WHEN trade.id IS NOT NULL THEN 'TRADE' ELSE 'TRANSFER' END AS transaction_kind
 FROM relationship
 JOIN relationship_type ON relationship.relationship_type_id = relationship_type.id

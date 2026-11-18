@@ -34,7 +34,7 @@ import com.moneymanager.importengineapi.TransactionOverrides
 
 private val EXCLUDED_TYPE = AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID)
 
-/** The exclusion reason a reconciled link gives its related end, as the deduper writes it. */
+/** The materialized reason for excluding a transaction through a Reconciler link. */
 private const val RECONCILED_EXCLUSION = "reconciled"
 
 /**
@@ -169,7 +169,12 @@ internal class ObservationMaterialization(
             .filter { link ->
                 link.relationshipType.id.id == WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID &&
                     link.members.any { it.role == RelationshipRole.RELATED && it.transactionId.id !in gone }
-            }.mapNotNullTo(mutableSetOf()) { link -> link.primary?.id?.takeIf { it in liveIds } }
+            }.flatMapTo(mutableSetOf()) { link ->
+                val primary = link.primary ?: return@flatMapTo emptyList()
+                if (primary.id in gone) return@flatMapTo emptyList()
+                val excluded = if (link.excludesRelated) link.members.map { it.transactionId } else listOf(primary)
+                excluded.mapNotNull { it.id.takeIf(liveIds::contains) }
+            }
     }
 
     private fun MaterializedTransaction.excludedAsReconciled(): MaterializedTransaction =

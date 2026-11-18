@@ -10,7 +10,6 @@ import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
-import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.observation.ImportGroupKey
 import com.moneymanager.domain.model.observation.ImportRecordKey

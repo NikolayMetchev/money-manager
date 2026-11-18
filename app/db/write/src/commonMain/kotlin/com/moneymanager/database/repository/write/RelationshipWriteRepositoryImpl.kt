@@ -45,6 +45,7 @@ class RelationshipWriteRepositoryImpl(
                                 write.typeId.id,
                                 write.members.map { it.transactionId.id to it.role },
                                 write.source,
+                                write.excludesRelated,
                             )
                         }
 

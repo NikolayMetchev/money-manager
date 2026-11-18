@@ -1,45 +1,29 @@
 package com.moneymanager.importer
 
-import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.AttributeTypeId
-import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.CurrencyScaleFactors
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
-import com.moneymanager.domain.model.NewRelationship
 import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
-import com.moneymanager.domain.model.TransferAttribute
 import com.moneymanager.domain.model.TransferId
-import com.moneymanager.domain.model.WellKnownIds
-import com.moneymanager.domain.model.calendar.testing.TestHolidayCalendars
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.rules.SettlementWindow
-import com.moneymanager.importengineapi.AccountBridge
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.DedupePolicy
-import com.moneymanager.importengineapi.ImportPassThrough
 import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTransfer
-import kotlinx.datetime.LocalDate
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.atTime
-import kotlinx.datetime.toInstant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
-import kotlin.time.Duration.Companion.minutes
-import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
-import kotlin.uuid.Uuid
 
 class ImportDeduperTest {
     private val currency =
@@ -251,11 +235,6 @@ class ImportDeduperTest {
         assertEquals(ImportStatus.IMPORTED, result[2].status)
     }
 
-    // Internal-transfer reconciliation (exchange <-> bridged app account). `source` (AccountId(1)) plays
-    // the exchange account; `appAccount` is the bridged bank account (e.g. Monzo); incoming transfers run
-    // exchange -> dangling counterparty (`target`, AccountId(2)) until rewritten onto the bridge.
-    private val appAccount = AccountId(3)
-
     private val reconcilingFuzzyPolicy =
         DedupePolicy.FuzzyAllFields(
             reconcileWindow = SettlementWindow.Elapsed(60 * 60L),
@@ -288,8 +267,6 @@ class ImportDeduperTest {
     // ends (it resolves the wallet by sort code + account number). Only the owned account, the direction
     // and the amount are common to the two records.
     private val wallet = AccountId(30)
-    private val placeholder = AccountId(31)
-    private val bank = AccountId(32)
 
     private val unidentifiedPolicy =
         DedupePolicy.FuzzyAllFields(
@@ -299,9 +276,6 @@ class ImportDeduperTest {
             unidentifiedCounterpartyAttributeTypeId = AttributeTypeId(-9),
         )
 
-    // Conduit statements: [wallet] is a conduit (PayPal) and [bank] the card side of a pass-through chain
-    // (card -> bank -> wallet -> merchant) another import already booked. The wallet's own export records
-    // the funding as a placeholder deposit, and the payment to the payee it really went to.
     private val payee = AccountId(33)
 
     @Test
@@ -352,11 +326,6 @@ class ImportDeduperTest {
         assertEquals(ImportStatus.DUPLICATE, deduper.classify(listOf(row)).single().status)
     }
 
-    // Funding-card reconcile: a conduit (e.g. Curve) spend, `conduit -> merchant`, reconciles against
-    // the funding leg `fundingAccount -> conduit` by amount+window, ignoring the merchant.
-    private val conduit = AccountId(10)
-    private val merchant = AccountId(2)
-
     @Test
     fun fuzzy_sameCoreDifferentAttributesIsUpdated() {
         val typeId = AttributeTypeId(42)
@@ -369,6 +338,4 @@ class ImportDeduperTest {
         val result = deduper.classify(listOf(incoming)).single()
         assertEquals(ImportStatus.UPDATED, result.status)
     }
-
-    private val reconciled = AttributeTypeId(-1) to "reconciled"
 }

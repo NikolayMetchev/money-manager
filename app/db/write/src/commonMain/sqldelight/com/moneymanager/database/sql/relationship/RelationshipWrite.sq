@@ -1,6 +1,6 @@
 insertRelationship:
-INSERT INTO relationship (relationship_type_id, created_at)
-VALUES (?, ?);
+INSERT INTO relationship (relationship_type_id, created_at, excludes_related)
+VALUES (?, ?, ?);
 
 lastInsertedId:
 SELECT last_insert_rowid();
