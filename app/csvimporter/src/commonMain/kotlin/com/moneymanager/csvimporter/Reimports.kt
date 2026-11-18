@@ -4,11 +4,14 @@ import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.ImportFileKind
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.csv.CsvImport
+import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.importFileKind
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.CryptoReadRepository
@@ -17,8 +20,12 @@ import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.ImportRecordReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.assetAliasMap
+import com.moneymanager.importengineapi.CsvImportMutation
+import com.moneymanager.importengineapi.CsvTransferSync
+import com.moneymanager.importengineapi.CsvTransferSyncRow
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.PreparedImport
 import com.moneymanager.importengineapi.RerunBlockedException
 import com.moneymanager.importengineapi.RerunFile
 import com.moneymanager.importengineapi.RerunReads
@@ -32,6 +39,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlin.time.Clock
 
 /**
  * The source account and currency a file was last imported with, as its latest application recorded
@@ -160,6 +168,95 @@ class Reimports(
             rerunFiles = rerunFiles,
         )
     }
+
+    /** Previews a single CSV whose rows can all keep their existing, independent bookings. */
+    suspend fun preview(
+        selection: ReimportAllPlan,
+        accountId: AccountId?,
+        currencyId: CurrencyId?,
+    ): PreparedImport? =
+        writeLock.withLock {
+            val picked = selection.files.singleOrNull() ?: return@withLock null
+            if (importFileKind(picked.originalFileName) != ImportFileKind.CSV) return@withLock null
+            val version = importEngine.planVersion() ?: return@withLock null
+            val file = reads.csvImportRepository.getImport(picked.id).first() ?: return@withLock null
+            if (file.lastAppliedAt == null || file.rowCount == 0) return@withLock null
+            val strategy = strategyFor(file, csvImportStrategyRepository.getAllStrategies().first()) ?: return@withLock null
+            val config = strategy.config
+            if (strategy.worksheetName != null || config.pdfLines != null || config.reconciliation != null ||
+                config.legGroups.isNotEmpty() || config.crossSourceReconcileWindow != null ||
+                config.placeholderReconcileWindow != null || config.duplicateDateTolerance != null ||
+                config.fundingAttributeMatch != null
+            ) {
+                return@withLock null
+            }
+
+            val saved = file.importedSettings
+            val effective = strategy.withCurrency((saved.currencyId ?: currencyId).takeIf { strategy.needsCurrencyOverride() })
+            val source = effectiveSourceFor(effective, saved.accountId ?: accountId)
+            val mappings = accountMappingRepository.getAllMappings().first()
+            val aliases = cryptoRepository.assetAliasMap()
+            val passThroughs = passThroughAccountRepository.getAll().first()
+            val matchers = AttributeAccountMatcher.registry(accountAttributeRepository.getAll().first())
+            val rows = reads.csvImportRepository.getImportRows(file.id, limit = file.rowCount, offset = 0)
+            if (rows.any { it.importStatus != ImportStatus.IMPORTED }) return@withLock null
+            val accounts = reads.accountRepository
+            val mapped =
+                buildCsvMapper(
+                    strategy = effective,
+                    columns = file.columns,
+                    accounts = accounts.accountsVisibleTo(effective),
+                    currencies = currencies(),
+                    accountMappings = mappings,
+                    sourceAccountOverride = source,
+                    passThroughAccounts = passThroughs,
+                    historicalAccountNames = accounts.getPreviousAccountNames(),
+                    cryptoAssets = cryptoRepository.getAllCryptoAssets().first(),
+                    attributeAccountMatchers = matchers,
+                    assetAliases = aliases,
+                    fileName = file.originalFileName,
+                    accountOwnerNames = accounts.getAccountOwnerNames(),
+                ).prepareImport(rows)
+            if (mapped.newAccounts.isNotEmpty() || mapped.validTransfers.size != rows.size ||
+                mapped.validTransfers.any { !it.isIndependentBooking() }
+            ) {
+                return@withLock null
+            }
+            val inputsHash = stagedInputsHash(effective, source, mappings, aliases, matchers, passThroughs)
+            importEngine.plan(
+                CsvTransferSync(
+                    id = file.id,
+                    fileChecksum = file.fileChecksum,
+                    rows = mapped.validTransfers.associate { it.rowIndex to CsvTransferSyncRow(it.transfer, it.statementAccountId) },
+                    application =
+                        CsvImportMutation.RecordApplication(
+                            file.id,
+                            effective.id,
+                            effective.name,
+                            Clock.System.now(),
+                            source,
+                            (effective.config.fieldMappings[TransferField.CURRENCY] as? HardCodedCurrencyMapping)?.currencyId,
+                        ),
+                    records = recordRowsMutation(file, rows, inputsHash),
+                    version = version,
+                ),
+            )
+        }
+
+    suspend fun applyPreview(plan: PreparedImport): BulkReimportResult =
+        writeLock.withLock {
+            val applied = importEngine.apply(plan)
+            if (applied) maintenance.refreshMaterializedViews()
+            BulkReimportResult(
+                filesImported = if (applied) 1 else 0,
+                filesUnchanged = if (applied) 0 else 1,
+                transfersCreated = 0,
+                duplicatesSkipped = 0,
+                filesSkippedNoStrategy = 0,
+                filesFailed = 0,
+                plan = plan.preview,
+            )
+        }
 
     /**
      * Re-imports every file of [plan]: one batch deletes what they all created and resets their rows, then each
@@ -393,3 +490,8 @@ class Reimports(
 }
 
 private val REMOVAL_PHASE = Progress.Phase(1, 3, "Removing what the files created")
+
+private fun CsvTransferWithAttributes.isIndependentBooking(): Boolean =
+    attributes.isEmpty() && feeAmount == null && tradeTo == null && personalCounterpartyName == null &&
+        passThrough == null && groupLeg == null && fundingMatchValue == null && unidentifiedCounterpartyAccountId == null &&
+        conversion == null && discoveredMappings.isEmpty()

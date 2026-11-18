@@ -26,6 +26,8 @@ import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
+import com.moneymanager.importengineapi.PreparedImport
+import com.moneymanager.importengineapi.StaleImportPlanException
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.tasks.Progress
@@ -86,16 +88,33 @@ fun ReimportDialog(
     // A run changes the file list it was planned from; re-planning then would only replace the plan it ran.
     LaunchedEffect(files) {
         if (isRunning || result != null) return@LaunchedEffect
-        try {
-            plan = reimports.planAll(files, onProgress = { planProgress = it })
-        } catch (expected: CancellationException) {
-            throw expected
-        } catch (expected: Exception) {
-            logger.e(expected) { "Re-import all preview failed: ${expected.message}" }
-            errorMessage = "Failed to prepare re-import: ${expected.message}"
-        }
+        plan =
+            readReimportPreview(onError = { errorMessage = "Failed to prepare re-import: ${it.message}" }) {
+                reimports.planAll(files, onProgress = { planProgress = it })
+            }
     }
     val ready = plan?.let { (!it.needsAccount || accountId != null) && (!it.needsCurrency || currencyId != null) } == true
+
+    var prepared by remember(plan, accountId, currencyId) { mutableStateOf<PreparedImport?>(null) }
+    var previewPending by remember(plan, accountId, currencyId) { mutableStateOf(true) }
+    var previewFailed by remember(plan, accountId, currencyId) { mutableStateOf(false) }
+    var previewAttempt by remember { mutableStateOf(0) }
+    LaunchedEffect(plan, accountId, currencyId, previewAttempt) {
+        val selection = plan ?: return@LaunchedEffect
+        if (!ready || result != null || isRunning) return@LaunchedEffect
+        previewPending = true
+        previewFailed = false
+        prepared = null
+        try {
+            prepared =
+                readReimportPreview(onError = {
+                    previewFailed = true
+                    errorMessage = it.message
+                }) { reimports.preview(selection, accountId, currencyId) }
+        } finally {
+            previewPending = false
+        }
+    }
 
     BulkImportDialogScaffold(
         pendingTitle = files.singleOrNull()?.let { "Re-import ${fileLabel(it)}" } ?: "Re-import ${files.size} files",
@@ -104,23 +123,33 @@ fun ReimportDialog(
         isRunning = isRunning,
         confirmLabel = (plan?.rerunFiles?.size ?: files.size).let { "Re-import $it file${if (it == 1) "" else "s"}" },
         // A file with no strategy is skipped, so a run of nothing but such files has nothing to do.
-        confirmEnabled = ready && plan?.rerunFiles?.isNotEmpty() == true,
+        confirmEnabled = ready && !previewPending && !previewFailed && plan?.rerunFiles?.isNotEmpty() == true,
         onRun = {
             val planned = plan ?: return@BulkImportDialogScaffold
+            val preview = prepared
             isRunning = true
             stopRequested = false
             errorMessage = null
             scope.launch {
                 try {
                     result =
-                        reimports.reimportAll(
-                            planned,
-                            accountId,
-                            currencyId,
-                            onProgress = { progress = it },
-                            fileLabel = fileLabel,
-                            stopRequested = { stopRequested },
-                        )
+                        if (preview != null) {
+                            reimports.applyPreview(preview)
+                        } else {
+                            reimports.reimportAll(
+                                planned,
+                                accountId,
+                                currencyId,
+                                onProgress = { progress = it },
+                                fileLabel = fileLabel,
+                                stopRequested = { stopRequested },
+                            )
+                        }
+                } catch (expected: StaleImportPlanException) {
+                    errorMessage = expected.message
+                    previewPending = true
+                    prepared = null
+                    previewAttempt++
                 } catch (expected: CancellationException) {
                     throw expected
                 } catch (expected: Exception) {
@@ -137,19 +166,21 @@ fun ReimportDialog(
             Text(finished.toSummary(), style = MaterialTheme.typography.bodyMedium)
             ImportPlanReport(finished.plan, accountName)
         },
-        onStop = { stopRequested = true },
+        onStop = if (prepared == null) ({ stopRequested = true }) else null,
         stopping = stopRequested,
     ) {
-        Text(
-            text =
-                "Deletes what ${if (files.size == 1) "the file" else "the ${files.size} files"} created and imports " +
-                    "${if (files.size == 1) "it" else "them"} again with the current strategies and account mappings.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        if (prepared == null && !previewPending) {
+            Text(
+                text =
+                    "Deletes what ${if (files.size == 1) "the file" else "the ${files.size} files"} created and imports " +
+                        "${if (files.size == 1) "it" else "them"} again with the current strategies and account mappings.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         Spacer(modifier = Modifier.height(12.dp))
         errorMessage?.let { Text(text = it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-        if (plan == null && errorMessage == null) {
+        if ((plan == null || (ready && previewPending)) && errorMessage == null) {
             ReimportProgressIndicator(planProgress ?: Progress(PREPARING_REIMPORT))
         }
         plan?.let { planned ->
@@ -163,11 +194,17 @@ fun ReimportDialog(
                 )
                 Spacer(modifier = Modifier.height(12.dp))
             }
-            val deleted = planned.rerunFiles.sumOf { it.createdTransfers.size }
-            Text(
-                text = "Deletes the $deleted transaction${if (deleted == 1) "" else "s"} they created.",
-                style = MaterialTheme.typography.bodySmall,
-            )
+            val preview = prepared
+            if (preview != null) {
+                Text(preview.preview.summary(), style = MaterialTheme.typography.bodyMedium)
+                ImportPlanReport(preview.preview, accountName)
+            } else if (!previewPending) {
+                val deleted = planned.rerunFiles.sumOf { it.createdTransfers.size }
+                Text(
+                    text = "Deletes the $deleted transaction${if (deleted == 1) "" else "s"} they created.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
             Spacer(modifier = Modifier.height(12.dp))
             if (planned.skippedNoStrategy > 0) {
                 Text(
@@ -196,6 +233,20 @@ fun ReimportDialog(
         }
     }
 }
+
+private suspend fun <T> readReimportPreview(
+    onError: (Exception) -> Unit,
+    read: suspend () -> T,
+): T? =
+    try {
+        read()
+    } catch (expected: CancellationException) {
+        throw expected
+    } catch (expected: Exception) {
+        logger.e(expected) { "Re-import preview failed: ${expected.message}" }
+        onError(expected)
+        null
+    }
 
 // Asks only for what the files' last imports didn't record.
 @Suppress("LongParameterList")

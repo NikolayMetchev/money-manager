@@ -338,14 +338,25 @@ class CsvImportWriteRepositoryImpl(
         currencyId: CurrencyId?,
     ): Unit =
         withContext(coroutineContext) {
-            csvImportWriteQueries.insertApplication(
-                id = Uuid.random().toString(),
-                csv_import_id = id.id.toString(),
-                strategy_id = strategyId.id.toString(),
-                strategy_name = strategyName,
-                applied_at = appliedAt.toEpochMilliseconds(),
-                account_id = accountId?.id,
-                currency_id = currencyId?.id,
-            )
+            database.recordCsvApplication(id, strategyId, strategyName, appliedAt, accountId, currencyId)
         }
+}
+
+internal suspend fun MoneyManagerDatabaseWrapper.recordCsvApplication(
+    id: CsvImportId,
+    strategyId: CsvImportStrategyId,
+    strategyName: String,
+    appliedAt: Instant,
+    accountId: AccountId?,
+    currencyId: CurrencyId?,
+) {
+    csvImportWriteQueries.insertApplication(
+        id = Uuid.random().toString(),
+        csv_import_id = id.id.toString(),
+        strategy_id = strategyId.id.toString(),
+        strategy_name = strategyName,
+        applied_at = appliedAt.toEpochMilliseconds(),
+        account_id = accountId?.id,
+        currency_id = currencyId?.id,
+    )
 }
