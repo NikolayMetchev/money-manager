@@ -400,4 +400,117 @@ internal val FRESH_IMPORT_GOLDENS: Map<String, String> =
             Pret A Manger | 2023-11-22 | GBP | 3.5
             Tesco | 2023-11-20 | GBP | 12.4
             """.trimIndent(),
+        "Santander QIF + two American Express statements" to
+            """
+            == accounts (4)
+            AMERICAN EXPRESS
+            PAYMENT RECEIVED - THANK YOU
+            SAINSBURY'S
+            Santander
+            == transfers (10)
+            2020-02-02T12:00:00Z | PAYMENT RECEIVED - THANK YOU -> AMERICAN EXPRESS | 1239.68 GBP | PAYMENT RECEIVED - THANK YOU [amex-process-date=02/02/2020, amex-reference=99361810, unidentified-counterparty=source]
+            2020-02-04T12:00:00Z | Santander -> AMERICAN EXPRESS | 1239.68 GBP | DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 3746-935125-04002, MANDATE NO 0013 [amex-process-date=02/02/2020, amex-reference=88361810, santander-mandate=0013, santander-reference=3746-935125-04002, santander-transaction-type=DIRECT_DEBIT]
+            2020-03-04T12:00:00Z | PAYMENT RECEIVED - THANK YOU -> AMERICAN EXPRESS | 738.42 GBP | PAYMENT RECEIVED - THANK YOU [amex-process-date=04/03/2020, amex-reference=99361811, unidentified-counterparty=source]
+            2020-03-04T12:00:00Z | Santander -> AMERICAN EXPRESS | 738.42 GBP | DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 3746-935125-04002, MANDATE NO 0013 [amex-process-date=04/03/2020, amex-reference=88361811, santander-mandate=0013, santander-reference=3746-935125-04002, santander-transaction-type=DIRECT_DEBIT]
+            2020-03-19T12:00:00Z | AMERICAN EXPRESS -> SAINSBURY'S | 16.1 GBP | SAINSBURY'S [amex-merchant-type=GOODS, amex-process-date=19/03/2020, amex-reference=88361819, excluded=reconciled]
+            2020-03-19T12:00:00Z | AMERICAN EXPRESS -> SAINSBURY'S | 16.1 GBP | SAINSBURY'S [amex-merchant-type=GOODS, amex-process-date=19/03/2020, amex-reference=99361819]
+            2020-04-02T12:00:00Z | PAYMENT RECEIVED - THANK YOU -> AMERICAN EXPRESS | 1574.62 GBP | PAYMENT RECEIVED - THANK YOU [amex-process-date=02/04/2020, amex-reference=88361812, excluded=reconciled, unidentified-counterparty=source]
+            2020-04-02T12:00:00Z | Santander -> AMERICAN EXPRESS | 1574.62 GBP | DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 3746-935125-04002, MANDATE NO 0013 [amex-process-date=02/04/2020, amex-reference=99361812, santander-mandate=0013, santander-reference=3746-935125-04002, santander-transaction-type=DIRECT_DEBIT]
+            2020-05-03T12:00:00Z | PAYMENT RECEIVED - THANK YOU -> AMERICAN EXPRESS | 1801.13 GBP | PAYMENT RECEIVED - THANK YOU [amex-process-date=03/05/2020, amex-reference=99361813, unidentified-counterparty=source]
+            2020-05-06T12:00:00Z | Santander -> AMERICAN EXPRESS | 1801.13 GBP | DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 3746-935125-04002, MANDATE NO 0013 [amex-process-date=03/05/2020, amex-reference=88361813, santander-mandate=0013, santander-reference=3746-935125-04002, santander-transaction-type=DIRECT_DEBIT]
+            == trades (0)
+            == relationships (2)
+            reconciled: PRIMARY {2020-03-19T12:00:00Z | AMERICAN EXPRESS -> SAINSBURY'S | 16.1 GBP | SAINSBURY'S [amex-merchant-type=GOODS, amex-process-date=19/03/2020, amex-reference=88361819, excluded=reconciled]} & RELATED {2020-03-19T12:00:00Z | AMERICAN EXPRESS -> SAINSBURY'S | 16.1 GBP | SAINSBURY'S [amex-merchant-type=GOODS, amex-process-date=19/03/2020, amex-reference=99361819]}
+            reconciled: PRIMARY {2020-04-02T12:00:00Z | PAYMENT RECEIVED - THANK YOU -> AMERICAN EXPRESS | 1574.62 GBP | PAYMENT RECEIVED - THANK YOU [amex-process-date=02/04/2020, amex-reference=88361812, excluded=reconciled, unidentified-counterparty=source]} & RELATED {2020-04-02T12:00:00Z | Santander -> AMERICAN EXPRESS | 1574.62 GBP | DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 3746-935125-04002, MANDATE NO 0013 [amex-process-date=02/04/2020, amex-reference=99361812, santander-mandate=0013, santander-reference=3746-935125-04002, santander-transaction-type=DIRECT_DEBIT]}
+            == daily balances (16)
+            AMERICAN EXPRESS | 2020-02-02 | GBP | 1239.68
+            AMERICAN EXPRESS | 2020-02-04 | GBP | 2479.36
+            AMERICAN EXPRESS | 2020-03-04 | GBP | 3956.2
+            AMERICAN EXPRESS | 2020-03-19 | GBP | 3940.1
+            AMERICAN EXPRESS | 2020-04-02 | GBP | 5514.72
+            AMERICAN EXPRESS | 2020-05-03 | GBP | 7315.85
+            AMERICAN EXPRESS | 2020-05-06 | GBP | 9116.98
+            PAYMENT RECEIVED - THANK YOU | 2020-02-02 | GBP | -1239.68
+            PAYMENT RECEIVED - THANK YOU | 2020-03-04 | GBP | -1978.1
+            PAYMENT RECEIVED - THANK YOU | 2020-04-02 | GBP | -1978.1
+            PAYMENT RECEIVED - THANK YOU | 2020-05-03 | GBP | -3779.23
+            SAINSBURY'S | 2020-03-19 | GBP | 16.1
+            Santander | 2020-02-04 | GBP | -1239.68
+            Santander | 2020-03-04 | GBP | -1978.1
+            Santander | 2020-04-02 | GBP | -3552.72
+            Santander | 2020-05-06 | GBP | -5353.85
+            """.trimIndent(),
+        "Crypto.com card + two overlapping Curve exports" to
+            """
+            == accounts (8)
+            Amazon
+            Crypto.com Card [card-last4=7721]
+            Curve
+            Curve Cash
+            Curve Cashback
+            Curve card 7721
+            Lastpass.com
+            Lastpasscom London
+            == transfers (6)
+            2026-05-02T11:05:01Z | Curve -> Lastpass.com | 32.31 GBP | Lastpass.com
+            2026-05-02T11:05:01Z | Curve card 7721 -> Curve | 32.31 GBP | Lastpass.com [curve-card-name=Visa Debit, curve-category=General, curve-fee=Weekend Currency Conversion Fee: £0.48, curve-foreign-amount=43.2, curve-foreign-currency=USD, curve-funding-card=7721, excluded=reconciled, unidentified-counterparty=source]
+            2026-05-02T11:05:08Z | Crypto.com Card -> Curve | 32.31 GBP | Crv*Lastpasscom London [cryptocom-txn-amount=-32.31, cryptocom-txn-currency=GBP, cryptocom-usd-amount=0.0]
+            2026-05-02T11:05:08Z | Curve -> Lastpasscom London | 32.31 GBP | Lastpasscom London [excluded=reconciled]
+            2026-05-03T09:00:00Z | Curve Cashback -> Curve Cash | 25 CURVECASH | Curve Cash: Deliveroo [curve-card-name=Curve Cash, curve-category=General]
+            2026-05-04T09:00:00Z | Curve Cash -> Amazon | 208 CURVECASH | Amazon [curve-card-name=Curve Cash, curve-category=General, curve-foreign-amount=2.08, curve-foreign-currency=GBP]
+            == trades (0)
+            == relationships (4)
+            pass-through: PRIMARY {2026-05-02T11:05:01Z | Curve card 7721 -> Curve | 32.31 GBP | Lastpass.com [curve-card-name=Visa Debit, curve-category=General, curve-fee=Weekend Currency Conversion Fee: £0.48, curve-foreign-amount=43.2, curve-foreign-currency=USD, curve-funding-card=7721, excluded=reconciled, unidentified-counterparty=source]} & RELATED {2026-05-02T11:05:01Z | Curve -> Lastpass.com | 32.31 GBP | Lastpass.com}
+            pass-through: PRIMARY {2026-05-02T11:05:08Z | Crypto.com Card -> Curve | 32.31 GBP | Crv*Lastpasscom London [cryptocom-txn-amount=-32.31, cryptocom-txn-currency=GBP, cryptocom-usd-amount=0.0]} & RELATED {2026-05-02T11:05:08Z | Curve -> Lastpasscom London | 32.31 GBP | Lastpasscom London [excluded=reconciled]}
+            reconciled: PRIMARY {2026-05-02T11:05:01Z | Curve card 7721 -> Curve | 32.31 GBP | Lastpass.com [curve-card-name=Visa Debit, curve-category=General, curve-fee=Weekend Currency Conversion Fee: £0.48, curve-foreign-amount=43.2, curve-foreign-currency=USD, curve-funding-card=7721, excluded=reconciled, unidentified-counterparty=source]} & RELATED {2026-05-02T11:05:08Z | Crypto.com Card -> Curve | 32.31 GBP | Crv*Lastpasscom London [cryptocom-txn-amount=-32.31, cryptocom-txn-currency=GBP, cryptocom-usd-amount=0.0]}
+            reconciled: PRIMARY {2026-05-02T11:05:01Z | Curve card 7721 -> Curve | 32.31 GBP | Lastpass.com [curve-card-name=Visa Debit, curve-category=General, curve-fee=Weekend Currency Conversion Fee: £0.48, curve-foreign-amount=43.2, curve-foreign-currency=USD, curve-funding-card=7721, excluded=reconciled, unidentified-counterparty=source]} & RELATED {2026-05-02T11:05:08Z | Curve -> Lastpasscom London | 32.31 GBP | Lastpasscom London [excluded=reconciled]}
+            == daily balances (9)
+            Amazon | 2026-05-04 | CURVECASH | 208
+            Crypto.com Card | 2026-05-02 | GBP | -32.31
+            Curve Cash | 2026-05-03 | CURVECASH | 25
+            Curve Cash | 2026-05-04 | CURVECASH | -183
+            Curve Cashback | 2026-05-03 | CURVECASH | -25
+            Curve card 7721 | 2026-05-02 | GBP | 0
+            Curve | 2026-05-02 | GBP | 0
+            Lastpass.com | 2026-05-02 | GBP | 32.31
+            Lastpasscom London | 2026-05-02 | GBP | 0
+            """.trimIndent(),
+        "Monzo + Freetrade ISA with two like top-ups" to
+            """
+            == accounts (4)
+            Freetrade ISA
+            Freetrade Limited
+            Freetrade Top Ups
+            Monzo
+            == transfers (2)
+            2026-03-01T09:00:00Z | Monzo -> Freetrade ISA | 1000 GBP | FREETRADE [Monzo Category=Transfers, Monzo Transaction ID=tx_ft_1, Type=Faster payment, freetrade-type=TOP_UP]
+            2026-03-02T10:28:23.178Z | Freetrade Top Ups -> Freetrade ISA | 1000 GBP | Top up [freetrade-type=TOP_UP, unidentified-counterparty=source]
+            == trades (0)
+            == relationships (0)
+            == daily balances (4)
+            Freetrade ISA | 2026-03-01 | GBP | 1000
+            Freetrade ISA | 2026-03-02 | GBP | 2000
+            Freetrade Top Ups | 2026-03-02 | GBP | -1000
+            Monzo | 2026-03-01 | GBP | -1000
+            """.trimIndent(),
+        "Two overlapping Santander QIF statements" to
+            """
+            == accounts (3)
+            AMERICAN EXPRESS
+            Santander
+            VANGUARD
+            == transfers (3)
+            2021-03-01T12:00:00Z | Santander -> AMERICAN EXPRESS | 1352.23 GBP | DIRECT DEBIT PAYMENT TO AMERICAN EXPRESS REF 374693512504002, MANDATE NO 0013 [santander-mandate=0013, santander-reference=374693512504002, santander-transaction-type=DIRECT_DEBIT]
+            2021-03-27T12:00:00Z | Santander -> VANGUARD | 7.32 GBP | CARD PAYMENT TO VANGUARD,7.32 GBP, RATE 1.00/GBP ON 27-03-2021 [santander-posted-date=27-03-2021, santander-transaction-type=CARD_PAYMENT]
+            2021-03-28T12:00:00Z | Santander -> VANGUARD | 10 GBP | CARD PAYMENT TO VANGUARD,10.00 GBP, RATE 1.00/GBP ON 28-03-2021 [santander-posted-date=28-03-2021, santander-transaction-type=CARD_PAYMENT]
+            == trades (0)
+            == relationships (0)
+            == daily balances (6)
+            AMERICAN EXPRESS | 2021-03-01 | GBP | 1352.23
+            Santander | 2021-03-01 | GBP | -1352.23
+            Santander | 2021-03-27 | GBP | -1359.55
+            Santander | 2021-03-28 | GBP | -1369.55
+            VANGUARD | 2021-03-27 | GBP | 7.32
+            VANGUARD | 2021-03-28 | GBP | 17.32
+            """.trimIndent(),
     )

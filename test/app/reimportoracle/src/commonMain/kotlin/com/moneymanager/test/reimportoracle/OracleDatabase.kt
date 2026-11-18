@@ -142,9 +142,15 @@ class OracleDatabase private constructor(
         }
     }
 
-    /** Re-imports each of [sources], one at a time in the order given, as the re-import dialog does for one file. */
-    suspend fun reimport(sources: List<OracleSource>) {
-        val reimports = db.reimports()
+    /**
+     * Re-imports each of [sources], one at a time in the order given, as the re-import dialog does for one file. A file
+     * that hasn't changed since its last import is skipped unless [force]d.
+     */
+    suspend fun reimport(
+        sources: List<OracleSource>,
+        force: Boolean = false,
+    ) {
+        val reimports = db.reimports(skipUnchanged = !force)
         for (source in sources) {
             if (source.file is OracleFile.Api) {
                 reimportSession(source, source.file)

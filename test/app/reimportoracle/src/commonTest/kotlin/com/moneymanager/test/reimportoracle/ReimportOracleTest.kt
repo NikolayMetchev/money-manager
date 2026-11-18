@@ -140,6 +140,23 @@ class ReimportOracleTest {
             }
         }
 
+    /**
+     * A forced re-run of one unchanged source changes nothing, whichever source it is. Unlike (b), nothing is skipped
+     * for being unchanged, so a source whose records others reconciled against is torn down and booked again while the
+     * others stay: what they reconciled must come back as it was.
+     */
+    @Test
+    fun g_forcing_a_reimport_of_any_one_source_changes_nothing() =
+        oracle(Assertion.FORCED_REIMPORT) { scenario ->
+            scenario.sources.firstNotNullOfOrNull { source ->
+                OracleDatabase.with(scenario) {
+                    val expected = importAndSnapshot()
+                    reimport(listOf(source), force = true)
+                    difference(expected, db.canonicalSnapshot(), "forced re-import of ${source.file.fileName}")
+                }
+            }
+        }
+
     /** Fails unless the strategy change of (c) reached the database, so (c) can never hold vacuously. */
     private fun CanonicalSnapshot.expectStrategyChange() =
         check((transfers + trades).any { "$ORACLE_STRATEGY_ATTRIBUTE=v2" in it }) { "the strategy change tagged nothing" }
@@ -258,10 +275,25 @@ enum class Assertion {
     HAND_WORK_STRATEGY_CHANGE,
     NO_AUDIT_WRITES,
     UNIMPORT,
+    FORCED_REIMPORT,
 }
 
 /**
- * The cases that fail today, by (scenario, assertion), each with the epic #1419 subtask that should fix it. Empty since
- * staged files derive, match and materialize (#1428): every scenario converges.
+ * The cases that fail today, by (scenario, assertion), each with the epic #1419 subtask that should fix it.
+ *
+ * Both are reconciles only `ImportDeduper` makes, while a file imports, so the outcome depends on which file came when
+ * (#1432 moves them into the matcher):
+ * - Two Amex statements' placeholders of one payment carry different references, and no matcher rule pairs two
+ *   placeholders: the deduper's `reconciled` link between them is all that excludes the second.
+ * - The second Curve export's row is a twin of the first's, but only the first's carries the onward `Curve -> merchant`
+ *   leg, so unimporting the first loses it.
  */
-val BASELINE: Map<Pair<String, Assertion>, Int> = emptyMap()
+val BASELINE: Map<Pair<String, Assertion>, Int> =
+    mapOf(
+        ("Santander QIF + two American Express statements" to Assertion.FILE_ORDER) to 1432,
+        ("Santander QIF + two American Express statements" to Assertion.STRATEGY_CHANGE) to 1432,
+        ("Santander QIF + two American Express statements" to Assertion.HAND_WORK_STRATEGY_CHANGE) to 1432,
+        ("Santander QIF + two American Express statements" to Assertion.UNIMPORT) to 1432,
+        ("Santander QIF + two American Express statements" to Assertion.FORCED_REIMPORT) to 1432,
+        ("Crypto.com card + two overlapping Curve exports" to Assertion.UNIMPORT) to 1432,
+    )
