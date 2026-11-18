@@ -198,7 +198,7 @@ class SourceRerunE2ETest : DbTest() {
     }
 
     @Test
-    fun reimport_keepsHandEditsOnTheirIds_andReimportsOtherFilesMatchedAgainstIt() =
+    fun reimport_keepsHandEditsOnTheirIds_andOtherFilesMatchedAgainstItKeepPointingAtThem() =
         runDbTest {
             repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
             val monzo = createMonzoAccount()
@@ -221,36 +221,45 @@ class SourceRerunE2ETest : DbTest() {
             val reimports = repositories.reimports(maintenance)
             val planAllProgress = mutableListOf<Progress>()
             val plan = reimports.planAll(listOf(reload(first.id)), onProgress = { planAllProgress += it })
-            assertProgressesTo(planAllProgress, "Finding the files that depend on them")
-            assertTrue(planAllProgress.any { it.detail.startsWith("File 2 of 2") }, "the file matched against it is read too")
+            assertProgressesTo(planAllProgress, "File 1 of 1: MonzoDataExport.csv")
             assertEquals(monzo, plan.imported.getValue(Source.Csv(first.id)).accountId, "the account is read from what the file created")
-            assertEquals(setOf<Source>(Source.Csv(second.id)), plan.cascaded, "the second file is re-imported too")
-            assertEquals(3, plan.rerunFiles.sumOf { it.createdTransfers.size }, "both files' transactions are deleted")
+            assertEquals(
+                listOf<Source>(Source.Csv(first.id)),
+                plan.rerunFiles.map { it.file },
+                "only the picked file is re-run: the other file's duplicate is matched again by the engine",
+            )
+            assertEquals(2, plan.rerunFiles.sumOf { it.createdTransfers.size }, "only the first file's transactions are deleted")
             val result = reimports.runPlan(plan)
 
-            assertEquals(3, result.transfersCreated, "the first file's two and the second file's own one")
+            assertEquals(2, result.transfersCreated, "the first file's two, back on their ids")
             assertTrue(result.plan.releasedOverrides.isEmpty(), "nothing is replayed: the edit is an override on the kept id")
-            assertEquals(1, result.cascadedFiles)
-            assertEquals(0, result.cascadedFilesNotRerun)
             val after = transfersOn(monzo)
-            assertEquals(3, after.size, "the duplicate row matched the re-created transaction again: $after")
-            val recreated = after.single { it.description == "Flat white" }
+            assertEquals(3, after.size, "the second file's own transaction stays and its duplicate still matches: $after")
+            val recreated =
+                assertNotNull(
+                    after.singleOrNull { it.description == "Flat white" },
+                    "the edit holds: ${after.map { it.id to it.description }}",
+                )
             assertEquals(coffee.id, recreated.id, "the re-import gave the transaction its id back")
             assertEquals(listOf("work trip"), recreated.attributes.filter { it.attributeType.name == "note" }.map { it.value })
             val secondRow = repositories.csvImportRepository.getImportRows(second.id, limit = 10, offset = 0).first()
-            assertEquals(recreated.id, secondRow.transferId, "the other file's row points at the replacement")
+            assertEquals(recreated.id, secondRow.transferId, "the other file's row still points at the kept id")
 
             // The edit is an override on the kept id, so the next re-import keeps it too.
-            val again = reimports.planFile(first.id)
-            assertEquals(1, again.cascaded.size, "the re-run duplicate is recorded against the kept transaction")
-            reimports.runPlan(again)
-            val twice = transfersOn(monzo).single { it.id == coffee.id }
+            reimports.runPlan(reimports.planFile(first.id))
+            val twice =
+                transfersOn(monzo).let { all ->
+                    assertNotNull(
+                        all.singleOrNull { it.id == coffee.id },
+                        "kept on a second re-import: ${all.map { it.id to it.description }}",
+                    )
+                }
             assertEquals("Flat white", twice.description)
             assertEquals(listOf("work trip"), twice.attributes.filter { it.attributeType.name == "note" }.map { it.value })
         }
 
     @Test
-    fun reimport_reimportsAnotherFileWithTheAccountItWasImportedWith() =
+    fun reimport_leavesAnotherFileMatchedAgainstItOnTheKeptTransaction() =
         runDbTest {
             repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
             val monzo = createMonzoAccount()
@@ -264,64 +273,51 @@ class SourceRerunE2ETest : DbTest() {
             val second = stage("MonzoDataExport-later.csv", listOf(row("tx_1", "Coffee Shop", "-3.50", "Coffee")))
             assertEquals(1, apply(second, monzo).duplicatesSkipped)
 
+            val coffee = createdBy(first.id, row = 0)
             val reimports = repositories.reimports(maintenance)
-            val result = reimports.reimportFile(first.id)
+            reimports.reimportFile(first.id)
 
-            assertEquals(1, result.cascadedFiles)
-            assertEquals(0, result.cascadedFilesNotRerun)
             val recreated = createdBy(first.id, row = 0)
+            assertEquals(coffee.id, recreated.id, "the re-import gave the transaction its id back")
+            assertEquals(2, transfersOn(monzo).size, "the duplicate row adds nothing")
             val secondRow = repositories.csvImportRepository.getImportRows(second.id, limit = 10, offset = 0).first()
-            assertEquals(recreated.id, secondRow.transferId, "the other file's row points at the replacement")
+            assertEquals(recreated.id, secondRow.transferId, "the other file's row still points at it")
         }
 
     @Test
-    fun reimport_refusesBeforeDeleting_whenAFileItTakesAlongCanNotBeReimported() =
+    fun reimport_refusesBeforeDeleting_whenThePickedFileRecordsNoAccount() =
         runDbTest {
             repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
             val monzo = createMonzoAccount()
-            val first =
-                stage(
-                    "MonzoDataExport.csv",
-                    listOf(row("tx_1", "Coffee Shop", "-3.50", "Coffee"), row("tx_2", "Book Store", "-12.00", "Books")),
-                )
-            assertEquals(2, apply(first, monzo).transfersCreated)
-            val second = stage("MonzoDataExport-later.csv", listOf(row("tx_1", "Coffee Shop", "-3.50", "Coffee")))
-            assertEquals(1, apply(second, monzo).duplicatesSkipped)
-            // Its latest application records no account, so nothing says which account its row moves money on.
-            val secondImport = reload(second.id)
+            val file = stage("MonzoDataExport.csv", listOf(row("tx_1", "Coffee Shop", "-3.50", "Coffee")))
+            assertEquals(1, apply(file, monzo).transfersCreated)
+            val coffee = createdBy(file.id, row = 0)
+            // Its latest application records no account, and its one transaction has two, so nothing says which is the file's.
+            val staged = reload(file.id)
             repositories.importEngine.applyCsvImportMutations(
                 listOf(
                     CsvImportMutation.RecordApplication(
-                        id = second.id,
-                        strategyId = assertNotNull(secondImport.lastAppliedStrategyId),
-                        strategyName = assertNotNull(secondImport.lastAppliedStrategyName),
-                        appliedAt = assertNotNull(secondImport.lastAppliedAt) + 1.seconds,
+                        id = file.id,
+                        strategyId = assertNotNull(staged.lastAppliedStrategyId),
+                        strategyName = assertNotNull(staged.lastAppliedStrategyName),
+                        appliedAt = assertNotNull(staged.lastAppliedAt) + 1.seconds,
                     ),
                 ),
             )
 
-            val secondRowBefore = repositories.csvImportRepository.getImportRows(second.id, limit = 10, offset = 0).first()
             val reimports = repositories.reimports(maintenance)
-            val plan = reimports.planFile(first.id)
-            assertTrue(plan.needsAccount, "the dialog asks which account the other file's row moves money on")
+            val plan = reimports.planFile(file.id)
+            assertTrue(plan.needsAccount, "the dialog asks which account the file moves money on")
             assertFailsWith<RerunBlockedException>("checked before a caller's own write") {
                 reimports.checkReimportable(plan, accountId = null, currencyId = null)
             }
             val refused = assertFailsWith<RerunBlockedException> { reimports.runPlan(plan) }
-            // An API session's re-import takes files along the same way, and refuses them the same way.
-            assertFailsWith<RerunBlockedException> { reimports.prepare(listOf(Source.Csv(second.id))) }
+            assertEquals(listOf("MonzoDataExport.csv (nothing says which account it imports onto)"), refused.files)
+            assertEquals(listOf(coffee.id), transfersOn(monzo).map { it.id }, "nothing was deleted")
 
-            assertEquals(listOf("MonzoDataExport-later.csv (nothing says which account it imports onto)"), refused.files)
-            val secondRow = repositories.csvImportRepository.getImportRows(second.id, limit = 10, offset = 0).first()
-            assertEquals(secondRowBefore.transferId, secondRow.transferId, "nothing was deleted")
-            assertNotNull(secondRow.transferId)
-
-            // Given the account, as the dialog asks for it, the other file is re-imported too.
-            val result = reimports.runPlan(reimports.planFile(first.id), accountId = monzo)
-            assertEquals(1, result.cascadedFiles)
-            val relinked = repositories.csvImportRepository.getImportRows(second.id, limit = 10, offset = 0).first()
-            assertEquals(createdBy(first.id, row = 0).id, relinked.transferId, "the other file's row points at the replacement")
-            assertEquals(emptySet(), reimports.prepare(listOf(Source.Csv(first.id)))(null), "a file that records its account runs")
+            // Given the account, as the dialog asks for it, the file is re-imported onto its kept id.
+            reimports.runPlan(reimports.planFile(file.id), accountId = monzo)
+            assertEquals(listOf(coffee.id), transfersOn(monzo).map { it.id })
         }
 
     @Test

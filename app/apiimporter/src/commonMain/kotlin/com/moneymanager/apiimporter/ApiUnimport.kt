@@ -8,9 +8,7 @@ import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.ApiSessionReadRepository
-import com.moneymanager.domain.repository.RelationshipReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
-import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.importengineapi.ApiSessionMutation
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ImportBatch
@@ -20,7 +18,6 @@ import com.moneymanager.importengineapi.ImportTradeIntent
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalTradeKey
 import com.moneymanager.importengineapi.deleteEmptyImportCreatedAccounts
-import com.moneymanager.importengineapi.reconciledPartnerUnhideUpdates
 
 /** What unimporting an API session will do, executed verbatim by [executeApiUnimport]. */
 data class ApiUnimportPlan(
@@ -37,8 +34,6 @@ data class ApiUnimportResult(
     val deletedTransfers: Int,
     val deletedTrades: Int,
     val deletedEmptyAccounts: List<String>,
-    /** Transfers from other sources that the deleted ones had hidden as reconciled copies, now shown again. */
-    val unhiddenTransfers: Int,
 )
 
 /**
@@ -73,21 +68,17 @@ suspend fun planApiUnimport(
 suspend fun executeApiUnimport(
     plan: ApiUnimportPlan,
     accountRepository: AccountReadRepository,
-    transactionRepository: TransactionReadRepository,
-    relationshipRepository: RelationshipReadRepository,
     tradeRepository: TradeReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
     refreshViews: Boolean = true,
 ): ApiUnimportResult {
     val source = Source.Api(plan.sessionId)
-    val unhideUpdates = reconciledPartnerUnhideUpdates(plan.transferIds, relationshipRepository, transactionRepository)
     // One batch, so the session never reads as unimported while its transactions remain, nor the reverse.
     importEngine.import(
         ImportBatch(
             transfers =
-                unhideUpdates +
-                    plan.transferIds.map { id -> ImportTransfer(source = source, operation = ImportOperation.DELETE, existingId = id) },
+                plan.transferIds.map { id -> ImportTransfer(source = source, operation = ImportOperation.DELETE, existingId = id) },
             trades =
                 plan.tradeIds.map { id ->
                     ImportTradeIntent(
@@ -117,6 +108,5 @@ suspend fun executeApiUnimport(
         deletedTransfers = plan.transferIds.size,
         deletedTrades = plan.tradeIds.size,
         deletedEmptyAccounts = deletedEmptyAccounts,
-        unhiddenTransfers = unhideUpdates.size,
     )
 }

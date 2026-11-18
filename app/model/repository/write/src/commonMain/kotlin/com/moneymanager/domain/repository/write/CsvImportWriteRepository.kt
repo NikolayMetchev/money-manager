@@ -111,21 +111,7 @@ interface CsvImportWriteRepository : CsvImportReadRepository {
     )
 
     /**
-     * Clears the import status and transfer link for the given rows so a re-run of the strategy picks
-     * them up again (used after their previously-imported transfers were deleted).
-     * The file's import records go too, so its next re-import runs rather than finding it unchanged.
-     *
-     * @param id The import ID
-     * @param rowIndexes The row indexes to reset, or null for every row
-     */
-    suspend fun resetRowStatuses(
-        id: CsvImportId,
-        rowIndexes: Collection<Long>?,
-    )
-
-    /**
-     * Gets [id] ready to re-run in place (#1430): every row's status and link are cleared and the matched sources its rows
-     * recorded go, like [resetRowStatuses], but its import records stay, their content hashes set to [unhashed] so the file
+     * Gets [id] ready to re-run in place (#1430): every row's status and link are cleared, but its import records stay, their content hashes set to [unhashed] so the file
      * never looks up to date until the run completes, and so do their observations, reserved for the run to say again.
      */
     suspend fun reserveForRerun(

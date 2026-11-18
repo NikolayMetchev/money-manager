@@ -541,7 +541,6 @@ suspend fun bulkApplyCsv(
  * not auto-matched — used by re-import and by [bulkApplyCsv] itself after it selects one.
  * [refreshViews] = false lets a caller batch many files and refresh once at the end.
  * [onProgress]/[engineBatchSize] are forwarded to the engine so a caller can show per-chunk progress.
- * [settled] = false records the rows as not settled ([recordRowsMutation]), so the file's own re-import still runs.
  * [syncMatches] = false leaves re-matching the stored observations ([ImportBatch.syncMatches]) to the caller, which
  * runs it once after many files.
  */
@@ -563,7 +562,6 @@ suspend fun applyStagedCsv(
     cryptoRepository: CryptoReadRepository? = null,
     attributeAccountMatchers: Map<String, AttributeAccountMatcher> = emptyMap(),
     tradeRepository: TradeReadRepository? = null,
-    settled: Boolean = true,
     syncMatches: Boolean = true,
 ): CsvImportResult? {
     // The staged rows must be the ones the strategy reads: an Excel import is initially staged from the workbook's
@@ -663,7 +661,7 @@ suspend fun applyStagedCsv(
             attributeAccountMatchers = attributeAccountMatchers,
             passThroughAccounts = passThroughAccounts,
         )
-    importEngine.applyCsvImportMutations(listOf(recordRowsMutation(stagedImport, allRows, inputsHash, settled)))
+    importEngine.applyCsvImportMutations(listOf(recordRowsMutation(stagedImport, allRows, inputsHash)))
     // An account the file's rules named that nothing ended up on (a conversion counterparty whose legs paired into a
     // trade) goes, as a re-run of the file removes it: a fresh import and a re-import then hold the same accounts.
     importEngine.deleteEmptyImportCreatedAccounts(

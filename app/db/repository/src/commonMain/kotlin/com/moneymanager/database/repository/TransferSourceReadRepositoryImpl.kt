@@ -3,8 +3,6 @@ package com.moneymanager.database.repository
 import app.cash.sqldelight.async.coroutines.awaitAsList
 import com.moneymanager.database.sql.read.MoneyManagerDatabase
 import com.moneymanager.domain.model.ApiRequestId
-import com.moneymanager.domain.model.ApiSessionId
-import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.Source
@@ -14,7 +12,6 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.TransferSourceReadRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlin.uuid.Uuid
 
 /**
  * Read-only implementation of TransferSourceReadRepository using SQLDelight.
@@ -96,32 +93,4 @@ class TransferSourceReadRepositoryImpl(
             // The first record of each trade: the rows are in creation order.
             records.groupBy({ it.first }, { it.second }).mapValues { (_, sources) -> sources.first() }
         }
-
-    override suspend fun getImportRecordsMatchedTo(
-        transferIds: Set<TransferId>,
-        tradeIds: Set<TradeId>,
-    ): List<Source.Csv> =
-        withContext(Dispatchers.Default) {
-            val records = linkedSetOf<Source.Csv>()
-            for (chunk in (transferIds.map { it.id } + tradeIds.map { it.id }).distinct().chunked(ID_CHUNK)) {
-                queries.selectImportRecordsMatchedTo(chunk).awaitAsList().mapTo(records) {
-                    Source.Csv(CsvImportId(Uuid.parse(it.import_id)), it.record_index)
-                }
-            }
-            records.toList()
-        }
-
-    override suspend fun getRerunClosure(
-        imports: Set<CsvImportId>,
-        sessions: Set<ApiSessionId>,
-    ): Set<CsvImportId> =
-        withContext(Dispatchers.Default) {
-            queries
-                .selectRerunClosure(imports.map { it.id.toString() }, sessions.map { it.id })
-                .awaitAsList()
-                .mapTo(mutableSetOf()) { CsvImportId(Uuid.parse(it)) }
-        }
 }
-
-// Keeps each IN list well under SQLite's bound-parameter limit.
-private const val ID_CHUNK = 500

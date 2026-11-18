@@ -23,8 +23,7 @@ CROSS JOIN entity_source ON entity_source.id = csv_entity_source.id
 JOIN transfer ON transfer.id = entity_source.entity_id
 WHERE csv_entity_source.csv_import_id = ?
   AND entity_source.entity_type_id = 7
-  AND entity_source.revision_id = 1
-  AND entity_source.matched = 0;
+  AND entity_source.revision_id = 1;
 
 -- The account whose statement (or API feed) each of the given transfers came from: their creating records' own accounts.
 selectStatementAccountsOfTransfers:
@@ -33,8 +32,7 @@ FROM entity_source
 CROSS JOIN entity_source_statement_account ON entity_source_statement_account.entity_source_id = entity_source.id
 WHERE entity_source.entity_id IN ?
   AND entity_source.entity_type_id = 7
-  AND entity_source.revision_id = 1
-  AND entity_source.matched = 0;
+  AND entity_source.revision_id = 1;
 
 -- Trades (entity_type_id = 11) created by the given CSV import, still-existing only — see
 -- selectTransferIdsCreatedByCsvImport.
@@ -45,8 +43,7 @@ CROSS JOIN entity_source ON entity_source.id = csv_entity_source.id
 JOIN trade ON trade.id = entity_source.entity_id
 WHERE csv_entity_source.csv_import_id = ?
   AND entity_source.entity_type_id = 11
-  AND entity_source.revision_id = 1
-  AND entity_source.matched = 0;
+  AND entity_source.revision_id = 1;
 
 -- Accounts (entity_type_id = 1) created (not merely touched) by the given API session — revision_id = 1
 -- means the entity's creating write is still its only recorded revision. Joined against `account` so a
@@ -89,8 +86,7 @@ SELECT id, source_type_id
 FROM entity_source
 WHERE entity_type_id = ?
   AND entity_id = ?
-  AND revision_id = ?
-  AND matched = 0;
+  AND revision_id = ?;
 
 selectApiEntitySourceId:
 SELECT id
@@ -132,7 +128,6 @@ LEFT JOIN csv_entity_source ON entity_source.id = csv_entity_source.id
 LEFT JOIN csv_import_metadata ON csv_entity_source.csv_import_id = csv_import_metadata.id
 LEFT JOIN api_entity_source ON entity_source.id = api_entity_source.id
 WHERE entity_source.entity_type_id = :entityTypeId AND entity_source.entity_id = :entityId
-  AND entity_source.matched = 0
 ORDER BY entity_source.revision_id DESC;
 
 -- Still-existing transfers (entity_type_id = 7) a CSV import created, with the row each came from.
@@ -145,8 +140,7 @@ CROSS JOIN entity_source ON entity_source.id = csv_entity_source.id
 JOIN transfer ON transfer.id = entity_source.entity_id
 WHERE csv_entity_source.csv_import_id = ?
   AND entity_source.entity_type_id = 7
-  AND entity_source.revision_id = 1
-  AND entity_source.matched = 0;
+  AND entity_source.revision_id = 1;
 
 -- The API analogue of selectCreatedTransferRowsByCsvImport: a record is a response node.
 selectCreatedTransferNodesByApiSession:
@@ -168,7 +162,6 @@ JOIN trade ON trade.id = entity_source.entity_id
 WHERE csv_entity_source.csv_import_id = ?
   AND entity_source.entity_type_id = 11
   AND entity_source.revision_id = 1
-  AND entity_source.matched = 0
 ORDER BY entity_source.id;
 
 selectCreatedTradeNodesByApiSession:
@@ -181,96 +174,7 @@ WHERE api_entity_source.api_session_id = ?
   AND entity_source.revision_id = 1
 ORDER BY entity_source.id;
 
--- The CSV rows whose current link is one of the given transfers or trades (they share one id space) without
--- having written it: their matched entries, which mirror those links exactly (see recordMatchedSource).
-selectImportRecordsMatchedTo:
-SELECT csv_entity_source.csv_import_id AS import_id, csv_entity_source.csv_row_index AS record_index
-FROM entity_source
-CROSS JOIN csv_entity_source ON csv_entity_source.id = entity_source.id
-WHERE entity_source.entity_type_id IN (7, 11)
-  AND entity_source.entity_id IN :transactionIds
-  AND entity_source.matched = 1
-  AND csv_entity_source.csv_row_index IS NOT NULL;
-
--- The matched entries of the given rows of one CSV import, or of all its rows; see forgetMatchedSources.
-selectMatchedCsvSourceIds:
-SELECT csv_entity_source.id
-FROM csv_entity_source
-CROSS JOIN entity_source ON entity_source.id = csv_entity_source.id
-WHERE csv_entity_source.csv_import_id = ?
-  AND csv_entity_source.csv_row_index IN ?
-  AND entity_source.matched = 1;
-
-selectAllMatchedCsvSourceIds:
-SELECT csv_entity_source.id
-FROM csv_entity_source
-CROSS JOIN entity_source ON entity_source.id = csv_entity_source.id
-WHERE csv_entity_source.csv_import_id = ?
-  AND entity_source.matched = 1;
-
--- Every staged file a re-import of the given files and API sessions takes along, with the given files themselves:
--- the closure of "depends on what it created". A file depends on a transaction another file or session created when
--- one of its rows matched it (a matched entry), or when it created a transfer reconciled against it that the
--- deletion would leave hidden (excluded as 'reconciled') or that took an end from it (the pair's primary, on other
--- accounts: ImportDeduper.otherSideOf). A partner reconciled against several transfers joins once any of them goes,
--- which only re-imports its file. Only staged files are ever taken along: an API session's partners are un-hidden.
-selectRerunClosure:
-WITH RECURSIVE
-dependant AS (
-    SELECT e.entity_id AS transaction_id, c.csv_import_id AS import_id
-    FROM entity_source e
-    CROSS JOIN csv_entity_source c ON c.id = e.id
-    WHERE e.entity_type_id IN (7, 11)
-      AND e.matched = 1
-      AND c.csv_row_index IS NOT NULL
-    UNION ALL
-    SELECT mine.transaction_id, c.csv_import_id
-    FROM relationship r
-    CROSS JOIN relationship_member mine ON mine.relationship_id = r.id
-    CROSS JOIN relationship_member other ON other.relationship_id = r.id AND other.transaction_id <> mine.transaction_id
-    CROSS JOIN transfer kept ON kept.id = other.transaction_id
-    CROSS JOIN transfer lent ON lent.id = mine.transaction_id
-    CROSS JOIN entity_source e ON e.entity_type_id = 7 AND e.entity_id = other.transaction_id AND e.revision_id = 1 AND e.matched = 0
-    CROSS JOIN csv_entity_source c ON c.id = e.id
-    WHERE r.relationship_type_id = 1
-      AND (
-        other.transaction_id IN (
-            SELECT transaction_id FROM transfer_attribute WHERE attribute_type_id = -1 AND attribute_value = 'reconciled'
-        )
-        OR (
-            other.role = 0 AND mine.role = 1
-            -- On other accounts: neither the same pair nor the same pair reversed.
-            AND (kept.source_account_id <> lent.source_account_id OR kept.target_account_id <> lent.target_account_id)
-            AND (kept.source_account_id <> lent.target_account_id OR kept.target_account_id <> lent.source_account_id)
-        )
-      )
-),
-seed AS (
-    SELECT id AS import_id FROM csv_import_metadata WHERE id IN :importIds
-    UNION
-    SELECT dependant.import_id
-    FROM api_entity_source a
-    CROSS JOIN entity_source e ON e.id = a.id
-    JOIN dependant ON dependant.transaction_id = e.entity_id
-    WHERE a.api_session_id IN :sessionIds
-      AND e.entity_type_id IN (7, 11)
-      AND e.revision_id = 1
-),
-closure AS (
-    SELECT import_id FROM seed
-    UNION
-    SELECT dependant.import_id
-    FROM closure
-    CROSS JOIN csv_entity_source c ON c.csv_import_id = closure.import_id
-    CROSS JOIN entity_source e ON e.id = c.id
-    JOIN dependant ON dependant.transaction_id = e.entity_id
-    WHERE e.entity_type_id IN (7, 11)
-      AND e.revision_id = 1
-      AND e.matched = 0
-)
-SELECT import_id FROM closure;
-
 -- The revision after every write recorded against an entity: a re-run inserting a row back under the id it took back
 -- (#1430) continues its history rather than writing over its first revision, which still says who created it.
 selectNextRevision:
-SELECT COALESCE(MAX(revision_id), 0) + 1 FROM entity_source WHERE entity_type_id = ? AND entity_id = ? AND matched = 0;
+SELECT COALESCE(MAX(revision_id), 0) + 1 FROM entity_source WHERE entity_type_id = ? AND entity_id = ?;

@@ -132,7 +132,7 @@ class QifReimportE2ETest : DbTest() {
     }
 
     @Test
-    fun reimport_rerunsAnotherFilesDuplicateRecord() =
+    fun reimport_leavesAnotherFilesDuplicateRecordOnTheKeptTransfers() =
         runDbTest {
             val first = createImport()
             apply(first)
@@ -156,7 +156,7 @@ class QifReimportE2ETest : DbTest() {
 
             val reimports = repositories.reimports(maintenance)
             val plan = reimports.planFile(first.id)
-            assertEquals(1, plan.cascaded.size, "the later file is re-imported too")
+            assertEquals(1, plan.rerunFiles.size, "only the picked file is re-run")
 
             reimports.runPlan(plan, accountId = sourceAccountId())
 
@@ -165,8 +165,9 @@ class QifReimportE2ETest : DbTest() {
                 relinked.all {
                     it.importStatus == ImportStatus.DUPLICATE && it.transferId != null
                 },
-                "matched the re-created transfers again: $relinked",
+                "still matched: $relinked",
             )
+            assertEquals(duplicates.map { it.transferId }, relinked.map { it.transferId }, "the re-created transfers kept their ids")
             assertEquals(3L, repositories.accountRepository.countTransfersByAccount(sourceAccountId()))
         }
 

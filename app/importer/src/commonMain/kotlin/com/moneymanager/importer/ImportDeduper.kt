@@ -1024,8 +1024,8 @@ class ImportDeduper(
         }
         pairedInBatch += found.id
         supersede(found.supersedes)
-        // Superseded legs are linked too, so the exclusion they take on stays explained — and is lifted by
-        // `reconciledPartnerUnhideUpdates` if this row is ever deleted.
+        // Superseded legs are linked too, so the exclusion they take on stays explained — and is lifted
+        // by the engine when this row is ever deleted (its link is left with one member).
         val relationships =
             transfer.relationships + NewRelationship(relatedTransferId = found.id, typeId = relationshipTypeId) +
                 found.supersedes.map { NewRelationship(relatedTransferId = it.id, typeId = relationshipTypeId) }

@@ -21,7 +21,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import co.touchlab.kermit.Logger
 import com.moneymanager.csvimporter.CsvBulkUnimportPlan
-import com.moneymanager.csvimporter.CsvUnimportAffectedFile
 import com.moneymanager.csvimporter.CsvUnimportPlan
 import com.moneymanager.csvimporter.CsvUnimportResult
 import com.moneymanager.csvimporter.executeCsvBulkUnimport
@@ -32,10 +31,7 @@ import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
-import com.moneymanager.domain.repository.RelationshipReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
-import com.moneymanager.domain.repository.TransactionReadRepository
-import com.moneymanager.domain.repository.TransferSourceReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.tasks.Progress
@@ -47,18 +43,14 @@ import kotlinx.coroutines.launch
 private val logger = Logger.withTag("UnimportDialog")
 
 /**
- * Confirms and runs an unimport of [csvImport]: previews what the file created (and which other files'
- * rows depend on it), then deletes it all, resets the file and moves it to the Ignored tab.
+ * Confirms and runs an unimport of [csvImport]: previews what the file created, then deletes it all, resets the file and moves it to the Ignored tab.
  */
 @Suppress("LongParameterList", "LongMethod")
 @Composable
 fun UnimportDialog(
     csvImport: CsvImport,
     csvImportRepository: CsvImportReadRepository,
-    transferSourceRepository: TransferSourceReadRepository,
     accountRepository: AccountReadRepository,
-    transactionRepository: TransactionReadRepository,
-    relationshipRepository: RelationshipReadRepository,
     tradeRepository: TradeReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
@@ -73,7 +65,7 @@ fun UnimportDialog(
 
     LaunchedEffect(csvImport.id) {
         try {
-            plan = planCsvUnimport(csvImport.id, csvImportRepository, transferSourceRepository)
+            plan = planCsvUnimport(csvImport.id, csvImportRepository)
         } catch (expected: CancellationException) {
             throw expected
         } catch (expected: Exception) {
@@ -108,7 +100,6 @@ fun UnimportDialog(
                             fileCount = 1,
                             transferCount = currentPlan.transferIds.size,
                             tradeCount = currentPlan.tradeIds.size,
-                            affectedFiles = currentPlan.affectedFiles,
                         )
                     }
                 }
@@ -134,8 +125,6 @@ fun UnimportDialog(
                                 executeCsvUnimport(
                                     plan = currentPlan,
                                     accountRepository = accountRepository,
-                                    transactionRepository = transactionRepository,
-                                    relationshipRepository = relationshipRepository,
                                     tradeRepository = tradeRepository,
                                     maintenance = maintenance,
                                     importEngine = importEngine,
@@ -177,10 +166,7 @@ fun UnimportDialog(
 fun CsvUnimportAllDialog(
     imports: List<CsvImport>,
     csvImportRepository: CsvImportReadRepository,
-    transferSourceRepository: TransferSourceReadRepository,
     accountRepository: AccountReadRepository,
-    transactionRepository: TransactionReadRepository,
-    relationshipRepository: RelationshipReadRepository,
     tradeRepository: TradeReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
@@ -195,7 +181,7 @@ fun CsvUnimportAllDialog(
 
     LaunchedEffect(imports) {
         try {
-            plan = planCsvBulkUnimport(imports.map { it.id }, csvImportRepository, transferSourceRepository)
+            plan = planCsvBulkUnimport(imports.map { it.id }, csvImportRepository)
         } catch (expected: CancellationException) {
             throw expected
         } catch (expected: Exception) {
@@ -230,7 +216,6 @@ fun CsvUnimportAllDialog(
                             fileCount = currentPlan.plans.size,
                             transferCount = currentPlan.transferCount,
                             tradeCount = currentPlan.tradeCount,
-                            affectedFiles = currentPlan.affectedFiles,
                         )
                     }
                 }
@@ -256,10 +241,7 @@ fun CsvUnimportAllDialog(
                                 executeCsvBulkUnimport(
                                     plan = currentPlan,
                                     csvImportRepository = csvImportRepository,
-                                    transferSourceRepository = transferSourceRepository,
                                     accountRepository = accountRepository,
-                                    transactionRepository = transactionRepository,
-                                    relationshipRepository = relationshipRepository,
                                     tradeRepository = tradeRepository,
                                     maintenance = maintenance,
                                     importEngine = importEngine,
@@ -297,7 +279,6 @@ private fun UnimportPlanPreview(
     fileCount: Int,
     transferCount: Int,
     tradeCount: Int,
-    affectedFiles: List<CsvUnimportAffectedFile>,
 ) {
     val files = if (fileCount == 1) "this file" else "these $fileCount files"
     Text(
@@ -311,22 +292,6 @@ private fun UnimportPlanPreview(
             },
         style = MaterialTheme.typography.bodyMedium,
     )
-    if (affectedFiles.isNotEmpty()) {
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(
-            text =
-                "Rows in these files were matched to transactions being deleted and will be reset. " +
-                    "Re-import them afterwards to restore those transactions:",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.error,
-        )
-        affectedFiles.forEach { file ->
-            Text(
-                text = "• ${file.fileName} (${file.rowIndexes.size} row(s))",
-                style = MaterialTheme.typography.bodySmall,
-            )
-        }
-    }
 }
 
 /** One-line summary of a finished unimport, for the screen's status message. */
@@ -336,9 +301,4 @@ fun CsvUnimportResult.summary(fileName: String): String =
         if (deletedTrades > 0) append(", $deletedTrades trade(s)")
         append(" deleted")
         if (deletedEmptyAccounts.isNotEmpty()) append(", ${deletedEmptyAccounts.size} empty account(s) deleted")
-        if (unhiddenTransfers > 0) append(", $unhiddenTransfers reconciled transaction(s) un-hidden")
-        if (affectedFiles.isNotEmpty()) {
-            append(". Re-import to restore: ")
-            append(affectedFiles.joinToString { it.fileName })
-        }
     }

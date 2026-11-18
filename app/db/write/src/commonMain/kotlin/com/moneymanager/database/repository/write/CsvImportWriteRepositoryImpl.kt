@@ -3,17 +3,13 @@ package com.moneymanager.database.repository.write
 import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
 import com.moneymanager.database.csv.CsvTableManager
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
-import com.moneymanager.database.write.forgetMatchedSources
-import com.moneymanager.database.write.recordMatchedSource
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DeviceId
-import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvRowLink
-import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csv.PdfImportSource
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.write.CsvImportWriteRepository
@@ -106,8 +102,6 @@ class CsvImportWriteRepositoryImpl(
 
                 // Recreate the dynamic table with the new column shape and rows. The row_index sequence
                 // restarts, so any previously written per-row errors are stale — clear them.
-                // The new rows carry no links, so neither may their matched entries.
-                database.forgetMatchedSources(id, rows = null)
                 tableManager.dropCsvTable(import.table_name)
                 tableManager.createCsvTable(import.table_name, columnCount)
                 tableManager.insertRowsBatch(import.table_name, rows, columnCount)
@@ -219,8 +213,6 @@ class CsvImportWriteRepositoryImpl(
                 // A file staged from an import folder references this import; forget the file too, so the
                 // delete isn't blocked and the next scan of that folder stages the file again.
                 csvImportWriteQueries.deleteDirectoryFilesForImport(id.id.toString())
-                // Its rows' links go with it; their matched entries would otherwise block the delete.
-                database.forgetMatchedSources(id, rows = null)
                 csvImportWriteQueries.deleteImportRecordObservations(id.id.toString())
                 csvImportWriteQueries.deleteImportRecords(id.id.toString())
 
@@ -240,7 +232,6 @@ class CsvImportWriteRepositoryImpl(
                     ?: return@withContext
 
             database.transaction {
-                database.forgetMatchedSources(id, rows = null)
                 tableManager.resetAllRowStatuses(import.table_name)
                 csvImportWriteQueries.deleteErrorsByImportId(id.id.toString())
                 csvImportWriteQueries.deleteApplicationsByImportId(id.id.toString())
@@ -271,37 +262,8 @@ class CsvImportWriteRepositoryImpl(
                     ?: return@withContext
 
             database.transaction {
-                database.forgetMatchedSources(id, rowTransferMap.keys)
                 rowTransferMap.forEach { (rowIndex, transferId) ->
                     tableManager.updateRowStatus(import.table_name, rowIndex, status, transferId)
-                    if (transferId != null && status != ImportStatus.IMPORTED.name) {
-                        database.recordMatchedSource(deviceId, Source.Csv(id, rowIndex), transferId.id)
-                    }
-                }
-            }
-        }
-
-    override suspend fun resetRowStatuses(
-        id: CsvImportId,
-        rowIndexes: Collection<Long>?,
-    ): Unit =
-        withContext(coroutineContext) {
-            if (rowIndexes?.isEmpty() == true) return@withContext
-
-            val import =
-                csvImportSelectQueries.selectImportById(id.id.toString()).awaitAsOneOrNull()
-                    ?: return@withContext
-
-            database.transaction {
-                database.forgetMatchedSources(id, rowIndexes)
-                // The file now waits for a run that may never finish (a stopped or failed re-import), so nothing it
-                // recorded may say it is up to date: its import records go, and its next re-import runs.
-                csvImportWriteQueries.deleteImportRecordObservations(id.id.toString())
-                csvImportWriteQueries.deleteImportRecords(id.id.toString())
-                if (rowIndexes == null) {
-                    tableManager.resetAllRowStatuses(import.table_name)
-                } else {
-                    tableManager.resetRowStatuses(import.table_name, rowIndexes)
                 }
             }
         }
@@ -315,7 +277,6 @@ class CsvImportWriteRepositoryImpl(
                 csvImportSelectQueries.selectImportById(id.id.toString()).awaitAsOneOrNull()
                     ?: return@withContext
             database.transaction {
-                database.forgetMatchedSources(id, null)
                 database.observationWriteQueries.reserveCsvImport(id.id.toString())
                 csvImportWriteQueries.unhashImportRecords(unhashed, id.id.toString())
                 tableManager.resetAllRowStatuses(import.table_name)

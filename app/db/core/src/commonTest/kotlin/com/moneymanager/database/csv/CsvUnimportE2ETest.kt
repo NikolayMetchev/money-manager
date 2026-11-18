@@ -145,10 +145,8 @@ class CsvUnimportE2ETest : DbTest() {
 
     private suspend fun unimport(import: CsvImport): CsvUnimportResult =
         executeCsvUnimport(
-            plan = planCsvUnimport(import.id, repositories.csvImportRepository, repositories.transferSourceRepository),
+            plan = planCsvUnimport(import.id, repositories.csvImportRepository),
             accountRepository = repositories.accountRepository,
-            transactionRepository = repositories.transactionRepository,
-            relationshipRepository = repositories.relationshipRepository,
             tradeRepository = repositories.tradeRepository,
             maintenance = maintenance,
             importEngine = repositories.importEngine,
@@ -227,8 +225,8 @@ class CsvUnimportE2ETest : DbTest() {
             assertEquals(1, apply(second, monzo).duplicatesSkipped, "the second file's row is a duplicate of the first's")
             val secondRowsBefore = repositories.csvImportRepository.getImportRows(second.id, limit = 10, offset = 0)
 
-            val plan = planCsvUnimport(first.id, repositories.csvImportRepository, repositories.transferSourceRepository)
-            assertTrue(plan.transferIds.isEmpty() && plan.affectedFiles.isEmpty(), "$plan")
+            val plan = planCsvUnimport(first.id, repositories.csvImportRepository)
+            assertTrue(plan.transferIds.isEmpty(), "$plan")
             assertEquals(0, unimport(reload(first.id)).deletedTransfers)
 
             assertEquals(1, transfersOn(monzo).size, "the second file still records the transfer")
@@ -256,8 +254,8 @@ class CsvUnimportE2ETest : DbTest() {
             assertTrue(transfersOn(personal).single().let { !it.isReconcileExcluded() }, "precondition: one counted transfer")
             val jointRowsBefore = repositories.csvImportRepository.getImportRows(jointExport.id, limit = 10, offset = 0)
 
-            val plan = planCsvUnimport(personalExport.id, repositories.csvImportRepository, repositories.transferSourceRepository)
-            assertTrue(plan.transferIds.isEmpty() && plan.affectedFiles.isEmpty(), "$plan")
+            val plan = planCsvUnimport(personalExport.id, repositories.csvImportRepository)
+            assertTrue(plan.transferIds.isEmpty(), "$plan")
             unimport(reload(personalExport.id))
 
             val kept = transfersOn(joint)
@@ -273,7 +271,7 @@ class CsvUnimportE2ETest : DbTest() {
         }
 
     @Test
-    fun unimportAll_removesEveryFile_withoutWarningAboutFilesInTheSet() =
+    fun unimportAll_removesEveryFile() =
         runDbTest {
             repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
             val monzo = createAccount("Monzo")
@@ -287,25 +285,20 @@ class CsvUnimportE2ETest : DbTest() {
             assertEquals(1, apply(second, monzo).transfersCreated, "tx_1 is a duplicate of the first file's row")
 
             val plan =
-                planCsvBulkUnimport(listOf(first.id, second.id), repositories.csvImportRepository, repositories.transferSourceRepository)
-            assertTrue(plan.affectedFiles.isEmpty(), "the dependent file is being unimported too: ${plan.affectedFiles}")
+                planCsvBulkUnimport(listOf(first.id, second.id), repositories.csvImportRepository)
             assertEquals(2, plan.transferCount)
 
             val result =
                 executeCsvBulkUnimport(
                     plan = plan,
                     csvImportRepository = repositories.csvImportRepository,
-                    transferSourceRepository = repositories.transferSourceRepository,
                     accountRepository = repositories.accountRepository,
-                    transactionRepository = repositories.transactionRepository,
-                    relationshipRepository = repositories.relationshipRepository,
                     tradeRepository = repositories.tradeRepository,
                     maintenance = maintenance,
                     importEngine = repositories.importEngine,
                 )
 
             assertEquals(2, result.deletedTransfers)
-            assertTrue(result.affectedFiles.isEmpty())
             assertTrue(transfersOn(monzo).isEmpty())
             listOf(first.id, second.id).forEach { id ->
                 val after = reload(id)

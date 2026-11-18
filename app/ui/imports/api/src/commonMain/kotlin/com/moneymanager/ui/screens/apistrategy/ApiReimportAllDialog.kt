@@ -75,7 +75,6 @@ fun ApiReimportAllDialog(
                                 reads = reimports.reads,
                                 maintenance = maintenance,
                                 importEngine = importEngine,
-                                cascadeRerunner = reimports,
                                 onProgress = { progress = it },
                             )
                         }
@@ -97,21 +96,6 @@ fun ApiReimportAllDialog(
                 text = "Re-imported ${finished.sessionsReimported} session(s) under \"${strategy.name}\".",
                 style = MaterialTheme.typography.bodyMedium,
             )
-            if (finished.cascadedFiles > 0) {
-                Text(
-                    text = "${finished.cascadedFiles} other file(s) re-imported along.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            if (finished.cascadedFilesNotRerun > 0) {
-                Text(
-                    text =
-                        "${finished.cascadedFilesNotRerun} other file(s) couldn't be re-imported along and are left for " +
-                            "their own re-import.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
             ImportPlanReport(finished.plan, accountName)
             if (finished.failures.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))

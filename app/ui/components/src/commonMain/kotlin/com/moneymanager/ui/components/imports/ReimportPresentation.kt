@@ -102,7 +102,7 @@ fun ReimportPlanSection(
 
 /**
  * The preview every re-import dialog shows (staged files and API sessions): what the source created and will create
- * again, and the other files that depend on it, which are re-imported too. [recordNoun] names the source's records
+ * again. [recordNoun] names the source's records
  * ("row", "record", "item").
  */
 @Composable
@@ -122,16 +122,6 @@ fun SourceRerunPreview(
                 },
             style = MaterialTheme.typography.bodySmall,
         )
-        if (plan.cascade.isNotEmpty()) {
-            val files = plan.cascade.size
-            ReimportPlanSection(
-                title = "Other files to re-import too ($files):",
-                lines = emptyList(),
-                note =
-                    "$files other file${plural(files)} matched or reconciled against these transactions. They are " +
-                        "re-imported whole after this one, so they reconcile against the new transactions.",
-            )
-        }
         Spacer(modifier = Modifier.height(12.dp))
         Text(
             text =

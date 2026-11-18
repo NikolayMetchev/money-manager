@@ -10,7 +10,6 @@ import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.importengineapi.ApiSessionMutation
-import com.moneymanager.importengineapi.CascadeRerunner
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportPlan
@@ -68,7 +67,6 @@ suspend fun executeApiReimport(
     reads: RerunReads,
     maintenance: Maintenance,
     importEngine: ImportEngine,
-    cascadeRerunner: CascadeRerunner,
     counterpartyAccountNames: Map<String, String> = emptyMap(),
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
     onProgress: (suspend (Progress) -> Unit)? = null,
@@ -82,9 +80,6 @@ suspend fun executeApiReimport(
             rerun = ApiRerunCounts(transactionsImported = 0, tradesImported = 0),
             deletedTransfers = 0,
             deletedTrades = 0,
-            unhiddenTransfers = 0,
-            cascaded = emptyList(),
-            notRerun = emptyList(),
             deletedEmptyAccounts = emptyList(),
         )
     }
@@ -101,7 +96,6 @@ suspend fun executeApiReimport(
             ),
         reads = reads,
         maintenance = maintenance,
-        cascadeRerunner = cascadeRerunner,
         onProgress = onProgress,
         refreshViews = refreshViews,
     ) {
@@ -137,10 +131,6 @@ data class ApiBulkReimportResult(
     /** Sessions that completed — failed ones are in [failures], not counted here. */
     val sessionsReimported: Int,
     val failures: List<ApiSessionReimportFailure> = emptyList(),
-    /** Other staged files re-imported along with a session (see `SourceRerunResult.cascaded`). */
-    val cascadedFiles: Int = 0,
-    /** Files a session's re-import deleted but couldn't import again: they wait for their own re-import. */
-    val cascadedFilesNotRerun: Int = 0,
     /** What the sessions' re-imports created, changed and removed, and where they met a person's overrides. */
     val plan: ImportPlan = ImportPlan(),
 )
@@ -167,7 +157,6 @@ suspend fun bulkReimportApiSessions(
     reads: RerunReads,
     maintenance: Maintenance,
     importEngine: ImportEngine,
-    cascadeRerunner: CascadeRerunner,
     counterpartyAccountNames: Map<String, String> = emptyMap(),
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
     onProgress: (suspend (Progress) -> Unit)? = null,
@@ -180,8 +169,6 @@ suspend fun bulkReimportApiSessions(
             .filter { it.id in importedSessionIds }
             .sortedBy { it.createdAt }
 
-    var cascaded = 0
-    var notRerun = 0
     var importPlan = ImportPlan()
     return reimportSessionsResiliently(sessions, maintenance, onProgress) { session, sessionProgress ->
         val result =
@@ -193,18 +180,13 @@ suspend fun bulkReimportApiSessions(
                 reads = reads,
                 maintenance = maintenance,
                 importEngine = importEngine,
-                cascadeRerunner = cascadeRerunner,
                 counterpartyAccountNames = counterpartyAccountNames,
                 passThroughAccounts = passThroughAccounts,
                 onProgress = sessionProgress,
                 refreshViews = false,
             )
-        cascaded += result.cascaded.size
-        notRerun += result.notRerun.size
         importPlan += result.plan
     }.copy(
-        cascadedFiles = cascaded,
-        cascadedFilesNotRerun = notRerun,
         plan = importPlan,
     )
 }

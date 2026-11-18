@@ -25,7 +25,7 @@ FROM (
         MAX(transfer.timestamp) AS latest_ms,
         COUNT(DISTINCT transfer.id) AS transaction_count
     FROM csv_entity_source
-    JOIN entity_source ON entity_source.id = csv_entity_source.id AND entity_source.entity_type_id = 7 AND entity_source.matched = 0
+    JOIN entity_source ON entity_source.id = csv_entity_source.id AND entity_source.entity_type_id = 7
     JOIN transfer ON transfer.id = entity_source.entity_id
     GROUP BY csv_entity_source.csv_import_id
 ) ranges
@@ -99,7 +99,7 @@ FROM (
         transfer.timestamp AS timestamp
     FROM csv_import_metadata
     JOIN csv_entity_source ON csv_entity_source.csv_import_id = csv_import_metadata.id
-    JOIN entity_source ON entity_source.id = csv_entity_source.id AND entity_source.entity_type_id = 7 AND entity_source.matched = 0
+    JOIN entity_source ON entity_source.id = csv_entity_source.id AND entity_source.entity_type_id = 7
     JOIN transfer ON transfer.id = entity_source.entity_id
     UNION ALL
     SELECT
@@ -111,7 +111,7 @@ FROM (
         transfer.timestamp
     FROM csv_import_metadata
     JOIN csv_entity_source ON csv_entity_source.csv_import_id = csv_import_metadata.id
-    JOIN entity_source ON entity_source.id = csv_entity_source.id AND entity_source.entity_type_id = 7 AND entity_source.matched = 0
+    JOIN entity_source ON entity_source.id = csv_entity_source.id AND entity_source.entity_type_id = 7
     JOIN transfer ON transfer.id = entity_source.entity_id
 )
 GROUP BY import_id, account_id;
