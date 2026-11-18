@@ -6,7 +6,6 @@ import com.moneymanager.csvimporter.bulkApplyCsv
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.RelationshipMember
 import com.moneymanager.domain.model.RelationshipRole
@@ -21,7 +20,6 @@ import com.moneymanager.domain.model.reconciliation.IGNORED_IN_RECONCILIATION
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportTransfer
-import com.moneymanager.importengineapi.ManualTradeEdit
 import com.moneymanager.importengineapi.RelationshipMutation
 import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.importengineapi.createReconciliationMatch
@@ -419,8 +417,6 @@ class KoinlyReconciliationE2ETest : DbTest() {
 
     private suspend fun reimport(file: CsvImport): BulkReimportResult = repositories.reimports(maintenance).reimportFile(file.id)
 
-    private fun ManualTradeEdit.excludedReason(): String? = attributes[AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID)]
-
     private suspend fun excludedReason(trade: TradeId): String? =
         repositories.tradeRepository
             .getAttributes(trade)
@@ -439,16 +435,9 @@ class KoinlyReconciliationE2ETest : DbTest() {
             val reimports = repositories.reimports(maintenance)
             val plan = reimports.planFile(file.id)
             assertEquals(1, plan.rerunFiles.sumOf { it.tradeIds.size })
-            assertEquals(
-                "duplicate of another wallet",
-                plan.links.tradeEdits
-                    .single()
-                    .excludedReason(),
-                "the plan lists the hand exclusion",
-            )
             val result = reimports.runPlan(plan)
 
-            assertEquals(0, result.reappliedLinks.reapplied, "nothing is replayed: the exclusion is an override on the kept id")
+            assertTrue(result.plan.releasedOverrides.isEmpty(), "the exclusion is an override on the kept id: ${result.plan}")
             val recreated = koinlyTrade()
             assertEquals(trade.id, recreated.id, "the re-import gave the trade its id back")
             assertEquals("duplicate of another wallet", excludedReason(recreated.id))
@@ -456,13 +445,6 @@ class KoinlyReconciliationE2ETest : DbTest() {
 
             // Kept by hand again, so a second re-import keeps it too.
             val again = reimports.planFile(file.id)
-            assertEquals(
-                "duplicate of another wallet",
-                again.links.tradeEdits
-                    .single()
-                    .excludedReason(),
-                "listed after an id-stable re-import too",
-            )
             reimports.runPlan(again)
             assertEquals("duplicate of another wallet", excludedReason(koinlyTrade().id))
         }
@@ -477,9 +459,6 @@ class KoinlyReconciliationE2ETest : DbTest() {
 
             val reimports = repositories.reimports(maintenance)
             val plan = reimports.planFile(file.id)
-            val edit = plan.links.tradeEdits.single()
-            assertTrue(edit.attributes.containsKey(AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID)), "the removal is listed")
-            assertNull(edit.excludedReason(), "as removed")
             reimports.runPlan(plan)
 
             assertNull(excludedReason(koinlyTrade().id), "the import's exclusion is lifted again")
@@ -532,7 +511,7 @@ class KoinlyReconciliationE2ETest : DbTest() {
 
             val result = reimport(file)
 
-            assertEquals(0, result.reappliedLinks.reapplied, "${result.reappliedLinks}")
+            assertTrue(result.plan.releasedOverrides.isEmpty(), "${result.plan}")
             val newTrade = koinlyTrade()
             val newTransfer = koinlyDeposit()
             assertEquals(koinlyTransfer.id, newTransfer.id, "the re-import gave the transfer its id back")

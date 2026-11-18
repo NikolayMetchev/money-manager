@@ -285,8 +285,7 @@ class AmexSantanderQifReconcileE2ETest : DbTest() {
 
             val result = reimport(card)
 
-            assertEquals(0, result.reappliedEdits, "nothing is replayed: the edit is an override on the kept id")
-            assertTrue(result.unmatchedEdits.isEmpty(), "unmatched: ${result.unmatchedEdits}")
+            assertTrue(result.plan.releasedOverrides.isEmpty(), "the edit is an override on the kept id: ${result.plan}")
             val recreated =
                 repositories.transferSourceRepository
                     .getTransfersCreatedBy(Source.Csv(secondCard.id))

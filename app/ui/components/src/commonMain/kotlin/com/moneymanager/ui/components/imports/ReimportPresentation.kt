@@ -16,8 +16,6 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.importengineapi.ImportPlan
-import com.moneymanager.importengineapi.ManualEdit
-import com.moneymanager.importengineapi.ReappliedLinks
 import com.moneymanager.importengineapi.SourceRerunPlan
 import com.moneymanager.importengineapi.sections
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
@@ -104,14 +102,13 @@ fun ReimportPlanSection(
 
 /**
  * The preview every re-import dialog shows (staged files and API sessions): what the source created and will create
- * again, the other files that depend on it, which are re-imported too, and the hand edits that will be
- * put back. [recordNoun] names the source's records ("row", "record", "item").
+ * again, and the other files that depend on it, which are re-imported too. [recordNoun] names the source's records
+ * ("row", "record", "item").
  */
 @Composable
 fun SourceRerunPreview(
     plan: SourceRerunPlan,
     recordNoun: String,
-    accountName: (AccountId) -> String,
 ) {
     Column {
         val transfers = plan.createdTransfers.size
@@ -135,13 +132,13 @@ fun SourceRerunPreview(
                         "re-imported whole after this one, so they reconcile against the new transactions.",
             )
         }
-        ManualEditsSection(
-            title = "Manual edits to re-apply (${plan.manualEdits.size}):",
-            edits = plan.manualEdits,
-            accountName = accountName,
-            note =
-                "Each edit is put back on the transaction its $recordNoun creates again. One whose " +
-                    "$recordNoun no longer creates a matching transaction is dropped and listed afterwards.",
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            text =
+                "Each $recordNoun takes its transactions' ids back, so hand edits and links on them stay. One no " +
+                    "$recordNoun makes any more is listed afterwards.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(modifier = Modifier.height(12.dp))
         Text(
@@ -152,56 +149,9 @@ fun SourceRerunPreview(
     }
 }
 
-/** Lists hand edits, one bullet per transaction with its changes; nothing when [edits] is empty. */
-@Composable
-fun ManualEditsSection(
-    title: String,
-    edits: List<ManualEdit>,
-    accountName: (AccountId) -> String,
-    note: String? = null,
-    isError: Boolean = false,
-) {
-    if (edits.isEmpty()) return
-    ReimportPlanSection(
-        title = title,
-        lines = edits.map { edit -> "${edit.imported.description}: ${edit.describeChanges(accountName).joinToString("; ")}" },
-        note = note,
-        limit = REIMPORT_PREVIEW_LIMIT,
-        isError = isError,
-    )
-}
-
-/** The hand edits a finished re-import could not put back, for its result report. */
-@Composable
-fun UnmatchedEditsReport(
-    edits: List<ManualEdit>,
-    accountName: (AccountId) -> String,
-) {
-    ManualEditsSection(
-        title = "Manual edits not re-applied (${edits.size}):",
-        edits = edits,
-        accountName = accountName,
-        note = "The re-import no longer creates a matching transaction for these, so redo them by hand if still needed.",
-        isError = true,
-    )
-}
-
-/** The hand-made links and trade edits a finished re-import could not put back; nothing when there are none. */
-@Composable
-fun UnmatchedLinksReport(links: ReappliedLinks) {
-    if (links.notReapplied.isEmpty()) return
-    ReimportPlanSection(
-        title = "Manual links and trade edits not re-applied (${links.notReapplied.size}):",
-        lines = links.notReapplied,
-        note = "The re-import no longer creates the transactions these were on, so redo them by hand if still needed.",
-        limit = REIMPORT_PREVIEW_LIMIT,
-        isError = true,
-    )
-}
-
 private fun plural(count: Int) = if (count == 1) "" else "s"
 
-/** Names accounts for [ManualEdit.describeChanges], falling back to the id while the list loads. */
+/** Names accounts for [ImportPlanReport], falling back to the id while the list loads. */
 @Composable
 fun rememberAccountNamer(accountRepository: AccountReadRepository): (AccountId) -> String {
     val accounts by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) { accountRepository.getAllAccounts() }

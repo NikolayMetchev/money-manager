@@ -28,10 +28,9 @@ class SourceRerunPreviewTest {
                     createdTransfers = mapOf(TransferId(1) to session, TransferId(2) to session),
                     tradeIds = setOf(TradeId(3)),
                     createdAccountIds = emptySet(),
-                    manualEdits = emptyList(),
                     cascade = listOf(dependentFile(), dependentFile()),
                 )
-            setContent { SourceRerunPreview(plan, recordNoun = "item", accountName = { "account ${it.id}" }) }
+            setContent { SourceRerunPreview(plan, recordNoun = "item") }
 
             onNodeWithText("Deletes the 2 transactions and 1 trade it created", substring = true).assertExists()
             onNodeWithText("imports every item again", substring = true).assertExists()
@@ -48,9 +47,8 @@ class SourceRerunPreviewTest {
                     createdTransfers = mapOf(TransferId(1) to session),
                     tradeIds = emptySet(),
                     createdAccountIds = emptySet(),
-                    manualEdits = emptyList(),
                 )
-            setContent { SourceRerunPreview(plan, recordNoun = "row", accountName = { "account ${it.id}" }) }
+            setContent { SourceRerunPreview(plan, recordNoun = "row") }
 
             onNodeWithText("Deletes the 1 transaction it created", substring = true).assertExists()
             onNodeWithText("Other files to re-import too", substring = true).assertDoesNotExist()

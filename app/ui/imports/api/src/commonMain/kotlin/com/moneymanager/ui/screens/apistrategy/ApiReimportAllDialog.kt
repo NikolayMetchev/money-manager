@@ -24,8 +24,6 @@ import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.tasks.Progress
 import com.moneymanager.ui.components.imports.BulkImportDialogScaffold
 import com.moneymanager.ui.components.imports.ImportPlanReport
-import com.moneymanager.ui.components.imports.UnmatchedEditsReport
-import com.moneymanager.ui.components.imports.UnmatchedLinksReport
 import com.moneymanager.ui.components.imports.rememberAccountNamer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -99,18 +97,6 @@ fun ApiReimportAllDialog(
                 text = "Re-imported ${finished.sessionsReimported} session(s) under \"${strategy.name}\".",
                 style = MaterialTheme.typography.bodyMedium,
             )
-            if (finished.reappliedEdits > 0) {
-                Text(
-                    text = "${finished.reappliedEdits} manual edit(s) re-applied.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            if (finished.reappliedLinks.reapplied > 0) {
-                Text(
-                    text = "${finished.reappliedLinks.reapplied} manual link(s) or trade edit(s) re-applied.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
             if (finished.cascadedFiles > 0) {
                 Text(
                     text = "${finished.cascadedFiles} other file(s) re-imported along.",
@@ -127,8 +113,6 @@ fun ApiReimportAllDialog(
                 )
             }
             ImportPlanReport(finished.plan, accountName)
-            UnmatchedEditsReport(finished.unmatchedEdits, accountName)
-            UnmatchedLinksReport(finished.reappliedLinks)
             if (finished.failures.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(

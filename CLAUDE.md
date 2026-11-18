@@ -593,23 +593,26 @@ of every card whose owner changed (a token can match other cards too, `7721` in 
 re-import dialog's progress indicators. A card an account
 matches only by a pattern is changed in the account editor.
 
-**Re-import is delete + re-run.** Re-importing a staged file (CSV, QIF, OFX, Excel or PDF: `Reimports`, `app/csvimporter`) or an API session (`executeApiReimport`) goes through `executeSourceRerun`
-(`app/importengineapi`): it deletes every transfer and trade the source created, resets its records, runs the normal
-import again, re-applies hand edits (from the audit log) to the re-created transfers, hand-set trade attributes to the
-re-created trades and hand-made (`Source.Manual`) relationships to their re-created members (reporting those it can't
-match), and deletes accounts the source created that are now empty. Other staged files that depend on what it deletes
+**Re-import is a re-run that keeps ids.** Re-importing a staged file (CSV, QIF, OFX, Excel or PDF: `Reimports`, `app/csvimporter`) or an API session (`executeApiReimport`) goes through `executeSourceRerun`
+(`app/importengineapi`): it reserves the ids of every transfer and trade the source created (`CsvImportMutation.Reserve`,
+`ApiSessionMutation.Reserve`), resets its records, runs the normal import again and settles (`ImportBatch.settle`): each
+record takes its transactions' ids back, so hand edits (person overrides), hand-set trade attributes and hand-made
+relationships stay on them and nothing is replayed. Whatever no record claims again is deleted, a hand-edited one among them
+is reported in the run's `ImportPlan` (`releasedOverrides`, "hand-edited transactions no longer imported"), and accounts
+the source created that are now empty are deleted. Other staged files that depend on what it deletes
 are re-imported **whole** with it, after it, in their import order (`RerunFile`, run by the `CascadeRerunner`, which is
 `Reimports`), all found up front by one recursive query (`selectRerunClosure`, `getRerunClosure`): a file with a row matched against a deleted transaction (found from provenance: a staged row linked to a
 transaction it didn't create is a `matched = 1` `entity_source` entry, kept in step with the row's link; readers asking
 who wrote a revision filter on `matched = 0`), a file that created a transfer a deleted one had reconciled away (the
 source's re-run never reconciles it again) or that took an end from a deleted record (the pair's primary, on other accounts), and then
-those files' own dependants. Never re-run single rows: a file's rows claim the records they match one at a time, so a
+those files' own dependants. The cascade is still load-bearing (#1432): `ImportDeduper`'s placeholder and other-side
+reconciles (`otherSideOf`, the `reconciled` exclusions, `supersededLegs`) only happen while a file imports, so a Curve
+card placeholder or a second Amex statement's "PAYMENT RECEIVED" is reconciled again only if its file re-runs. Never re-run single rows: a file's rows claim the records they match one at a time, so a
 row run alone can claim the record its neighbour explains (two like £800 payments became one). "Re-import all" takes the closure of every file
-it was given, deletes what all of them created in one batch (`executeRerun`), imports each again in import order, then
-puts the hand edits back and deletes empty accounts once; stopping it leaves the files not yet started reset, waiting
+it was given, removes what all of them created in one batch (`executeRerun`), imports each again in import order, then
+deletes empty accounts once; stopping it leaves the files not yet started reset, waiting
 for their re-import. A transfer an API session created is only un-hidden. There is no separate
 re-import logic: no merges, no in-place updates, no detectors, no row-level re-runs.
-
 ## Dependency Injection
 
 **Metro** provides compile-time DI. The graphs live in `app/di/core` (`AppComponent`,
