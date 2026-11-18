@@ -71,7 +71,7 @@ suspend fun executeApiUnimport(
     tradeRepository: TradeReadRepository,
     maintenance: Maintenance,
     importEngine: ImportEngine,
-    refreshViews: Boolean = true,
+    refreshViews: Boolean,
 ): ApiUnimportResult {
     val source = Source.Api(plan.sessionId)
     // One batch, so the session never reads as unimported while its transactions remain, nor the reverse.

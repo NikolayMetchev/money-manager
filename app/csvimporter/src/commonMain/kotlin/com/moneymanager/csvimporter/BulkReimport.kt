@@ -75,8 +75,8 @@ suspend fun <T, C> runBulkReimport(
     fileName: (T) -> String,
     logLabel: String,
     onProgress: suspend (Progress) -> Unit,
-    startDetail: String? = null,
-    stopRequested: () -> Boolean = { false },
+    startDetail: String?,
+    stopRequested: () -> Boolean,
     prepare: suspend (onPrepared: suspend (index: Int) -> Unit) -> C,
     reimportFile: suspend (index: Int, file: T, context: C, onFileProgress: suspend (Progress) -> Unit) -> BulkReimportFileOutcome,
 ): BulkReimportResult {

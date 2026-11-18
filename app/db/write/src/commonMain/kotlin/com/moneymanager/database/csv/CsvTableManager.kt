@@ -155,7 +155,7 @@ class CsvTableManager(
         tableName: String,
         rowIndex: Long,
         status: String,
-        transferId: TransferId? = null,
+        transferId: TransferId?,
     ) {
         val transferIdClause = transferId?.let { ", transaction_id = '${it.id}'" }.orEmpty()
         database.execute("UPDATE $tableName SET import_status = '$status'$transferIdClause WHERE row_index = $rowIndex")

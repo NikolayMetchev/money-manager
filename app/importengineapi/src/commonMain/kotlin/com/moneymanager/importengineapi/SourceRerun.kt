@@ -94,7 +94,7 @@ suspend fun planSourceRerun(
     tradeIds: Set<TradeId>,
     createdAccountIds: Set<AccountId>,
     reads: RerunReads,
-    onProgress: (suspend (Progress) -> Unit)? = null,
+    onProgress: (suspend (Progress) -> Unit)?,
 ): SourceRerunPlan {
     onProgress?.invoke(Progress("Finding what the import created"))
     return SourceRerunPlan(
@@ -112,8 +112,8 @@ suspend fun <R> ImportEngine.executeSourceRerun(
     resetRecords: ImportBatch,
     reads: RerunReads,
     maintenance: Maintenance,
-    onProgress: (suspend (Progress) -> Unit)? = null,
-    refreshViews: Boolean = true,
+    onProgress: (suspend (Progress) -> Unit)?,
+    refreshViews: Boolean,
     rerun: suspend () -> R,
 ): SourceRerunResult<R> {
     val outcome = executeRerun(listOf(plan.file), resetRecords, reads, maintenance, onProgress, refreshViews = refreshViews, run = rerun)
@@ -142,7 +142,7 @@ suspend fun <R> ImportEngine.executeRerun(
     resetRecords: ImportBatch,
     reads: RerunReads,
     maintenance: Maintenance,
-    onProgress: (suspend (Progress) -> Unit)? = null,
+    onProgress: (suspend (Progress) -> Unit)?,
     refreshViews: Boolean = true,
     run: suspend () -> R,
 ): RerunOutcome<R> {
