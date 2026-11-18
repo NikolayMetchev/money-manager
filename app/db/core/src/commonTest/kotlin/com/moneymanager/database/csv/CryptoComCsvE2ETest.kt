@@ -301,7 +301,7 @@ class CryptoComCsvE2ETest : DbTest() {
             val gbp = repositories.currencyRepository.getCurrencyByCode("GBP").first()!!
             val bankId =
                 repositories.importEngine.createAccount(Account(id = AccountId(0), name = "Monzo", openingDate = now), Source.Manual)
-            createTransfer(
+            createRecordedTransfer(
                 Transfer(
                     id = TransferId(0),
                     timestamp = Instant.parse("2023-11-17T02:18:14Z"),
@@ -321,13 +321,10 @@ class CryptoComCsvE2ETest : DbTest() {
                     .getTransactionsByAccount(cashId)
                     .first()
                     .filter { it.targetAccountId == cashId && it.amount.toDisplayValue().compareTo(BigDecimal("2000.00")) == 0 }
-            assertEquals(2, deposits.size, "both records are kept")
-            assertTrue(
-                deposits.single { it.sourceAccountId != bankId }.attributes.any {
-                    it.attributeType.name == "excluded" && it.value == "reconciled"
-                },
-                "the wallet's placeholder record is now excluded",
-            )
+            // The wallet's placeholder record and the bank's are one deposit, from the bank's real end.
+            val deposit = deposits.single()
+            assertEquals(bankId, deposit.sourceAccountId, "the deposit comes from the bank")
+            assertEquals(2, repositories.observationRepository.getObservationsOfTransaction(deposit.id).size, "both records are kept")
             val cashBalance =
                 repositories.transactionRepository
                     .getAccountBalances()
@@ -337,10 +334,10 @@ class CryptoComCsvE2ETest : DbTest() {
         }
 
     /**
-     * The bank's record of an FPS deposit into Crypto.com Cash, then the fiat export's own: returns the wallet and its
-     * two deposits, the wallet's and the bank's.
+     * The bank's record of an FPS deposit into Crypto.com Cash, then the fiat export's own: returns the wallet and the
+     * one deposit both records are, from the bank's real end.
      */
-    private suspend fun importBankDepositThenTheWalletsRecord(): Triple<AccountId, Transfer, Transfer> {
+    private suspend fun importBankDepositThenTheWalletsRecord(): Pair<AccountId, Transfer> {
         repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
         val gbp = repositories.currencyRepository.getCurrencyByCode("GBP").first()!!
         val bankId =
@@ -372,9 +369,10 @@ class CryptoComCsvE2ETest : DbTest() {
         assertEquals(1, applyAll(listOf(fiat)).filesImported)
         repositories.maintenanceService.refreshMaterializedViews()
 
-        val deposits = depositsOf2000(cashId)
-        assertEquals(2, deposits.size, "both records are kept")
-        return Triple(cashId, deposits.single { it.sourceAccountId != bankId }, deposits.single { it.sourceAccountId == bankId })
+        val deposit = depositsOf2000(cashId).single()
+        assertEquals(bankId, deposit.sourceAccountId, "the deposit comes from the bank")
+        assertEquals(2, repositories.observationRepository.getObservationsOfTransaction(deposit.id).size, "both records are kept")
+        return cashId to deposit
     }
 
     private suspend fun depositsOf2000(cashId: AccountId): List<Transfer> =
@@ -391,19 +389,8 @@ class CryptoComCsvE2ETest : DbTest() {
             // placeholder counterparty. Nothing links the two records but the wallet account, the
             // direction and the amount — so without the unidentified-counterparty reconcile the deposit
             // lands in the wallet twice.
-            val (cashId, walletRecord, bankRecord) = importBankDepositThenTheWalletsRecord()
-            assertTrue(
-                walletRecord.attributes.any { it.attributeType.name == "excluded" && it.value == "reconciled" },
-                "the wallet's placeholder record is excluded, so the deposit is counted once",
-            )
-            assertTrue(bankRecord.attributes.none { it.attributeType.name == "excluded" }, "the bank's record stays counted")
-            val reconciledLink =
-                repositories.relationshipRepository
-                    .getByTransaction(walletRecord.id)
-                    .first()
-                    .single { it.relationshipType.name == "reconciled" }
-            assertEquals(walletRecord.id, reconciledLink.primary)
-            assertEquals(bankRecord.id, reconciledLink.related)
+            val (cashId, deposit) = importBankDepositThenTheWalletsRecord()
+            assertTrue(deposit.attributes.none { it.attributeType.name == "excluded" }, "the deposit counts")
 
             // The wallet balance reflects one deposit: +2000 in, -400 to the card, -5055.89 withdrawn,
             // -5000 converted to TGBP and +5009.86 converted back.
@@ -415,24 +402,15 @@ class CryptoComCsvE2ETest : DbTest() {
             assertEquals("-3446.03", cashBalance.balance.toDisplayValue().toString())
         }
 
-    // "These are different" on the two records the deposit reconciled: the person says they are two movements, so the
-    // reconciled link goes and the wallet's own record counts again beside the bank's.
+    // "These are different" on the two records of the deposit: the person says they are two movements, so the wallet's
+    // own record counts again beside the bank's.
     @Test
     fun separatingTheReconciledDepositRecords_dropsTheLink_andBothCount() =
         runDbTest {
-            val (cashId, walletRecord, bankRecord) = importBankDepositThenTheWalletsRecord()
-            val observations = repositories.observationRepository
-            repositories.importEngine.separateObservations(
-                observations.getObservationsOfTransaction(walletRecord.id).single().id,
-                observations.getObservationsOfTransaction(bankRecord.id).single().id,
-            )
+            val (cashId, deposit) = importBankDepositThenTheWalletsRecord()
+            val (first, second) = repositories.observationRepository.getObservationsOfTransaction(deposit.id)
+            repositories.importEngine.separateObservations(first.id, second.id)
 
-            val reconciled =
-                repositories.relationshipRepository
-                    .getByTransaction(walletRecord.id)
-                    .first()
-                    .filter { it.relationshipType.name == "reconciled" }
-            assertTrue(reconciled.isEmpty(), "$reconciled")
             val deposits = depositsOf2000(cashId)
             assertEquals(2, deposits.size, "$deposits")
             assertTrue(deposits.none { d -> d.attributes.any { it.attributeType.name == "excluded" } }, "both records count: $deposits")

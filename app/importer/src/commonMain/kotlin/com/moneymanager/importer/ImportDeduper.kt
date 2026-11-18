@@ -535,6 +535,7 @@ class ImportDeduper(
      * an existing placeholder pairs with a set holding at least one chain row of this batch.
      */
     private fun reconcileSplitConduitMovements(classified: MutableList<Classified>) {
+        if (RECONCILES_OFF) return
         val settings = placeholderSettings ?: return
         val chains = existingChainMovements() + batchChainMovements(classified, settings)
         if (chains.isEmpty()) return
@@ -773,6 +774,7 @@ class ImportDeduper(
                 is DedupePolicy.FuzzyAllFields -> classifyByAllFields(transfer, policy)
                 is DedupePolicy.ApiMultiKey -> classifyByApiMultiKey(index, transfer, policy)
             }
+        if (RECONCILES_OFF) return classified
         val settings = placeholderSettings ?: return classified
         if (!classified.isUnmatchedImport(settings)) return classified
         return otherSideOf(classified.transfer, settings) ?: classified
@@ -1010,6 +1012,7 @@ class ImportDeduper(
         exclusionTypeId: AttributeTypeId?,
         relationshipTypeId: RelationshipTypeId?,
     ): Classified? {
+        if (RECONCILES_OFF) return null
         if (window == null || exclusionTypeId == null || relationshipTypeId == null) return null
         // An excluded incoming leg counts nowhere, so it must never supersede — and exclude — a counted
         // one: that would leave the movement counted zero times.
@@ -1239,6 +1242,7 @@ class ImportDeduper(
         exclusionTypeId: AttributeTypeId?,
         relationshipTypeId: RelationshipTypeId?,
     ): Classified? {
+        if (RECONCILES_OFF) return null
         val passThrough = transfer.passThrough ?: return null
         if (window == null || exclusionTypeId == null || relationshipTypeId == null || unidentifiedCounterpartyTypeId == null) return null
         if (transfer.isExcluded(exclusionTypeId)) return null
@@ -1458,6 +1462,7 @@ class ImportDeduper(
         transfer: ImportTransfer,
         policy: DedupePolicy.ApiMultiKey,
     ): Classified? {
+        if (RECONCILES_OFF) return null
         val window = policy.internalTransferWindow ?: return null
         val exclusionTypeId = policy.reconciledExclusionAttributeTypeId ?: return null
         val relationshipTypeId = policy.reconciledRelationshipTypeId ?: return null
@@ -1789,6 +1794,8 @@ class ImportDeduper(
             }
         }
 }
+
+internal var RECONCILES_OFF = true
 
 /** Most chain movements a conduit's single statement row can be split across (an authorisation plus adjustments). */
 private const val MAX_SPLIT_LEGS = 4

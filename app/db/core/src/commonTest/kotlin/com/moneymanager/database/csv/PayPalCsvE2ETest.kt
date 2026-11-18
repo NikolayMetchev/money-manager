@@ -266,6 +266,7 @@ class PayPalCsvE2ETest : DbTest() {
         assertBalance("8.00", "PayPal Bank Transfers")
     }
 
+    /** The transactions each `reconciled` link from a PayPal transaction relates it to, summed: one link per deposit, over the card's legs. */
     private suspend fun reconciledLinks(): Int =
         repositories.transactionRepository
             .getTransactionsByAccount(
@@ -279,7 +280,8 @@ class PayPalCsvE2ETest : DbTest() {
                 repositories.relationshipRepository
                     .getByTransaction(t.id)
                     .first()
-                    .count { it.relationshipType.name == "reconciled" && it.primary == t.id }
+                    .filter { it.relationshipType.name == "reconciled" && it.primary == t.id }
+                    .sumOf { it.othersThan(t.id).size }
             }
 
     @Test

@@ -11,6 +11,7 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.importengineapi.createCrypto
+import com.moneymanager.importengineapi.ensureApiCredential
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
@@ -73,7 +74,9 @@ class CryptoComExchangeApiE2ETest : DbTest() {
         val strategy = repositories.apiImportStrategyRepository.getStrategyByName("Crypto.com Exchange").first()
         assertNotNull(strategy, "built-in Crypto.com Exchange strategy should be installed")
         val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-os", "test-machine"))
-        val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
+        // A download always runs under the strategy's credential, which is how its records are known to be the strategy's.
+        val credentialId = repositories.importEngine.ensureApiCredential(strategy.id, now)
+        val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null, credentialId)
 
         suspend fun stage(
             path: String,
@@ -309,19 +312,15 @@ class CryptoComExchangeApiE2ETest : DbTest() {
             val cro = repositories.cryptoRepository.getCryptoAssetById(croId).first()!!
             val app = repositories.importEngine.createAppAccount("Crypto.com")
             val exchange = repositories.importEngine.createAppAccount("Crypto.com Exchange")
-            repositories.transactionRepository.createTransfers(
-                transfers =
-                    listOf(
-                        Transfer(
-                            id = TransferId(0),
-                            timestamp = Instant.fromEpochMilliseconds(1_700_000_000_970L),
-                            description = "Transfer: App wallet -> Exchange",
-                            sourceAccountId = app,
-                            targetAccountId = exchange,
-                            amount = Money.fromDisplayValue("1500.25", cro),
-                        ),
-                    ),
-                sources = listOf(Source.SampleGenerator),
+            createRecordedTransfer(
+                Transfer(
+                    id = TransferId(0),
+                    timestamp = Instant.fromEpochMilliseconds(1_700_000_000_970L),
+                    description = "Transfer: App wallet -> Exchange",
+                    sourceAccountId = app,
+                    targetAccountId = exchange,
+                    amount = Money.fromDisplayValue("1500.25", cro),
+                ),
             )
 
             // The API's view: an INTERNAL_DEPOSIT (address = "INTERNAL_DEPOSIT") aliases the counterparty
@@ -336,26 +335,19 @@ class CryptoComExchangeApiE2ETest : DbTest() {
                 """.trimIndent()
             stageSessionAndImport(deposits = internalDeposit)
 
+            // The CSV leg and the API's are one transfer, booked directly App -> Exchange (not via a funding/wallet account),
+            // holding both records.
             val apiDeposit =
                 repositories.transactionRepository
                     .getTransactionsByDateRange(
-                        Instant.fromEpochMilliseconds(1_700_000_000_980L),
+                        Instant.fromEpochMilliseconds(1_700_000_000_960L),
                         Instant.fromEpochMilliseconds(1_700_000_001_020L),
                     ).first()
-                    .first { it.amount.asset.code == "CRO" }
-            // Booked directly App -> Exchange (not via a funding/wallet account).
+                    .single { it.amount.asset.code == "CRO" }
             assertEquals(app, apiDeposit.sourceAccountId, "internal deposit source should be the App account")
             assertEquals(exchange, apiDeposit.targetAccountId, "internal deposit target should be the Exchange account")
-            // Reconciled to the CSV leg: excluded from balances + linked.
-            val attrs = repositories.transferAttributeRepository.getByTransaction(apiDeposit.id).first()
-            assertTrue(attrs.any { it.attributeType.id.id == -1L }, "the API leg should be excluded (reconciled)")
-            assertTrue(
-                repositories.relationshipRepository
-                    .getByTransaction(apiDeposit.id)
-                    .first()
-                    .isNotEmpty(),
-                "the API leg should be linked to the CSV leg",
-            )
+            assertTrue(apiDeposit.attributes.none { it.attributeType.id.id == -1L }, "the transfer counts once")
+            assertEquals(2, repositories.observationRepository.getObservationsOfTransaction(apiDeposit.id).size, "both records")
         }
 
     @Test
@@ -367,19 +359,15 @@ class CryptoComExchangeApiE2ETest : DbTest() {
             val cro = repositories.cryptoRepository.getCryptoAssetById(croId).first()!!
             val appAccount = repositories.importEngine.createAppAccount("Crypto.com")
             val external = repositories.importEngine.createAppAccount("App wallet -> Exchange")
-            repositories.transactionRepository.createTransfers(
-                transfers =
-                    listOf(
-                        Transfer(
-                            id = TransferId(0),
-                            timestamp = Instant.fromEpochMilliseconds(1_700_000_001_000L),
-                            description = "Transfer: App wallet -> Exchange",
-                            sourceAccountId = appAccount,
-                            targetAccountId = external,
-                            amount = Money.fromDisplayValue("1500.25", cro),
-                        ),
-                    ),
-                sources = listOf(Source.SampleGenerator),
+            createRecordedTransfer(
+                Transfer(
+                    id = TransferId(0),
+                    timestamp = Instant.fromEpochMilliseconds(1_700_000_001_000L),
+                    description = "Transfer: App wallet -> Exchange",
+                    sourceAccountId = appAccount,
+                    targetAccountId = external,
+                    amount = Money.fromDisplayValue("1500.25", cro),
+                ),
             )
 
             stageSessionAndImport()
@@ -399,13 +387,13 @@ class CryptoComExchangeApiE2ETest : DbTest() {
             assertNotNull(croDeposit, "the CRO deposit should target the Exchange account")
             assertEquals(appAccount, croDeposit.sourceAccountId, "deposit rewritten to come from the App account")
 
-            // The stale App-side leg is now excluded from balances (reconciled).
-            val appLeg = exchangeTransfers.firstOrNull { it.sourceAccountId == appAccount && it.targetAccountId == external }
-            assertNotNull(appLeg, "the original App leg still exists")
+            // The stale App-side leg and the Exchange's deposit are one internal transfer, holding both records.
             assertTrue(
-                appLeg.attributes.any { it.attributeType.id.id == -1L },
-                "the App leg should carry the excluded attribute",
+                exchangeTransfers.none { it.sourceAccountId == appAccount && it.targetAccountId == external },
+                "no App leg to the dangling wallet is left",
             )
+            assertTrue(croDeposit.attributes.none { it.attributeType.id.id == -1L }, "the internal transfer counts")
+            assertEquals(2, repositories.observationRepository.getObservationsOfTransaction(croDeposit.id).size, "both records")
         }
 }
 

@@ -24,6 +24,7 @@ import com.moneymanager.domain.repository.AttributeTypeReadRepository
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.ImportRecordReadRepository
 import com.moneymanager.domain.repository.ObservationReadRepository
+import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.MatchFamily
 import com.moneymanager.importengineapi.TradeDedupePolicy
 import com.moneymanager.observationmatcher.CrossSourceFacts
@@ -218,7 +219,9 @@ class MatchScopeLoader(
                     .toMap()
             return ObservationMatcher(
                 SameFamilyRules.forPolicies(policies) +
-                    CrossSourceRules.forPolicies(policies, containerAccounts, calendarFor) +
+                    // A hand-made transfer is no source of its own: it is never the incoming record, but another source's record of the
+                    // same movement finds it, as the deduper found every transfer on its accounts.
+                    CrossSourceRules.forPolicies(mapOf(MANUAL_FAMILY to DedupePolicy.None) + policies, containerAccounts, calendarFor) +
                     TradeRules.forPolicies(tradePolicies),
                 TradeStages.forPolicies(tradePolicies, conversionWindows),
             )

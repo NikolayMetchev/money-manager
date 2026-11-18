@@ -3,6 +3,7 @@ package com.moneymanager.database.api
 import com.moneymanager.apiimporter.importApiSessionExchange
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.DeviceInfo
+import com.moneymanager.importengineapi.ensureApiCredential
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
@@ -169,7 +170,9 @@ class BinanceExchangeApiE2ETest : DbTest() {
         val strategy = repositories.apiImportStrategyRepository.getStrategyByName("Binance").first()
         assertNotNull(strategy, "built-in Binance strategy should be installed")
         val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-os", "test-machine"))
-        val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null)
+        // A download always runs under the strategy's credential, which is how its records are known to be the strategy's.
+        val credentialId = repositories.importEngine.ensureApiCredential(strategy.id, now)
+        val sessionId = repositories.apiSessionRepository.createSession(deviceId, now, null, credentialId)
 
         suspend fun stage(
             marker: String,
