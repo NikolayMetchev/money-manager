@@ -97,14 +97,17 @@ private val intListOrder =
         a.zip(b).map { (x, y) -> x.compareTo(y) }.firstOrNull { it != 0 } ?: a.size.compareTo(b.size)
     }
 
-private fun azulArchive(
+internal fun azulArchive(
     version: String,
     platform: Triple<String, String, String>,
+    get: (String) -> ByteArray = ::httpGet,
 ): Pair<String, String> {
     val (os, arch, type) = platform
+    val requested = version.split(".").map(String::toInt)
+    val release = requested.take(3)
     val query =
         mapOf(
-            "java_version" to version,
+            "java_version" to release.joinToString("."),
             "os" to os,
             "arch" to arch,
             "archive_type" to type,
@@ -116,15 +119,18 @@ private fun azulArchive(
             "page_size" to "100",
         ).entries.joinToString("&") { (k, v) -> "$k=${URLEncoder.encode(v, "UTF-8")}" }
     val packages =
-        apiJson.decodeFromString<List<AzulPackage>>(String(httpGet("$AZUL?$query"))).filter {
-            "musl" !in it.name && it.javaVersion.take(3).joinToString(".") == version
+        apiJson.decodeFromString<List<AzulPackage>>(String(get("$AZUL?$query"))).filter {
+            "musl" !in it.name && it.javaVersion.take(3) == release && intListOrder.compare(it.javaVersion, requested) <= 0
         }
     if (packages.isEmpty()) fail("Azul publishes no Zulu $version JDK for $os $arch ($type)")
     val newest =
         packages.maxWith(
             compareBy<AzulPackage, List<Int>>(intListOrder) { it.javaVersion }.thenBy(intListOrder) { it.distroVersion },
         )
-    val sha = apiJson.decodeFromString<AzulPackageDetail>(String(httpGet(AZUL + newest.packageUuid))).sha256
+    if (newest.javaVersion != requested) {
+        println("Zulu $version is unavailable for $os $arch; pinning ${newest.javaVersion.joinToString(".")}")
+    }
+    val sha = apiJson.decodeFromString<AzulPackageDetail>(String(get(AZUL + newest.packageUuid))).sha256
     return newest.name to sha
 }
 
@@ -134,13 +140,12 @@ fun repinJdk(
     moduleFile: File,
     bazelrcFile: File,
     toolVersionsFile: File,
-    archive: (String, Triple<String, String, String>) -> Pair<String, String> = ::azulArchive,
+    archive: (String, Triple<String, String, String>) -> Pair<String, String> = { version, platform -> azulArchive(version, platform) },
 ) {
     val module = moduleFile.readText()
     val version = constant(module, "JDK")
-    // A pin already for this release (Zulu names it -jdk<version>.<build> or -jdk<version>-<os>) is kept, so repin.sh,
-    // which runs for every MODULE.bazel change Renovate makes, only asks Azul when JDK itself moved.
-    val current = Regex("-jdk${Regex.escape(version)}[.-]")
+    // Keep exact pins; recheck lagging platforms on every repin so they catch up when Azul publishes their build.
+    val current = Regex("-jdk${Regex.escape(version)}-")
     val (updated, count) =
         JDK_ENTRY.replaceCounting(module) { m ->
             val platform = JDK_PLATFORMS[m.groupValues[2]] ?: fail("JDK_ARCHIVES has an unknown platform ${m.groupValues[2]}")

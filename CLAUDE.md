@@ -849,7 +849,10 @@ set of writes.
 1. **Java**: everything runs on, and the desktop app bundles, `MODULE.bazel`'s `JDK` (Azul Zulu 27, which Bazel
    downloads; Zulu because it ships the `jmods/` jlink and ProGuard read, which Temurin dropped in 24). Renovate bumps
    it to every release, LTS or not, and `repin.sh` (`repo-scripts repin jdk`) rewrites the archives and `.bazelrc`'s
-   `remotejdk_<n>`, and `.tool-versions` (for asdf/mise) to the same Zulu build. Javac runs on it through `//bazel/kmp/java:java_toolchain`. Code compiles for that JDK, or for the newest
+   `remotejdk_<n>`, and `.tool-versions` (for asdf/mise) to the Linux x64 Zulu build. `JDK` keeps the full Java
+   version, including security build components. Each platform pins its newest available build up to that version
+   within the same major.minor.patch release; a platform with no build in that release fails the repin. Lagging
+   platforms are checked again on every repin. Javac runs on it through `//bazel/kmp/java:java_toolchain`. Code compiles for that JDK, or for the newest
    Java the Kotlin compiler targets if that is older. `repo-scripts repin bytecode` sets it after every JDK
    or Kotlin bump in `.bazelrc`'s `java_language_version`s, the Java toolchain's `source_version`/`target_version` and
    the Kotlin toolchain's `jvm_target` (`bazel/kmp/BUILD.bazel`); `jvm_target.patch` drops rules_kotlin's value lists,
