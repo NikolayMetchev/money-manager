@@ -1,8 +1,10 @@
 package com.moneymanager.ui.screens.reconciliation
 
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -32,7 +34,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.reconciliation.LegTransactionKind
 import com.moneymanager.domain.model.reconciliation.ReconciliationLeg
 import com.moneymanager.reconciliation.CopyPlan
 import com.moneymanager.reconciliation.ReconciliationResult
@@ -82,9 +83,12 @@ fun MatchPickerDialog(
 ) {
     val window = state.window
     val sameAssetOnly = state.sameAssetOnly
+    val showMatched = state.showMatched
     val selected = state.selected
     val candidates =
-        remember(result, movement, wallet, window, sameAssetOnly) { result.pickerCandidates(movement, wallet, window, sameAssetOnly) }
+        remember(result, movement, wallet, window, sameAssetOnly, showMatched) {
+            result.pickerCandidates(movement, wallet, window, sameAssetOnly, showMatched)
+        }
 
     // A selection kept across a followed link may name a leg the result no longer offers (edited or claimed meanwhile).
     LaunchedEffect(result, movement, wallet) {
@@ -95,6 +99,7 @@ fun MatchPickerDialog(
                     wallet,
                     Duration.INFINITE,
                     sameAssetOnly = false,
+                    showMatched = false,
                 ).filter { it.selectable }
                 .map { it.leg }
         selected.retainAll(offered.toSet())
@@ -146,9 +151,12 @@ fun MatchPickerDialog(
                     item(key = "header") { Text("In $sourceName", style = MaterialTheme.typography.labelLarge) }
                     items(movement.size, key = { "movement-${movement[it].key}" }) {
                         // Indented by a checkbox, so the viewport matches the candidates' and the shared scroll range does too.
-                        Row {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Spacer(Modifier.width(CHECKBOX_SLOT))
-                            PickerLegLine(movement[it], accountNames, rowScroll, descriptionWidth)
+                            Box(modifier = Modifier.weight(1f)) {
+                                PickerLegLine(movement[it], accountNames, rowScroll, descriptionWidth)
+                            }
+                            PickerLegLinks(movement[it], onOpenLeg, onOpenSource)
                         }
                     }
                     item(key = "filters") {
@@ -160,23 +168,32 @@ fun MatchPickerDialog(
                                 Checkbox(checked = sameAssetOnly, onCheckedChange = { state.sameAssetOnly = it })
                                 Text("Same asset only")
                             }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(checked = showMatched, onCheckedChange = { state.showMatched = it })
+                                Text("Show matched transactions")
+                            }
                         }
                     }
                     if (candidates.isEmpty()) {
-                        item(key = "empty") { Text("No unmatched transactions on the linked accounts within ± $window.") }
+                        item(key = "empty") { Text("No transactions match these filters within ± $window.") }
                     }
                     items(candidates.size, key = { "candidate-${candidates[it].leg.key}" }) { index ->
                         val candidate = candidates[index]
                         val checked = candidate.leg in selected
+                        val background =
+                            if (candidate.selectable) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceContainerHigh
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier =
-                                Modifier.fillMaxWidth().toggleable(
-                                    value = checked,
-                                    enabled = candidate.selectable,
-                                    role = Role.Checkbox,
-                                    onValueChange = { if (it) selected += candidate.leg else selected -= candidate.leg },
-                                ),
+                                Modifier
+                                    .fillMaxWidth()
+                                    .background(background)
+                                    .toggleable(
+                                        value = checked,
+                                        enabled = candidate.selectable,
+                                        role = Role.Checkbox,
+                                        onValueChange = { if (it) selected += candidate.leg else selected -= candidate.leg },
+                                    ),
                         ) {
                             Checkbox(checked = checked, onCheckedChange = null, enabled = candidate.selectable)
                             Column(modifier = Modifier.weight(1f)) {
@@ -188,29 +205,17 @@ fun MatchPickerDialog(
                                     delta = candidate.delta,
                                     enabled = candidate.selectable,
                                 )
-                                candidate.nearMatchFor?.let { match ->
+                                candidate.claimedBy?.let { match ->
+                                    val status = if (match.settled) "Matched to" else "Near match for"
                                     Text(
-                                        "Near match for $sourceName's ${formatAmount(match.sourceLeg.amount)} on " +
+                                        "$status $sourceName's ${formatAmount(match.sourceLeg.amount)} on " +
                                             match.sourceLeg.timestamp.displayDateTime(),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
                             }
-                            TextButton(
-                                onClick = { onOpenLeg(candidate.leg) },
-                                modifier = Modifier.testTag("$PICKER_OPEN_TRANSACTION_TAG-${candidate.leg.key}"),
-                            ) {
-                                Text("Transaction")
-                            }
-                            if (candidate.leg.kind == LegTransactionKind.TRANSFER) {
-                                TextButton(
-                                    onClick = { onOpenSource(candidate.leg) },
-                                    modifier = Modifier.testTag("$PICKER_OPEN_SOURCE_TAG-${candidate.leg.key}"),
-                                ) {
-                                    Text("Source")
-                                }
-                            }
+                            PickerLegLinks(candidate.leg, onOpenLeg, onOpenSource)
                         }
                     }
                     item(key = "totals") {
@@ -239,6 +244,26 @@ fun MatchPickerDialog(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun PickerLegLinks(
+    leg: ReconciliationLeg,
+    onOpenLeg: (ReconciliationLeg) -> Unit,
+    onOpenSource: (ReconciliationLeg) -> Unit,
+) {
+    TextButton(
+        onClick = { onOpenLeg(leg) },
+        modifier = Modifier.testTag("$PICKER_OPEN_TRANSACTION_TAG-${leg.key}"),
+    ) {
+        Text("Transaction")
+    }
+    TextButton(
+        onClick = { onOpenSource(leg) },
+        modifier = Modifier.testTag("$PICKER_OPEN_SOURCE_TAG-${leg.key}"),
+    ) {
+        Text("Source")
     }
 }
 

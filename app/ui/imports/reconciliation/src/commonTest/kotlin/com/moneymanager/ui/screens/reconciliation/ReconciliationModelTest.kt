@@ -117,6 +117,23 @@ class ReconciliationModelTest {
     }
 
     @Test
+    fun pickerShowsExactAndStoredMatchesWithoutAllowingReselection() {
+        val fee = leg(wallet, "-0.001", t0)
+        val exact = LegMatch(leg(wallet, "-1", t0), leg(binance, "-1", t0))
+        val stored =
+            LegMatch(
+                listOf(leg(wallet, "-0.001", t0)),
+                listOf(leg(binance, "-0.001", t0 + 1.hours)),
+                matchId = 42,
+            )
+        val result = ReconciliationResult(null, listOf(exact, stored), emptyList(), emptyList())
+
+        val shown = result.pickerCandidates(listOf(fee), wallet, 3.days, sameAssetOnly = true)
+        assertEquals(listOf(exact.realLeg to false, stored.realLeg to false), shown.map { it.leg to it.selectable })
+        assertEquals(emptyList(), result.pickerCandidates(listOf(fee), wallet, 3.days, sameAssetOnly = true, showMatched = false))
+    }
+
+    @Test
     fun aMovementIsEveryUnmatchedLegOfItsRowOnTheWallet() {
         val trade = leg(wallet, "5", t0, movement = "c1:3")
         val fee = leg(wallet, "-0.1", t0, movement = "c1:3")

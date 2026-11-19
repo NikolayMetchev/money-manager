@@ -20,12 +20,14 @@ class MatchPickerState {
     var pickedKey: String? by mutableStateOf(null)
     var window: Duration by mutableStateOf(DEFAULT_WINDOW)
     var sameAssetOnly: Boolean by mutableStateOf(true)
+    var showMatched: Boolean by mutableStateOf(true)
     val selected = mutableStateListOf<ReconciliationLeg>()
 
     fun open(key: String) {
         pickedKey = key
         window = DEFAULT_WINDOW
         sameAssetOnly = true
+        showMatched = true
         selected.clear()
     }
 

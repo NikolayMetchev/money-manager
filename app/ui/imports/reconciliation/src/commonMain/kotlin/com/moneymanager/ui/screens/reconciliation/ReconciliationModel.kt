@@ -90,27 +90,28 @@ fun ReconciliationResult.unstoredMatches(
 /** Every transaction a near match spans, each once: the members of its `reconciliation-match` relationship. */
 fun LegMatch.memberTransactions(): List<TransactionId> = (sourceLegs + realLegs).map { it.transactionRef }.distinct()
 
-/** A real leg the match picker lists: selectable, or shown greyed because a near match already claims it. */
+/** A real leg the match picker lists: selectable, or shown for reference because a match already claims it. */
 data class PickerCandidate(
     val leg: ReconciliationLeg,
     /** The leg's time minus the movement's. */
     val delta: Duration,
-    /** The near match that claims this leg; accept or ignore that one first. Null when the leg is free. */
-    val nearMatchFor: LegMatch? = null,
+    /** The match that claims this leg, if any. */
+    val claimedBy: LegMatch? = null,
 ) {
-    val selectable: Boolean get() = nearMatchFor == null
+    val selectable: Boolean get() = claimedBy == null
 }
 
 /**
  * The real legs a person may match [movement] (on [wallet]) to by hand: the linked accounts' legs no match claims,
- * within [window] of the movement, oldest first. Legs a near match claims are listed too, unselectable, so a missing
- * likely candidate is explained; legs in a stored or exact match never are.
+ * within [window] of the movement, oldest first. Claimed legs are shown for inspection, with settled matches
+ * included when [showMatched] is on.
  */
 fun ReconciliationResult.pickerCandidates(
     movement: List<ReconciliationLeg>,
     wallet: AccountId,
     window: Duration,
     sameAssetOnly: Boolean,
+    showMatched: Boolean = true,
 ): List<PickerCandidate> {
     val at = movement.minOf { it.timestamp }
     val assets = movement.mapTo(mutableSetOf()) { it.amount.asset.id }
@@ -122,8 +123,10 @@ fun ReconciliationResult.pickerCandidates(
             .filter { sameGroup(it.walletAccountId, wallet) && eligible(it.leg) }
             .map { PickerCandidate(it.leg, it.leg.timestamp - at) }
     val claimed =
-        nearMatches
-            .filter { match -> sameGroup(match.sourceLeg.accountId, wallet) }
+        matches
+            .asSequence()
+            .filter { showMatched || !it.settled }
+            .filter { match -> match.sourceLegs.any { sameGroup(it.accountId, wallet) } }
             .flatMap { match -> match.realLegs.filter(::eligible).map { PickerCandidate(it, it.timestamp - at, match) } }
     return (free + claimed).sortedWith(compareBy({ it.leg.timestamp }, { it.leg.transactionId }))
 }
