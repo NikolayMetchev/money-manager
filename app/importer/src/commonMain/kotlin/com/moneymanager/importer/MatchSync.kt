@@ -252,7 +252,7 @@ internal class MatchSync(
         if (writes.isNotEmpty()) repository.apply(writes)
     }
 
-    /** Each staged row that observed a released transfer, marked a duplicate of the transfer that took its place. */
+    /** Mark a staged row duplicate when its main transfer was folded into another transaction. */
     private suspend fun relinkRows(
         changes: List<AssignmentChange>,
         resolved: Map<TransactionId, TransactionId>,
@@ -260,7 +260,9 @@ internal class MatchSync(
         val relinked =
             changes.mapNotNull { change ->
                 val owner = change.ref.owner as? ObservationOwner.Record
-                owner?.recordId?.takeIf { change.from?.let { resolved[it] } is TransferId }
+                owner?.recordId?.takeIf {
+                    change.ref.slot == ObservationSlot.MAIN && change.from?.let { resolved[it] } is TransferId
+                }
             }
         if (relinked.isEmpty()) return
         val links = mutableMapOf<CsvImportId, MutableSet<Long>>()

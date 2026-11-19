@@ -50,8 +50,8 @@ import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferId
-import com.moneymanager.domain.model.reconciliation.LegTransactionKind
 import com.moneymanager.domain.model.timeline.TimelineSourceKind
 import com.moneymanager.domain.strategy.StrategyKind
 import com.moneymanager.importfilesource.DriveFolderBrowser
@@ -719,12 +719,7 @@ fun MoneyManagerApp(
                                                             accountId = leg.accountId,
                                                             accountName =
                                                                 accounts.find { it.id == leg.accountId }?.name ?: leg.accountId.toString(),
-                                                            // Only transfers can be scrolled to; a trade leg just opens its account.
-                                                            scrollToTransferId =
-                                                                TransferId(leg.transactionId).takeIf {
-                                                                    leg.kind ==
-                                                                        LegTransactionKind.TRANSFER
-                                                                },
+                                                            scrollToTransferId = TransferId(leg.transactionId),
                                                         ),
                                                     )
                                                 },
@@ -734,11 +729,24 @@ fun MoneyManagerApp(
                                                 onReconciliationSourceClick = { leg ->
                                                     scope.launch {
                                                         val sources =
-                                                            services.transactions.transferSourceRepository
-                                                                .getSourcesForTransaction(TransferId(leg.transactionId))
-                                                                .sortedBy { it.revisionId }
-                                                        val csv = sources.map { it.source }.filterIsInstance<Source.Csv>().firstOrNull()
-                                                        val api = sources.map { it.source }.filterIsInstance<Source.Api>().firstOrNull()
+                                                            when (val id = leg.transactionRef) {
+                                                                is TradeId -> {
+                                                                    services.audit.auditRepository
+                                                                        .getAuditHistoryForTrade(id)
+                                                                        .mapNotNull { it.source }
+                                                                }
+
+                                                                is TransferId -> {
+                                                                    services.transactions.transferSourceRepository
+                                                                        .getSourcesForTransaction(id)
+                                                                }
+
+                                                                else -> {
+                                                                    emptyList()
+                                                                }
+                                                            }.sortedBy { it.revisionId }.map { it.source }
+                                                        val csv = sources.filterIsInstance<Source.Csv>().firstOrNull()
+                                                        val api = sources.filterIsInstance<Source.Api>().firstOrNull()
                                                         val apiRequestId = api?.requestId
                                                         when {
                                                             csv != null -> {

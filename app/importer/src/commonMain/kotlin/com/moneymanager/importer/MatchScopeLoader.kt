@@ -95,6 +95,12 @@ class MatchScopeLoader(
             records.getRecords(owners.filterIsInstance<ObservationOwner.Record>().map { it.recordId }).associateBy { it.id }
         val groupsById =
             records.getGroupsById(owners.filterIsInstance<ObservationOwner.Group>().map { it.groupId }).associateBy { it.id }
+        val feeOwners = stored.filter { it.slot == ObservationSlot.FEE }.mapTo(mutableSetOf()) { it.owner }
+        val mainAttributesByFeeOwner =
+            stored
+                .asSequence()
+                .filter { it.slot == ObservationSlot.MAIN && it.owner in feeOwners }
+                .associate { it.owner to it.content.attributes }
         val origins = mutableMapOf<ObservationOwner, Origin>()
         return stored.map { observation ->
             // A copy (#1475) is a person's booking that its record keeps up to date: matched as a person's own transaction, never
@@ -107,6 +113,9 @@ class MatchScopeLoader(
                 }
             val family = families[origin.family]
             val attributes = observation.content.attributes
+            // A derived fee carries no provider ID of its own. Match it using the identity of the row that charged it.
+            val identityAttributes =
+                if (observation.slot == ObservationSlot.FEE) mainAttributesByFeeOwner[observation.owner] ?: attributes else attributes
             MatchObservation(
                 ref = ObservationRef(observation.owner, observation.slot),
                 storedId = observation.id,
@@ -121,9 +130,10 @@ class MatchScopeLoader(
                             family
                                 ?.uniqueIdAttributeTypes
                                 .orEmpty()
-                                .mapNotNull { type -> attributes.firstOrNull { it.typeId == type }?.let { type.toString() to it.value } }
-                                .toMap(),
-                        apiId = family?.apiIdAttributeType?.let { type -> attributes.firstOrNull { it.typeId == type }?.value },
+                                .mapNotNull { type ->
+                                    identityAttributes.firstOrNull { it.typeId == type }?.let { type.toString() to it.value }
+                                }.toMap(),
+                        apiId = family?.apiIdAttributeType?.let { type -> identityAttributes.firstOrNull { it.typeId == type }?.value },
                     ),
                 crossSource =
                     CrossSourceFacts(

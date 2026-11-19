@@ -16,12 +16,17 @@ import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csv.CsvImport
+import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.observation.COPY_SLOT_PREFIX
 import com.moneymanager.domain.model.observation.ObservationOwner
 import com.moneymanager.domain.model.reconciliation.IGNORED_IN_RECONCILIATION
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportTransfer
+import com.moneymanager.importengineapi.LocalTransactionKey
+import com.moneymanager.importengineapi.MaterializationRequest
+import com.moneymanager.importengineapi.ObservationMutation
+import com.moneymanager.importengineapi.ObservationTransaction
 import com.moneymanager.importengineapi.RelationshipMutation
 import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.importengineapi.createReconciliationMatch
@@ -777,6 +782,76 @@ class KoinlyReconciliationE2ETest : DbTest() {
 
             assertEquals("400", balanceOf("Koinly · Coinbase", "GBP"))
             assertEquals("358.32414347", balanceOf("Koinly · Coinbase", "KNC"))
+        }
+
+    @Test
+    fun overlappingExportsShareTheWithdrawalFeeAfterReimport() =
+        runDbTest {
+            val first = stage("a.csv", listOf(walletTransfer))
+            val second = stage("b.csv", listOf(coinbaseDeposit, walletTransfer))
+            applyAll(listOf(first))
+            applyAll(listOf(second))
+
+            val feeAccount = assertNotNull(accountByName("Koinly · Coinbase Pro Fees")).id
+            val fee = transfersOn(feeAccount).single()
+            val observations = repositories.observationRepository
+            assertEquals(2, observations.getObservationsOfTransaction(fee.id).size)
+
+            // Force both re-runs to exercise observation reservations even when the files are unchanged.
+            val reruns = repositories.reimports(maintenance, skipUnchanged = false)
+            for (file in listOf(first, second)) {
+                reruns.reimportFile(file.id)
+                assertEquals(listOf(fee.id), transfersOn(feeAccount).map { it.id })
+                assertEquals(2, observations.getObservationsOfTransaction(fee.id).size)
+            }
+        }
+
+    @Test
+    fun matchSyncRepairsAWithdrawalFeeSplitByAnEarlierImport() =
+        runDbTest {
+            val first = stage("a.csv", listOf(walletTransfer))
+            val second = stage("b.csv", listOf(walletTransfer))
+            applyAll(listOf(first))
+            applyAll(listOf(second))
+
+            val feeAccount = assertNotNull(accountByName("Koinly · Coinbase Pro Fees")).id
+            val feeId = transfersOn(feeAccount).single().id
+            val observations = repositories.observationRepository
+            val feeObservation = observations.getObservationsOfTransaction(feeId).first()
+            val engine = repositories.importEngine
+            val duplicateKey = LocalTransactionKey("duplicate-fee")
+            val duplicateId =
+                engine
+                    .import(
+                        ImportBatch(
+                            observationMutations =
+                                listOf(
+                                    ObservationMutation.Upsert(
+                                        feeObservation.owner,
+                                        feeObservation.slot,
+                                        ObservationTransaction.New(duplicateKey),
+                                        feeObservation.content,
+                                    ),
+                                ),
+                            materialization = MaterializationRequest(Source.Reconciler),
+                        ),
+                    ).materialization.newTransactionIds
+                    .getValue(duplicateKey)
+            val relationship = repositories.relationshipRepository.getByTransactions(listOf(feeId)).single()
+
+            val result = engine.import(ImportBatch(syncMatches = true))
+
+            assertEquals(setOf(duplicateId), result.matchSync.deleted)
+            assertEquals(listOf(feeId), transfersOn(feeAccount).map { it.id })
+            assertEquals(2, observations.getObservationsOfTransaction(feeId).size)
+            assertEquals(relationship, repositories.relationshipRepository.getByTransactions(listOf(feeId)).single())
+            assertEquals(
+                ImportStatus.IMPORTED,
+                repositories.csvImportRepository
+                    .getImportRows(first.id, limit = 1, offset = 0)
+                    .single()
+                    .importStatus,
+            )
         }
 
     @Test

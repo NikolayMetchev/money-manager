@@ -815,12 +815,12 @@ class ReconciliationScreenTest {
     }
 
     @Test
-    fun thePickerLinksACandidateToItsTransactionAndSource() {
+    fun thePickerLinksTheSourceMovementAndAMatchedCandidate() {
         runMoneyManagerComposeUiTest {
             val opened = mutableListOf<ReconciliationLeg>()
             val openedSources = mutableListOf<ReconciliationLeg>()
             showLegs(
-                listOf(leg(10, wallet.accountId, "5", t0)),
+                listOf(leg(10, wallet.accountId, "5", t0), leg(11, wallet.accountId, "6.9", t0 + 1.hours)),
                 listOf(leg(21, binance, "6.9", t0 + 1.hours)),
                 opened,
                 openedSources,
@@ -829,14 +829,18 @@ class ReconciliationScreenTest {
 
             clickText("Select matching transactions…")
             val picker = onNodeWithTag(PICKER_CANDIDATES_TAG)
-            picker.performScrollToNode(
-                hasTestTag("$PICKER_OPEN_SOURCE_TAG-21-${binance.id}-${leg(21, binance, "6.9", t0).amount.asset.id}"),
-            )
-            onNode(hasTestTag("$PICKER_OPEN_SOURCE_TAG-21-${binance.id}-${leg(21, binance, "6.9", t0).amount.asset.id}")).performClick()
+            val asset = leg(21, binance, "6.9", t0).amount.asset.id
+            val movementKey = "10-${wallet.accountId.id}-$asset"
+            val candidateKey = "21-${binance.id}-$asset"
+            onNodeWithTag("$PICKER_OPEN_SOURCE_TAG-$movementKey").performClick()
+            onNodeWithTag("$PICKER_OPEN_TRANSACTION_TAG-$movementKey").performClick()
+            picker.performScrollToNode(hasTestTag("$PICKER_OPEN_SOURCE_TAG-$candidateKey"))
+            onNodeWithTag("$PICKER_OPEN_SOURCE_TAG-$candidateKey").performClick()
+            onNodeWithTag("$PICKER_OPEN_TRANSACTION_TAG-$candidateKey").performClick()
             waitForIdle()
 
-            assertEquals(listOf(21L), openedSources.map { it.transactionId })
-            assertEquals(emptyList(), opened)
+            assertEquals(listOf(10L, 21L), openedSources.map { it.transactionId })
+            assertEquals(listOf(10L, 21L), opened.map { it.transactionId })
             // The picker stays open in its state, so back from the followed link finds it as it was left.
             onNodeWithText("Select matching transactions").assertExists()
         }
