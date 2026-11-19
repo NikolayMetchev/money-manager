@@ -34,6 +34,7 @@ sealed interface RelationshipWrite {
         val members: List<RelationshipMember>,
         val source: Source,
         val excludesRelated: Boolean = false,
+        val pinObservations: Boolean = false,
     ) : RelationshipWrite
 
     data class Delete(

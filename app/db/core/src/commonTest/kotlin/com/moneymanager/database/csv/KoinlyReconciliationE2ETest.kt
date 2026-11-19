@@ -675,7 +675,6 @@ class KoinlyReconciliationE2ETest : DbTest() {
                 repositories.importEngine.copyToMoneyManager(
                     movement,
                     assertIs<CopyPlan.Ready>(plan),
-                    repositories.observationRepository,
                 )
 
             val trade =

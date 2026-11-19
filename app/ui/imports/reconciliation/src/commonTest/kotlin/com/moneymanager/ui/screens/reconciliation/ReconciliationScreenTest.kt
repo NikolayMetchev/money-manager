@@ -5,11 +5,13 @@ package com.moneymanager.ui.screens.reconciliation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
@@ -48,7 +50,6 @@ import com.moneymanager.domain.model.reconciliation.ShadowAccount
 import com.moneymanager.domain.model.reconciliation.reconciliationMonth
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
-import com.moneymanager.domain.repository.ObservationReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.ReconciliationReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
@@ -112,9 +113,6 @@ class ReconciliationScreenTest {
 
     private val transactionRepository: TransactionReadRepository = mock()
 
-    private val observationRepository: ObservationReadRepository =
-        mock { everySuspend { getObservationsOfTransaction(any()) } returns emptyList() }
-
     private fun accountRepository(accounts: List<Account>): AccountReadRepository =
         mock {
             every { getAllAccounts() } returns flowOf(accounts)
@@ -147,7 +145,6 @@ class ReconciliationScreenTest {
                         categoryRepository = categoryRepository,
                         personRepository = personRepository,
                         transactionRepository = transactionRepository,
-                        observationRepository = observationRepository,
                         onOpenLeg = {},
                     )
                 }
@@ -174,7 +171,6 @@ class ReconciliationScreenTest {
                         categoryRepository = categoryRepository,
                         personRepository = personRepository,
                         transactionRepository = transactionRepository,
-                        observationRepository = observationRepository,
                         onOpenLeg = {},
                     )
                 }
@@ -217,7 +213,6 @@ class ReconciliationScreenTest {
                             categoryRepository = categoryRepository,
                             personRepository = personRepository,
                             transactionRepository = transactionRepository,
-                            observationRepository = observationRepository,
                             onOpenLeg = {},
                         )
                     }
@@ -252,7 +247,6 @@ class ReconciliationScreenTest {
                         categoryRepository = categoryRepository,
                         personRepository = personRepository,
                         transactionRepository = transactionRepository,
-                        observationRepository = observationRepository,
                         onOpenLeg = {},
                     )
                 }
@@ -291,7 +285,6 @@ class ReconciliationScreenTest {
                             categoryRepository = categoryRepository,
                             personRepository = personRepository,
                             transactionRepository = transactionRepository,
-                            observationRepository = observationRepository,
                             onOpenLeg = {},
                         )
                     }
@@ -317,7 +310,6 @@ class ReconciliationScreenTest {
                             categoryRepository = categoryRepository,
                             personRepository = personRepository,
                             transactionRepository = transactionRepository,
-                            observationRepository = observationRepository,
                             onOpenLeg = {},
                         )
                     }
@@ -381,6 +373,7 @@ class ReconciliationScreenTest {
         opened: MutableList<ReconciliationLeg> = mutableListOf(),
         openedSources: MutableList<ReconciliationLeg> = mutableListOf(),
         focus: ReconciliationFocusState = ReconciliationFocusState(),
+        onLoadLegs: () -> Unit = {},
     ) {
         val accounts =
             listOf(
@@ -396,12 +389,14 @@ class ReconciliationScreenTest {
                                 listOf(koinly),
                                 listOf(wallet),
                                 flowOf(listOf(ReconciliationLink(wallet.accountId, binance))),
-                            ) { ids -> if (wallet.accountId in ids) sourceLegs else realLegs },
+                            ) { ids ->
+                                onLoadLegs()
+                                if (wallet.accountId in ids) sourceLegs else realLegs
+                            },
                         accountRepository = accountRepository(accounts),
                         categoryRepository = categoryRepository,
                         personRepository = personRepository,
                         transactionRepository = transactionRepository,
-                        observationRepository = observationRepository,
                         onOpenLeg = { opened += it },
                         onOpenSource = { openedSources += it },
                         focus = focus,
@@ -454,6 +449,7 @@ class ReconciliationScreenTest {
                             RelationshipMember(TransferId(20), RelationshipRole.MEMBER),
                         ),
                         Source.Manual,
+                        pinObservations = true,
                     ),
                 ),
                 batches.single().relationshipMutations,
@@ -555,6 +551,48 @@ class ReconciliationScreenTest {
 
             val create = batches.single().relationshipMutations.filterIsInstance<RelationshipMutation.Create>()
             assertEquals(setOf(listOf(match(10), match(20)), listOf(match(11), match(21))), create.map { it.members }.toSet())
+        }
+    }
+
+    @Test
+    fun acceptAllReloadsLegsOnlyAfterTheLastChunk() {
+        runMoneyManagerComposeUiTest {
+            val secondChunkStarted = CompletableDeferred<Unit>()
+            val finishSecondChunk = CompletableDeferred<Unit>()
+            var chunks = 0
+            val engine =
+                importEngine {
+                    if (++chunks == 2) {
+                        secondChunkStarted.complete(Unit)
+                        finishSecondChunk.await()
+                    }
+                    ImportResult()
+                }
+            val loads = MutableStateFlow(0)
+            showLegsWith(
+                engine,
+                List(51) { leg(100L + it, wallet.accountId, "${it + 1}", t0) },
+                List(51) { leg(200L + it, binance, "${it + 1}", t0 + 1.hours) },
+                onLoadLegs = { loads.value++ },
+            )
+            reveal(hasText("Near matches (51)"))
+            val initialLoads = loads.value
+
+            try {
+                onAllNodesWithText("Accept all (51)")[0].performClick()
+                waitUntil(timeoutMillis = 10_000) { secondChunkStarted.isCompleted }
+                waitForIdle()
+                assertEquals(initialLoads, loads.value)
+                onNodeWithText("Accepting matches").assertIsDisplayed()
+                onNode(hasProgressBarRangeInfo(ProgressBarRangeInfo(50f / 51, 0f..1f))).assertIsDisplayed()
+            } finally {
+                finishSecondChunk.complete(Unit)
+            }
+
+            waitUntil(timeoutMillis = 10_000) { loads.value >= initialLoads + 2 }
+            waitForIdle()
+            assertEquals(initialLoads + 2, loads.value)
+            onNodeWithText("Accepting matches").assertDoesNotExist()
         }
     }
 
@@ -851,7 +889,6 @@ class ReconciliationScreenTest {
                             categoryRepository = categoryRepository,
                             personRepository = personRepository,
                             transactionRepository = transactionRepository,
-                            observationRepository = observationRepository,
                             onOpenLeg = {},
                         )
                     }
@@ -898,7 +935,6 @@ class ReconciliationScreenTest {
                             categoryRepository = categoryRepository,
                             personRepository = personRepository,
                             transactionRepository = transactionRepository,
-                            observationRepository = observationRepository,
                             onOpenLeg = {},
                         )
                     }

@@ -55,7 +55,6 @@ import com.moneymanager.domain.model.reconciliation.ReconciliationSource
 import com.moneymanager.domain.model.reconciliation.ShadowAccount
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
-import com.moneymanager.domain.repository.ObservationReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.ReconciliationReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
@@ -125,7 +124,6 @@ fun ReconciliationScreen(
     categoryRepository: CategoryReadRepository,
     personRepository: PersonReadRepository,
     transactionRepository: TransactionReadRepository,
-    observationRepository: ObservationReadRepository,
     onOpenLeg: (ReconciliationLeg) -> Unit,
     onOpenSource: (ReconciliationLeg) -> Unit = {},
     pickerState: MatchPickerState = remember { MatchPickerState() },
@@ -173,7 +171,6 @@ fun ReconciliationScreen(
             categoryRepository = categoryRepository,
             personRepository = personRepository,
             transactionRepository = transactionRepository,
-            observationRepository = observationRepository,
             onOpenLeg = onOpenLeg,
             onOpenSource = onOpenSource,
             pickerState = pickerState,
@@ -191,7 +188,6 @@ private fun SourceReconciliation(
     categoryRepository: CategoryReadRepository,
     personRepository: PersonReadRepository,
     transactionRepository: TransactionReadRepository,
-    observationRepository: ObservationReadRepository,
     onOpenLeg: (ReconciliationLeg) -> Unit,
     onOpenSource: (ReconciliationLeg) -> Unit,
     pickerState: MatchPickerState,
@@ -224,6 +220,14 @@ private fun SourceReconciliation(
         }
     }
 
+    val taskManager = LocalTaskManager.current
+    val tasks by taskManager.tasks.collectAsState()
+    val bulkKey = "reconciliation-bulk-${source.name}"
+    // Set on the click itself: the task list only shows the run a recomposition later.
+    var bulkSubmitted by remember { mutableStateOf(false) }
+    val bulkTask = tasks.firstOrNull { it.key == bulkKey && it.isRunning }
+    val bulkRunning = bulkSubmitted || bulkTask != null
+
     var refreshKey by remember { mutableStateOf(0) }
 
     fun refresh() {
@@ -234,7 +238,9 @@ private fun SourceReconciliation(
     // The wallets and links the result was made for: the one shown at first may be a kept result for inputs not loaded yet.
     var resultFor by remember { mutableStateOf<Pair<Set<AccountId>, List<ReconciliationLink>>?>(null) }
     var progress by remember { mutableStateOf<Progress?>(null) }
-    LaunchedEffect(source, shadowIds, links, refreshKey, writeVersion) {
+    LaunchedEffect(source, shadowIds, links, refreshKey, writeVersion, bulkRunning) {
+        // Each chunk bumps writeVersion. Reload once the bulk task has finished.
+        if (bulkRunning) return@LaunchedEffect
         cache.get(source.name, shadowIds, links, writeVersion)?.let {
             result = it
             resultFor = shadowIds to links
@@ -352,7 +358,7 @@ private fun SourceReconciliation(
     }
 
     fun storeMatch(legs: List<ReconciliationLeg>) =
-        write("Matching") { importEngine.acceptMatches(listOf(legs.map { it.transactionRef }.distinct()), observationRepository) }
+        write("Matching") { importEngine.acceptMatches(listOf(legs.map { it.transactionRef }.distinct())) }
 
     // Ignoring a source row excludes every transaction of its movement (a trade and its fee, say).
     suspend fun applyIgnored(
@@ -372,14 +378,6 @@ private fun SourceReconciliation(
         legs: List<ReconciliationLeg>,
         ignored: Boolean,
     ) = write(if (ignored) "Ignoring" else "Un-ignoring") { applyIgnored(legs, ignored) }
-
-    // A bulk run is a background task: it shows in the task panel with a progress bar, and the legs reload when it ends.
-    val taskManager = LocalTaskManager.current
-    val tasks by taskManager.tasks.collectAsState()
-    val bulkKey = "reconciliation-bulk-${source.name}"
-    // Set on the click itself: the task list only shows the run a recomposition later.
-    var bulkSubmitted by remember { mutableStateOf(false) }
-    val bulkRunning = bulkSubmitted || tasks.any { it.key == bulkKey && it.isRunning }
 
     fun <T> runBulk(
         title: String,
@@ -410,7 +408,7 @@ private fun SourceReconciliation(
 
     fun storeMatches(matches: List<LegMatch>) =
         runBulk("Accepting ${matches.size} matches", "Accepting matches", matches) { chunk ->
-            importEngine.acceptMatches(chunk.map { it.memberTransactions() }, observationRepository)
+            importEngine.acceptMatches(chunk.map { it.memberTransactions() })
         }
 
     fun ignoreAll(legs: List<ReconciliationLeg>) =
@@ -425,6 +423,8 @@ private fun SourceReconciliation(
             creatingAll = false
         }
     }
+
+    if (bulkRunning) ReconciliationProgress(bulkTask?.progress ?: Progress("Starting"))
 
     LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         IndexingScope(this, indexByKey).run {
@@ -494,7 +494,7 @@ private fun SourceReconciliation(
             }
             val loaded = result
             if (loaded == null) {
-                item { ReconciliationProgress(progress) }
+                if (!bulkRunning) item { ReconciliationProgress(progress) }
                 return@run
             }
             item {
@@ -539,7 +539,7 @@ private fun SourceReconciliation(
                                 onClick = {
                                     write(
                                         "Matching",
-                                    ) { importEngine.acceptMatches(listOf(match.memberTransactions()), observationRepository) }
+                                    ) { importEngine.acceptMatches(listOf(match.memberTransactions())) }
                                 },
                                 enabled = !bulkRunning,
                             ) { Text("Accept") }
@@ -684,7 +684,7 @@ private fun SourceReconciliation(
                 pickerState.close()
                 write("Adding the fee") {
                     val feeId = importEngine.createManualFee(fee.account, fee.fee, fee.timestamp)
-                    importEngine.acceptMatches(listOf((movement + selected).map { it.transactionRef } + feeId), observationRepository)
+                    importEngine.acceptMatches(listOf((movement + selected).map { it.transactionRef } + feeId))
                 }
             },
             onOpenLeg = onOpenLeg,
@@ -692,7 +692,7 @@ private fun SourceReconciliation(
             copyPlan = remember(movement, shadowAccounts, links, accountNames) { planCopy(movement, shadowAccounts, links, accountNames) },
             onCopy = { plan ->
                 pickerState.close()
-                write("Copying to Money Manager") { importEngine.copyToMoneyManager(movement, plan, observationRepository) }
+                write("Copying to Money Manager") { importEngine.copyToMoneyManager(movement, plan) }
             },
         )
     }
@@ -1016,7 +1016,7 @@ internal inline fun <T> runCatchingUnlessCancelled(block: () -> T): Result<T> =
 
 internal fun formatDelta(delta: Duration): String = delta.absoluteValue.toString().let { if (delta.isNegative()) "-$it" else "+$it" }
 
-/** The bar and step shown while the legs load and [reconcile] runs through its passes. */
+/** The bar and step shown while reconciling or applying a bulk action. */
 @Composable
 private fun ReconciliationProgress(progress: Progress?) {
     Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

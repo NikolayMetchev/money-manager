@@ -119,12 +119,12 @@ suspend fun ImportEngine.setTransferExcluded(
 suspend fun ImportEngine.createReconciliationMatch(members: Collection<TransactionId>) = createReconciliationMatches(listOf(members))
 
 /**
- * [createReconciliationMatch] for several movements at once, in one batch, with [pins]: a person's match also pins its
- * members' observations where they are, so a re-import re-makes each member as the transaction the match names.
+ * [createReconciliationMatch] for several movements at once. With [pinObservations], a re-import re-makes each
+ * member as the transaction the match names.
  */
 suspend fun ImportEngine.createReconciliationMatches(
     matches: Collection<Collection<TransactionId>>,
-    pins: Collection<ObservationPin> = emptyList(),
+    pinObservations: Boolean = false,
 ) {
     if (matches.isEmpty()) return
     val typeId = RelationshipTypeId(WellKnownIds.RECONCILIATION_MATCH_RELATIONSHIP_TYPE_ID)
@@ -136,9 +136,10 @@ suspend fun ImportEngine.createReconciliationMatches(
                 typeId = typeId,
                 members = distinct.map { RelationshipMember(it, RelationshipRole.MEMBER) },
                 source = Source.Manual,
+                pinObservations = pinObservations,
             )
         }
-    import(ImportBatch(relationshipMutations = mutations, observationDecisions = pins.map { ObservationDecision.Pin(it) }))
+    import(ImportBatch(relationshipMutations = mutations))
 }
 
 suspend fun ImportEngine.deleteRelationship(id: RelationshipId) {

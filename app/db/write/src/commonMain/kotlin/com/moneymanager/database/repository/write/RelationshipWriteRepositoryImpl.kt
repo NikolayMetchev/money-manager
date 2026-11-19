@@ -37,22 +37,28 @@ class RelationshipWriteRepositoryImpl(
     override suspend fun apply(writes: List<RelationshipWrite>): Unit =
         withContext(Dispatchers.Default) {
             writeQueries.transaction {
+                val transactionsToPin = mutableSetOf<Long>()
                 writes.forEach { write ->
                     when (write) {
                         is RelationshipWrite.Create -> {
+                            val members = write.members.map { it.transactionId.id to it.role }
                             database.insertRelationship(
                                 deviceId,
                                 write.typeId.id,
-                                write.members.map { it.transactionId.id to it.role },
+                                members,
                                 write.source,
                                 write.excludesRelated,
                             )
+                            if (write.pinObservations) members.mapTo(transactionsToPin) { it.first }
                         }
 
                         is RelationshipWrite.Delete -> {
                             writeQueries.deleteById(write.id.id)
                         }
                     }
+                }
+                for (ids in transactionsToPin.chunked(MAX_PIN_TRANSACTION_IDS)) {
+                    database.personOverrideWriteQueries.pinObservationsOfTransactions(ids)
                 }
             }
         }
@@ -62,3 +68,6 @@ class RelationshipWriteRepositoryImpl(
             writeQueries.deleteById(id.id)
         }
 }
+
+// Stay within SQLite's default bind limit for a single statement.
+private const val MAX_PIN_TRANSACTION_IDS = 999
