@@ -391,7 +391,7 @@
     },
     "@@rules_java+//java:extensions.bzl%java_repository": {
       "general": {
-        "bzlTransitiveDigest": "D8BXONxcZrkyTKbyupPENZsiIn7PqbBf5gbPdlP4ptQ=",
+        "bzlTransitiveDigest": "qjeB5212moovNignTA5JcNGkoPm0ZbOjCrBftjw/hj8=",
         "usagesDigest": "UIIrmSgUiyaivCk7oywPvu4FR5PLOJb8tYG24ErdWoU=",
         "recordedInputs": [
           "REPO_MAPPING:bazel_features+,bazel_features_globals bazel_features++version_extension+bazel_features_globals",
