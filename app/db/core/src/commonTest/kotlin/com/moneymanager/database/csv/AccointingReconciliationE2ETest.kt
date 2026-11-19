@@ -11,13 +11,22 @@ import com.moneymanager.domain.model.Trade
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csv.CsvImport
+import com.moneymanager.domain.model.csv.ImportStatus
+import com.moneymanager.domain.model.observation.ImportRecordKey
 import com.moneymanager.importengineapi.AccountRef
+import com.moneymanager.importengineapi.CsvImportMutation
 import com.moneymanager.importengineapi.ImportBatch
+import com.moneymanager.importengineapi.ImportTradeIntent
 import com.moneymanager.importengineapi.ImportTransfer
+import com.moneymanager.importengineapi.LocalTradeKey
+import com.moneymanager.importengineapi.ObservationOwnerKey
+import com.moneymanager.importengineapi.applyCsvImportMutations
 import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.importengineapi.setReconciliationLinks
 import com.moneymanager.reconciliation.reconcile
 import com.moneymanager.test.database.DbTest
+import com.moneymanager.test.database.reimports
+import com.moneymanager.test.database.runPlan
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -219,6 +228,63 @@ class AccointingReconciliationE2ETest : DbTest() {
                     "Accointing",
                 ),
             )
+        }
+
+    @Test
+    fun `bulk re-import reuses a shared trade ID only once per batch`() =
+        runDbTest {
+            val anotherOrder =
+                order.toMutableList().apply {
+                    this[headers.indexOf("id")] = "6"
+                    this[headers.indexOf("feeQuantity")] = "0"
+                }
+            val first = stage("history (1).xlsx", listOf(income, order, anotherOrder))
+            val second = stage("history.xlsx", listOf(income, midnightIncome))
+            val lastRow =
+                repositories.csvImportRepository
+                    .getImportRows(first.id, limit = 3, offset = 0)
+                    .last()
+                    .rowIndex
+            val engine = repositories.importEngine
+            // Book the identical fills in separate passes so both rows observe the same trade.
+            engine.applyCsvImportMutations(
+                listOf(CsvImportMutation.UpdateRowStatuses(first.id, ImportStatus.SKIPPED.name, listOf(lastRow))),
+            )
+            assertEquals(2, applyAll(listOf(first, second)).filesImported)
+            val originalTrade = trades().single()
+            val anotherKey = LocalTradeKey("another-order")
+            val booked =
+                engine.import(
+                    ImportBatch(
+                        trades =
+                            listOf(
+                                ImportTradeIntent(
+                                    key = anotherKey,
+                                    source = Source.Csv(first.id),
+                                    timestamp = originalTrade.timestamp,
+                                    description = originalTrade.description,
+                                    fromAccountId = originalTrade.fromAccountId,
+                                    fromAmount = originalTrade.from,
+                                    toAccountId = originalTrade.toAccountId,
+                                    toAmount = originalTrade.to,
+                                    owner = ObservationOwnerKey.Record(ImportRecordKey.CsvRow(first.id, lastRow)),
+                                ),
+                            ),
+                    ),
+                )
+            assertEquals(originalTrade.id, booked.createdTradeIds.getValue(anotherKey))
+            val beforeTransfers = transfers().associate { it.id to it.amount }
+            assertEquals(3, beforeTransfers.size)
+
+            val reimports = repositories.reimports(maintenance = maintenance, skipUnchanged = false)
+            val result = reimports.runPlan(reimports.planAll(listOf(first, second)))
+
+            assertEquals(0, result.filesFailed)
+            assertEquals(2, result.filesImported)
+            assertEquals(beforeTransfers, transfers().associate { it.id to it.amount })
+            // The two fills are now seen together, so the import's occurrence counting books both.
+            assertEquals(2, trades().size)
+            assertTrue(trades().any { it.id == originalTrade.id })
         }
 
     @Test
