@@ -50,8 +50,8 @@ JDK = "27.0.1.1"
 JDK_ARCHIVES = {
     "linux_aarch64": ["zulu27.30.201-ca-jdk27.0.1.1-linux_aarch64.tar.gz", "18875b92ad2535230a13175f718933f7cc0593b4affa2dab442815ec245dacbb"],
     "linux_x86_64": ["zulu27.30.201-ca-jdk27.0.1.1-linux_x64.tar.gz", "c4d7bf4c80a21e935187ecdcb111e4b2f14e1fdd18364974fe7f7da54b12bea0"],
-    "macos_aarch64": ["zulu27.30.109-ca-jdk27.0.1.0.3-macosx_aarch64.tar.gz", "88dec2f8609e7c4162778cbaef5437f00febd3c498a7c0e77277d1f4ac8f839d"],
-    "macos_x86_64": ["zulu27.30.109-ca-jdk27.0.1.0.3-macosx_x64.tar.gz", "88cf4b1d04ed677d88e53716fb0c960b89917a0234cea6555ba9aa5d37961b83"],
+    "macos_aarch64": ["zulu27.30.201-ca-jdk27.0.1.1-macosx_aarch64.tar.gz", "1d28430a13d257248856792e0131d845cbe324145971df7c9716ec2a92ac0fca"],
+    "macos_x86_64": ["zulu27.30.201-ca-jdk27.0.1.1-macosx_x64.tar.gz", "271f8d1bb2f692bdc981799e8f251133c854cc5c1edafa80298a461bb8909dec"],
     "windows_x86_64": ["zulu27.30.201-ca-jdk27.0.1.1-win_x64.zip", "f5424ea36f832aa28a0441a57ffb1dfe2cd3d903802c0a36d22576b1acc430ec"],
 }
 
