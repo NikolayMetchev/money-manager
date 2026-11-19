@@ -9,7 +9,7 @@
       "androidx-compose-foundation": "androidx.compose.foundation:foundation:1.12.1",
       "androidx-compose-foundation-layout": "androidx.compose.foundation:foundation-layout:1.12.1",
       "androidx-compose-material-icons-core": "androidx.compose.material:material-icons-core:1.7.8",
-      "androidx-compose-material3": "androidx.compose.material3:material3:1.4.0",
+      "androidx-compose-material3": "androidx.compose.material3:material3:1.5.0",
       "androidx-compose-runtime": "androidx.compose.runtime:runtime:1.12.1",
       "androidx-compose-runtime-annotation": "androidx.compose.runtime:runtime-annotation:1.12.1",
       "androidx-compose-runtime-desktop": "androidx.compose.runtime:runtime-desktop:1.12.1",
@@ -428,6 +428,7 @@
     "androidx.compose.foundation:foundation": "androidx_compose_foundation",
     "androidx.compose.foundation:foundation-layout": "androidx_compose_foundation_layout",
     "androidx.compose.material3:material3": "androidx_compose_material3",
+    "androidx.compose.material3:material3-ripple": "androidx_compose_material3_material3_ripple",
     "androidx.compose.material:material-icons-core": "androidx_compose_material_icons_core",
     "androidx.compose.material:material-ripple": "androidx_compose_material_material_ripple",
     "androidx.compose.runtime:runtime": "androidx_compose_runtime",
@@ -455,6 +456,7 @@
     "androidx.emoji2:emoji2": "androidx_emoji2_emoji2",
     "androidx.fragment:fragment": "androidx_fragment_fragment",
     "androidx.graphics:graphics-path": "androidx_graphics_graphics_path",
+    "androidx.graphics:graphics-shapes": "androidx_graphics_graphics_shapes",
     "androidx.interpolator:interpolator": "androidx_interpolator_interpolator",
     "androidx.lifecycle:lifecycle-common": "androidx_lifecycle_lifecycle_common",
     "androidx.lifecycle:lifecycle-common-java8": "androidx_lifecycle_lifecycle_common_java8",
@@ -804,6 +806,9 @@
       "androidx.compose.material3.pulltorefresh",
       "androidx.compose.material3.tokens"
     ],
+    "androidx.compose.material3:material3-ripple": [
+      "androidx.compose.material3.ripple"
+    ],
     "androidx.compose.material:material-icons-core": [
       "androidx.compose.material.icons",
       "androidx.compose.material.icons.automirrored.filled",
@@ -1060,6 +1065,9 @@
     ],
     "androidx.graphics:graphics-path": [
       "androidx.graphics.path"
+    ],
+    "androidx.graphics:graphics-shapes": [
+      "androidx.graphics.shapes"
     ],
     "androidx.interpolator:interpolator": [
       "androidx.interpolator.view.animation"
@@ -5025,12 +5033,12 @@
     },
     "androidx.compose.material3:material3": {
       "android": {
-        "version": "1.4.0",
+        "version": "1.5.0",
         "files": [
           {
             "name": "material3.aar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/material3/material3-android/1.4.0/material3-android-1.4.0.aar",
-            "sha256": "3a37e8b36df3822fe1e6059f0f9fafda8800388860477624ac1b9422c418a36e"
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/material3/material3-android/1.5.0/material3-android-1.5.0.aar",
+            "sha256": "dd17540643810cd13007f64c85091fd98c6f7e7619437d2fd18e0c2e41155ee1"
           }
         ],
         "deps": [
@@ -5041,14 +5049,39 @@
           "androidx.compose.material:material-ripple",
           "androidx.compose.runtime:runtime",
           "androidx.compose.ui:ui",
-          "androidx.compose.ui:ui-text"
+          "androidx.compose.ui:ui-text",
+          "androidx.graphics:graphics-shapes"
         ],
         "runtime_deps": [
           "androidx.activity:activity-compose",
           "androidx.collection:collection",
           "androidx.compose.animation:animation-core",
+          "androidx.compose.material3:material3-ripple",
           "androidx.compose.ui:ui-util",
-          "androidx.lifecycle:lifecycle-common-java8"
+          "androidx.lifecycle:lifecycle-common-java8",
+          "androidx.lifecycle:lifecycle-runtime"
+        ]
+      }
+    },
+    "androidx.compose.material3:material3-ripple": {
+      "android": {
+        "version": "1.5.0",
+        "files": [
+          {
+            "name": "material3-ripple.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/material3/material3-ripple-android/1.5.0/material3-ripple-android-1.5.0.aar",
+            "sha256": "8d947b02b21f6af335dbb92332a09d3029955cc5f62d8e3116b4474b04f30848"
+          }
+        ],
+        "deps": [
+          "androidx.compose.foundation:foundation",
+          "androidx.compose.runtime:runtime"
+        ],
+        "runtime_deps": [
+          "androidx.collection:collection",
+          "androidx.compose.animation:animation",
+          "androidx.compose.ui:ui-util",
+          "androidx.lifecycle:lifecycle-runtime"
         ]
       }
     },
@@ -5069,12 +5102,12 @@
     },
     "androidx.compose.material:material-ripple": {
       "android": {
-        "version": "1.8.1",
+        "version": "1.12.0",
         "files": [
           {
-            "name": "material-ripple-release.aar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/material/material-ripple-android/1.8.1/material-ripple-android-1.8.1.aar",
-            "sha256": "a6bc5eb03cd1d714e06339b8e48944462d9994a9e88eb7519af4cf3ec20e3afa"
+            "name": "material-ripple.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/compose/material/material-ripple-android/1.12.0/material-ripple-android-1.12.0.aar",
+            "sha256": "14c87d654caf31eec9bdb62d6bea945b3caf219a60b7d4955e61f51526e04a0a"
           }
         ],
         "deps": [
@@ -6104,6 +6137,24 @@
         ],
         "runtime_deps": [
           "androidx.core:core"
+        ]
+      }
+    },
+    "androidx.graphics:graphics-shapes": {
+      "android": {
+        "version": "1.0.1",
+        "files": [
+          {
+            "name": "graphics-shapes-release.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/graphics/graphics-shapes-android/1.0.1/graphics-shapes-android-1.0.1.aar",
+            "sha256": "7171269a4122feabb071768df46d10b362e47ac75fd0aa8dbcafa1f44f61b40c"
+          }
+        ],
+        "runtime_deps": [
+          "androidx.annotation:annotation",
+          "androidx.annotation:annotation-experimental",
+          "androidx.collection:collection",
+          "androidx.core:core-ktx"
         ]
       }
     },
