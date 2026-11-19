@@ -31,7 +31,7 @@ interface ImportEngine {
     suspend fun planVersion(): ImportPlanVersion? = null
 
     /** Computes a preview for a supported source without writing. Null means this source requires the regular import. */
-    suspend fun plan(request: CsvTransferSync): PreparedImport? = null
+    suspend fun plan(requests: List<CsvTransferSync>): PreparedImport? = null
 
     /** Commits the prepared changes and returns the plan with allocated IDs, or null if it wrote nothing. */
     suspend fun apply(plan: PreparedImport): ImportPlan? = error("This engine cannot apply prepared imports")

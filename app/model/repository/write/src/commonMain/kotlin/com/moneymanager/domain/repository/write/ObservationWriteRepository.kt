@@ -32,7 +32,7 @@ interface ObservationWriteRepository : ObservationReadRepository {
         newTransactions: Collection<TransactionId>,
         observations: List<ObservationChange>,
         rows: List<MaterializedWrite>,
-        csv: CsvObservationCommit? = null,
+        csv: List<CsvObservationCommit> = emptyList(),
         reclaimed: Collection<ObservationId> = emptyList(),
     ): Map<TransactionId, TransactionId>
 

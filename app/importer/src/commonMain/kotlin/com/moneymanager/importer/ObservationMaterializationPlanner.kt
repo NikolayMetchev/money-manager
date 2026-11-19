@@ -54,8 +54,9 @@ internal class ObservationMaterializationPlanner(
     suspend fun plan(
         mutations: List<ObservationMutation>,
         request: MaterializationRequest,
+        allocatedLocals: Int = 0,
     ): ObservationMaterializationPlan {
-        val overlay = ObservationOverlay(observations)
+        val overlay = ObservationOverlay(observations, allocatedLocals)
         mutations.forEach { overlay.add(it) }
         val observationChanges = overlay.changes()
         val affected = request.transactionIds + overlay.affected
@@ -180,6 +181,7 @@ internal class ObservationMaterializationPlanner(
 /** The slot changes in this plan. Unchanged observations still come from the read repository. */
 private class ObservationOverlay(
     private val observations: ObservationReadRepository,
+    private val allocatedLocals: Int,
 ) {
     private val storedByOwner = mutableMapOf<ObservationOwner, Map<String, Observation>>()
     private val bySlot = linkedMapOf<Pair<ObservationOwner, String>, ObservationChange>()
@@ -235,7 +237,7 @@ private class ObservationOverlay(
 
                 is ObservationTransaction.New -> {
                     newTransactions.getOrPut(target.key) {
-                        val provisional = -(newTransactions.size.toLong() + 1)
+                        val provisional = -(allocatedLocals.toLong() + newTransactions.size + 1)
                         when (kind) {
                             TransactionKind.TRANSFER -> TransferId(provisional)
                             TransactionKind.TRADE -> TradeId(provisional)

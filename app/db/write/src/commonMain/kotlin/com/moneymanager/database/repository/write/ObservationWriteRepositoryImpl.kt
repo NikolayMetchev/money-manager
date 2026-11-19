@@ -63,13 +63,14 @@ class ObservationWriteRepositoryImpl(
         newTransactions: Collection<TransactionId>,
         observations: List<ObservationChange>,
         rows: List<MaterializedWrite>,
-        csv: CsvObservationCommit?,
+        csv: List<CsvObservationCommit>,
         reclaimed: Collection<ObservationId>,
     ): Map<TransactionId, TransactionId> {
-        if (csv == null && newTransactions.isEmpty() && observations.isEmpty() && rows.isEmpty() && reclaimed.isEmpty()) return emptyMap()
+        if (csv.isEmpty() && newTransactions.isEmpty() && observations.isEmpty() && rows.isEmpty() && reclaimed.isEmpty()) return emptyMap()
         return withContext(coroutineContext) {
             queries.transactionWithResult {
-                val csvTable = csv?.let { verifyCsvCommit(it, observations, rows) }
+                val csvTables = csv.associateWith { verifyCsvCommit(it) }
+                if (csv.isNotEmpty()) verifyCsvChanges(observations, rows)
                 val ids = newTransactions.associateWith { allocate(it.kind()) }
                 for (change in observations) {
                     val before = change.before
@@ -109,21 +110,21 @@ class ObservationWriteRepositoryImpl(
                         }
                     }
                 }
-                if (csv != null) {
+                for ((commit, table) in csvTables) {
                     val tableManager = CsvTableManager(database)
-                    csv.statuses.forEach { (index, status) ->
-                        tableManager.updateRowStatus(checkNotNull(csvTable), index, status.name)
+                    commit.statuses.forEach { (index, status) ->
+                        tableManager.updateRowStatus(table, index, status.name)
                     }
-                    csv.hashes.forEach { (recordId, hash) ->
+                    commit.hashes.forEach { (recordId, hash) ->
                         database.importRecordWriteQueries.updateContentHash(hash, recordId.id)
                     }
                     database.recordCsvApplication(
-                        csv.importId,
-                        csv.strategyId,
-                        csv.strategyName,
-                        csv.appliedAt,
-                        csv.accountId,
-                        csv.currencyId,
+                        commit.importId,
+                        commit.strategyId,
+                        commit.strategyName,
+                        commit.appliedAt,
+                        commit.accountId,
+                        commit.currencyId,
                     )
                 }
                 ids
@@ -131,27 +132,33 @@ class ObservationWriteRepositoryImpl(
         }
     }
 
-    private suspend fun verifyCsvCommit(
-        csv: CsvObservationCommit,
+    private suspend fun verifyCsvCommit(csv: CsvObservationCommit): String {
+        val file =
+            database.csvImportSelectQueries.selectImportById(csv.importId.id.toString()).awaitAsOneOrNull()
+                ?: throw StaleObservationCommitException()
+        if (file.file_checksum != csv.fileChecksum || database.dataChangeToken() != csv.changeToken) {
+            throw StaleObservationCommitException()
+        }
+        return file.table_name
+    }
+
+    private suspend fun verifyCsvChanges(
         changes: List<ObservationChange>,
         rows: List<MaterializedWrite>,
-    ): String {
-        val file = database.csvImportSelectQueries.selectImportById(csv.importId.id.toString()).awaitAsOneOrNull()
+    ) {
         val valid =
-            file?.file_checksum == csv.fileChecksum && database.dataChangeToken() == csv.changeToken &&
-                changes.all { change ->
-                    val before = change.before
-                    if (before == null) {
-                        getObservationsOf(change.owner).none { it.slot == change.slot }
-                    } else {
-                        getObservationsOfTransaction(before.transactionId).singleOrNull() == before
-                    }
-                } &&
+            changes.all { change ->
+                val before = change.before
+                if (before == null) {
+                    getObservationsOf(change.owner).none { it.slot == change.slot }
+                } else {
+                    getObservationsOfTransaction(before.transactionId).singleOrNull() == before
+                }
+            } &&
                 rows.filterIsInstance<MaterializedWrite.Update>().all { update ->
                     getMaterialized(TransferId(update.transactionId)) == update.before
                 }
         if (!valid) throw StaleObservationCommitException()
-        return checkNotNull(file).table_name
     }
 
     private suspend fun allocate(kind: TransactionKind): TransactionId {

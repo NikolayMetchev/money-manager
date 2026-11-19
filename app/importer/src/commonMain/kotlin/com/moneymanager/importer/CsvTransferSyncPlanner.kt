@@ -1,5 +1,6 @@
 package com.moneymanager.importer
 
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.ImportStatus
@@ -44,7 +45,10 @@ internal class CsvTransferSyncPlanner(
     private val overrides: PersonOverrideReadRepository,
     private val materializer: ObservationMaterializationPlanner,
 ) {
-    suspend fun plan(request: CsvTransferSync): CsvTransferChanges? {
+    suspend fun plan(
+        request: CsvTransferSync,
+        allocatedLocals: Int,
+    ): CsvTransferChanges? {
         val id = request.id
         val rows = request.rows
         val hashes = request.records.contentHashes
@@ -72,7 +76,7 @@ internal class CsvTransferSyncPlanner(
         if (stored.size != ids.size || stored.any { it.transactionId !in ids }) return null
         val byTransaction = stored.associateBy { it.transactionId }
         val accounts = proposedAccounts + current.values.flatMap { listOf(it.sourceAccountId, it.targetAccountId) }
-        // A new or removed booking may change deductions on either account if it participates in matching.
+        // The planner must account for every candidate that could match the old or new bookings.
         if (observations.getObservationsOnAccounts(accounts).map { it.id }.toSet() != stored.map { it.id }.toSet() ||
             accounts.any { account -> transfers.getTransactionsByAccount(account).first().any { it.id !in ids } }
         ) {
@@ -128,7 +132,7 @@ internal class CsvTransferSyncPlanner(
                     )
                 }
             }
-        val changes = materializer.plan(mutations, MaterializationRequest(Source.Csv(id)))
+        val changes = materializer.plan(mutations, MaterializationRequest(Source.Csv(id)), allocatedLocals)
         val inputByNewId = changes.newTransactions.entries.associate { (key, localId) -> localId to newSources.getValue(key) }
         val created = mutableListOf<PlannedTransaction>()
         val updated = mutableListOf<PlannedUpdate>()
@@ -140,7 +144,8 @@ internal class CsvTransferSyncPlanner(
                     is MaterializedWrite.Insert -> {
                         val source = inputByNewId.getValue(transferId)
                         val input = rows.getValue(checkNotNull(source.rowIndex)).transfer
-                        created += input.copy(id = transferId).planned()
+                        val values = write.row.values as ObservedValues.Transfer
+                        created += input.copy(id = transferId, timestamp = values.timestamp).planned()
                         write.copy(source = source)
                     }
 
@@ -197,6 +202,7 @@ internal class CsvTransferSyncPlanner(
                     if (record.contentHash == hash) null else record.id to hash
                 }.toMap(),
             statuses,
+            accounts,
         )
     }
 
@@ -219,4 +225,10 @@ internal data class CsvTransferChanges(
     val preview: ImportPlan,
     val hashes: Map<ImportRecordId, String>,
     val statuses: Map<Long, ImportStatus>,
-)
+    val accounts: Set<AccountId>,
+) {
+    val hasWrites: Boolean
+        get() =
+            materialization.observations.isNotEmpty() || materialization.rows.isNotEmpty() || hashes.isNotEmpty() ||
+                statuses.isNotEmpty()
+}

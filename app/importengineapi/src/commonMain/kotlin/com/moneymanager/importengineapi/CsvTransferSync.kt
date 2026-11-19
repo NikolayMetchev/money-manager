@@ -27,6 +27,8 @@ data class ImportPlanVersion(
 /** A preview bound to the engine and database state that produced it. */
 interface PreparedImport {
     val preview: ImportPlan
+    val files: Int
+    val changedFiles: Int
 }
 
 class StaleImportPlanException : IllegalStateException("The database changed after this preview was prepared. Preview the import again.")

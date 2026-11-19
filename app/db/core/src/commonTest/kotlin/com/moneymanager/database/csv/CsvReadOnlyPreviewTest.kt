@@ -9,6 +9,7 @@ import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.AmountMode
@@ -41,6 +42,7 @@ import com.moneymanager.test.database.planFile
 import com.moneymanager.test.database.read.testReads
 import com.moneymanager.test.database.reimportFile
 import com.moneymanager.test.database.reimports
+import com.moneymanager.test.database.runPlan
 import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
@@ -90,6 +92,46 @@ class CsvReadOnlyPreviewTest : DbTest() {
         }
 
     @Test
+    fun bulkReimportCommitsOnlyTheDeltasOfIndependentCsvFiles() =
+        runDbTest {
+            val fixtures = listOf(stage(includeUnchangedRow = true), stage(includeUnchangedRow = true, suffix = "-second"))
+            val originalRows = fixtures.map { rows(it.id) }
+            val engine = repositories.importEngine
+            fixtures.forEach { (_, strategy) -> engine.updateCsvStrategy(skipFirst(strategy)) }
+            val reimports = repositories.reimports()
+            val files = fixtures.map { assertNotNull(repositories.csvImportRepository.getImport(it.id).first()) }
+            val before = transferAuditCount()
+
+            val removed = reimports.runPlan(reimports.planAll(files))
+
+            assertEquals(2, removed.filesImported)
+            val removedIds: Set<TransactionId> = originalRows.map { assertNotNull(it.first().transferId) }.toSet()
+            assertEquals(
+                removedIds,
+                removed.plan.removed
+                    .map { it.id }
+                    .toSet(),
+            )
+            assertEquals(before + 2, transferAuditCount())
+            fixtures.forEach { (_, strategy) -> engine.updateCsvStrategy(strategy) }
+
+            val restored = reimports.runPlan(reimports.planAll(files))
+
+            assertEquals(2, restored.filesImported)
+            assertEquals(2, restored.transfersCreated)
+            val after = fixtures.map { rows(it.id) }
+            val restoredIds: Set<TransactionId> = after.map { assertNotNull(it.first().transferId) }.toSet()
+            assertEquals(
+                restoredIds,
+                restored.plan.created
+                    .map { it.id }
+                    .toSet(),
+            )
+            assertEquals(originalRows.map { it.last() }, after.map { it.last() })
+            assertEquals(before + 4, transferAuditCount())
+        }
+
+    @Test
     fun standardReimportRemovesAndRestoresOnlyTheRowAffectedByASkipRule() =
         runDbTest {
             val (id, strategy) = stage(includeUnchangedRow = true)
@@ -98,13 +140,8 @@ class CsvReadOnlyPreviewTest : DbTest() {
             val neighbor = staged[1]
             val original = repositories.transactionRepository.getTransactionsByIds(listOf(removedId)).getValue(removedId)
             editDescription(original, "My description")
-            val skip =
-                StrategyRule(
-                    conditions = listOf(Condition("Description", ConditionOp.EQUALS, "Old description")),
-                    actions = listOf(RuleAction.Skip),
-                )
             val engine = repositories.importEngine
-            engine.updateCsvStrategy(strategy.copy(config = strategy.config.copy(rules = listOf(skip))))
+            engine.updateCsvStrategy(skipFirst(strategy))
             val reimports = repositories.reimports()
             val before = transferAuditCount()
 
@@ -270,16 +307,28 @@ class CsvReadOnlyPreviewTest : DbTest() {
         )
     }
 
-    private suspend fun stage(includeUnchangedRow: Boolean = false): Fixture {
+    private fun skipFirst(strategy: CsvImportStrategy): CsvImportStrategy {
+        val skip =
+            StrategyRule(
+                conditions = listOf(Condition("Description", ConditionOp.EQUALS, "Old description")),
+                actions = listOf(RuleAction.Skip),
+            )
+        return strategy.copy(config = strategy.config.copy(rules = listOf(skip)))
+    }
+
+    private suspend fun stage(
+        includeUnchangedRow: Boolean = false,
+        suffix: String = "",
+    ): Fixture {
         val db = repositories
         val engine = db.importEngine
-        val bank = engine.createAccount(Account(id = AccountId(0), name = "Bank", openingDate = now), Source.Manual)
-        val shop = engine.createAccount(Account(id = AccountId(0), name = "Shop", openingDate = now), Source.Manual)
+        val bank = engine.createAccount(Account(id = AccountId(0), name = "Bank$suffix", openingDate = now), Source.Manual)
+        val shop = engine.createAccount(Account(id = AccountId(0), name = "Shop$suffix", openingDate = now), Source.Manual)
         db.currencyRepository.upsertCurrencyByCode("GBP", "Pound sterling")
         val strategy =
             CsvImportStrategy(
                 id = CsvImportStrategyId(Uuid.random()),
-                name = "Independent transfers",
+                name = "Independent transfers$suffix",
                 config =
                     CsvStrategyConfig(
                         identificationColumns = headings.toSet(),
@@ -303,7 +352,7 @@ class CsvReadOnlyPreviewTest : DbTest() {
         db.csvImportStrategyRepository.createStrategy(strategy, Source.Manual)
         val id =
             db.csvImportRepository.createImport(
-                fileName = "independent.csv",
+                fileName = "independent$suffix.csv",
                 headers = headings,
                 rows =
                     buildList {
@@ -312,7 +361,7 @@ class CsvReadOnlyPreviewTest : DbTest() {
                             add(listOf("2026-01-02", "11:00:00", "GBP", "5.00", "5.00", "Unchanged", "Unchanged"))
                         }
                     },
-                fileChecksum = "independent",
+                fileChecksum = "independent$suffix",
                 fileLastModified = now,
             )
         assertNotNull(

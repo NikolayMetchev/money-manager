@@ -260,16 +260,17 @@ class ImportEngineImpl(
     private suspend fun currentPlanVersion(): ImportPlanVersion? =
         observationRepository?.let { ImportPlanVersion(writes.value, it.changeToken()) }
 
-    override suspend fun plan(request: CsvTransferSync): PreparedImport? =
+    override suspend fun plan(requests: List<CsvTransferSync>): PreparedImport? =
         commitLock.withLock {
+            val version = requests.firstOrNull()?.version ?: return@withLock null
             val observations = observationRepository ?: return@withLock null
             val overrides = personOverrideRepository ?: return@withLock null
             val records = importRecordRepository ?: return@withLock null
             val relationships = relationshipRepository ?: return@withLock null
-            if (currentPlanVersion() != request.version) throw StaleImportPlanException()
-            require(request.application.id == request.id && request.records.id == request.id)
+            if (currentPlanVersion() != version) throw StaleImportPlanException()
+            require(requests.map { it.id }.distinct().size == requests.size)
             val materializer = ObservationMaterializationPlanner(observations, overrides, relationships, placeholderTypeId(), records)
-            val changes =
+            val planner =
                 CsvTransferSyncPlanner(
                     observations,
                     records,
@@ -278,42 +279,50 @@ class ImportEngineImpl(
                     relationships,
                     overrides,
                     materializer,
-                ).plan(request) ?: return@withLock null
-            if (currentPlanVersion() != request.version) throw StaleImportPlanException()
-            CsvPreparedImport(this, request, changes)
+                )
+            val accounts = mutableSetOf<AccountId>()
+            var allocatedLocals = 0
+            val changes =
+                requests.map { request ->
+                    require(request.version == version && request.application.id == request.id && request.records.id == request.id)
+                    val change = planner.plan(request, allocatedLocals) ?: return@withLock null
+                    // Even two files with no existing bookings may produce transactions that can match each other.
+                    if (change.accounts.any { !accounts.add(it) }) return@withLock null
+                    allocatedLocals += change.materialization.newTransactions.size
+                    request to change
+                }
+            if (currentPlanVersion() != version) throw StaleImportPlanException()
+            CsvPreparedImport(this, version, changes)
         }
 
     override suspend fun apply(plan: PreparedImport): ImportPlan? {
         require(plan is CsvPreparedImport && plan.engine === this)
         return commitLock.withLock {
             editGate.ensureWritable()
-            if (currentPlanVersion() != plan.request.version) throw StaleImportPlanException()
-            val changes = plan.changes.materialization
-            if (changes.observations.isEmpty() && changes.rows.isEmpty() && plan.changes.hashes.isEmpty() &&
-                plan.changes.statuses.isEmpty()
-            ) {
-                return@withLock null
-            }
-            val application = plan.request.application
+            if (currentPlanVersion() != plan.version) throw StaleImportPlanException()
+            if (plan.changedFiles == 0) return@withLock null
             try {
                 val ids =
                     checkNotNull(observationRepository).applyObservationChanges(
-                        newTransactions = changes.newTransactions.values,
-                        observations = changes.observations,
-                        rows = changes.rows,
+                        newTransactions = plan.changed.flatMap { (_, change) -> change.materialization.newTransactions.values },
+                        observations = plan.changed.flatMap { (_, change) -> change.materialization.observations },
+                        rows = plan.changed.flatMap { (_, change) -> change.materialization.rows },
                         csv =
-                            CsvObservationCommit(
-                                plan.request.version.database,
-                                application.id,
-                                plan.request.fileChecksum,
-                                application.strategyId,
-                                application.strategyName,
-                                application.appliedAt,
-                                application.accountId,
-                                application.currencyId,
-                                plan.changes.hashes,
-                                plan.changes.statuses,
-                            ),
+                            plan.changed.map { (request, change) ->
+                                val application = request.application
+                                CsvObservationCommit(
+                                    plan.version.database,
+                                    application.id,
+                                    request.fileChecksum,
+                                    application.strategyId,
+                                    application.strategyName,
+                                    application.appliedAt,
+                                    application.accountId,
+                                    application.currencyId,
+                                    change.hashes,
+                                    change.statuses,
+                                )
+                            },
                     )
                 plan.preview.copy(created = plan.preview.created.map { it.copy(id = ids.getValue(it.id)) })
             } catch (_: StaleObservationCommitException) {
@@ -326,10 +335,13 @@ class ImportEngineImpl(
 
     private class CsvPreparedImport(
         val engine: ImportEngineImpl,
-        val request: CsvTransferSync,
-        val changes: CsvTransferChanges,
+        val version: ImportPlanVersion,
+        entries: List<Pair<CsvTransferSync, CsvTransferChanges>>,
     ) : PreparedImport {
-        override val preview get() = changes.preview
+        val changed = entries.filter { (_, changes) -> changes.hasWrites }
+        override val preview = entries.fold(ImportPlan()) { combined, (_, changes) -> combined + changes.preview }
+        override val files = entries.size
+        override val changedFiles = changed.size
     }
 
     override suspend fun import(

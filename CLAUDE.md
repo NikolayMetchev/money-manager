@@ -591,9 +591,9 @@ of every card whose owner changed (a token can match other cards too, `7721` in 
 re-import dialog's progress indicators. A card an account
 matches only by a pattern is changed in the account editor.
 
-**Re-import keeps transaction ids.** For a single CSV with independent transfers, `Reimports` uses the same read-only
-plan for preview and direct re-import. The engine updates changed transfers in place and applies skip-rule changes as
-individual inserts or deletes. Other staged files
+**Re-import keeps transaction ids.** For CSVs with independent transfers on disjoint accounts, `Reimports` uses the
+same read-only plan for preview and direct re-import. The engine updates changed transfers in place and applies
+skip-rule changes as individual inserts or deletes in one commit. Other staged files
 (CSV, QIF, OFX, Excel or PDF) and API sessions (`executeApiReimport`) use the shared re-run
 (`app/importengineapi`): it reserves the ids of every transfer and trade the source created (`CsvImportMutation.Reserve`,
 `ApiSessionMutation.Reserve`), resets its records, runs the normal import again and settles (`ImportBatch.settle`): each
