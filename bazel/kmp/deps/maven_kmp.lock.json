@@ -139,14 +139,14 @@
       "androidx.annotation:annotation-jvm": "1.11.0",
       "androidx.collection:collection": "1.7.0",
       "androidx.concurrent:concurrent-futures": "1.3.0",
-      "androidx.lifecycle:lifecycle-common": "2.11.0",
-      "androidx.lifecycle:lifecycle-common-jvm": "2.11.0",
-      "androidx.lifecycle:lifecycle-runtime": "2.11.0",
-      "androidx.lifecycle:lifecycle-runtime-android": "2.11.0",
-      "androidx.lifecycle:lifecycle-runtime-compose": "2.11.0",
-      "androidx.lifecycle:lifecycle-runtime-compose-android": "2.11.0",
-      "androidx.lifecycle:lifecycle-runtime-ktx": "2.11.0",
-      "androidx.lifecycle:lifecycle-runtime-ktx-android": "2.11.0",
+      "androidx.lifecycle:lifecycle-common": "2.11.1",
+      "androidx.lifecycle:lifecycle-common-jvm": "2.11.1",
+      "androidx.lifecycle:lifecycle-runtime": "2.11.1",
+      "androidx.lifecycle:lifecycle-runtime-android": "2.11.1",
+      "androidx.lifecycle:lifecycle-runtime-compose": "2.11.1",
+      "androidx.lifecycle:lifecycle-runtime-compose-android": "2.11.1",
+      "androidx.lifecycle:lifecycle-runtime-ktx": "2.11.1",
+      "androidx.lifecycle:lifecycle-runtime-ktx-android": "2.11.1",
       "androidx.navigationevent:navigationevent": "1.2.0",
       "androidx.navigationevent:navigationevent-compose": "1.2.0",
       "androidx.savedstate:savedstate": "1.5.0",
@@ -6175,11 +6175,11 @@
     },
     "androidx.lifecycle:lifecycle-common": {
       "android": {
-        "version": "2.11.0",
+        "version": "2.11.1",
         "files": [
           {
-            "name": "lifecycle-common-jvm-2.11.0.jar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common-jvm/2.11.0/lifecycle-common-jvm-2.11.0.jar",
+            "name": "lifecycle-common-jvm-2.11.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common-jvm/2.11.1/lifecycle-common-jvm-2.11.1.jar",
             "sha256": "e6a66e67b9f63a0fb6344f165c1d872376e5fe6d235bffb138af45122cf452a9"
           }
         ],
@@ -6208,11 +6208,11 @@
         ]
       },
       "jvm": {
-        "version": "2.11.0",
+        "version": "2.11.1",
         "files": [
           {
-            "name": "lifecycle-common-jvm-2.11.0.jar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common-jvm/2.11.0/lifecycle-common-jvm-2.11.0.jar",
+            "name": "lifecycle-common-jvm-2.11.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common-jvm/2.11.1/lifecycle-common-jvm-2.11.1.jar",
             "sha256": "e6a66e67b9f63a0fb6344f165c1d872376e5fe6d235bffb138af45122cf452a9"
           }
         ],
@@ -6268,11 +6268,11 @@
         ]
       },
       "metadata": {
-        "version": "2.11.0",
+        "version": "2.11.1",
         "files": [
           {
-            "name": "lifecycle-common-metadata-2.11.0.jar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common/2.11.0/lifecycle-common-2.11.0.jar",
+            "name": "lifecycle-common-metadata-2.11.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common/2.11.1/lifecycle-common-2.11.1.jar",
             "sha256": "a9bd29ac86677987501ab7d023609734ae07a67de0b1390e158c1aa89eeb3eb2"
           }
         ],
@@ -6285,11 +6285,11 @@
         ]
       },
       "metadataWeb": {
-        "version": "2.11.0",
+        "version": "2.11.1",
         "files": [
           {
-            "name": "lifecycle-common-metadata-2.11.0.jar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common/2.11.0/lifecycle-common-2.11.0.jar",
+            "name": "lifecycle-common-metadata-2.11.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common/2.11.1/lifecycle-common-2.11.1.jar",
             "sha256": "a9bd29ac86677987501ab7d023609734ae07a67de0b1390e158c1aa89eeb3eb2"
           }
         ],
@@ -6336,11 +6336,11 @@
     },
     "androidx.lifecycle:lifecycle-common-java8": {
       "android": {
-        "version": "2.11.0",
+        "version": "2.11.1",
         "files": [
           {
-            "name": "lifecycle-common-java8-2.11.0.jar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common-java8/2.11.0/lifecycle-common-java8-2.11.0.jar",
+            "name": "lifecycle-common-java8-2.11.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common-java8/2.11.1/lifecycle-common-java8-2.11.1.jar",
             "sha256": "895e71679cd319db8140664d650af6695b0530f5896be9b8ecccd24cc4f6674f"
           }
         ],
@@ -6352,12 +6352,12 @@
     },
     "androidx.lifecycle:lifecycle-livedata-core": {
       "android": {
-        "version": "2.11.0",
+        "version": "2.11.1",
         "files": [
           {
-            "name": "lifecycle-livedata-core-2.11.0.aar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-livedata-core/2.11.0/lifecycle-livedata-core-2.11.0.aar",
-            "sha256": "39b26ef1e081fc88d7054ff1a63d0a5d71876373c33a711ab789c8228d025ad1"
+            "name": "lifecycle-livedata-core-2.11.1.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-livedata-core/2.11.1/lifecycle-livedata-core-2.11.1.aar",
+            "sha256": "ca91fb3d46a7ba74eceeba816abfd28e885aa2121daa74851f021e1600c06d0e"
           }
         ],
         "deps": [
@@ -6372,12 +6372,12 @@
     },
     "androidx.lifecycle:lifecycle-process": {
       "android": {
-        "version": "2.11.0",
+        "version": "2.11.1",
         "files": [
           {
-            "name": "lifecycle-process-2.11.0.aar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-process/2.11.0/lifecycle-process-2.11.0.aar",
-            "sha256": "9743f0c7baf27d34497b7e9a1cd497d8260251b03124507963abfaad66c3f552"
+            "name": "lifecycle-process-2.11.1.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-process/2.11.1/lifecycle-process-2.11.1.aar",
+            "sha256": "b5a3dcc64a185badb88784c16a1c9b229529410cc8776cec3c4b624a4189135a"
           }
         ],
         "deps": [
@@ -6389,12 +6389,12 @@
     },
     "androidx.lifecycle:lifecycle-runtime": {
       "android": {
-        "version": "2.11.0",
+        "version": "2.11.1",
         "files": [
           {
             "name": "lifecycle-runtime.aar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-android/2.11.0/lifecycle-runtime-android-2.11.0.aar",
-            "sha256": "8711865f8d3603bc05decc03bb42aab2faa8d8bc55b3b12a0a8e516b562b60ca"
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-android/2.11.1/lifecycle-runtime-android-2.11.1.aar",
+            "sha256": "f2d47c2a332fe66a0119958c5d7e4ad8e8f9c1da0672adf00bbd728791c91481"
           }
         ],
         "deps": [
@@ -6430,12 +6430,12 @@
         ]
       },
       "jvm": {
-        "version": "2.11.0",
+        "version": "2.11.1",
         "files": [
           {
-            "name": "lifecycle-runtime-desktop-2.11.0.jar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-desktop/2.11.0/lifecycle-runtime-desktop-2.11.0.jar",
-            "sha256": "09f75a4a8d763cee5d6af36f422139a0205d3f6df2e2c5288cae42836f0b36ea"
+            "name": "lifecycle-runtime-desktop-2.11.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-desktop/2.11.1/lifecycle-runtime-desktop-2.11.1.jar",
+            "sha256": "2cf09be5c7da8dc96740e0717fb283263020615bf27fa1608c0196fc11db3f2f"
           }
         ],
         "deps": [
@@ -6490,12 +6490,12 @@
         ]
       },
       "metadata": {
-        "version": "2.11.0",
+        "version": "2.11.1",
         "files": [
           {
-            "name": "lifecycle-runtime-metadata-2.11.0.jar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime/2.11.0/lifecycle-runtime-2.11.0.jar",
-            "sha256": "7f248525126dc0ba56e3b0daa254a9d2c9d66ce5d2f7ba74a81f862920601e93"
+            "name": "lifecycle-runtime-metadata-2.11.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime/2.11.1/lifecycle-runtime-2.11.1.jar",
+            "sha256": "58bede0de6cda6c8b93f18b15ceb9973d4b7536aa67e8b3a9ebdb4f8b99eb22b"
           }
         ],
         "deps": [
@@ -6508,12 +6508,12 @@
         ]
       },
       "metadataWeb": {
-        "version": "2.11.0",
+        "version": "2.11.1",
         "files": [
           {
-            "name": "lifecycle-runtime-metadata-2.11.0.jar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime/2.11.0/lifecycle-runtime-2.11.0.jar",
-            "sha256": "7f248525126dc0ba56e3b0daa254a9d2c9d66ce5d2f7ba74a81f862920601e93"
+            "name": "lifecycle-runtime-metadata-2.11.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime/2.11.1/lifecycle-runtime-2.11.1.jar",
+            "sha256": "58bede0de6cda6c8b93f18b15ceb9973d4b7536aa67e8b3a9ebdb4f8b99eb22b"
           }
         ],
         "deps": [
@@ -6559,12 +6559,12 @@
     },
     "androidx.lifecycle:lifecycle-runtime-compose": {
       "android": {
-        "version": "2.11.0",
+        "version": "2.11.1",
         "files": [
           {
             "name": "lifecycle-runtime-compose.aar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-compose-android/2.11.0/lifecycle-runtime-compose-android-2.11.0.aar",
-            "sha256": "7b31489e6e162143c481f14e1ae5a4dc089f8ec58e65976a0502b910c641987f"
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-compose-android/2.11.1/lifecycle-runtime-compose-android-2.11.1.aar",
+            "sha256": "74ba4d662557b0d88d32301f63b1e995c9d1b7d9e48dd72d1476c1d252b2d944"
           }
         ],
         "deps": [
@@ -6591,11 +6591,11 @@
         ]
       },
       "jvm": {
-        "version": "2.11.0",
+        "version": "2.11.1",
         "files": [
           {
-            "name": "lifecycle-runtime-compose-desktop-2.11.0.jar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-compose-desktop/2.11.0/lifecycle-runtime-compose-desktop-2.11.0.jar",
+            "name": "lifecycle-runtime-compose-desktop-2.11.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-compose-desktop/2.11.1/lifecycle-runtime-compose-desktop-2.11.1.jar",
             "sha256": "d5336753ea4d5881ccfb8b0613e034eb241f0d8b4349536df1cd0ec86cf63664"
           }
         ],
@@ -6651,11 +6651,11 @@
         ]
       },
       "metadata": {
-        "version": "2.11.0",
+        "version": "2.11.1",
         "files": [
           {
-            "name": "lifecycle-runtime-compose-metadata-2.11.0.jar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-compose/2.11.0/lifecycle-runtime-compose-2.11.0.jar",
+            "name": "lifecycle-runtime-compose-metadata-2.11.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-compose/2.11.1/lifecycle-runtime-compose-2.11.1.jar",
             "sha256": "045938bff680337cff50481caf7d96431ef1ce9f2f38e164791003923b880cea"
           }
         ],
@@ -6669,11 +6669,11 @@
         ]
       },
       "metadataWeb": {
-        "version": "2.11.0",
+        "version": "2.11.1",
         "files": [
           {
-            "name": "lifecycle-runtime-compose-metadata-2.11.0.jar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-compose/2.11.0/lifecycle-runtime-compose-2.11.0.jar",
+            "name": "lifecycle-runtime-compose-metadata-2.11.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-compose/2.11.1/lifecycle-runtime-compose-2.11.1.jar",
             "sha256": "045938bff680337cff50481caf7d96431ef1ce9f2f38e164791003923b880cea"
           }
         ],
@@ -6719,12 +6719,12 @@
     },
     "androidx.lifecycle:lifecycle-runtime-ktx": {
       "android": {
-        "version": "2.11.0",
+        "version": "2.11.1",
         "files": [
           {
             "name": "lifecycle-runtime-ktx.aar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-ktx-android/2.11.0/lifecycle-runtime-ktx-android-2.11.0.aar",
-            "sha256": "1fead96607f8b4ebd2bc5840c6fcf08b09fc47ceb1665e4b381dce80b19f32a0"
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-ktx-android/2.11.1/lifecycle-runtime-ktx-android-2.11.1.aar",
+            "sha256": "e455fb2d40292c6050d33fbfc5d7575487f957e17ddbbe38aa12f58088ce315a"
           }
         ],
         "deps": [
@@ -6736,12 +6736,12 @@
     },
     "androidx.lifecycle:lifecycle-viewmodel": {
       "android": {
-        "version": "2.11.0",
+        "version": "2.11.1",
         "files": [
           {
             "name": "lifecycle-viewmodel.aar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-android/2.11.0/lifecycle-viewmodel-android-2.11.0.aar",
-            "sha256": "509aa5c0711e61a1571024b4f8431dc9aa20960d23cbadb01f21a33fd864352a"
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-android/2.11.1/lifecycle-viewmodel-android-2.11.1.aar",
+            "sha256": "5305020bb0eb1944014407ec16b1c056eba196baa5a4693c05b2267d32e96331"
           }
         ],
         "deps": [
@@ -6773,11 +6773,11 @@
         ]
       },
       "jvm": {
-        "version": "2.11.0",
+        "version": "2.11.1",
         "files": [
           {
-            "name": "lifecycle-viewmodel-desktop-2.11.0.jar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-desktop/2.11.0/lifecycle-viewmodel-desktop-2.11.0.jar",
+            "name": "lifecycle-viewmodel-desktop-2.11.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-desktop/2.11.1/lifecycle-viewmodel-desktop-2.11.1.jar",
             "sha256": "175c349266ccbb6a2036615725b7066ee3f3319665c98af42206ab3a582a43c3"
           }
         ],
@@ -6790,11 +6790,11 @@
         ]
       },
       "metadata": {
-        "version": "2.11.0",
+        "version": "2.11.1",
         "files": [
           {
-            "name": "lifecycle-viewmodel-metadata-2.11.0.jar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel/2.11.0/lifecycle-viewmodel-2.11.0.jar",
+            "name": "lifecycle-viewmodel-metadata-2.11.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel/2.11.1/lifecycle-viewmodel-2.11.1.jar",
             "sha256": "7cba4aa1ce8a69e5a54cdb76b2e6b6e5bd636d733b76b82d23130a436dbfa7f4"
           }
         ],
@@ -6808,11 +6808,11 @@
         ]
       },
       "metadataWeb": {
-        "version": "2.11.0",
+        "version": "2.11.1",
         "files": [
           {
-            "name": "lifecycle-viewmodel-metadata-2.11.0.jar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel/2.11.0/lifecycle-viewmodel-2.11.0.jar",
+            "name": "lifecycle-viewmodel-metadata-2.11.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel/2.11.1/lifecycle-viewmodel-2.11.1.jar",
             "sha256": "7cba4aa1ce8a69e5a54cdb76b2e6b6e5bd636d733b76b82d23130a436dbfa7f4"
           }
         ],
@@ -6868,11 +6868,11 @@
         ]
       },
       "jvm": {
-        "version": "2.11.0",
+        "version": "2.11.1",
         "files": [
           {
-            "name": "lifecycle-viewmodel-compose-desktop-2.11.0.jar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-compose-desktop/2.11.0/lifecycle-viewmodel-compose-desktop-2.11.0.jar",
+            "name": "lifecycle-viewmodel-compose-desktop-2.11.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-compose-desktop/2.11.1/lifecycle-viewmodel-compose-desktop-2.11.1.jar",
             "sha256": "1b4c58125c7b3693444f40c8ab76881d17fa74726860c24872a3dec3e0fad34b"
           }
         ],
@@ -6890,11 +6890,11 @@
         ]
       },
       "metadataWeb": {
-        "version": "2.11.0",
+        "version": "2.11.1",
         "files": [
           {
-            "name": "lifecycle-viewmodel-compose-metadata-2.11.0.jar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-compose/2.11.0/lifecycle-viewmodel-compose-2.11.0.jar",
+            "name": "lifecycle-viewmodel-compose-metadata-2.11.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-compose/2.11.1/lifecycle-viewmodel-compose-2.11.1.jar",
             "sha256": "b2b0e8629a53bcd9308b649c34fe113b9002f1ae852e9f7b9987314da39be924"
           }
         ],
@@ -6937,12 +6937,12 @@
     },
     "androidx.lifecycle:lifecycle-viewmodel-ktx": {
       "android": {
-        "version": "2.11.0",
+        "version": "2.11.1",
         "files": [
           {
-            "name": "lifecycle-viewmodel-ktx-2.11.0.aar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-ktx/2.11.0/lifecycle-viewmodel-ktx-2.11.0.aar",
-            "sha256": "230af6c866076d320d92c22c7c44bb52afca97f6892ddf987e2906ef2919998f"
+            "name": "lifecycle-viewmodel-ktx-2.11.1.aar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-ktx/2.11.1/lifecycle-viewmodel-ktx-2.11.1.aar",
+            "sha256": "9319f246bb273721a50cd03b50536cbb29f01694ce4df3c132787946dbb32070"
           }
         ],
         "deps": [
@@ -6953,12 +6953,12 @@
     },
     "androidx.lifecycle:lifecycle-viewmodel-savedstate": {
       "android": {
-        "version": "2.11.0",
+        "version": "2.11.1",
         "files": [
           {
             "name": "lifecycle-viewmodel-savedstate.aar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-savedstate-android/2.11.0/lifecycle-viewmodel-savedstate-android-2.11.0.aar",
-            "sha256": "1761707c1ddee002bd97e1a0889a5016f7cd6bd8e0b6b069bcba8b2523d63723"
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-savedstate-android/2.11.1/lifecycle-viewmodel-savedstate-android-2.11.1.aar",
+            "sha256": "0956b541392dbb4f05387b045829079433276c6fc221fc494e9cf4378cc95448"
           }
         ],
         "deps": [
@@ -6999,11 +6999,11 @@
         ]
       },
       "jvm": {
-        "version": "2.11.0",
+        "version": "2.11.1",
         "files": [
           {
-            "name": "lifecycle-viewmodel-savedstate-desktop-2.11.0.jar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-savedstate-desktop/2.11.0/lifecycle-viewmodel-savedstate-desktop-2.11.0.jar",
+            "name": "lifecycle-viewmodel-savedstate-desktop-2.11.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-savedstate-desktop/2.11.1/lifecycle-viewmodel-savedstate-desktop-2.11.1.jar",
             "sha256": "ca21720ce7f370cb21cabb5329b959eda624107ec06282e3bdc92582917b1d27"
           }
         ],
@@ -7020,11 +7020,11 @@
         ]
       },
       "metadata": {
-        "version": "2.11.0",
+        "version": "2.11.1",
         "files": [
           {
-            "name": "lifecycle-viewmodel-savedstate-metadata-2.11.0.jar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-savedstate/2.11.0/lifecycle-viewmodel-savedstate-2.11.0.jar",
+            "name": "lifecycle-viewmodel-savedstate-metadata-2.11.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-savedstate/2.11.1/lifecycle-viewmodel-savedstate-2.11.1.jar",
             "sha256": "eac96037ba6a2349828154d3d2c9c92ae0c94f377eb2eb93e99754f3a7f8e279"
           }
         ],
@@ -7042,11 +7042,11 @@
         ]
       },
       "metadataWeb": {
-        "version": "2.11.0",
+        "version": "2.11.1",
         "files": [
           {
-            "name": "lifecycle-viewmodel-savedstate-metadata-2.11.0.jar",
-            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-savedstate/2.11.0/lifecycle-viewmodel-savedstate-2.11.0.jar",
+            "name": "lifecycle-viewmodel-savedstate-metadata-2.11.1.jar",
+            "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-savedstate/2.11.1/lifecycle-viewmodel-savedstate-2.11.1.jar",
             "sha256": "eac96037ba6a2349828154d3d2c9c92ae0c94f377eb2eb93e99754f3a7f8e279"
           }
         ],
