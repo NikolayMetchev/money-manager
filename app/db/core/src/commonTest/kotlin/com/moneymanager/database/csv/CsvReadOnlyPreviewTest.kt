@@ -1,5 +1,6 @@
 package com.moneymanager.database.csv
 
+import app.cash.sqldelight.async.coroutines.awaitAsList
 import com.moneymanager.csvimporter.applyStagedCsv
 import com.moneymanager.database.di.createImportEngine
 import com.moneymanager.domain.model.Account
@@ -33,6 +34,8 @@ import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.importengineapi.updateCsvStrategy
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.planFile
+import com.moneymanager.test.database.read.testReads
+import com.moneymanager.test.database.reimportFile
 import com.moneymanager.test.database.reimports
 import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
@@ -47,6 +50,39 @@ import kotlin.uuid.Uuid
 class CsvReadOnlyPreviewTest : DbTest() {
     private val now = Instant.fromEpochMilliseconds(1_765_000_000_000)
     private val headings = listOf("Date", "Time", "Currency", "Amount", "Corrected", "Description", "Corrected description")
+
+    @Test
+    fun standardReimportUpdatesOnlyTheChangedTransfer() =
+        runDbTest {
+            val (id, strategy) = stage(includeUnchangedRow = true)
+            val staged = rows(id)
+            val correctedId = assertNotNull(staged[0].transferId)
+            val unchangedId = assertNotNull(staged[1].transferId)
+            val transfers = repositories.transactionRepository
+            val neighbor = transfers.getTransactionsByIds(listOf(unchangedId)).getValue(unchangedId)
+            repositories.importEngine.updateCsvStrategy(corrected(strategy))
+            val before = transferAuditCount()
+            val reimports = repositories.reimports()
+
+            val result = reimports.reimportFile(id)
+
+            assertEquals(1, result.filesImported)
+            assertEquals(0, result.transfersCreated)
+            val update = result.plan.updated.single()
+            assertEquals(correctedId, update.after.id)
+            assertEquals(staged, rows(id))
+            val after = transfers.getTransactionsByIds(listOf(correctedId, unchangedId))
+            val corrected = after.getValue(correctedId)
+            assertEquals(Money.fromDisplayValue("12.00", corrected.amount.asset), corrected.amount)
+            assertEquals(neighbor, after.getValue(unchangedId))
+            assertEquals(before + 1, transferAuditCount())
+
+            val version = repositories.importEngine.writeVersion.value
+            val repeated = reimports.reimportFile(id)
+            assertEquals(1, repeated.filesUnchanged)
+            assertEquals(version, repositories.importEngine.writeVersion.value)
+            assertEquals(before + 1, transferAuditCount())
+        }
 
     @Test
     fun previewIsReadOnlyAndApplyKeepsIdsAndOverrides() =
@@ -130,6 +166,13 @@ class CsvReadOnlyPreviewTest : DbTest() {
 
     private suspend fun rows(id: CsvImportId) = repositories.csvImportRepository.getImportRows(id, limit = 10, offset = 0)
 
+    private suspend fun transferAuditCount(): Long =
+        database.testReads.rowCountSelectQueries
+            .countAuditRowsByTable()
+            .awaitAsList()
+            .single { it.table_name == "transfer_audit" }
+            .row_count
+
     private suspend fun transfer(id: CsvImportId): Transfer =
         repositories.transactionRepository
             .getTransactionsByIds(listOf(assertNotNull(rows(id).single().transferId)))
@@ -172,7 +215,7 @@ class CsvReadOnlyPreviewTest : DbTest() {
         )
     }
 
-    private suspend fun stage(): Fixture {
+    private suspend fun stage(includeUnchangedRow: Boolean = false): Fixture {
         val db = repositories
         val engine = db.importEngine
         val bank = engine.createAccount(Account(id = AccountId(0), name = "Bank", openingDate = now), Source.Manual)
@@ -207,7 +250,13 @@ class CsvReadOnlyPreviewTest : DbTest() {
             db.csvImportRepository.createImport(
                 fileName = "independent.csv",
                 headers = headings,
-                rows = listOf(listOf("2026-01-01", "10:00:00", "GBP", "10.00", "12.00", "Old description", "New description")),
+                rows =
+                    buildList {
+                        add(listOf("2026-01-01", "10:00:00", "GBP", "10.00", "12.00", "Old description", "New description"))
+                        if (includeUnchangedRow) {
+                            add(listOf("2026-01-02", "11:00:00", "GBP", "5.00", "5.00", "Unchanged", "Unchanged"))
+                        }
+                    },
                 fileChecksum = "independent",
                 fileLastModified = now,
             )

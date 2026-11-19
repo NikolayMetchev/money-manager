@@ -88,11 +88,10 @@ data class ReimportAllPlan(
 
 /**
  * The one way to re-import staged files (CSV, QIF, OFX, Excel or PDF), one or many: [planAll] reads what they created and
- * [reimportAll] deletes it and runs their records through the normal import again, each with the strategy, account and
- * currency it was imported with. Other files are never re-run with them: what another file matched or reconciled
- * against is matched again by the engine (`MatchSync`), and the records keep their ids.
- * Each re-import holds [writeLock], the session's write lock, throughout: its delete, import, re-runs
- * and settle are separate writes, and an import between them would dedupe against a half-done state.
+ * [reimportAll] replays them with their strategy, account and currency. Independent transfers in a single CSV can
+ * update in place. Other runs reserve ids, delete bookings, replay the records and settle under the session's
+ * [writeLock], so another import cannot dedupe against a half-done run. The engine rematches other sources'
+ * observations without replaying their files.
  */
 @Suppress("LongParameterList", "TooManyFunctions")
 class Reimports(
@@ -178,94 +177,104 @@ class Reimports(
     ): PreparedImport? =
         writeLock.withLock {
             val picked = selection.files.singleOrNull() ?: return@withLock null
-            if (importFileKind(picked.originalFileName) != ImportFileKind.CSV) return@withLock null
-            val version = importEngine.planVersion() ?: return@withLock null
-            val file = reads.csvImportRepository.getImport(picked.id).first() ?: return@withLock null
-            if (file.lastAppliedAt == null || file.rowCount == 0) return@withLock null
-            val strategy = strategyFor(file, csvImportStrategyRepository.getAllStrategies().first()) ?: return@withLock null
-            val config = strategy.config
-            if (strategy.worksheetName != null || config.pdfLines != null || config.reconciliation != null ||
-                config.legGroups.isNotEmpty() || config.crossSourceReconcileWindow != null ||
-                config.placeholderReconcileWindow != null || config.duplicateDateTolerance != null ||
-                config.fundingAttributeMatch != null
-            ) {
-                return@withLock null
-            }
-
-            val saved = file.importedSettings
-            val effective = strategy.withCurrency((saved.currencyId ?: currencyId).takeIf { strategy.needsCurrencyOverride() })
-            val source = effectiveSourceFor(effective, saved.accountId ?: accountId)
-            val mappings = accountMappingRepository.getAllMappings().first()
-            val aliases = cryptoRepository.assetAliasMap()
-            val passThroughs = passThroughAccountRepository.getAll().first()
-            val matchers = AttributeAccountMatcher.registry(accountAttributeRepository.getAll().first())
-            val rows = reads.csvImportRepository.getImportRows(file.id, limit = file.rowCount, offset = 0)
-            if (rows.any { it.importStatus != ImportStatus.IMPORTED }) return@withLock null
-            val accounts = reads.accountRepository
-            val mapped =
-                buildCsvMapper(
-                    strategy = effective,
-                    columns = file.columns,
-                    accounts = accounts.accountsVisibleTo(effective),
-                    currencies = currencies(),
-                    accountMappings = mappings,
-                    sourceAccountOverride = source,
-                    passThroughAccounts = passThroughs,
-                    historicalAccountNames = accounts.getPreviousAccountNames(),
-                    cryptoAssets = cryptoRepository.getAllCryptoAssets().first(),
-                    attributeAccountMatchers = matchers,
-                    assetAliases = aliases,
-                    fileName = file.originalFileName,
-                    accountOwnerNames = accounts.getAccountOwnerNames(),
-                ).prepareImport(rows)
-            if (mapped.newAccounts.isNotEmpty() || mapped.validTransfers.size != rows.size ||
-                mapped.validTransfers.any { !it.isIndependentBooking() }
-            ) {
-                return@withLock null
-            }
-            val inputsHash = stagedInputsHash(effective, source, mappings, aliases, matchers, passThroughs)
-            importEngine.plan(
-                CsvTransferSync(
-                    id = file.id,
-                    fileChecksum = file.fileChecksum,
-                    rows = mapped.validTransfers.associate { it.rowIndex to CsvTransferSyncRow(it.transfer, it.statementAccountId) },
-                    application =
-                        CsvImportMutation.RecordApplication(
-                            file.id,
-                            effective.id,
-                            effective.name,
-                            Clock.System.now(),
-                            source,
-                            (effective.config.fieldMappings[TransferField.CURRENCY] as? HardCodedCurrencyMapping)?.currencyId,
-                        ),
-                    records = recordRowsMutation(file, rows, inputsHash),
-                    version = version,
-                ),
-            )
+            planInPlace(picked, accountId, currencyId)
         }
 
-    suspend fun applyPreview(plan: PreparedImport): BulkReimportResult =
-        writeLock.withLock {
-            val applied = importEngine.apply(plan)
-            if (applied) maintenance.refreshMaterializedViews()
-            BulkReimportResult(
-                filesImported = if (applied) 1 else 0,
-                filesUnchanged = if (applied) 0 else 1,
-                transfersCreated = 0,
-                duplicatesSkipped = 0,
-                filesSkippedNoStrategy = 0,
-                filesFailed = 0,
-                plan = plan.preview,
-            )
+    private suspend fun planInPlace(
+        picked: CsvImport,
+        accountId: AccountId?,
+        currencyId: CurrencyId?,
+        plannedStrategy: CsvImportStrategy? = null,
+    ): PreparedImport? {
+        if (importFileKind(picked.originalFileName) != ImportFileKind.CSV) return null
+        val version = importEngine.planVersion() ?: return null
+        val file = reads.csvImportRepository.getImport(picked.id).first() ?: return null
+        if (file.lastAppliedAt == null || file.rowCount == 0) return null
+        val strategy = plannedStrategy ?: strategyFor(file, csvImportStrategyRepository.getAllStrategies().first()) ?: return null
+        val config = strategy.config
+        if (strategy.worksheetName != null || config.pdfLines != null || config.reconciliation != null ||
+            config.legGroups.isNotEmpty() || config.crossSourceReconcileWindow != null ||
+            config.placeholderReconcileWindow != null || config.duplicateDateTolerance != null ||
+            config.fundingAttributeMatch != null
+        ) {
+            return null
         }
+
+        val saved = file.importedSettings
+        val effective = strategy.withCurrency((saved.currencyId ?: currencyId).takeIf { strategy.needsCurrencyOverride() })
+        val source = effectiveSourceFor(effective, saved.accountId ?: accountId)
+        val mappings = accountMappingRepository.getAllMappings().first()
+        val aliases = cryptoRepository.assetAliasMap()
+        val passThroughs = passThroughAccountRepository.getAll().first()
+        val matchers = AttributeAccountMatcher.registry(accountAttributeRepository.getAll().first())
+        val rows = reads.csvImportRepository.getImportRows(file.id, limit = file.rowCount, offset = 0)
+        if (rows.any { it.importStatus != ImportStatus.IMPORTED }) return null
+        val accounts = reads.accountRepository
+        val mapped =
+            buildCsvMapper(
+                strategy = effective,
+                columns = file.columns,
+                accounts = accounts.accountsVisibleTo(effective),
+                currencies = currencies(),
+                accountMappings = mappings,
+                sourceAccountOverride = source,
+                passThroughAccounts = passThroughs,
+                historicalAccountNames = accounts.getPreviousAccountNames(),
+                cryptoAssets = cryptoRepository.getAllCryptoAssets().first(),
+                attributeAccountMatchers = matchers,
+                assetAliases = aliases,
+                fileName = file.originalFileName,
+                accountOwnerNames = accounts.getAccountOwnerNames(),
+            ).prepareImport(rows)
+        if (mapped.newAccounts.isNotEmpty() || mapped.validTransfers.size != rows.size ||
+            mapped.validTransfers.any { !it.isIndependentBooking() }
+        ) {
+            return null
+        }
+        val inputsHash = stagedInputsHash(effective, source, mappings, aliases, matchers, passThroughs)
+        return importEngine.plan(
+            CsvTransferSync(
+                id = file.id,
+                fileChecksum = file.fileChecksum,
+                rows = mapped.validTransfers.associate { it.rowIndex to CsvTransferSyncRow(it.transfer, it.statementAccountId) },
+                application =
+                    CsvImportMutation.RecordApplication(
+                        file.id,
+                        effective.id,
+                        effective.name,
+                        Clock.System.now(),
+                        source,
+                        (effective.config.fieldMappings[TransferField.CURRENCY] as? HardCodedCurrencyMapping)?.currencyId,
+                    ),
+                records = recordRowsMutation(file, rows, inputsHash),
+                version = version,
+            ),
+        )
+    }
+
+    suspend fun applyPreview(plan: PreparedImport): BulkReimportResult = writeLock.withLock { applyInPlace(plan) }
+
+    private suspend fun applyInPlace(plan: PreparedImport): BulkReimportResult {
+        val applied = importEngine.apply(plan)
+        // A change in the input fingerprint can be committed without changing a booked transfer.
+        if (applied && plan.preview.updated.isNotEmpty()) maintenance.refreshMaterializedViews()
+        return BulkReimportResult(
+            filesImported = if (applied) 1 else 0,
+            filesUnchanged = if (applied) 0 else 1,
+            transfersCreated = 0,
+            duplicatesSkipped = 0,
+            filesSkippedNoStrategy = 0,
+            filesFailed = 0,
+            plan = plan.preview,
+        )
+    }
 
     /**
-     * Re-imports every file of [plan]: one batch deletes what they all created and resets their rows, then each
-     * file is imported again in the order it was first imported, as a fresh import of its rows, each row taking its
-     * old ids back, and finally the ids no row took back are released, the empty accounts deleted and the materialized views refreshed, once each.
+     * Re-imports every file of [plan]. A single eligible CSV updates in place. Otherwise one batch deletes what the
+     * files created and resets their rows, then replays them in their original import order. Each row can take its old
+     * ids back. The run releases unclaimed ids, deletes empty accounts and refreshes the materialized views.
      * [accountId] and [currencyId] are for the files whose last import didn't record them. Progress names each
-     * file by [fileLabel], and once [stopRequested] says yes no further file starts (see [runBulkReimport]): what
-     * those files created is already deleted, so their rows wait, reset, for their next import.
+     * file by [fileLabel], and once [stopRequested] says yes no further file starts (see [runBulkReimport]).
      */
     suspend fun reimportAll(
         plan: ReimportAllPlan,
@@ -330,6 +339,19 @@ class Reimports(
                 filesFailed = 0,
                 filesUnchanged = run.size,
             )
+        }
+        val single = plan.files.singleOrNull()?.takeIf { run.size == 1 }
+        val strategy = single?.let { plan.strategies[it.source] }
+        if (single != null && strategy != null) {
+            if (stopRequested()) return BulkReimportResult(0, 0, 0, 0, 0, filesNotStarted = 1)
+            val prepared = planInPlace(single, accountId, currencyId, strategy)
+            if (prepared != null) {
+                val label = fileLabel(single)
+                onProgress(Progress("Updating $label", fraction = 0f))
+                val result = applyInPlace(prepared)
+                onProgress(Progress("Re-imported $label", fraction = 1f))
+                return result
+            }
         }
         // Three phases, each filling the bar from empty: the one delete batch, then runBulkReimport's two (preparing
         // the files, re-importing them). The steps after the last file (settling, empty accounts, views) keep the

@@ -591,7 +591,9 @@ of every card whose owner changed (a token can match other cards too, `7721` in 
 re-import dialog's progress indicators. A card an account
 matches only by a pattern is changed in the account editor.
 
-**Re-import is a re-run that keeps ids.** Re-importing a staged file (CSV, QIF, OFX, Excel or PDF: `Reimports`, `app/csvimporter`) or an API session (`executeApiReimport`) goes through `executeSourceRerun`
+**Re-import keeps transaction ids.** For a single CSV with independent transfers, `Reimports` uses the same read-only
+plan for preview and direct re-import. The engine updates only changed transfers in place. Other staged files
+(CSV, QIF, OFX, Excel or PDF) and API sessions (`executeApiReimport`) use the shared re-run
 (`app/importengineapi`): it reserves the ids of every transfer and trade the source created (`CsvImportMutation.Reserve`,
 `ApiSessionMutation.Reserve`), resets its records, runs the normal import again and settles (`ImportBatch.settle`): each
 record takes its transactions' ids back, so hand edits (person overrides), hand-set trade attributes and hand-made
@@ -604,8 +606,8 @@ row run alone can claim the record its neighbour explains (two like £800 paymen
 what every file it was given created in one batch (`executeRerun`, over each `RerunFile`), imports each again in import
 order, then deletes empty accounts once; a file it can't run (strategy, account or currency gone) refuses the whole run
 before anything is deleted (`RerunBlockedException`). Stopping it leaves the files not yet started reset, waiting
-for their re-import. A transfer an API session created is only un-hidden. There is no separate
-re-import logic: no merges, no in-place updates, no detectors, no row-level re-runs.
+for their re-import. A transfer an API session created is only un-hidden. The shared re-run uses the normal importer
+over whole sources.
 ## Dependency Injection
 
 **Metro** provides compile-time DI. The graphs live in `app/di/core` (`AppComponent`,
