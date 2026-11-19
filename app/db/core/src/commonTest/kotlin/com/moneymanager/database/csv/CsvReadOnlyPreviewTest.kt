@@ -21,6 +21,7 @@ import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
+import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.rules.Condition
@@ -60,6 +61,38 @@ import kotlin.uuid.Uuid
 class CsvReadOnlyPreviewTest : DbTest() {
     private val now = Instant.fromEpochMilliseconds(1_765_000_000_000)
     private val headings = listOf("Date", "Time", "Currency", "Amount", "Corrected", "Description", "Corrected description")
+
+    @Test
+    fun reimportChangesTheDateAccountAndCurrencyUnderTheExistingId() =
+        runDbTest {
+            val (id, strategy) = stage()
+            val engine = repositories.importEngine
+            val original = transfer(id)
+            val target = engine.createAccount(Account(id = AccountId(0), name = "New destination", openingDate = now), Source.Manual)
+            repositories.currencyRepository.upsertCurrencyByCode("EUR", "Euro")
+            val euro = assertNotNull(repositories.currencyRepository.getCurrencyByCode("EUR").first())
+            val corrections =
+                mapOf(
+                    TransferField.TARGET_ACCOUNT to HardCodedAccountMapping(TransferField.TARGET_ACCOUNT, target),
+                    TransferField.CURRENCY to HardCodedCurrencyMapping(TransferField.CURRENCY, euro.id),
+                    TransferField.TIMEZONE to HardCodedTimezoneMapping(TransferField.TIMEZONE, "America/New_York"),
+                )
+            engine.updateCsvStrategy(
+                strategy.copy(config = strategy.config.copy(fieldMappings = strategy.config.fieldMappings + corrections)),
+            )
+            val before = transferAuditCount()
+
+            val result = repositories.reimports().reimportFile(id)
+
+            val after = transfer(id)
+            assertEquals(original.id, after.id)
+            assertEquals(target, after.targetAccountId)
+            assertEquals(Money.fromDisplayValue("10.00", euro), after.amount)
+            assertEquals(Instant.parse("2026-01-01T15:00:00Z"), after.timestamp)
+            val updated = result.plan.updated.single()
+            assertEquals(setOf(PlannedField.TIME, PlannedField.ACCOUNTS, PlannedField.AMOUNT), updated.fields.toSet())
+            assertEquals(before + 1, transferAuditCount())
+        }
 
     @Test
     fun reimportOfAReplacedFileOnlyInsertsTheNewRow() =
@@ -125,6 +158,30 @@ class CsvReadOnlyPreviewTest : DbTest() {
             val repeated = reimports.reimportFile(id)
             assertEquals(1, repeated.filesUnchanged)
             assertEquals(version, repositories.importEngine.writeVersion.value)
+            assertEquals(before + 1, transferAuditCount())
+        }
+
+    @Test
+    fun bulkReimportLeavesNonMatchingTransfersOnSharedAccountsAlone() =
+        runDbTest {
+            val first = stage()
+            val second = stage(suffix = "-shared", existingAccounts = first.bank to first.shop)
+            val original = transfer(first.id)
+            val neighbor = transfer(second.id)
+            val engine = repositories.importEngine
+            engine.updateCsvStrategy(corrected(first.strategy))
+            val reimports = repositories.reimports()
+            val files = listOf(first, second).map { assertNotNull(repositories.csvImportRepository.getImport(it.id).first()) }
+            val before = transferAuditCount()
+
+            val result = reimports.runPlan(reimports.planAll(files))
+
+            assertEquals(1, result.filesImported)
+            assertEquals(1, result.filesUnchanged)
+            val updated = result.plan.updated.single()
+            assertEquals(original.id, updated.after.id)
+            assertEquals(original.id, transfer(first.id).id)
+            assertEquals(neighbor, transfer(second.id))
             assertEquals(before + 1, transferAuditCount())
         }
 
@@ -356,11 +413,16 @@ class CsvReadOnlyPreviewTest : DbTest() {
     private suspend fun stage(
         includeUnchangedRow: Boolean = false,
         suffix: String = "",
+        existingAccounts: Pair<AccountId, AccountId>? = null,
     ): Fixture {
         val db = repositories
         val engine = db.importEngine
-        val bank = engine.createAccount(Account(id = AccountId(0), name = "Bank$suffix", openingDate = now), Source.Manual)
-        val shop = engine.createAccount(Account(id = AccountId(0), name = "Shop$suffix", openingDate = now), Source.Manual)
+        val bank =
+            existingAccounts?.first
+                ?: engine.createAccount(Account(id = AccountId(0), name = "Bank$suffix", openingDate = now), Source.Manual)
+        val shop =
+            existingAccounts?.second
+                ?: engine.createAccount(Account(id = AccountId(0), name = "Shop$suffix", openingDate = now), Source.Manual)
         db.currencyRepository.upsertCurrencyByCode("GBP", "Pound sterling")
         val strategy =
             CsvImportStrategy(
@@ -393,7 +455,11 @@ class CsvReadOnlyPreviewTest : DbTest() {
                 headers = headings,
                 rows =
                     buildList {
-                        add(listOf("2026-01-01", "10:00:00", "GBP", "10.00", "12.00", "Old description", "New description"))
+                        if (existingAccounts == null) {
+                            add(listOf("2026-01-01", "10:00:00", "GBP", "10.00", "12.00", "Old description", "New description"))
+                        } else {
+                            add(listOf("2026-02-15", "10:00:00", "GBP", "50.00", "50.00", "Other statement", "Other statement"))
+                        }
                         if (includeUnchangedRow) {
                             add(listOf("2026-01-02", "11:00:00", "GBP", "5.00", "5.00", "Unchanged", "Unchanged"))
                         }

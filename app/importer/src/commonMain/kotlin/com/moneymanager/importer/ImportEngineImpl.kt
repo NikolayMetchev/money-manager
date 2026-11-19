@@ -279,20 +279,35 @@ class ImportEngineImpl(
                     relationships,
                     overrides,
                     materializer,
+                    ::sourceTransferSnapshots,
                 )
-            val accounts = mutableSetOf<AccountId>()
+            val replacedBookings = requests.flatMapTo(mutableSetOf()) { csvImportRepository.getTransferIdsCreatedByImport(it.id) }
+            val earlierBookings = mutableListOf<Transfer>()
             var allocatedLocals = 0
             var allocatedRecords = 0
             val changes =
                 requests.map { request ->
                     require(request.version == version && request.application.id == request.id && request.records.id == request.id)
-                    val change = planner.plan(request, allocatedLocals, allocatedRecords) ?: return@withLock null
-                    // Even two files with no existing bookings may produce transactions that can match each other.
-                    if (change.accounts.any { !accounts.add(it) }) return@withLock null
+                    val change =
+                        planner.plan(request, allocatedLocals, allocatedRecords, replacedBookings, earlierBookings)
+                            ?: return@withLock null
                     allocatedLocals += change.materialization.newTransactions.size
                     allocatedRecords += change.newRecords.size
+                    request.rows.values.forEach { input ->
+                        earlierBookings += input.transfer.copy(id = TransferId(-earlierBookings.size.toLong() - 1))
+                    }
                     request to change
                 }
+            val matcher = matchSync() ?: return@withLock null
+            if (matcher.needsWrites(
+                    proposed = changes.flatMap { (_, change) -> change.materialization.observations },
+                    newRecords = changes.flatMap { (_, change) -> change.newRecords },
+                    recordHashes = changes.flatMap { (_, change) -> change.hashes.entries }.associate { it.toPair() },
+                    csvFamilies = requests.associate { it.id to MatchScopeLoader.csvFamily(it.application.strategyId.toString()) },
+                )
+            ) {
+                return@withLock null
+            }
             if (currentPlanVersion() != version) throw StaleImportPlanException()
             CsvPreparedImport(this, version, changes)
         }

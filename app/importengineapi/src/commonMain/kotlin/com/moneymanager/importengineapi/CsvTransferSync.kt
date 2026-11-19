@@ -12,6 +12,7 @@ data class CsvTransferSync(
     val application: CsvImportMutation.RecordApplication,
     val records: CsvImportMutation.RecordRows,
     val version: ImportPlanVersion,
+    val dedupePolicy: DedupePolicy,
 )
 
 data class CsvTransferSyncRow(

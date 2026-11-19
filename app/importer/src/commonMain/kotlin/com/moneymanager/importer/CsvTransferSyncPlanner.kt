@@ -1,7 +1,9 @@
 package com.moneymanager.importer
 
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.observation.ImportRecord
@@ -21,9 +23,11 @@ import com.moneymanager.domain.repository.ObservationReadRepository
 import com.moneymanager.domain.repository.PersonOverrideReadRepository
 import com.moneymanager.domain.repository.RelationshipReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
+import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.CsvTransferSync
 import com.moneymanager.importengineapi.CsvTransferSyncRow
 import com.moneymanager.importengineapi.ImportPlan
+import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalTransactionKey
 import com.moneymanager.importengineapi.MaterializationRequest
 import com.moneymanager.importengineapi.ObservationMutation
@@ -45,11 +49,14 @@ internal class CsvTransferSyncPlanner(
     private val relationships: RelationshipReadRepository,
     private val overrides: PersonOverrideReadRepository,
     private val materializer: ObservationMaterializationPlanner,
+    private val sourceSnapshots: suspend (List<Transfer>, List<ImportTransfer>, String?) -> List<Transfer>,
 ) {
     suspend fun plan(
         request: CsvTransferSync,
         allocatedLocals: Int,
         allocatedRecords: Int,
+        replacedBookings: Set<TransferId>,
+        earlierBookings: List<Transfer>,
     ): CsvTransferChanges? {
         val id = request.id
         val rows = request.rows
@@ -94,11 +101,32 @@ internal class CsvTransferSyncPlanner(
         if (stored.size != ids.size || stored.any { it.transactionId !in ids }) return null
         val byTransaction = stored.associateBy { it.transactionId }
         val accounts = proposedAccounts + current.values.flatMap { listOf(it.sourceAccountId, it.targetAccountId) }
-        // The planner must account for every candidate that could match the old or new bookings.
-        if (observations.getObservationsOnAccounts(accounts).map { it.id }.toSet() != stored.map { it.id }.toSet() ||
-            accounts.any { account -> transfers.getTransactionsByAccount(account).first().any { it.id !in ids } }
-        ) {
-            return null
+        if (observations.getObservationsOfTransactions(ids).size != stored.size) return null
+        val outside =
+            accounts
+                .flatMap { account -> transfers.getTransactionsByAccount(account).first() }
+                .distinctBy { it.id }
+                .filter { it.id !in replacedBookings }
+        // Before the final observation match, the normal importer can deduplicate against an earlier file.
+        // Only use this plan when replay would give each row its own preliminary booking.
+        if (outside.isNotEmpty() || earlierBookings.isNotEmpty()) {
+            val intents =
+                rows.values.map { input ->
+                    val row = input.transfer
+                    ImportTransfer(
+                        source = Source.Csv(id),
+                        fromAccount = AccountRef.Existing(row.sourceAccountId),
+                        toAccount = AccountRef.Existing(row.targetAccountId),
+                        timestamp = row.timestamp,
+                        description = row.description,
+                        amount = row.amount,
+                    )
+                }
+            val competing =
+                (sourceSnapshots(outside, intents, request.application.strategyId.toString()) + earlierBookings).map { transfer ->
+                    ExistingTransferInfo(transfer.id, transfer, transfer.attributes.associate { it.attributeType.id to it.value })
+                }
+            if (ImportDeduper(request.dedupePolicy, competing).classify(intents).any { it.status != ImportStatus.IMPORTED }) return null
         }
         if (proposed.values
                 .map { it.copy(description = "") }
@@ -127,17 +155,11 @@ internal class CsvTransferSyncPlanner(
                         else -> null
                     }
                 if (booking != null) {
-                    val previous = booking.content.values as? ObservedValues.Transfer ?: return null
-                    if (previous.copy(amount = values.amount, description = values.description) != values ||
-                        ownEnd != booking.content.facts.ownEnd
-                    ) {
-                        return null
-                    }
                     ObservationMutation.Upsert(
                         owner,
                         ObservationSlot.MAIN,
                         ObservationTransaction.Existing(booking.transactionId),
-                        booking.content.copy(values = values),
+                        booking.content.copy(values = values, facts = booking.content.facts.copy(ownEnd = ownEnd)),
                     )
                 } else {
                     val key = LocalTransactionKey(index.toString())
@@ -155,6 +177,7 @@ internal class CsvTransferSyncPlanner(
         val created = mutableListOf<PlannedTransaction>()
         val updated = mutableListOf<PlannedUpdate>()
         val removed = mutableListOf<PlannedTransaction>()
+        val indexByBooking = bookings.entries.associate { (index, booking) -> booking to index }
         val writes =
             changes.rows.map { write ->
                 val transferId = TransferId(write.transactionId)
@@ -170,7 +193,11 @@ internal class CsvTransferSyncPlanner(
                     is MaterializedWrite.Update -> {
                         val before = current.getValue(transferId)
                         val after = write.after.values as ObservedValues.Transfer
-                        if (before.amount.asset.id.id != after.assetId.id) return null
+                        val rowIndex = indexByBooking.getValue(transferId)
+                        val input = rows.getValue(rowIndex)
+                        val asset =
+                            listOf(before.amount.asset, input.transfer.amount.asset).firstOrNull { it.id.id == after.assetId.id }
+                                ?: return null
                         val update =
                             PlannedUpdate(
                                 before = before.planned(),
@@ -183,13 +210,13 @@ internal class CsvTransferSyncPlanner(
                                             PlannedLeg(
                                                 after.sourceAccountId,
                                                 after.targetAccountId,
-                                                before.amount.copy(amount = after.amount),
+                                                Money(after.amount, asset),
                                             ),
                                         ),
                                     ),
                             )
                         if (update.fields.isNotEmpty()) updated += update
-                        write
+                        write.copy(source = Source.Csv(id, rowIndex, input.statementAccount))
                     }
 
                     is MaterializedWrite.Delete -> {
@@ -220,7 +247,6 @@ internal class CsvTransferSyncPlanner(
                     if (record.contentHash == hash) null else record.id to hash
                 }.toMap(),
             statuses,
-            accounts,
             newRecords,
         )
     }
@@ -244,7 +270,6 @@ internal data class CsvTransferChanges(
     val preview: ImportPlan,
     val hashes: Map<ImportRecordId, String>,
     val statuses: Map<Long, ImportStatus>,
-    val accounts: Set<AccountId>,
     val newRecords: List<ImportRecord>,
 ) {
     val hasWrites: Boolean

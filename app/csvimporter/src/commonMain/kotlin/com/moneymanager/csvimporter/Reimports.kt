@@ -31,6 +31,7 @@ import com.moneymanager.importengineapi.PreparedImport
 import com.moneymanager.importengineapi.RerunBlockedException
 import com.moneymanager.importengineapi.RerunFile
 import com.moneymanager.importengineapi.RerunReads
+import com.moneymanager.importengineapi.dedupePolicy
 import com.moneymanager.importengineapi.executeRerun
 import com.moneymanager.tasks.PhasedProgress
 import com.moneymanager.tasks.Progress
@@ -92,8 +93,8 @@ data class ReimportAllPlan(
 
 /**
  * The one way to re-import staged files (CSV, QIF, OFX, Excel or PDF), one or many: [planAll] reads what they created and
- * [reimportAll] replays them with their strategy, account and currency. CSVs with independent transfers on disjoint
- * accounts can update in place. Other runs reserve ids, delete bookings, replay the records and settle under the session's
+ * [reimportAll] replays them with their strategy, account and currency. CSVs with independent transfers can
+ * update in place. Other runs reserve ids, delete bookings, replay the records and settle under the session's
  * [writeLock], so another import cannot dedupe against a half-done run. The engine rematches other sources'
  * observations without replaying their files.
  */
@@ -267,6 +268,7 @@ class Reimports(
                 ),
             records = recordRowsMutation(file, rows, inputsHash),
             version = version,
+            dedupePolicy = effective.dedupePolicy(unidentifiedCounterpartyTypeId = null),
         )
     }
 
@@ -293,7 +295,7 @@ class Reimports(
     }
 
     /**
-     * Re-imports every file of [plan]. Eligible CSVs on disjoint accounts update in one commit. Otherwise one batch deletes what the
+     * Re-imports every file of [plan]. Eligible CSVs update in one commit. Otherwise one batch deletes what the
      * files created and resets their rows, then replays them in their original import order. Each row can take its old
      * ids back. The run releases unclaimed ids, deletes empty accounts and refreshes the materialized views.
      * [accountId] and [currencyId] are for the files whose last import didn't record them. Progress names each
