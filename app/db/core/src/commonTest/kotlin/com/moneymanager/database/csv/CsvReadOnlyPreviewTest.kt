@@ -21,6 +21,10 @@ import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.rules.Condition
+import com.moneymanager.domain.model.rules.ConditionOp
+import com.moneymanager.domain.model.rules.RuleAction
+import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.EditGate
@@ -43,6 +47,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -82,6 +87,56 @@ class CsvReadOnlyPreviewTest : DbTest() {
             assertEquals(1, repeated.filesUnchanged)
             assertEquals(version, repositories.importEngine.writeVersion.value)
             assertEquals(before + 1, transferAuditCount())
+        }
+
+    @Test
+    fun standardReimportRemovesAndRestoresOnlyTheRowAffectedByASkipRule() =
+        runDbTest {
+            val (id, strategy) = stage(includeUnchangedRow = true)
+            val staged = rows(id)
+            val removedId = assertNotNull(staged[0].transferId)
+            val neighbor = staged[1]
+            val original = repositories.transactionRepository.getTransactionsByIds(listOf(removedId)).getValue(removedId)
+            editDescription(original, "My description")
+            val skip =
+                StrategyRule(
+                    conditions = listOf(Condition("Description", ConditionOp.EQUALS, "Old description")),
+                    actions = listOf(RuleAction.Skip),
+                )
+            val engine = repositories.importEngine
+            engine.updateCsvStrategy(strategy.copy(config = strategy.config.copy(rules = listOf(skip))))
+            val reimports = repositories.reimports()
+            val before = transferAuditCount()
+
+            val removed = reimports.reimportFile(id)
+
+            assertEquals(
+                removedId,
+                removed.plan.removed
+                    .single()
+                    .id,
+            )
+            assertTrue(removedId in removed.plan.releasedOverrides)
+            val afterRemoval = rows(id)
+            assertEquals(ImportStatus.SKIPPED, afterRemoval[0].importStatus)
+            assertNull(afterRemoval[0].transferId)
+            assertEquals(neighbor, afterRemoval[1])
+            assertEquals(before + 1, transferAuditCount())
+
+            engine.updateCsvStrategy(strategy)
+            val restored = reimports.reimportFile(id)
+
+            assertEquals(1, restored.transfersCreated)
+            val afterRestore = rows(id)
+            assertEquals(ImportStatus.IMPORTED, afterRestore[0].importStatus)
+            assertEquals(
+                assertNotNull(afterRestore[0].transferId),
+                restored.plan.created
+                    .single()
+                    .id,
+            )
+            assertEquals(neighbor, afterRestore[1])
+            assertEquals(before + 2, transferAuditCount())
         }
 
     @Test

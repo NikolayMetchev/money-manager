@@ -169,7 +169,7 @@ class Reimports(
         )
     }
 
-    /** Previews a single CSV whose rows can all keep their existing, independent bookings. */
+    /** Previews a single CSV whose rows produce independent transfers. */
     suspend fun preview(
         selection: ReimportAllPlan,
         accountId: AccountId?,
@@ -208,7 +208,7 @@ class Reimports(
         val passThroughs = passThroughAccountRepository.getAll().first()
         val matchers = AttributeAccountMatcher.registry(accountAttributeRepository.getAll().first())
         val rows = reads.csvImportRepository.getImportRows(file.id, limit = file.rowCount, offset = 0)
-        if (rows.any { it.importStatus != ImportStatus.IMPORTED }) return null
+        if (rows.any { it.importStatus != ImportStatus.IMPORTED && it.importStatus != ImportStatus.SKIPPED }) return null
         val accounts = reads.accountRepository
         val mapped =
             buildCsvMapper(
@@ -226,7 +226,8 @@ class Reimports(
                 fileName = file.originalFileName,
                 accountOwnerNames = accounts.getAccountOwnerNames(),
             ).prepareImport(rows)
-        if (mapped.newAccounts.isNotEmpty() || mapped.validTransfers.size != rows.size ||
+        if (mapped.newAccounts.isNotEmpty() || mapped.errorRows.isNotEmpty() ||
+            mapped.validTransfers.size + mapped.skippedRowIndexes.size != rows.size ||
             mapped.validTransfers.any { !it.isIndependentBooking() }
         ) {
             return null
@@ -257,15 +258,17 @@ class Reimports(
     private suspend fun applyInPlace(plan: PreparedImport): BulkReimportResult {
         val applied = importEngine.apply(plan)
         // A change in the input fingerprint can be committed without changing a booked transfer.
-        if (applied && plan.preview.updated.isNotEmpty()) maintenance.refreshMaterializedViews()
+        if (applied != null && (applied.created.isNotEmpty() || applied.updated.isNotEmpty() || applied.removed.isNotEmpty())) {
+            maintenance.refreshMaterializedViews()
+        }
         return BulkReimportResult(
-            filesImported = if (applied) 1 else 0,
-            filesUnchanged = if (applied) 0 else 1,
-            transfersCreated = 0,
+            filesImported = if (applied != null) 1 else 0,
+            filesUnchanged = if (applied == null) 1 else 0,
+            transfersCreated = applied?.created.orEmpty().size,
             duplicatesSkipped = 0,
             filesSkippedNoStrategy = 0,
             filesFailed = 0,
-            plan = plan.preview,
+            plan = applied ?: plan.preview,
         )
     }
 

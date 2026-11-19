@@ -7,6 +7,7 @@ import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.MergeId
 import com.moneymanager.domain.model.TransactionId
+import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.observation.ImportRecordId
 import com.moneymanager.domain.model.observation.ImportRecordKey
 import com.moneymanager.domain.model.observation.MaterializedWrite
@@ -110,6 +111,7 @@ data class CsvObservationCommit(
     val accountId: AccountId?,
     val currencyId: CurrencyId?,
     val hashes: Map<ImportRecordId, String>,
+    val statuses: Map<Long, ImportStatus>,
 )
 
 class StaleObservationCommitException : IllegalStateException("The database changed after observation planning")

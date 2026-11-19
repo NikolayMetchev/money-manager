@@ -4,7 +4,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.Transfer
 
-/** A staged CSV whose rows still report one transfer each, using their existing accounts and assets. */
+/** A staged CSV whose rows report at most one independent transfer using existing accounts and assets. */
 data class CsvTransferSync(
     val id: CsvImportId,
     val fileChecksum: String,

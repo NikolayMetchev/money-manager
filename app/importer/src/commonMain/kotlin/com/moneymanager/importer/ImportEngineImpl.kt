@@ -111,6 +111,7 @@ import com.moneymanager.importengineapi.ImportDirectoryMutation
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportOwnershipIntent
+import com.moneymanager.importengineapi.ImportPlan
 import com.moneymanager.importengineapi.ImportPlanVersion
 import com.moneymanager.importengineapi.ImportResult
 import com.moneymanager.importengineapi.ImportRowKey
@@ -269,39 +270,52 @@ class ImportEngineImpl(
             require(request.application.id == request.id && request.records.id == request.id)
             val materializer = ObservationMaterializationPlanner(observations, overrides, relationships, placeholderTypeId(), records)
             val changes =
-                CsvTransferSyncPlanner(observations, records, csvImportRepository, transactionRepository, relationships, materializer)
-                    .plan(request) ?: return@withLock null
+                CsvTransferSyncPlanner(
+                    observations,
+                    records,
+                    csvImportRepository,
+                    transactionRepository,
+                    relationships,
+                    overrides,
+                    materializer,
+                ).plan(request) ?: return@withLock null
             if (currentPlanVersion() != request.version) throw StaleImportPlanException()
             CsvPreparedImport(this, request, changes)
         }
 
-    override suspend fun apply(plan: PreparedImport): Boolean {
+    override suspend fun apply(plan: PreparedImport): ImportPlan? {
         require(plan is CsvPreparedImport && plan.engine === this)
         return commitLock.withLock {
             editGate.ensureWritable()
             if (currentPlanVersion() != plan.request.version) throw StaleImportPlanException()
             val changes = plan.changes.materialization
-            if (changes.observations.isEmpty() && changes.rows.isEmpty() && plan.changes.hashes.isEmpty()) return@withLock false
+            if (changes.observations.isEmpty() && changes.rows.isEmpty() && plan.changes.hashes.isEmpty() &&
+                plan.changes.statuses.isEmpty()
+            ) {
+                return@withLock null
+            }
             val application = plan.request.application
             try {
-                checkNotNull(observationRepository).applyObservationChanges(
-                    newTransactions = emptyList(),
-                    observations = changes.observations,
-                    rows = changes.rows,
-                    csv =
-                        CsvObservationCommit(
-                            plan.request.version.database,
-                            application.id,
-                            plan.request.fileChecksum,
-                            application.strategyId,
-                            application.strategyName,
-                            application.appliedAt,
-                            application.accountId,
-                            application.currencyId,
-                            plan.changes.hashes,
-                        ),
-                )
-                true
+                val ids =
+                    checkNotNull(observationRepository).applyObservationChanges(
+                        newTransactions = changes.newTransactions.values,
+                        observations = changes.observations,
+                        rows = changes.rows,
+                        csv =
+                            CsvObservationCommit(
+                                plan.request.version.database,
+                                application.id,
+                                plan.request.fileChecksum,
+                                application.strategyId,
+                                application.strategyName,
+                                application.appliedAt,
+                                application.accountId,
+                                application.currencyId,
+                                plan.changes.hashes,
+                                plan.changes.statuses,
+                            ),
+                    )
+                plan.preview.copy(created = plan.preview.created.map { it.copy(id = ids.getValue(it.id)) })
             } catch (_: StaleObservationCommitException) {
                 throw StaleImportPlanException()
             } finally {
