@@ -20,6 +20,7 @@ import androidx.compose.ui.test.waitUntilDoesNotExist
 import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.moneymanager.database.DatabaseManager
 import com.moneymanager.database.di.openDatabaseComponent
+import com.moneymanager.database.di.toAppServices
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AppVersion
@@ -28,17 +29,28 @@ import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
+import com.moneymanager.importengineapi.ImportBatch
+import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.ImportResult
+import com.moneymanager.presenter.error.ProvideSchemaAwareScope
+import com.moneymanager.session.importDirectoryService
+import com.moneymanager.tasks.Progress
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
+import com.moneymanager.test.database.installBuiltInApiStrategies
 import com.moneymanager.test.database.installBuiltInCsvStrategies
 import com.moneymanager.test.database.upsertCurrencyByCode
+import com.moneymanager.ui.screens.csv.CsvImportAllDialog
 import com.moneymanager.ui.test.MoneyManagerTestApp
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
 import kotlin.test.AfterTest
 import kotlin.test.Test
+import kotlin.test.assertNotNull
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -417,11 +429,11 @@ class ImportMonzoCsvE2ETest {
 
     /**
      * "Import all" auto-matches each file's strategy by its columns (the built-in "Monzo CSV" strategy
-     * here) and applies it to every unimported file in one click. This guards the regression where
+     * here) and applies it to matching files in one click. This guards the regression where
      * getAllImports() returned imports without their columns, so column-based matching skipped every file.
      */
     @Test
-    fun importAll_matchesFilesByColumnsAndImportsThemAll() {
+    fun importAll_importsMatchingFilesAndReportsUnmatchedFiles() {
         runMoneyManagerComposeUiTest {
             testDbLocation = createTestDatabaseLocation()
             val databaseManager = createTestDatabaseManager()
@@ -430,6 +442,8 @@ class ImportMonzoCsvE2ETest {
                 val db = databaseManager.openDatabase(testDbLocation!!)
                 val databaseComponent = openDatabaseComponent(db)
                 databaseComponent.installBuiltInCsvStrategies()
+                // Match sync reads the API strategies, including Starling's single date range.
+                databaseComponent.installBuiltInApiStrategies()
 
                 databaseComponent.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
                 // A source account for the bulk dialog (the built-in Monzo CSV strategy has no source mapping).
@@ -457,6 +471,13 @@ class ImportMonzoCsvE2ETest {
                     fileChecksum = "import_all_second",
                     fileLastModified = Instant.fromEpochMilliseconds(1700000000001L),
                 )
+                databaseComponent.csvImportRepository.createImport(
+                    fileName = "unmatched.csv",
+                    headers = listOf("Unrecognised column"),
+                    rows = listOf(listOf("Unmatched row")),
+                    fileChecksum = "import_all_unmatched",
+                    fileLastModified = Instant.fromEpochMilliseconds(1700000000002L),
+                )
             }
 
             setContent {
@@ -473,9 +494,8 @@ class ImportMonzoCsvE2ETest {
             waitForIdle()
             waitForIdle()
 
-            // The Unimported tab offers a single "Import all (2)" action.
-            waitUntilExactlyOneExists(hasText("Import all (2)"), timeoutMillis = 15000)
-            onNodeWithText("Import all (2)").performClick()
+            waitUntilExactlyOneExists(hasText("Import all (3)"), timeoutMillis = 15000)
+            onNodeWithText("Import all (3)").performClick()
 
             // The dialog shows a source picker (the strategy has no source mapping); choose "My Monzo".
             waitUntilExactlyOneExists(hasText("Import all unimported files"), timeoutMillis = 15000)
@@ -485,12 +505,14 @@ class ImportMonzoCsvE2ETest {
             onNodeWithText("My Monzo").performClick()
             waitForIdle()
 
-            waitUntilAtLeastOneExists(hasText("Import 2 files") and isEnabled(), timeoutMillis = 15000)
-            onNodeWithText("Import 2 files").performClick()
+            waitUntilAtLeastOneExists(hasText("Import 3 files") and isEnabled(), timeoutMillis = 15000)
+            onNodeWithText("Import 3 files").performClick()
 
             // Both files matched the Monzo CSV strategy by columns and imported in one click.
             waitUntilAtLeastOneExists(hasText("Imported 2 files", substring = true), timeoutMillis = 20000)
+            onNodeWithText("unmatched.csv · No matching strategy").assertExists()
             onNodeWithText("Done").performClick()
+            waitUntilDoesNotExist(hasText("Import complete"), timeoutMillis = 15000)
             waitForIdle()
 
             // The tab counts come from an import listing that refreshes at most every 250 ms while writes burst,
@@ -502,7 +524,7 @@ class ImportMonzoCsvE2ETest {
             waitUntilExactlyOneExists(hasText("Re-import all (2)"), timeoutMillis = 15000)
             onNode(hasScrollToIndexAction()).performScrollToNode(hasText("second.csv"))
             waitUntilExactlyOneExists(hasText("second.csv"), timeoutMillis = 15000)
-            onNodeWithText("Unimported (0)").assertExists()
+            onNodeWithText("Unimported (1)").assertExists()
 
             // Re-import both through the bulk dialog; nothing changed, so both are found unchanged and nothing is written.
             onNodeWithText("Re-import all (2)").performClick()
@@ -513,6 +535,80 @@ class ImportMonzoCsvE2ETest {
             onNodeWithText("Done").performClick()
             waitUntilDoesNotExist(hasText("Deletes what the 2 files created", substring = true), timeoutMillis = 15000)
             waitForIdle()
+        }
+    }
+
+    @Test
+    fun importAll_reportsInterruptionAfterSavingFiles() {
+        runMoneyManagerComposeUiTest {
+            val location = createTestDatabaseLocation().also { testDbLocation = it }
+            val (dc, file) =
+                runBlocking {
+                    val component = openDatabaseComponent(createTestDatabaseManager().openDatabase(location))
+                    component.installBuiltInCsvStrategies()
+                    val now = Clock.System.now()
+                    component.accountRepository.createAccount(Account(id = AccountId(0), name = "My Monzo", openingDate = now))
+                    val lines =
+                        loadTestCsvContent()
+                            .lineSequence()
+                            .filter { it.isNotBlank() }
+                            .take(2)
+                            .toList()
+                    val id =
+                        component.csvImportRepository.createImport(
+                            fileName = "monzo.csv",
+                            headers = parseCsvLine(lines.first()),
+                            rows = listOf(parseCsvLine(lines.last())),
+                            fileChecksum = "import_all_interrupted",
+                            fileLastModified = now,
+                        )
+                    component to checkNotNull(component.csvImportRepository.getImport(id).first())
+                }
+            val engine =
+                object : ImportEngine by dc.importEngine {
+                    override suspend fun import(
+                        batch: ImportBatch,
+                        onProgress: (suspend (Progress) -> Unit)?,
+                        batchSize: Int,
+                    ): ImportResult {
+                        check(!batch.syncMatches) { "Matching failed" }
+                        return dc.importEngine.import(batch, onProgress, batchSize)
+                    }
+                }
+            val service = dc.toAppServices(engine).importDirectoryService(fileSourceFactory = null, writeLock = Mutex())
+
+            setContent {
+                ProvideSchemaAwareScope {
+                    CsvImportAllDialog(
+                        unimported = listOf(file),
+                        importDirectoryService = service,
+                        accountRepository = dc.accountRepository,
+                        categoryRepository = dc.categoryRepository,
+                        personRepository = dc.personRepository,
+                        onDismiss = {},
+                        onComplete = {},
+                    )
+                }
+            }
+
+            waitUntilAtLeastOneExists(hasText("Select..."), timeoutMillis = 15_000)
+            onNodeWithText("Select...").performClick()
+            waitUntilAtLeastOneExists(hasText("My Monzo"), timeoutMillis = 10_000)
+            onNodeWithText("My Monzo").performClick()
+            waitUntilAtLeastOneExists(hasText("Import 1 file") and isEnabled(), timeoutMillis = 15_000)
+            onNodeWithText("Import 1 file").performClick()
+
+            waitUntilAtLeastOneExists(hasText("Import interrupted"), timeoutMillis = 20_000)
+            onNodeWithText("Matching failed").assertExists()
+            onNodeWithText("Done").assertIsEnabled()
+            assertNotNull(
+                runBlocking {
+                    dc.csvImportRepository
+                        .getImport(file.id)
+                        .first()
+                        ?.lastAppliedAt
+                },
+            )
         }
     }
 
