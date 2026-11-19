@@ -107,7 +107,7 @@ jobs:
           # SQLDelight plugin, which can't find the dialect without a Gradle import and rejects valid SQLite.
           rm -rf "$CACHES/plugins"
       - name: 'Qodana Scan'
-        uses: JetBrains/qodana-action@v2026.2
+        uses: JetBrains/qodana-action@v2026.3.1
         env:
           QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
           QODANA_ENDPOINT: 'https://qodana.cloud'
