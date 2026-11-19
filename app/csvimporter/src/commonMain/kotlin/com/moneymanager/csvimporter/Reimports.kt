@@ -222,7 +222,12 @@ class Reimports(
         val passThroughs = passThroughAccountRepository.getAll().first()
         val matchers = AttributeAccountMatcher.registry(accountAttributeRepository.getAll().first())
         val rows = reads.csvImportRepository.getImportRows(file.id, limit = file.rowCount, offset = 0)
-        if (rows.any { it.importStatus != ImportStatus.IMPORTED && it.importStatus != ImportStatus.SKIPPED }) return null
+        if (rows.any {
+                it.importStatus != null && it.importStatus != ImportStatus.IMPORTED && it.importStatus != ImportStatus.SKIPPED
+            }
+        ) {
+            return null
+        }
         val accounts = reads.accountRepository
         val mapped =
             buildCsvMapper(

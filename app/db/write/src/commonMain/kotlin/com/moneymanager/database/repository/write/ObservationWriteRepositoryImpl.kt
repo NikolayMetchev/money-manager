@@ -71,6 +71,12 @@ class ObservationWriteRepositoryImpl(
             queries.transactionWithResult {
                 val csvTables = csv.associateWith { verifyCsvCommit(it) }
                 if (csv.isNotEmpty()) verifyCsvChanges(observations, rows)
+                val recordIds = mutableMapOf<ImportRecordId, ImportRecordId>()
+                for (commit in csv) {
+                    for (record in commit.newRecords) {
+                        recordIds[record.id] = database.insertImportRecord(record.key, record.contentHash)
+                    }
+                }
                 val ids = newTransactions.associateWith { allocate(it.kind()) }
                 for (change in observations) {
                     val before = change.before
@@ -80,7 +86,9 @@ class ObservationWriteRepositoryImpl(
                         val target = ids[after.transactionId] ?: after.transactionId
                         val storedId = after.storedId
                         if (storedId == null) {
-                            insert(change.owner, change.slot, target, after.content)
+                            val owner = change.owner
+                            val recordId = (owner as? ObservationOwner.Record)?.let { recordIds[it.recordId] }
+                            insert(recordId?.let { ObservationOwner.Record(it) } ?: owner, change.slot, target, after.content)
                         } else {
                             checkNotNull(before)
                             if (before.content != after.content) update(storedId, after.content)

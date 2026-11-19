@@ -4,6 +4,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.ImportStatus
+import com.moneymanager.domain.model.observation.ImportRecord
 import com.moneymanager.domain.model.observation.ImportRecordId
 import com.moneymanager.domain.model.observation.ImportRecordKey
 import com.moneymanager.domain.model.observation.MaterializedWrite
@@ -48,6 +49,7 @@ internal class CsvTransferSyncPlanner(
     suspend fun plan(
         request: CsvTransferSync,
         allocatedLocals: Int,
+        allocatedRecords: Int,
     ): CsvTransferChanges? {
         val id = request.id
         val rows = request.rows
@@ -55,9 +57,25 @@ internal class CsvTransferSyncPlanner(
         if (hashes.isEmpty() || rows.keys.any { it !in hashes }) return null
         val staged = csv.getImportRows(id, limit = hashes.size, offset = 0).associateBy { it.rowIndex }
         val recordsByRow = records.getCsvImportRecords(id).associateBy { (it.key as ImportRecordKey.CsvRow).rowIndex }
-        if (staged.keys != hashes.keys || recordsByRow.keys != staged.keys) return null
+        if (staged.keys != hashes.keys || recordsByRow.keys.any { it !in staged }) return null
         val bookings = staged.filterValues { it.importStatus == ImportStatus.IMPORTED }.mapValues { it.value.transferId ?: return null }
-        if (staged.any { (index, row) -> index !in bookings && row.importStatus != ImportStatus.SKIPPED }) return null
+        if (staged.any { (index, row) ->
+                when (row.importStatus) {
+                    ImportStatus.IMPORTED, ImportStatus.SKIPPED -> index !in recordsByRow
+                    null -> row.transferId != null
+                    else -> true
+                }
+            }
+        ) {
+            return null
+        }
+        val newRecords = mutableListOf<ImportRecord>()
+        val recordIds =
+            staged.keys.associateWith { index ->
+                recordsByRow[index]?.id ?: ImportRecordId(-(allocatedRecords.toLong() + newRecords.size + 1)).also { provisional ->
+                    newRecords += ImportRecord(provisional, ImportRecordKey.CsvRow(id, index), hashes.getValue(index))
+                }
+            }
 
         val ids = bookings.values.toSet()
         if (ids.size != bookings.size || csv.getTransferIdsCreatedByImport(id) != ids ||
@@ -92,8 +110,8 @@ internal class CsvTransferSyncPlanner(
 
         val newSources = mutableMapOf<LocalTransactionKey, Source.Csv>()
         val mutations =
-            recordsByRow.mapNotNull { (index, record) ->
-                val owner = ObservationOwner.Record(record.id)
+            recordIds.mapNotNull { (index, recordId) ->
+                val owner = ObservationOwner.Record(recordId)
                 val existingId = bookings[index]
                 val values = proposed[index]
                 val input = rows[index]
@@ -203,6 +221,7 @@ internal class CsvTransferSyncPlanner(
                 }.toMap(),
             statuses,
             accounts,
+            newRecords,
         )
     }
 
@@ -226,9 +245,10 @@ internal data class CsvTransferChanges(
     val hashes: Map<ImportRecordId, String>,
     val statuses: Map<Long, ImportStatus>,
     val accounts: Set<AccountId>,
+    val newRecords: List<ImportRecord>,
 ) {
     val hasWrites: Boolean
         get() =
             materialization.observations.isNotEmpty() || materialization.rows.isNotEmpty() || hashes.isNotEmpty() ||
-                statuses.isNotEmpty()
+                statuses.isNotEmpty() || newRecords.isNotEmpty()
 }

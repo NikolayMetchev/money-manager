@@ -11,6 +11,7 @@ import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
+import com.moneymanager.domain.model.csv.CsvRowLink
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
@@ -28,6 +29,7 @@ import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.importengineapi.AccountRef
+import com.moneymanager.importengineapi.CsvImportMutation
 import com.moneymanager.importengineapi.EditGate
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
@@ -35,6 +37,7 @@ import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.PlannedField
 import com.moneymanager.importengineapi.StaleImportPlanException
+import com.moneymanager.importengineapi.applyCsvImportMutations
 import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.importengineapi.updateCsvStrategy
 import com.moneymanager.test.database.DbTest
@@ -57,6 +60,40 @@ import kotlin.uuid.Uuid
 class CsvReadOnlyPreviewTest : DbTest() {
     private val now = Instant.fromEpochMilliseconds(1_765_000_000_000)
     private val headings = listOf("Date", "Time", "Currency", "Amount", "Corrected", "Description", "Corrected description")
+
+    @Test
+    fun reimportOfAReplacedFileOnlyInsertsTheNewRow() =
+        runDbTest {
+            val (id) = stage()
+            val original = rows(id).single()
+            repositories.importEngine.applyCsvImportMutations(
+                listOf(
+                    CsvImportMutation.Repopulate(
+                        id,
+                        headings,
+                        listOf(original.values, listOf("2026-01-02", "11:00:00", "GBP", "5.00", "5.00", "New", "New")),
+                        fileChecksum = "independent-replaced",
+                        fileLastModified = now,
+                        carriedRows = listOf(CsvRowLink(1, ImportStatus.IMPORTED)),
+                        rowIndexRemap = mapOf(original.rowIndex to 1L),
+                    ),
+                ),
+            )
+            val before = transferAuditCount()
+            val reimports = repositories.reimports()
+
+            val result = reimports.reimportFile(id)
+
+            assertEquals(1, result.transfersCreated)
+            val after = rows(id)
+            assertEquals(original, after[0])
+            val created = result.plan.created.single()
+            assertEquals(created.id, assertNotNull(after[1].transferId))
+            assertEquals(ImportStatus.IMPORTED, after[1].importStatus)
+            assertEquals(2, repositories.importRecordRepository.getCsvImportRecords(id).size)
+            assertEquals(before + 1, transferAuditCount())
+            assertEquals(1, reimports.reimportFile(id).filesUnchanged)
+        }
 
     @Test
     fun standardReimportUpdatesOnlyTheChangedTransfer() =

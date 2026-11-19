@@ -282,13 +282,15 @@ class ImportEngineImpl(
                 )
             val accounts = mutableSetOf<AccountId>()
             var allocatedLocals = 0
+            var allocatedRecords = 0
             val changes =
                 requests.map { request ->
                     require(request.version == version && request.application.id == request.id && request.records.id == request.id)
-                    val change = planner.plan(request, allocatedLocals) ?: return@withLock null
+                    val change = planner.plan(request, allocatedLocals, allocatedRecords) ?: return@withLock null
                     // Even two files with no existing bookings may produce transactions that can match each other.
                     if (change.accounts.any { !accounts.add(it) }) return@withLock null
                     allocatedLocals += change.materialization.newTransactions.size
+                    allocatedRecords += change.newRecords.size
                     request to change
                 }
             if (currentPlanVersion() != version) throw StaleImportPlanException()
@@ -321,6 +323,7 @@ class ImportEngineImpl(
                                     application.currencyId,
                                     change.hashes,
                                     change.statuses,
+                                    change.newRecords,
                                 )
                             },
                     )
