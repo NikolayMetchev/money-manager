@@ -104,6 +104,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.math.absoluteValue
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 private val logger = Logger.withTag("ApiSessionImportService")
@@ -1214,7 +1215,7 @@ private suspend fun fetchResponse(
     var retries = 0
     while (response.statusCode == 429 && retries < 3) {
         val retryAfter = response.retryAfterSeconds?.takeIf { it in 0L..300L } ?: break
-        delay(retryAfter * 1_000L)
+        delay(retryAfter.seconds)
         response = apiClient.get(url = url, bearerToken = token, sca = sca)
         retries += 1
     }
@@ -2567,10 +2568,9 @@ internal fun dateWindows(
         } else {
             maxOf(lookbackStart, incrementalStartMillis(since, pagination))
         }
-    val windowDays = windowing.windowDays
-    if (windowDays == null) {
-        return if (rawStart < nowMillis) listOf(ApiDateWindow(Instant.fromEpochMilliseconds(rawStart), now)) else emptyList()
-    }
+    val windowDays =
+        windowing.windowDays
+            ?: return if (rawStart < nowMillis) listOf(ApiDateWindow(Instant.fromEpochMilliseconds(rawStart), now)) else emptyList()
     val windowMillis = windowDays.toLong() * MILLIS_PER_DAY
     if (windowMillis <= 0L) return emptyList()
     var start = (rawStart / windowMillis) * windowMillis
