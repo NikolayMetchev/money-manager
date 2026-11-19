@@ -146,8 +146,8 @@ data class ApiBulkReimportResult(
  *
  * A session that fails does not abort the run: it is logged, recorded in
  * [ApiBulkReimportResult.failures] and the remaining sessions are still re-imported — mirroring how
- * the CSV and QIF bulk re-import collects per-file failures. Materialized views are refreshed once at the end
- * whatever happens, since the sessions that did run have already changed the data they describe.
+ * the CSV and QIF bulk re-import collects per-file failures. A run that attempted writes refreshes materialized
+ * views once, even if it was interrupted after changing the data they describe.
  */
 @Suppress("LongParameterList")
 suspend fun bulkReimportApiSessions(
@@ -170,7 +170,13 @@ suspend fun bulkReimportApiSessions(
             .sortedBy { it.createdAt }
 
     var importPlan = ImportPlan()
-    return reimportSessionsResiliently(sessions, maintenance, onProgress) { session, sessionProgress ->
+    val version = importEngine.writeVersion.value
+    return reimportSessionsResiliently(
+        sessions,
+        maintenance,
+        onProgress,
+        refreshRequired = { importEngine.writeVersion.value != version },
+    ) { session, sessionProgress ->
         val result =
             executeApiReimport(
                 plan = planApiReimport(session.id, apiSessionRepository, reads),
@@ -193,13 +199,13 @@ suspend fun bulkReimportApiSessions(
 
 /**
  * Runs [reimport] over [sessions] in order, tolerating a failing session, and refreshes the
- * materialized views exactly once at the end — including on the failure path, since a session that
- * got as far as deleting its transfers has already invalidated them.
+ * materialized views once when the run may have changed them, including after a partial failure.
  */
 internal suspend fun reimportSessionsResiliently(
     sessions: List<ApiSession>,
     maintenance: Maintenance,
     onProgress: (suspend (Progress) -> Unit)?,
+    refreshRequired: () -> Boolean,
     reimport: suspend (ApiSession, (suspend (Progress) -> Unit)?) -> Unit,
 ): ApiBulkReimportResult {
     var reimported = 0
@@ -243,7 +249,11 @@ internal suspend fun reimportSessionsResiliently(
 
     // NonCancellable so a cancelled run doesn't leave stale balances behind either.
     val refreshFailure =
-        runCatching { withContext(NonCancellable) { maintenance.refreshMaterializedViews() } }.exceptionOrNull()
+        if (refreshRequired()) {
+            runCatching { withContext(NonCancellable) { maintenance.refreshMaterializedViews() } }.exceptionOrNull()
+        } else {
+            null
+        }
 
     // A refresh that fails while the run is already unwinding must not replace the exception that ended
     // it — the caller needs to see the cancellation or error that actually happened.

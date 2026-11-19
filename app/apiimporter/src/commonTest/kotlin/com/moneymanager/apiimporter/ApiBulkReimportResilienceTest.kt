@@ -72,6 +72,7 @@ class ApiBulkReimportResilienceTest {
                     sessions = (1L..4L).map { session(it) },
                     maintenance = maintenance,
                     onProgress = null,
+                    refreshRequired = { attempted.isNotEmpty() },
                 ) { session, _ ->
                     attempted += session.id.id
                     if (session.id.id == 2L) error("boom")
@@ -94,6 +95,7 @@ class ApiBulkReimportResilienceTest {
                     sessions = (1L..3L).map { session(it) },
                     maintenance = maintenance,
                     onProgress = null,
+                    refreshRequired = { true },
                 ) { session, _ ->
                     if (session.id.id == 2L) throw CancellationException("cancelled")
                 }
@@ -113,6 +115,7 @@ class ApiBulkReimportResilienceTest {
                         sessions = (1L..3L).map { session(it) },
                         maintenance = maintenance,
                         onProgress = null,
+                        refreshRequired = { true },
                     ) { session, _ ->
                         if (session.id.id == 2L) throw CancellationException("cancelled")
                     }
@@ -129,18 +132,29 @@ class ApiBulkReimportResilienceTest {
 
             val thrown =
                 assertFailsWith<IllegalStateException> {
-                    reimportSessionsResiliently((1L..2L).map { session(it) }, maintenance, onProgress = null) { _, _ -> }
+                    reimportSessionsResiliently(
+                        (1L..2L).map { session(it) },
+                        maintenance,
+                        onProgress = null,
+                        refreshRequired = { true },
+                    ) { _, _ -> }
                 }
 
             assertEquals("refresh failed", thrown.message, "nothing else was in flight to mask it")
         }
 
     @Test
-    fun `an empty run still refreshes once`() =
+    fun `a run without writes does not refresh the views`() =
         runTest {
             val maintenance = CountingMaintenance()
-            val result = reimportSessionsResiliently(emptyList(), maintenance, onProgress = null) { _, _ -> }
-            assertEquals(0, result.sessionsReimported)
-            assertEquals(1, maintenance.refreshes)
+            val result =
+                reimportSessionsResiliently(
+                    listOf(session(1)),
+                    maintenance,
+                    onProgress = null,
+                    refreshRequired = { false },
+                ) { _, _ -> }
+            assertEquals(1, result.sessionsReimported)
+            assertEquals(0, maintenance.refreshes)
         }
 }

@@ -47,6 +47,7 @@ class ApiImportProgressTest {
                 sessions = (1L..2L).map { session(it) },
                 maintenance = NoopMaintenance(),
                 onProgress = { emitted += it },
+                refreshRequired = { false },
             ) { _, sessionProgress ->
                 sessionProgress?.invoke(Progress("Re-importing", fraction = 0.5f))
             }
