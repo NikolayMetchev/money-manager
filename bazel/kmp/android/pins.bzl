@@ -23,7 +23,7 @@ ANDROID_PLATFORM = {
 }
 
 PLATFORM_TOOLS = {
-    "linux": ["platform-tools_r37.0.1-linux.zip", "d230f13842f60f782a8645f9c813f8f845bf36089ea7289f28c48f17979313f1"],
-    "osx": ["platform-tools_r37.0.1-darwin.zip", "ee39ad5967e95c2a07f04dbcbde96b1a0c916ba376096db5d2f498b7727a5d1d"],
-    "windows": ["platform-tools_r37.0.1-win.zip", "45f4d63113e895ebde0c90f194099a4676b6ac653bd28d54314a9e022bbc1a99"],
+    "linux": ["platform-tools_r37.0.3-linux.zip", "214548146cadb2ca3508143d8a1d4be4c59de5bb837253e3ede89ed74cf450d1"],
+    "osx": ["platform-tools_r37.0.3-darwin.zip", "df21339b9371fef9b19264404338dc686f59a88a1dce634b963da344909001d6"],
+    "windows": ["platform-tools_r37.0.3-win.zip", "89d108360a3bf2924d3bea837239edaccc22fd6ff5befd3787c4348a9fe4f09d"],
 }
