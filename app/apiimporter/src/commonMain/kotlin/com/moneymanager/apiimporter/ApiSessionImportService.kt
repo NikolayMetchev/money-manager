@@ -88,6 +88,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -363,16 +364,17 @@ suspend fun downloadApiSessionTransactions(
                             windowEnd = page.window?.end?.toString(),
                         )
                     val url = buildBankFeedUrl(strategy, feed, ctx, page)
-                    // Incremental: reuse a stored response only when both request and response are present.
-                    // An orphan request (response missing from an interrupted prior run) is a cache miss,
-                    // so paging can make progress on retry. fetchResponse throws on a non-200, so coverage is
-                    // only ever recorded for pages that validated.
-                    val body =
-                        existingRequestsByUrl[url]?.let { existingResponsesByRequestId[it.id] }?.json
-                            ?: fetchResponse(url = url, token = token, apiClient = apiClient, sca = sca).body.also {
-                                transactionResponseCount += 1
-                            }
-                    PageOutcome.Fetched(body, responseItemsArray(body, feed.responseArrayKey).orEmpty().filterIsInstance<JsonObject>())
+                    // An interrupted or rate-limited request may have no response or a saved error body.
+                    // Only a response containing the feed array can satisfy a retry from the cache.
+                    val cached = existingRequestsByUrl[url]?.let { existingResponsesByRequestId[it.id] }?.json
+                    val cachedItems = cached?.let { responseItemsArray(it, feed.responseArrayKey) }
+                    if (cached != null && cachedItems != null) {
+                        PageOutcome.Fetched(cached, cachedItems.filterIsInstance<JsonObject>())
+                    } else {
+                        val body = fetchResponse(url = url, token = token, apiClient = apiClient, sca = sca).body
+                        transactionResponseCount += 1
+                        PageOutcome.Fetched(body, responseItemsArray(body, feed.responseArrayKey).orEmpty().filterIsInstance<JsonObject>())
+                    }
                 },
                 onUnitComplete = { coveredUntil -> importEngine.recordApiDownloadCoverage(sessionId, endpointKey, coveredUntil) },
             )
@@ -1208,11 +1210,16 @@ private suspend fun fetchResponse(
     apiClient: ApiClient,
     sca: ScaParams? = null,
 ): ApiHttpResponse {
-    val response = apiClient.get(url = url, bearerToken = token, sca = sca)
-    if (response.statusCode != 200) {
-        throw ApiSessionImportException("HTTP ${response.statusCode}: ${response.body}")
+    var response = apiClient.get(url = url, bearerToken = token, sca = sca)
+    var retries = 0
+    while (response.statusCode == 429 && retries < 3) {
+        val retryAfter = response.retryAfterSeconds?.takeIf { it in 0L..300L } ?: break
+        delay(retryAfter * 1_000L)
+        response = apiClient.get(url = url, bearerToken = token, sca = sca)
+        retries += 1
     }
-    return response
+    if (response.statusCode == 200) return response
+    throw ApiSessionImportException("HTTP ${response.statusCode}: ${response.body}")
 }
 
 class ApiSessionImportException(
@@ -2552,8 +2559,6 @@ internal fun dateWindows(
     since: Instant? = null,
 ): List<ApiDateWindow> {
     val windowing = pagination.window ?: return emptyList()
-    val windowMillis = windowing.windowDays.toLong() * MILLIS_PER_DAY
-    if (windowMillis <= 0L) return emptyList()
     val nowMillis = now.toEpochMilliseconds()
     val lookbackStart = nowMillis - windowing.lookbackDays.toLong() * MILLIS_PER_DAY
     val rawStart =
@@ -2562,6 +2567,12 @@ internal fun dateWindows(
         } else {
             maxOf(lookbackStart, incrementalStartMillis(since, pagination))
         }
+    val windowDays = windowing.windowDays
+    if (windowDays == null) {
+        return if (rawStart < nowMillis) listOf(ApiDateWindow(Instant.fromEpochMilliseconds(rawStart), now)) else emptyList()
+    }
+    val windowMillis = windowDays.toLong() * MILLIS_PER_DAY
+    if (windowMillis <= 0L) return emptyList()
     var start = (rawStart / windowMillis) * windowMillis
     val windows = mutableListOf<ApiDateWindow>()
     while (start < nowMillis) {
@@ -2610,12 +2621,11 @@ private fun ApiRequest.resolveAccountExternalId(strategy: ApiImportStrategy): St
     if (accountIdParamName != null) {
         return runCatching { URLBuilder(url).parameters[accountIdParamName] }.getOrNull()
     }
-    return extractPathVariables(
-        strategy.config
-            .bankFeed()
-            .endpoint.path,
-        encodedPath(),
-    )?.get("account.id")
+    val feed = strategy.config.bankFeed().endpoint
+    val path = encodedPath()
+    return (sequenceOf(feed.path) + feed.historicalPaths.asSequence()).firstNotNullOfOrNull { template ->
+        extractPathVariables(template, path)?.get("account.id")
+    }
 }
 
 /** True when this request targets the accounts endpoint (path matches the accounts path template). */

@@ -671,7 +671,7 @@ internal fun PaginationEditor(
     )
     val config = pagination ?: return
     ToggleRow(
-        label = "Split history into date windows",
+        label = "Send date bounds",
         checked = config.window != null,
         onCheckedChange = { onChange(config.copy(window = if (it) ApiDateWindowing() else null)) },
         enabled = enabled,
@@ -688,7 +688,13 @@ internal fun PaginationEditor(
             optionLabel = { it.name },
             enabled = enabled,
         )
-        IntFieldRow("Window days", w.windowDays, { window(w.copy(windowDays = it)) }, enabled)
+        ToggleRow(
+            label = "Split history into fixed-length windows",
+            checked = w.windowDays != null,
+            onCheckedChange = { window(w.copy(windowDays = if (it) ApiDateWindowing().windowDays else null)) },
+            enabled = enabled,
+        )
+        w.windowDays?.let { days -> IntFieldRow("Window days", days, { window(w.copy(windowDays = it)) }, enabled) }
         IntFieldRow("Lookback days", w.lookbackDays, { window(w.copy(lookbackDays = it)) }, enabled)
         QueryParamsEditor(params = config.extraParams, onChange = { onChange(config.copy(extraParams = it)) }, enabled = enabled)
     }
@@ -738,10 +744,18 @@ internal fun PaginationEditor(
                 supportingText = "Dot-path to the response's next-page token, sent back as the cursor param",
             )
             TextFieldRow("Cursor param", p.param, { paging(p.copy(param = it)) }, enabled)
-            ToggleRow(
-                label = "Token is already URL-encoded (e.g. Bybit)",
-                checked = p.urlEncoded,
-                onCheckedChange = { paging(p.copy(urlEncoded = it)) },
+            if (p.linkQueryParams.isEmpty()) {
+                ToggleRow(
+                    label = "Token is already URL-encoded (e.g. Bybit)",
+                    checked = p.urlEncoded,
+                    onCheckedChange = { paging(p.copy(urlEncoded = it)) },
+                    enabled = enabled,
+                )
+            }
+            StringListEditor(
+                label = "Additional query parameters from a next-page link",
+                items = p.linkQueryParams,
+                onChange = { paging(p.copy(linkQueryParams = it)) },
                 enabled = enabled,
             )
             TextFieldRow(

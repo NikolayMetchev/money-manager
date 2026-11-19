@@ -104,24 +104,32 @@ private fun DownloadedAccountsEditor(
         Spacer(Modifier.padding(top = 4.dp))
         HorizontalDivider()
         SectionHeader("Transactions endpoint (fetched per account)")
+
+        fun updateFeed(endpoint: ApiEndpointConfig) {
+            state.updateConfig {
+                copy(
+                    dataEndpoints =
+                        dataEndpoints.map {
+                            if (it.kind ==
+                                ApiEndpointKind.BANK_TRANSACTIONS
+                            ) {
+                                it.copy(endpoint = endpoint)
+                            } else {
+                                it
+                            }
+                        },
+                )
+            }
+        }
         EndpointEditor(
             endpoint = feed.endpoint,
-            onChange = { v ->
-                state.updateConfig {
-                    copy(
-                        dataEndpoints =
-                            dataEndpoints.map {
-                                if (it.kind ==
-                                    ApiEndpointKind.BANK_TRANSACTIONS
-                                ) {
-                                    it.copy(endpoint = v)
-                                } else {
-                                    it
-                                }
-                            },
-                    )
-                }
-            },
+            onChange = ::updateFeed,
+            enabled = enabled,
+        )
+        StringListEditor(
+            label = "Historical paths for importing saved responses",
+            items = feed.endpoint.historicalPaths,
+            onChange = { updateFeed(feed.endpoint.copy(historicalPaths = it)) },
             enabled = enabled,
         )
     }

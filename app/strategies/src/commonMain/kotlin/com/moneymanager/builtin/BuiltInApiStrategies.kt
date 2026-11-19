@@ -466,13 +466,15 @@ object BuiltInApiStrategies {
             updatedAt = now,
         )
 
+    private const val STARLING_FEED_PATH = "/api/v2/feed/account/{account.id}/category/{account.defaultCategory}"
+
     /**
      * The built-in Starling Bank API import strategy. Starling is a flat two-level API like
      * Monzo: a single Bearer token lists accounts, and each account's transaction feed is fetched
      * from a path templated with the account id and its `defaultCategory`. Amounts are integer minor
-     * units and the direction lives in a separate `direction` field (IN/OUT). The whole feed is
-     * returned in one response, so no pagination is configured. The account holder is a single global
-     * object (`/api/v2/account-holder/individual`) linked to every imported account.
+     * units and the direction lives in a separate `direction` field (IN/OUT). The paginated endpoint
+     * can span the full history in a single date range. The account holder is a single global object
+     * (`/api/v2/account-holder/individual`) linked to every imported account.
      */
     fun starling(now: Instant): ApiImportStrategy =
         ApiImportStrategy(
@@ -494,6 +496,7 @@ object BuiltInApiStrategies {
                                     descriptionField = "name",
                                     currencyField = "currency",
                                     ownersArrayField = null,
+                                    rules = listOf(accounts(AccountSide.OWN, fixedNaming("accountUid", "Starling"))),
                                     // Starling's /accounts response omits bank details; they come from the
                                     // account-identifiers endpoint below, where the sort code is `bankIdentifier`
                                     // and the account number is `accountIdentifier`.
@@ -511,19 +514,28 @@ object BuiltInApiStrategies {
                             ApiDataEndpoint(
                                 endpoint =
                                     ApiEndpointConfig(
-                                        // {account.defaultCategory} resolves the account's defaultCategory from its raw
-                                        // JSON. Bound each request: changesSince=1970 exceeds Starling's range limit.
-                                        path = "/api/v2/feed/account/{account.id}/category/{account.defaultCategory}/transactions-between",
+                                        path = "$STARLING_FEED_PATH/paginated-transactions",
                                         responseArrayKey = "feedItems",
+                                        historicalPaths =
+                                            listOf(
+                                                STARLING_FEED_PATH,
+                                                "$STARLING_FEED_PATH/transactions-between",
+                                            ),
                                         pagination =
                                             ApiPaginationConfig(
                                                 window =
                                                     ApiDateWindowing(
                                                         startParam = "minTransactionTimestamp",
                                                         endParam = "maxTransactionTimestamp",
-                                                        windowDays = 365,
+                                                        windowDays = null,
                                                         lookbackDays = 365 * 20,
                                                         boundFormat = WindowBoundFormat.ISO_8601,
+                                                    ),
+                                                paging =
+                                                    ApiPaging.Token(
+                                                        tokenField = "links.next",
+                                                        param = "cursor",
+                                                        linkQueryParams = listOf("pageToFetch"),
                                                     ),
                                             ),
                                     ),

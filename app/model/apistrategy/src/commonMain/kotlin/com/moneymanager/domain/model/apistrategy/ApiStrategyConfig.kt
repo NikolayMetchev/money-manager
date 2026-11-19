@@ -87,7 +87,8 @@ enum class WindowBoundFormat {
  * Splits an endpoint's history into fixed-length date windows, one request unit per window, each bounded
  * by [startParam]/[endParam] (also exposed to templating as `window.start`/`window.end`). Windows reach
  * back [lookbackDays] and are anchored to fixed [windowDays] boundaries, so earlier windows produce
- * stable, cacheable URLs; only the final window (ending "now") shifts across re-imports.
+ * stable, cacheable URLs; only the final window (ending "now") shifts across re-imports. A null
+ * [windowDays] sends the requested period as a single unit for APIs with no fixed range limit.
  *
  * @property rangeErrorSubstrings Case-insensitive error-body substrings meaning "this particular window
  *   is outside the range the provider will serve" (Binance `asset/transfer` only answers for the last 6
@@ -100,7 +101,7 @@ enum class WindowBoundFormat {
 data class ApiDateWindowing(
     val startParam: String = "intervalStart",
     val endParam: String = "intervalEnd",
-    val windowDays: Int = 469,
+    val windowDays: Int? = 469,
     val lookbackDays: Int = 365 * 6,
     val boundFormat: WindowBoundFormat = WindowBoundFormat.EPOCH_MS,
     @EncodeDefault(EncodeDefault.Mode.NEVER)
@@ -164,7 +165,8 @@ sealed interface ApiPaging {
      * until it comes back blank. With [urlEncoded], the token arrives already percent-encoded and is
      * decoded before sending (it would otherwise be double-encoded). Outside a date window, an
      * incremental walk stops once a page's oldest [positionField] (ISO-8601 or epoch) predates what an
-     * earlier download covered — so that relies on newest-first order.
+     * earlier download covered — so that relies on newest-first order. When [linkQueryParams] is
+     * set, the field is a URL and only [param] and the listed query parameters are carried forward.
      */
     @Serializable
     @SerialName("token")
@@ -173,6 +175,9 @@ sealed interface ApiPaging {
         val param: String,
         val urlEncoded: Boolean = false,
         val positionField: String? = null,
+        @EncodeDefault(EncodeDefault.Mode.NEVER)
+        @Serializable(with = SortedStringListSerializer::class)
+        val linkQueryParams: List<String> = emptyList(),
     ) : ApiPaging
 }
 
@@ -271,6 +276,10 @@ data class ApiEndpointConfig(
      * audit trail and incremental-resume skip keep working.
      */
     val storeResponse: Boolean = true,
+    /** Earlier bank-feed path templates whose stored responses still use this endpoint's mappings. */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    @Serializable(with = SortedStringListSerializer::class)
+    val historicalPaths: List<String> = emptyList(),
 )
 
 /**

@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -41,6 +42,7 @@ import kotlin.time.Instant
 
 private const val ACCOUNT_UID = "11111111-1111-1111-1111-111111111111"
 private const val CATEGORY_UID = "22222222-2222-2222-2222-222222222222"
+private const val NEXT_CURSOR = "33333333-3333-3333-3333-333333333333"
 
 private val ACCOUNTS_JSON =
     """
@@ -227,6 +229,7 @@ class StarlingImportE2ETest : DbTest() {
         feedRequestUrls: MutableList<String>? = null,
         accountsJson: String = ACCOUNTS_JSON,
         identifiersJson: String? = null,
+        paginateAndRateLimit: Boolean = false,
     ) = MockEngine { request ->
         val url = request.url.toString()
         val json =
@@ -241,32 +244,50 @@ class StarlingImportE2ETest : DbTest() {
 
                 url.contains("/feed/account/") -> {
                     feedRequestUrls?.add(url)
-                    assertTrue(request.url.encodedPath.endsWith("/transactions-between"))
+                    assertTrue(request.url.encodedPath.endsWith("/paginated-transactions"))
                     val start = Instant.parse(assertNotNull(request.url.parameters["minTransactionTimestamp"]))
                     val end = Instant.parse(assertNotNull(request.url.parameters["maxTransactionTimestamp"]))
-                    assertTrue(end >= start && end - start < 365.days, "Starling rejects oversized date ranges: $url")
+                    assertTrue(end - start > 365.days)
                     assertEquals(null, request.url.parameters["changesSince"])
                     assertEquals(null, request.url.parameters["limit"])
+                    if (paginateAndRateLimit && feedRequestUrls?.size == 1) {
+                        return@MockEngine respond("", HttpStatusCode.TooManyRequests, headersOf(HttpHeaders.RetryAfter, "0"))
+                    }
                     val items =
                         Json
                             .parseToJsonElement(feedJson)
                             .jsonObject
                             .getValue("feedItems")
                             .jsonArray
-                    JsonObject(
-                        mapOf(
-                            "feedItems" to
-                                JsonArray(
-                                    items.filter {
-                                        Instant.parse(
-                                            it.jsonObject
-                                                .getValue("transactionTime")
-                                                .jsonPrimitive.content,
-                                        ) in start..end
-                                    },
-                                ),
-                        ),
-                    ).toString()
+                    val inRange =
+                        items.filter {
+                            Instant.parse(
+                                it.jsonObject
+                                    .getValue("transactionTime")
+                                    .jsonPrimitive.content,
+                            ) in
+                                start..end
+                        }
+                    val cursor = request.url.parameters["cursor"]
+                    val links = mutableMapOf<String, JsonPrimitive>()
+                    val page =
+                        when {
+                            !paginateAndRateLimit -> {
+                                inRange
+                            }
+
+                            cursor == null -> {
+                                links["next"] = JsonPrimitive("https://other.example/feed?cursor=$NEXT_CURSOR&pageToFetch=NEXT&limit=1")
+                                inRange.take(1)
+                            }
+
+                            else -> {
+                                assertEquals(NEXT_CURSOR, cursor)
+                                assertEquals("NEXT", request.url.parameters["pageToFetch"])
+                                inRange.drop(1)
+                            }
+                        }
+                    JsonObject(mapOf("feedItems" to JsonArray(page), "links" to JsonObject(links))).toString()
                 }
 
                 url.contains("/api/v2/accounts") -> {
@@ -297,7 +318,7 @@ class StarlingImportE2ETest : DbTest() {
                 createApiClient(
                     trafficRecorder =
                         ApiSessionTrafficRecorder(sessionId = sessionId, importEngine = repositories.importEngine),
-                    engine = mockEngine(feedRequestUrls = feedRequestUrls),
+                    engine = mockEngine(feedRequestUrls = feedRequestUrls, paginateAndRateLimit = true),
                 )
 
             downloadApiSessionAccounts(
@@ -328,16 +349,16 @@ class StarlingImportE2ETest : DbTest() {
             assertEquals(2, importResult.transactionCount, "Both feed items should import")
             assertEquals(0, importResult.errorCount, "No import errors expected")
 
-            assertTrue(feedRequestUrls.size > 1, "History must span multiple bounded requests")
-            val windows = feedRequestUrls.map { Url(it).parameters }
-            windows.zipWithNext().forEach { (previous, next) ->
-                val end = Instant.parse(assertNotNull(previous["maxTransactionTimestamp"]))
-                val start = Instant.parse(assertNotNull(next["minTransactionTimestamp"]))
-                assertEquals(1L, (start - end).inWholeMilliseconds, "History windows must not leave gaps")
-            }
+            assertEquals(3, feedRequestUrls.size)
+            val (first, retry, next) = feedRequestUrls.map { Url(it) }
+            assertEquals(first, retry)
+            assertEquals(first.host, next.host)
+            assertEquals(first.encodedPath, next.encodedPath)
+            assertEquals(first.parameters["minTransactionTimestamp"], next.parameters["minTransactionTimestamp"])
+            assertEquals(first.parameters["maxTransactionTimestamp"], next.parameters["maxTransactionTimestamp"])
 
             val allAccounts = repositories.accountRepository.getAllAccounts().first()
-            val ownAccount = allAccounts.single { it.name == "Personal" }
+            val ownAccount = allAccounts.single { it.name == "Starling" }
             val transfers = repositories.transactionRepository.getTransactionsByAccount(ownAccount.id).first()
             assertEquals(2, transfers.size)
 
@@ -354,7 +375,7 @@ class StarlingImportE2ETest : DbTest() {
         }
 
     @Test
-    fun `starling import sets identifying attributes and makes personal counterparties owners`() =
+    fun `starling import of a saved legacy feed keeps identifying attributes and counterparty ownership`() =
         runDbTest {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
@@ -365,10 +386,10 @@ class StarlingImportE2ETest : DbTest() {
                     .first()
                     .single { it.name == "Starling" }
 
+            val recorder = ApiSessionTrafficRecorder(sessionId = sessionId, importEngine = repositories.importEngine)
             val apiClient =
                 createApiClient(
-                    trafficRecorder =
-                        ApiSessionTrafficRecorder(sessionId = sessionId, importEngine = repositories.importEngine),
+                    trafficRecorder = recorder,
                     engine = mockEngine(),
                 )
 
@@ -379,14 +400,13 @@ class StarlingImportE2ETest : DbTest() {
                 sessionId = sessionId,
                 strategy = strategy,
             )
-            downloadApiSessionTransactions(
-                token = "test-starling-token",
-                apiClient = apiClient,
-                apiSessionRepository = repositories.apiSessionRepository,
-                sessionId = sessionId,
-                strategy = strategy,
-                importEngine = repositories.importEngine,
-            )
+            val legacyRequest =
+                recorder.recordRequest(
+                    "GET",
+                    "https://api.starlingbank.com/api/v2/feed/account/$ACCOUNT_UID/category/$CATEGORY_UID/transactions-between",
+                    emptyMap(),
+                )
+            recorder.recordResponse(legacyRequest, FEED_JSON)
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
                 currencyRepository = repositories.currencyRepository,
@@ -396,7 +416,7 @@ class StarlingImportE2ETest : DbTest() {
             )
 
             val allAccounts = repositories.accountRepository.getAllAccounts().first()
-            val ownAccount = allAccounts.single { it.name == "Personal" }
+            val ownAccount = allAccounts.single { it.name == "Starling" }
             val coffee = allAccounts.single { it.name == "Coffee Shop" }
             val acme = allAccounts.single { it.name == "ACME Ltd" }
 
@@ -495,7 +515,7 @@ class StarlingImportE2ETest : DbTest() {
             )
 
             val allAccounts = repositories.accountRepository.getAllAccounts().first()
-            val ownAccount = allAccounts.single { it.name == "Personal" }
+            val ownAccount = allAccounts.single { it.name == "Starling" }
 
             // Both feed items name a different counterparty (cp-one/"ACME Ltd" vs cp-two/"ACME Limited")
             // but the same bank account, so exactly one counterparty account must be created.
@@ -531,7 +551,7 @@ class StarlingImportE2ETest : DbTest() {
             // another provider. ACME in FEED_JSON has the same sort code + account number (040004/12345678).
             val existingId =
                 repositories.accountRepository.createAccount(
-                    Account(id = AccountId(0), name = "Personal", openingDate = now),
+                    Account(id = AccountId(0), name = "Starling", openingDate = now),
                 )
             repositories.accountAttributeRepository
                 .insert(existingId, AttributeTypeId(WellKnownIds.ACCOUNT_SORT_CODE_ATTR_TYPE_ID), "040004")
@@ -584,11 +604,11 @@ class StarlingImportE2ETest : DbTest() {
             )
 
             // The incoming ACME transfer originates from the pre-existing account.
-            // The own account shares the bare name "Personal" with the pre-existing fixture account, and
+            // The own account shares the bare name "Starling" with the pre-existing fixture account, and
             // account names are unique, so the own account (created second) is disambiguated. This test
             // doesn't stage the identifiers endpoint, so the own account carries no sort/account-number
             // attributes; the discriminator falls back to its external id (ACCOUNT_UID) last 6 chars.
-            val ownAccount = allAccounts.single { it.name == "Personal (111111)" }
+            val ownAccount = allAccounts.single { it.name == "Starling (111111)" }
             val transfers = repositories.transactionRepository.getTransactionsByAccount(ownAccount.id).first()
             val acmeIncoming = transfers.single { it.amount.hasDisplayValue("500.00") }
             assertEquals(existingId, acmeIncoming.sourceAccountId, "The ACME transfer should link to the pre-existing account")
@@ -659,7 +679,7 @@ class StarlingImportE2ETest : DbTest() {
 
             // The Starling source account IS the adopted pre-existing account (same id), now renamed; the
             // old counterparty name is gone and no second account carries 099999/55556666.
-            val ownAccount = allAccounts.single { it.name == "Personal" }
+            val ownAccount = allAccounts.single { it.name == "Starling" }
             assertEquals(existingId, ownAccount.id, "The source account should reuse the pre-existing account's id")
             assertTrue(
                 allAccounts.none { it.name == "Nikolay" },
@@ -749,7 +769,7 @@ class StarlingImportE2ETest : DbTest() {
             )
 
             val allAccounts = repositories.accountRepository.getAllAccounts().first()
-            val ownAccount = allAccounts.single { it.name == "Personal" }
+            val ownAccount = allAccounts.single { it.name == "Starling" }
             assertEquals(existingId, ownAccount.id, "The source account should adopt the bank-external-id account")
             assertTrue(
                 allAccounts.none { it.name == "Nikolay" },
@@ -811,7 +831,7 @@ class StarlingImportE2ETest : DbTest() {
                 repositories.accountRepository
                     .getAllAccounts()
                     .first()
-                    .single { it.name == "Personal" }
+                    .single { it.name == "Starling" }
             val attrs = repositories.accountAttributeRepository.getByAccount(ownAccount.id).first()
             assertEquals("099999", attrs.single { it.attributeType.name == "account-sort-code" }.value)
             assertEquals("55556666", attrs.single { it.attributeType.name == "account-account-number" }.value)
@@ -882,7 +902,7 @@ class StarlingImportE2ETest : DbTest() {
             val people = repositories.personRepository.getAllPeople().first()
             val ada = people.single { it.firstName == "Ada" && it.lastName == "Lovelace" }
             val accounts = repositories.accountRepository.getAllAccounts().first()
-            val ownAccount = accounts.single { it.name == "Personal" }
+            val ownAccount = accounts.single { it.name == "Starling" }
             val owners =
                 repositories.personAccountOwnershipRepository
                     .getOwnershipsByAccount(ownAccount.id)
@@ -965,7 +985,7 @@ class StarlingImportE2ETest : DbTest() {
                 repositories.accountRepository
                     .getAllAccounts()
                     .first()
-                    .single { it.name == "Personal" }
+                    .single { it.name == "Starling" }
             val owners = repositories.personAccountOwnershipRepository.getOwnershipsByAccount(ownAccount.id).first()
             assertTrue(owners.any { it.personId == ada.id }, "The holder should own the own account regardless of import order")
         }
@@ -1097,7 +1117,7 @@ class StarlingImportE2ETest : DbTest() {
             repositories.maintenanceService.refreshMaterializedViews()
 
             val accounts = repositories.accountRepository.getAllAccounts().first()
-            val ownAccount = accounts.single { it.name == "Personal" }
+            val ownAccount = accounts.single { it.name == "Starling" }
             val balances = repositories.transactionRepository.getAccountBalances().first()
             val ownBalance = balances.single { it.accountId == ownAccount.id }
 
