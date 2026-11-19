@@ -59,6 +59,12 @@ bootstrap: >-
 profile:
   path: .qodana/profile.xml
 exclude:
+  # The Bazel IDE model uses commonTest/kotlin/com/moneymanager as the CSV importer's test
+  # source root with an empty package prefix. The file's package matches its Kotlin source path.
+  - name: PackageDirectoryMismatch
+    paths:
+      - app/csvimporter/src/commonTest/kotlin/com/moneymanager/csvimporter/BarclaycardCsvMapperTest.kt
+
   # Compose @Composable functions are PascalCase by convention; the community linter has no
   # Compose awareness. ktlint (compose ruleset) polices naming in these modules instead.
   - name: FunctionName

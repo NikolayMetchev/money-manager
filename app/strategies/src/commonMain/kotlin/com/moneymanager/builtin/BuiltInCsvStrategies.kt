@@ -66,6 +66,7 @@ object BuiltInCsvStrategies {
     val marcusCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000019")
     val revolutCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000001a")
     val barclaycardOfxStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000001b")
+    val barclaycardCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000001c")
 
     /** Fixed account names shared by the crypto.com Card and Fiat strategies, so both files resolve the same accounts. */
     private const val CRYPTO_COM_CARD_ACCOUNT = "Crypto.com Card"
@@ -443,8 +444,8 @@ object BuiltInCsvStrategies {
     private const val BINANCE_CONVERSION_PAIRING_WINDOW_SECONDS = 2L
 
     /**
-     * All built-in CSV import strategies. [qifCurrencyId] is the database's GBP, the currency the QIF and PDF
-     * statements and the Marcus export are in; the catalog publishes it as the code "GBP", which an install resolves in its database.
+     * All built-in CSV import strategies. [qifCurrencyId] is the database's GBP for fixed-currency UK statements.
+     * The catalog publishes it as "GBP", which an install resolves in its database.
      */
     fun builtInCsvStrategies(
         now: Instant,
@@ -455,6 +456,7 @@ object BuiltInCsvStrategies {
             buildAmexQifStrategy(now, qifCurrencyId),
             buildAmexPdfStrategy(now, qifCurrencyId),
             buildBarclaycardOfxStrategy(now),
+            buildBarclaycardCsvStrategy(now, qifCurrencyId),
             buildWiseCsvStrategy(now),
             buildMonzoCsvStrategy(now),
             buildMarcusCsvStrategy(now, qifCurrencyId),
@@ -1872,6 +1874,70 @@ object BuiltInCsvStrategies {
                     fieldMappings = fieldMappings,
                     rules = rules,
                     contentMatchRules = listOf(Condition(OfxColumns.COL_FITID, ConditionOp.MATCHES, BARCLAYCARD_FITID)),
+                    crossSourceReconcileWindow = SettlementWindow.Elapsed(QIF_STATEMENT_RECONCILE_WINDOW_SECONDS),
+                    placeholderReconcileWindow = STATEMENT_PLACEHOLDER_WINDOW,
+                ),
+            createdAt = now,
+            updatedAt = now,
+        )
+    }
+
+    /**
+     * Barclaycard's sterling CSV lists purchases as positive and payments to the card as negative.
+     * It has no FITID or running balance. Identical purchases on the same day are separate rows, so
+     * use the existing one-to-one all-fields dedupe for overlapping downloads.
+     */
+    fun buildBarclaycardCsvStrategy(
+        now: Instant,
+        currencyId: CurrencyId,
+    ): CsvImportStrategy {
+        val date = "Date"
+        val card = "Account/Card No"
+        val amount = "Amount"
+        val subcategory = "Subcategory"
+        val memo = "Memo"
+        // A tab or padding separates the merchant label from an additional description.
+        val merchant = ValueExpr.of(memo, extraction = Extraction("^\\s*(\\S.*?)(?:\\t| {2,}|$)", "$1"))
+        return CsvImportStrategy(
+            id = CsvImportStrategyId(barclaycardCsvStrategyId),
+            name = "Barclaycard CSV",
+            config =
+                CsvStrategyConfig(
+                    identificationColumns = setOf(date, card, amount, subcategory, memo),
+                    fieldMappings =
+                        mapOf(
+                            accountFromRules(TransferField.SOURCE_ACCOUNT),
+                            accountFromRules(TransferField.TARGET_ACCOUNT),
+                            TransferField.TIMESTAMP to
+                                DateTimeParsingMapping(
+                                    fieldType = TransferField.TIMESTAMP,
+                                    dateColumnName = date,
+                                    dateFormat = "dd/MM/yyyy",
+                                ),
+                            TransferField.DESCRIPTION to DirectColumnMapping(fieldType = TransferField.DESCRIPTION, value = merchant),
+                            TransferField.AMOUNT to
+                                AmountParsingMapping(
+                                    fieldType = TransferField.AMOUNT,
+                                    mode = AmountMode.SINGLE_COLUMN,
+                                    amountColumnName = amount,
+                                ),
+                            TransferField.CURRENCY to HardCodedCurrencyMapping(fieldType = TransferField.CURRENCY, currencyId = currencyId),
+                            TransferField.TIMEZONE to HardCodedTimezoneMapping(fieldType = TransferField.TIMEZONE, timezoneId = "UTC"),
+                        ),
+                    rules =
+                        listOf(
+                            incomingWhen(Condition(amount, ConditionOp.NEGATIVE)),
+                            attribute(card, "barclaycard-card-number"),
+                            attribute(subcategory, "barclaycard-subcategory"),
+                            attribute(memo, "barclaycard-memo"),
+                            accounts(AccountSide.SOURCE, fixedNaming(card, BARCLAYCARD_ACCOUNT)),
+                            rule(
+                                RuleAction.Account(AccountSide.TARGET, AccountNaming(value = merchant, unidentified = true)),
+                                conditions = listOf(Condition(subcategory, ConditionOp.EQUALS, "Payment received")),
+                            ),
+                            accounts(AccountSide.TARGET, AccountNaming(value = merchant)),
+                        ),
+                    duplicateDateTolerance = SettlementWindow.Elapsed(0),
                     crossSourceReconcileWindow = SettlementWindow.Elapsed(QIF_STATEMENT_RECONCILE_WINDOW_SECONDS),
                     placeholderReconcileWindow = STATEMENT_PLACEHOLDER_WINDOW,
                 ),
