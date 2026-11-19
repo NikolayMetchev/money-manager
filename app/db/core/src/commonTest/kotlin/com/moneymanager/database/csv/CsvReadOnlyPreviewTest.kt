@@ -24,6 +24,7 @@ import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.observation.ObservationOwner
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ConditionOp
 import com.moneymanager.domain.model.rules.RuleAction
@@ -36,6 +37,10 @@ import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportTransfer
+import com.moneymanager.importengineapi.MaterializationRequest
+import com.moneymanager.importengineapi.ObservationMutation
+import com.moneymanager.importengineapi.ObservationSlot
+import com.moneymanager.importengineapi.ObservationTransaction
 import com.moneymanager.importengineapi.PlannedField
 import com.moneymanager.importengineapi.StaleImportPlanException
 import com.moneymanager.importengineapi.applyCsvImportMutations
@@ -159,6 +164,48 @@ class CsvReadOnlyPreviewTest : DbTest() {
             assertEquals(1, repeated.filesUnchanged)
             assertEquals(version, repositories.importEngine.writeVersion.value)
             assertEquals(before + 1, transferAuditCount())
+        }
+
+    @Test
+    fun skippingTheCreatingRowKeepsATransferAnotherFileStillReports() =
+        runDbTest {
+            val first = stage()
+            val second = stage(suffix = "-other", existingAccounts = first.bank to first.shop)
+            val shared = transfer(first.id)
+            val engine = repositories.importEngine
+            val record = repositories.importRecordRepository.getCsvImportRecords(second.id).single()
+            val content =
+                repositories.observationRepository
+                    .getObservationsOfTransaction(shared.id)
+                    .single()
+                    .content
+            engine.import(
+                ImportBatch(
+                    observationMutations =
+                        listOf(
+                            ObservationMutation.Upsert(
+                                ObservationOwner.Record(record.id),
+                                ObservationSlot.MAIN,
+                                ObservationTransaction.Existing(shared.id),
+                                content,
+                            ),
+                        ),
+                    materialization = MaterializationRequest(Source.Reconciler),
+                ),
+            )
+            engine.updateCsvStrategy(skipFirst(first.strategy))
+            val before = transferAuditCount()
+            val reimports = repositories.reimports()
+            val prepared = assertNotNull(reimports.preview(reimports.planFile(first.id), null, null))
+
+            val result = reimports.applyPreview(prepared)
+
+            assertTrue(result.plan.isEmpty)
+            assertEquals(ImportStatus.SKIPPED, rows(first.id).single().importStatus)
+            assertEquals(shared, transfer(second.id))
+            val remaining = repositories.observationRepository.getObservationsOfTransaction(shared.id).single()
+            assertEquals(ObservationOwner.Record(record.id), remaining.owner)
+            assertEquals(before, transferAuditCount())
         }
 
     @Test

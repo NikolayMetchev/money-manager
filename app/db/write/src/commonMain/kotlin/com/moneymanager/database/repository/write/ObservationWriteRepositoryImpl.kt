@@ -160,7 +160,7 @@ class ObservationWriteRepositoryImpl(
                 if (before == null) {
                     getObservationsOf(change.owner).none { it.slot == change.slot }
                 } else {
-                    getObservationsOfTransaction(before.transactionId).singleOrNull() == before
+                    getObservationsOf(before.owner).singleOrNull { it.slot == before.slot } == before
                 }
             } &&
                 rows.filterIsInstance<MaterializedWrite.Update>().all { update ->

@@ -101,7 +101,8 @@ internal class CsvTransferSyncPlanner(
         if (stored.size != ids.size || stored.any { it.transactionId !in ids }) return null
         val byTransaction = stored.associateBy { it.transactionId }
         val accounts = proposedAccounts + current.values.flatMap { listOf(it.sourceAccountId, it.targetAccountId) }
-        if (observations.getObservationsOfTransactions(ids).size != stored.size) return null
+        val related = observations.getObservationsOfTransactions(ids)
+        if (observations.getReservedIds(related.map { it.id }).isNotEmpty()) return null
         val outside =
             accounts
                 .flatMap { account -> transfers.getTransactionsByAccount(account).first() }
@@ -248,6 +249,7 @@ internal class CsvTransferSyncPlanner(
                 }.toMap(),
             statuses,
             newRecords,
+            ids,
         )
     }
 
@@ -271,6 +273,7 @@ internal data class CsvTransferChanges(
     val hashes: Map<ImportRecordId, String>,
     val statuses: Map<Long, ImportStatus>,
     val newRecords: List<ImportRecord>,
+    val transactionIds: Set<TransferId>,
 ) {
     val hasWrites: Boolean
         get() =

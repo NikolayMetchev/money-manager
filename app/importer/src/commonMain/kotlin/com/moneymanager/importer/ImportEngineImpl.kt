@@ -281,7 +281,15 @@ class ImportEngineImpl(
                     materializer,
                     ::sourceTransferSnapshots,
                 )
-            val replacedBookings = requests.flatMapTo(mutableSetOf()) { csvImportRepository.getTransferIdsCreatedByImport(it.id) }
+            val createdBookings = requests.flatMapTo(mutableSetOf()) { csvImportRepository.getTransferIdsCreatedByImport(it.id) }
+            val stillObserved =
+                observations.getTransactionsObservedByOtherRecords(
+                    createdBookings,
+                    requests.mapTo(mutableSetOf()) { it.id },
+                    emptySet(),
+                )
+            val replacedBookings = createdBookings.filterNotTo(mutableSetOf()) { it in stillObserved }
+            val plannedBookings = mutableSetOf<TransferId>()
             val earlierBookings = mutableListOf<Transfer>()
             var allocatedLocals = 0
             var allocatedRecords = 0
@@ -291,6 +299,8 @@ class ImportEngineImpl(
                     val change =
                         planner.plan(request, allocatedLocals, allocatedRecords, replacedBookings, earlierBookings)
                             ?: return@withLock null
+                    // Plans that both change the same transaction need one merged materialization.
+                    if (change.transactionIds.any { !plannedBookings.add(it) }) return@withLock null
                     allocatedLocals += change.materialization.newTransactions.size
                     allocatedRecords += change.newRecords.size
                     request.rows.values.forEach { input ->
