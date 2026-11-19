@@ -51,21 +51,7 @@ private fun showLoadDialog(
     val lastDirectory = localSettings.getString(KEY_LAST_DIRECTORY)
     // AWT's Linux file dialog has no per-dialog control over hidden entries.
     if (System.getProperty("os.name") == "Linux") {
-        val chooser =
-            JFileChooser(lastDirectory).apply {
-                dialogTitle = title
-                isMultiSelectionEnabled = multiple
-                isFileHidingEnabled = false
-                if (extensions.isNotEmpty()) {
-                    isAcceptAllFileFilterUsed = false
-                    fileFilter =
-                        object : FileFilter() {
-                            override fun accept(file: File): Boolean = file.isDirectory || matchesExtensions(file.name, extensions)
-
-                            override fun getDescription(): String = extensions.joinToString(", ") { "*$it" }
-                        }
-                }
-            }
+        val chooser = linuxLoadChooser(title, lastDirectory, extensions, multiple)
         if (chooser.showOpenDialog(null) != JFileChooser.APPROVE_OPTION) return emptyList()
         return if (multiple) chooser.selectedFiles.toList() else listOfNotNull(chooser.selectedFile)
     }
@@ -87,6 +73,27 @@ private fun showLoadDialog(
         frame.dispose()
     }
 }
+
+internal fun linuxLoadChooser(
+    title: String,
+    directory: String?,
+    extensions: List<String>,
+    multiple: Boolean,
+): JFileChooser =
+    JFileChooser(directory).apply {
+        dialogTitle = title
+        isMultiSelectionEnabled = multiple
+        isFileHidingEnabled = false
+        if (extensions.isNotEmpty()) {
+            isAcceptAllFileFilterUsed = false
+            fileFilter =
+                object : FileFilter() {
+                    override fun accept(file: File): Boolean = file.isDirectory || matchesExtensions(file.name, extensions)
+
+                    override fun getDescription(): String = extensions.joinToString(", ") { "*$it" }
+                }
+        }
+    }
 
 /**
  * Checks if a filename matches any of the given extensions.
