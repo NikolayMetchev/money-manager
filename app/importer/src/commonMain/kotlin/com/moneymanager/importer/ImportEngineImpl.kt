@@ -1135,6 +1135,7 @@ class ImportEngineImpl(
         // Each file or session reads only its own record slots. Groups may span files and have their own pool.
         private val vacantRecords = mutableMapOf<Any, MutableMap<Pair<ObservationOwner, String>, VacantObservation>>()
         private var vacantGroups: MutableMap<Pair<ObservationOwner, String>, VacantObservation>? = null
+        private val claimedIds = mutableSetOf<TransactionId>()
 
         /**
          * The id a re-run reserved for [key]'s slot, when its record said it before and nothing took it back yet: a new
@@ -1177,7 +1178,8 @@ class ImportEngineImpl(
             val id = reserved.transactionId
             if ((id is TransferId) != (kind == TransactionKind.TRANSFER)) return null
             pool.remove(owner to key.slot)
-            return id
+            // Several slots can observe the same transaction, and batched writes claim IDs before inserting any rows.
+            return id.takeIf { claimedIds.add(it) }
         }
 
         fun transferContent(
