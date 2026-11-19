@@ -100,6 +100,7 @@ class ApiClient(
             body = call.attributes.getOrNull(apiResponseBodyKey) ?: bodyAsText(),
             responseId = call.attributes[apiResponseIdKey],
             requestId = call.attributes[apiRequestIdKey],
+            retryAfterSeconds = headers[HttpHeaders.RetryAfter]?.toLongOrNull(),
         )
 }
 
@@ -108,6 +109,7 @@ data class ApiHttpResponse(
     val body: String,
     val responseId: Long,
     val requestId: Long,
+    val retryAfterSeconds: Long? = null,
 )
 
 interface ApiTrafficRecorder {

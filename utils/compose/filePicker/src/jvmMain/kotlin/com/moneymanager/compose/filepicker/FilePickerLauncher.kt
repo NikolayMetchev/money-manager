@@ -9,6 +9,8 @@ import java.awt.FileDialog
 import java.awt.Frame
 import java.io.File
 import java.io.FilenameFilter
+import javax.swing.JFileChooser
+import javax.swing.filechooser.FileFilter
 import kotlin.time.Instant
 
 /** Remembers the directory last used in a file dialog so subsequent dialogs reopen there. */
@@ -37,7 +39,7 @@ actual class MultipleBinaryFilePickerLauncher(
 }
 
 /**
- * Shows a native load dialog filtered by [mimeTypes], opened at the last-used directory, and returns
+ * Shows a load dialog filtered by [mimeTypes], opened at the last-used directory, and returns
  * the selected files (empty if the user cancelled).
  */
 private fun showLoadDialog(
@@ -45,13 +47,21 @@ private fun showLoadDialog(
     mimeTypes: List<String>,
     multiple: Boolean,
 ): List<File> {
+    val extensions = mimeTypesToExtensions(mimeTypes)
+    val lastDirectory = localSettings.getString(KEY_LAST_DIRECTORY)
+    // AWT's Linux file dialog has no per-dialog control over hidden entries.
+    if (System.getProperty("os.name") == "Linux") {
+        val chooser = linuxLoadChooser(title, lastDirectory, extensions, multiple)
+        if (chooser.showOpenDialog(null) != JFileChooser.APPROVE_OPTION) return emptyList()
+        return if (multiple) chooser.selectedFiles.toList() else listOfNotNull(chooser.selectedFile)
+    }
+
     val frame = Frame()
     try {
         val fileDialog = FileDialog(frame, title, FileDialog.LOAD)
         fileDialog.isMultipleMode = multiple
-        localSettings.getString(KEY_LAST_DIRECTORY)?.let { fileDialog.directory = it }
+        lastDirectory?.let { fileDialog.directory = it }
 
-        val extensions = mimeTypesToExtensions(mimeTypes)
         if (extensions.isNotEmpty()) {
             fileDialog.filenameFilter = FilenameFilter { _, name -> matchesExtensions(name, extensions) }
         }
@@ -63,6 +73,27 @@ private fun showLoadDialog(
         frame.dispose()
     }
 }
+
+internal fun linuxLoadChooser(
+    title: String,
+    directory: String?,
+    extensions: List<String>,
+    multiple: Boolean,
+): JFileChooser =
+    JFileChooser(directory).apply {
+        dialogTitle = title
+        isMultiSelectionEnabled = multiple
+        isFileHidingEnabled = false
+        if (extensions.isNotEmpty()) {
+            isAcceptAllFileFilterUsed = false
+            fileFilter =
+                object : FileFilter() {
+                    override fun accept(file: File): Boolean = file.isDirectory || matchesExtensions(file.name, extensions)
+
+                    override fun getDescription(): String = extensions.joinToString(", ") { "*$it" }
+                }
+        }
+    }
 
 /**
  * Checks if a filename matches any of the given extensions.

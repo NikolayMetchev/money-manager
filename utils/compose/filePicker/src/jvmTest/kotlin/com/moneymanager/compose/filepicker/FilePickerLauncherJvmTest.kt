@@ -1,6 +1,8 @@
 package com.moneymanager.compose.filepicker
 
 import java.io.File
+import javax.swing.SwingUtilities
+import kotlin.io.path.createTempDirectory
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -26,6 +28,33 @@ class FilePickerLauncherJvmTest {
         file.writeText(content, Charsets.UTF_8)
         tempFiles.add(file)
         return file
+    }
+
+    @Test
+    fun `Linux chooser shows dotfiles and dotfolders while filtering extensions`() {
+        val directory = createTempDirectory().toFile()
+        try {
+            check(File(directory, ".settings").mkdir())
+            check(File(directory, ".starling.api.JSON").createNewFile())
+            check(File(directory, ".notes.txt").createNewFile())
+            SwingUtilities.invokeAndWait {
+                val chooser = linuxLoadChooser("Select files", directory.path, listOf(".json"), multiple = true)
+                val visibleNames =
+                    chooser.fileSystemView
+                        .getFiles(chooser.currentDirectory, chooser.isFileHidingEnabled)
+                        .filter(chooser::accept)
+                        .map(File::getName)
+                        .toSet()
+
+                assertEquals(setOf(".settings", ".starling.api.JSON"), visibleNames)
+                assertEquals("Select files", chooser.dialogTitle)
+                assertTrue(chooser.isMultiSelectionEnabled)
+                assertFalse(chooser.isAcceptAllFileFilterUsed)
+                assertEquals("*.json", chooser.fileFilter.description)
+            }
+        } finally {
+            directory.deleteRecursively()
+        }
     }
 
     // MIME type to extensions tests

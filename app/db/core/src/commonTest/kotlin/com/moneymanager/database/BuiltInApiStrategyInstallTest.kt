@@ -345,9 +345,9 @@ class BuiltInApiStrategyInstallTest : DbTest() {
             assertEquals("/api/v2/accounts", starlingAccounts.endpoint.path)
             assertEquals("accounts", starlingAccounts.endpoint.responseArrayKey)
             val feedEndpoint = checkNotNull(starling.config.bankTransactions).endpoint
-            assertEquals("/api/v2/feed/account/{account.id}/category/{account.defaultCategory}/transactions-between", feedEndpoint.path)
+            assertEquals("/api/v2/feed/account/{account.id}/category/{account.defaultCategory}/paginated-transactions", feedEndpoint.path)
             assertEquals("feedItems", feedEndpoint.responseArrayKey)
-            assertEquals(365, feedEndpoint.pagination?.window?.windowDays)
+            assertEquals(null, assertNotNull(feedEndpoint.pagination?.window).windowDays)
 
             assertEquals("accountUid", starlingAccounts.mappings.idField)
             assertEquals("currency", starlingAccounts.mappings.currencyField)

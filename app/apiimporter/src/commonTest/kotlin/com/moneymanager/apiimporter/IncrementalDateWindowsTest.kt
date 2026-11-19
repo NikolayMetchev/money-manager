@@ -52,6 +52,19 @@ class IncrementalDateWindowsTest {
     }
 
     @Test
+    fun `a single date range uses the exact lookback or incremental start`() {
+        val singleRange = pagination.copy(window = ApiDateWindowing(windowDays = null, lookbackDays = 365))
+        val since = Instant.fromEpochMilliseconds(now.toEpochMilliseconds() - 30 * MILLIS_PER_DAY)
+        val full = dateWindows(singleRange, now).single()
+        val incremental = dateWindows(singleRange, now, since).single()
+
+        assertEquals(now.toEpochMilliseconds() - 365 * MILLIS_PER_DAY, full.start.toEpochMilliseconds())
+        assertEquals(since.toEpochMilliseconds() - 5 * MILLIS_PER_DAY, incremental.start.toEpochMilliseconds())
+        assertEquals(now, full.end)
+        assertEquals(now, incremental.end)
+    }
+
+    @Test
     fun `window boundaries stay anchored so earlier windows keep stable urls`() {
         val full = dateWindows(pagination, now)
         val incremental = dateWindows(pagination, now, now - kotlin.time.Duration.parse("30d"))

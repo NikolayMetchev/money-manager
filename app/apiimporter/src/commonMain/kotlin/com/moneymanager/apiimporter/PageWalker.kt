@@ -3,6 +3,7 @@ package com.moneymanager.apiimporter
 import com.moneymanager.domain.model.apistrategy.ApiPaginationConfig
 import com.moneymanager.domain.model.apistrategy.ApiPaging
 import com.moneymanager.domain.model.apistrategy.WindowBoundFormat
+import io.ktor.http.URLBuilder
 import io.ktor.http.decodeURLQueryComponent
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -115,7 +116,7 @@ private suspend fun walkUnit(
 ): UnitOutcome {
     var offset = if (paging is ApiPaging.Offset && paging.pageNumbers) 1 else 0
     var itemsSeen = 0
-    var token: String? = null
+    var tokenParams: Map<String, String>? = null
     var tokenPage = 0
     var before: Instant? = null
     while (true) {
@@ -135,7 +136,7 @@ private suspend fun walkUnit(
             }
 
             is ApiPaging.Token -> {
-                token?.let { params[paging.param] = it }
+                tokenParams?.let(params::putAll)
                 limit?.let { params[it.limitParam] = it.limitValue.toString() }
                 marker = tokenPage.toString()
             }
@@ -179,15 +180,14 @@ private suspend fun walkUnit(
                 }
 
                 is ApiPaging.Token -> {
-                    val sent = token
-                    token = nextPageToken(page.body, paging, sent)
+                    tokenParams = nextPageParams(page.body, paging, tokenParams)
                     tokenPage += 1
                     val pagedPastCutoff =
                         cutoff != null &&
                             paging.positionPath()?.let { path ->
                                 items.any { item -> item.position(path)?.let { it < cutoff } == true }
                             } == true
-                    token != null && items.isNotEmpty() && !pagedPastCutoff
+                    tokenParams != null && items.isNotEmpty() && !pagedPastCutoff
                 }
 
                 is ApiPaging.BeforeCursor -> {
@@ -246,16 +246,21 @@ internal fun formatWindowBound(
     }
 
 /**
- * The next-page token in [body] per [paging] — decoded when the provider sends it already
- * percent-encoded, since request params are percent-encoded again when sent. Null when absent, blank, or
- * the same token that was just sent: a provider echoing it back would otherwise page forever.
+ * The next-page parameters in [body]. When the provider returns a link, copy only the configured
+ * query values: requests still go to the original endpoint with its own account and date bounds.
  */
-internal fun nextPageToken(
+internal fun nextPageParams(
     body: String,
     paging: ApiPaging.Token,
-    sentToken: String?,
-): String? {
+    sentParams: Map<String, String>?,
+): Map<String, String>? {
     val raw = stringFieldFromJson(body, paging.tokenField)?.takeIf { it.isNotBlank() } ?: return null
-    val token = if (paging.urlEncoded) raw.decodeURLQueryComponent() else raw
-    return token.takeIf { it != sentToken }
+    val nextParams =
+        if (paging.linkQueryParams.isEmpty()) {
+            mapOf(paging.param to if (paging.urlEncoded) raw.decodeURLQueryComponent() else raw)
+        } else {
+            val query = runCatching { URLBuilder(raw).parameters }.getOrNull() ?: return null
+            (listOf(paging.param) + paging.linkQueryParams).mapNotNull { name -> query[name]?.let { name to it } }.toMap()
+        }
+    return nextParams.takeIf { !it[paging.param].isNullOrBlank() && it != sentParams }
 }
