@@ -606,8 +606,18 @@ class ImportEngineImpl(
             relationships.apply(
                 batch.relationshipMutations.map { m ->
                     when (m) {
-                        is RelationshipMutation.Create -> RelationshipWrite.Create(m.typeId, m.members, m.source)
-                        is RelationshipMutation.Delete -> RelationshipWrite.Delete(m.id)
+                        is RelationshipMutation.Create -> {
+                            RelationshipWrite.Create(
+                                m.typeId,
+                                m.members,
+                                m.source,
+                                pinObservations = m.pinObservations,
+                            )
+                        }
+
+                        is RelationshipMutation.Delete -> {
+                            RelationshipWrite.Delete(m.id)
+                        }
                     }
                 },
             )

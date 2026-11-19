@@ -1,8 +1,6 @@
 package com.moneymanager.reconciliation
 
 import com.moneymanager.domain.model.TransactionId
-import com.moneymanager.domain.model.observation.ObservationPin
-import com.moneymanager.domain.repository.ObservationReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.createReconciliationMatches
 
@@ -11,13 +9,5 @@ import com.moneymanager.importengineapi.createReconciliationMatches
  * write: a re-import then re-makes each member as the transaction the match names, so the match holds. Nothing merges,
  * so no balance moves.
  */
-suspend fun ImportEngine.acceptMatches(
-    matches: Collection<Collection<TransactionId>>,
-    observations: ObservationReadRepository,
-) {
-    val pins =
-        matches.flatten().distinct().flatMap { member ->
-            observations.getObservationsOfTransaction(member).map { ObservationPin(it.id, member) }
-        }
-    createReconciliationMatches(matches, pins)
-}
+suspend fun ImportEngine.acceptMatches(matches: Collection<Collection<TransactionId>>) =
+    createReconciliationMatches(matches, pinObservations = true)

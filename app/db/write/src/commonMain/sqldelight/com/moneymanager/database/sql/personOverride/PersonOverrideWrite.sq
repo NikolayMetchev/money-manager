@@ -32,6 +32,10 @@ DELETE FROM trade_attribute_removal WHERE transaction_id = ? AND attribute_type_
 upsertPin:
 INSERT OR REPLACE INTO observation_pin (observation_id, transaction_id) VALUES (?, ?);
 
+pinObservationsOfTransactions:
+INSERT OR REPLACE INTO observation_pin (observation_id, transaction_id)
+SELECT id, transaction_id FROM observation WHERE transaction_id IN :transactionIds;
+
 deletePin:
 DELETE FROM observation_pin WHERE observation_id = ?;
 

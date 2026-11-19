@@ -125,11 +125,13 @@ sealed interface RelationshipMutation {
      * A relationship of [typeId] over [members], recorded with [source] as its provenance (a person's is
      * [Source.Manual], which a re-import of any member's source rebuilds on the re-created transactions).
      * Skipped when [typeId] already relates exactly these members.
+     * [pinObservations] also pins each member's observations to their current transaction in the same write.
      */
     data class Create(
         val typeId: RelationshipTypeId,
         val members: List<RelationshipMember>,
         val source: Source,
+        val pinObservations: Boolean = false,
     ) : RelationshipMutation
 
     data class Delete(

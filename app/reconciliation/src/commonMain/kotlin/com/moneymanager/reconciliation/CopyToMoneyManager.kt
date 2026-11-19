@@ -8,7 +8,6 @@ import com.moneymanager.domain.model.reconciliation.LegTransactionKind
 import com.moneymanager.domain.model.reconciliation.ReconciliationLeg
 import com.moneymanager.domain.model.reconciliation.ReconciliationLink
 import com.moneymanager.domain.model.reconciliation.ShadowAccount
-import com.moneymanager.domain.repository.ObservationReadRepository
 import com.moneymanager.importengineapi.CopyEnd
 import com.moneymanager.importengineapi.CopyEnds
 import com.moneymanager.importengineapi.ImportBatch
@@ -127,13 +126,12 @@ fun planCopy(
 suspend fun ImportEngine.copyToMoneyManager(
     movement: List<ReconciliationLeg>,
     plan: CopyPlan.Ready,
-    observations: ObservationReadRepository,
 ): List<TransactionId> {
     val feeOwners = plan.transfers.flatMap { listOf(it.from, it.to) }.filterIsInstance<CopyEnd.FeeAccountOf>()
     feeAccounts(feeOwners.mapTo(mutableSetOf()) { it.account }, Source.Reconciliation)
     val copies =
         import(ImportBatch(reconciliationCopies = plan.trades.map { it.copies } + plan.transfers.map { it.copies }))
             .copiedTransactionIds
-    acceptMatches(listOf(movement.map { it.transactionRef }.distinct() + copies), observations)
+    acceptMatches(listOf(movement.map { it.transactionRef }.distinct() + copies))
     return copies
 }
