@@ -1,13 +1,15 @@
 # gazelle:kmp_generate true
 # gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64 web
 # gazelle:kmp_forbid_deps //app/db/core //app/di/core //app/ui/core
-# The engine is the sole writer: only ImportEngineImpl and the steps it delegates to (match sync, materialization,
-# source observations, re-run settlement, reconciliation copies, hand edits) may take a write repository.
+# The engine is the sole writer: only ImportEngineImpl and the steps it delegates to (the files allowed below) may
+# take a write repository.
 # gazelle:kmp_forbid_reference \b[A-Za-z]+WriteRepository\b route writes through the ImportEngine (CLAUDE.md, "Database Writes")
+# gazelle:kmp_allow_reference src/commonMain/kotlin/com/moneymanager/importer/AccountResolver.kt
 # gazelle:kmp_allow_reference src/commonMain/kotlin/com/moneymanager/importer/HandEdits.kt
 # gazelle:kmp_allow_reference src/commonMain/kotlin/com/moneymanager/importer/ImportEngineImpl.kt
 # gazelle:kmp_allow_reference src/commonMain/kotlin/com/moneymanager/importer/MatchSync.kt
 # gazelle:kmp_allow_reference src/commonMain/kotlin/com/moneymanager/importer/ObservationMaterialization.kt
+# gazelle:kmp_allow_reference src/commonMain/kotlin/com/moneymanager/importer/PersonResolver.kt
 # gazelle:kmp_allow_reference src/commonMain/kotlin/com/moneymanager/importer/ReconciliationCopier.kt
 # gazelle:kmp_allow_reference src/commonMain/kotlin/com/moneymanager/importer/RerunSettlement.kt
 # gazelle:kmp_allow_reference src/commonMain/kotlin/com/moneymanager/importer/SourceObservations.kt
@@ -39,6 +41,8 @@ kmp_library(
         "src/commonMain/kotlin/com/moneymanager/importer/ReconciliationCopier.kt",
         "src/commonMain/kotlin/com/moneymanager/importer/RerunSettlement.kt",
         "src/commonMain/kotlin/com/moneymanager/importer/SourceObservations.kt",
+        "src/commonMain/kotlin/com/moneymanager/importer/AccountResolver.kt",
+        "src/commonMain/kotlin/com/moneymanager/importer/PersonResolver.kt",
     ],
     forbidden_reference_reason = "route writes through the ImportEngine (CLAUDE.md, \"Database Writes\")",
     native_targets = [
