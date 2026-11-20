@@ -71,6 +71,24 @@ class CsvReadOnlyPreviewTest : DbTest() {
     private val headings = listOf("Date", "Time", "Currency", "Amount", "Corrected", "Description", "Corrected description")
 
     @Test
+    fun reimportOfAlreadyStagedQifAndOfxUsesTheSameTransactionPlan() =
+        runDbTest {
+            val fixtures = listOf(stage(suffix = "-qif", extension = "qif"), stage(suffix = "-ofx", extension = "ofx"))
+            val existing = fixtures.map { transfer(it.id).id }.toSet()
+            val engine = repositories.importEngine
+            fixtures.forEach { (_, strategy) -> engine.updateCsvStrategy(corrected(strategy)) }
+            val files = fixtures.map { assertNotNull(repositories.csvImportRepository.getImport(it.id).first()) }
+            val reimports = repositories.reimports()
+            val before = transferAuditCount()
+
+            val result = reimports.runPlan(reimports.planAll(files))
+
+            assertEquals(2, result.filesImported)
+            assertEquals(existing, fixtures.map { transfer(it.id).id }.toSet())
+            assertEquals(before + 2, transferAuditCount())
+        }
+
+    @Test
     fun reimportCorrectsAnAssembledTradeUnderItsExistingId() =
         runDbTest {
             val (id, strategy) = stage(grouped = true)

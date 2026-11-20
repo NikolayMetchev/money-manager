@@ -206,12 +206,22 @@ class Reimports(
         plannedStrategy: CsvImportStrategy?,
         version: ImportPlanVersion,
     ): CsvTransferSync? {
-        if (importFileKind(picked.originalFileName) != ImportFileKind.CSV) return null
+        val kind = importFileKind(picked.originalFileName) ?: return null
         val file = reads.csvImportRepository.getImport(picked.id).first() ?: return null
         if (file.lastAppliedAt == null || file.rowCount == 0) return null
         val strategy = plannedStrategy ?: strategyFor(file, csvImportStrategyRepository.getAllStrategies().first()) ?: return null
         val config = strategy.config
-        if (strategy.worksheetName != null || config.pdfLines != null || config.reconciliation != null ||
+        if (kind == ImportFileKind.XLSX && strategy.worksheetName != null &&
+            reads.csvImportRepository.getXlsxBlob(file.id)?.worksheetName != strategy.worksheetName
+        ) {
+            return null
+        }
+        if (kind == ImportFileKind.PDF) {
+            val stagedPdf = reads.csvImportRepository.getPdfSource(file.id) ?: return null
+            val rulesHash = config.pdfLines?.let { PdfRowAssembler.rulesHash(it) }
+            if (stagedPdf.stagedRulesHash != rulesHash) return null
+        }
+        if (config.reconciliation != null ||
             config.legGroups.any { it.assembly !is LegAssembly.Trade || it.isCrossFileTrade() || it.reconcileWindowSeconds != null } ||
             config.crossSourceReconcileWindow != null ||
             config.placeholderReconcileWindow != null || config.duplicateDateTolerance != null ||
