@@ -10,7 +10,6 @@ import com.moneymanager.domain.model.withStatementAccount
 import com.moneymanager.domain.repository.write.ObservationWriteRepository
 import com.moneymanager.domain.repository.write.TransactionWriteRepository
 import com.moneymanager.domain.repository.write.TransferEdit
-import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ExpandedTransfer
 import com.moneymanager.importengineapi.ExpansionRow
 import com.moneymanager.importengineapi.ImportBatch
@@ -38,7 +37,7 @@ internal class TransferImporter(
     private val transferWriter: TransferWriter,
     private val tradeImporter: TradeImporter,
     private val handEdits: HandEdits,
-    private val sourceObservations: suspend () -> SourceObservations,
+    private val sourceObservations: () -> SourceObservations,
 ) {
     /** The transfer-related portion of an [ImportResult], produced by [importTransferCreates]. */
     class TransferOutcome(
@@ -122,13 +121,7 @@ internal class TransferImporter(
         onProgress?.invoke(Progress("Importing transactions", fraction = 0f, processed = 0, total = toImport.size))
         // The engine's own cross-source reconcile marker is never "owned" by a source: a row that
         // re-imports must not un-exclude a transfer the engine reconciled away.
-        val engineOwnedTypeId =
-            when (val policy = batch.dedupePolicy) {
-                is DedupePolicy.FuzzyAllFields -> policy.reconciledExclusionAttributeTypeId
-                is DedupePolicy.UniqueIdentifier -> policy.reconciledExclusionAttributeTypeId
-                is DedupePolicy.ApiMultiKey -> policy.reconciledExclusionAttributeTypeId
-                else -> null
-            }
+        val engineOwnedTypeId = batch.dedupePolicy.reconciledExclusionAttributeTypeId
         val createdLegs = mutableListOf<Pair<ExpandedTransfer, TransferId>>()
         val observer = sourceObservations()
         // A re-run's row that still says its reserved transaction is recorded as its observation and brought to the merge of every

@@ -28,6 +28,12 @@ const val DESCRIPTION_SIMILARITY_THRESHOLD = 0.85
 /** How the central import engine decides whether an incoming transfer already exists. */
 sealed interface DedupePolicy {
     /**
+     * The attribute type a cross-source reconcile tags what it excludes with: the engine's own marker, which no source owns, so a
+     * row that re-imports never un-excludes a transfer the engine reconciled away. Null when the policy doesn't reconcile.
+     */
+    val reconciledExclusionAttributeTypeId: AttributeTypeId?
+
+    /**
      * Match by [ImportTransfer.uniqueKey]: identical existing transfer -> DUPLICATE, an existing
      * transfer with the same key but differing fields -> UPDATED. Also dedupes within the same batch
      * (a later transfer with a key already seen in this batch is treated as a duplicate). Used by the
@@ -44,7 +50,7 @@ sealed interface DedupePolicy {
      */
     data class UniqueIdentifier(
         val reconcileWindow: SettlementWindow? = null,
-        val reconciledExclusionAttributeTypeId: AttributeTypeId? = null,
+        override val reconciledExclusionAttributeTypeId: AttributeTypeId? = null,
         val reconciledRelationshipTypeId: RelationshipTypeId? = null,
         /**
          * Marks placeholder legs, as on [FuzzyAllFields]: a placeholder and the record naming the far end are
@@ -76,7 +82,7 @@ sealed interface DedupePolicy {
         val dateTolerance: Duration = 3.days,
         val similarityThreshold: Double = DESCRIPTION_SIMILARITY_THRESHOLD,
         val reconcileWindow: SettlementWindow? = null,
-        val reconciledExclusionAttributeTypeId: AttributeTypeId? = null,
+        override val reconciledExclusionAttributeTypeId: AttributeTypeId? = null,
         val reconciledRelationshipTypeId: RelationshipTypeId? = null,
         /**
          * Unidentified-counterparty reconciliation. When set (together with the exclusion + relationship
@@ -116,7 +122,7 @@ sealed interface DedupePolicy {
      */
     data class ApiMultiKey(
         val reconcileWindow: SettlementWindow? = null,
-        val reconciledExclusionAttributeTypeId: AttributeTypeId? = null,
+        override val reconciledExclusionAttributeTypeId: AttributeTypeId? = null,
         val reconciledRelationshipTypeId: RelationshipTypeId? = null,
         /**
          * Internal-transfer reconciliation between owned accounts. When [internalTransferBridges] is
@@ -149,5 +155,7 @@ sealed interface DedupePolicy {
     ) : DedupePolicy
 
     /** No deduplication — every transfer is imported. */
-    data object None : DedupePolicy
+    data object None : DedupePolicy {
+        override val reconciledExclusionAttributeTypeId: AttributeTypeId? get() = null
+    }
 }

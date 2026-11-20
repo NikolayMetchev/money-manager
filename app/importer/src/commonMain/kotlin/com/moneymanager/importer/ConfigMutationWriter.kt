@@ -93,11 +93,7 @@ internal class ConfigMutationWriter(
 
     private suspend fun applyReconciliationLinkMutations(mutations: List<ReconciliationLinkMutation>) {
         val repository = reconciliationLinkRepository
-        val sourceByShadow =
-            accountAttributeRepository
-                .getByType(AttributeTypeId(WellKnownIds.ACCOUNT_RECONCILIATION_SOURCE_ATTR_TYPE_ID))
-                .first()
-                .associate { it.accountId to it.value }
+        val sourceByShadow = accountAttributeRepository.shadowSources()
         for (m in mutations) {
             when (m) {
                 is ReconciliationLinkMutation.SetLinks -> {

@@ -42,11 +42,7 @@ internal class AccountResolver(
 ) {
     /** Ids of the shadow accounts of reconciliation source [source]. */
     suspend fun shadowAccountIds(source: String): Set<AccountId> =
-        accountAttributeRepository
-            .getByType(AttributeTypeId(WellKnownIds.ACCOUNT_RECONCILIATION_SOURCE_ATTR_TYPE_ID))
-            .first()
-            .filter { it.value == source }
-            .mapTo(mutableSetOf()) { it.accountId }
+        accountAttributeRepository.shadowSources().filterValues { it == source }.keys
 
     class AccountResolution(
         val keyToId: Map<LocalAccountKey, AccountId>,
@@ -79,7 +75,7 @@ internal class AccountResolver(
         val keyToId = mutableMapOf<LocalAccountKey, AccountId>()
         var created = 0
         val shadowTag =
-            batch.shadowSource?.let { NewAttribute(AttributeTypeId(WellKnownIds.ACCOUNT_RECONCILIATION_SOURCE_ATTR_TYPE_ID), it) }
+            batch.shadowSource?.let { NewAttribute(RECONCILIATION_SOURCE_TYPE, it) }
         // A fee account names the account it belongs to, which may be another intent of this batch: resolve it last.
         val (feeIntents, otherIntents) = batch.accountsToCreate.partition { it.match is AccountMatchKey.FeeAccountOf }
         for (rawIntent in otherIntents) {
@@ -155,14 +151,18 @@ internal class AccountResolver(
         byAttr[tag.typeId to tag.value]?.let { return ResolvedFeeAccount(it, created = false) }
         val desired = "${requireNotNull(nameById[owner]) { "Fee account of unknown account $owner" }} Fees"
         // A shadow account's fee account belongs to the same reconciliation source, whichever batch creates it.
-        val shadowType = AttributeTypeId(WellKnownIds.ACCOUNT_RECONCILIATION_SOURCE_ATTR_TYPE_ID)
         val shadowTag =
-            if (intent.attributes.any { it.typeId == shadowType }) {
+            if (intent.attributes.any { it.typeId == RECONCILIATION_SOURCE_TYPE }) {
                 null
             } else {
-                accountAttributeRepository.getByAccount(owner).first().firstOrNull { it.attributeType.id == shadowType }?.let {
-                    NewAttribute(shadowType, it.value)
-                }
+                accountAttributeRepository
+                    .getByAccount(
+                        owner,
+                    ).first()
+                    .firstOrNull { it.attributeType.id == RECONCILIATION_SOURCE_TYPE }
+                    ?.let {
+                        NewAttribute(RECONCILIATION_SOURCE_TYPE, it.value)
+                    }
             }
         val named = intent.copy(name = desired, attributes = intent.attributes + tag + listOfNotNull(shadowTag))
         val resolvedName = uniqueName(desired, named, byName)
