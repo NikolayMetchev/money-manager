@@ -241,4 +241,83 @@ internal class RerunSettlement(
         val apiSessions = deletingSources.filterIsInstance<Source.Api>().mapTo(mutableSetOf()) { it.sessionId }
         return observations.getTransactionsObservedByOtherRecords(ids, csvImports, apiSessions)
     }
+
+    /**
+     * Deletes the batch's DELETE transfers and trades, [onProgress] reporting each chunk. A transaction another record still
+     * observes outlives its creator, and a re-run's are reserved rather than deleted (#1510); what [sharedByResets] (the
+     * transactions a reset file shared with other records) and the withdrawn records' reconciled partners still observe is
+     * rebuilt from what is left. Returns the re-run's reservations.
+     */
+    suspend fun deleteTransactions(
+        batch: ImportBatch,
+        sharedByResets: Set<TransactionId>,
+        onProgress: (suspend (Progress) -> Unit)?,
+    ): ReservedTransactions {
+        // Transfers and trades are the only deletes a batch holds in bulk (a re-import removes every row
+        // its session created before re-running it), so they report progress like the write phase does —
+        // otherwise a caller's bar holds still through the slower half of a re-import.
+        val transferDeletes = batch.transfers.deletes()
+        val tradeDeletes = batch.trades.deletes()
+        val deleteTotal = transferDeletes.size + tradeDeletes.size
+        var deleted = 0
+
+        suspend fun reportDeleted(count: Int) {
+            deleted += count
+            onProgress?.invoke(
+                Progress(
+                    detail = "Deleting transactions",
+                    fraction = deleted.toFloat() / deleteTotal,
+                    processed = deleted,
+                    total = deleteTotal,
+                ),
+            )
+        }
+
+        // A transaction another record still observes (a joined twin) outlives its creator: it is rebuilt from what is
+        // left, as is one that only lost a reset file's observations.
+        val transferDeleteIds = transferDeletes.map { requireNotNull(it.existingId) }
+        val tradeDeleteIds = tradeDeletes.map { requireNotNull(it.existingId) }
+        val stillObserved =
+            stillObserved(
+                // A person deleting a transaction deletes it; only a source withdrawing its records leaves the others standing.
+                transferDeletes.filter { it.source.isImport() }.map { requireNotNull(it.existingId) } +
+                    tradeDeletes.filter { it.source.isImport() }.map { requireNotNull(it.existingId) },
+                (transferDeletes.map { it.source } + tradeDeletes.map { it.source }).toSet(),
+            )
+        // A re-run's reserved transactions keep their rows (#1510): each stands vacant, hidden from the re-run's own dedupe
+        // and matching, until its record says it again (and it is written only if what it says changed) or the settle
+        // deletes it. Their links stay with them.
+        val reserved = reserveVacated(batch, (transferDeleteIds + tradeDeleteIds).filterNot { it in stillObserved })
+        // What a withdrawn record was reconciled with is rebuilt once it goes: a link left with one member is pruned, so
+        // the exclusion it held lifts, as a fresh import of the others has it.
+        val partners =
+            reconciledPartnersOf(
+                transferDeletes.filter { it.source.isImport() }.map { requireNotNull(it.existingId) } +
+                    tradeDeletes.filter { it.source.isImport() }.map { requireNotNull(it.existingId) },
+                stillObserved + reserved.ids,
+            )
+        transferDeleteIds.filterNot { it in stillObserved }.chunked(DELETE_CHUNK_ROWS).forEach { chunk ->
+            val gone = chunk.filterNot { it in reserved.ids }
+            observationRepository.deleteObservationsOfTransactions(gone)
+            transactionRepository.deleteTransactions(gone)
+            reportDeleted(chunk.size)
+        }
+        tradeDeleteIds.filterNot { it in stillObserved }.chunked(DELETE_CHUNK_ROWS).forEach { chunk ->
+            val gone = chunk.filterNot { it in reserved.ids }
+            observationRepository.deleteObservationsOfTransactions(gone)
+            tradeRepository.deleteTrades(gone)
+            reportDeleted(chunk.size)
+        }
+        // A transaction the reset left with no observation at all stays as its import booked it until the file's re-import:
+        // rebuilding it from nothing would delete what the reset file's other rows still report.
+        val rebuildCandidates = sharedByResets - (transferDeleteIds + tradeDeleteIds).toSet() + partners - reserved.ids
+        val rebuilt =
+            observationRepository
+                .getObservationsOfTransactions(rebuildCandidates)
+                .mapTo(stillObserved.toMutableSet()) { it.transactionId }
+        if (rebuilt.isNotEmpty()) materialize(emptyList(), MaterializationRequest(Source.Reconciler, rebuilt))
+        return reserved
+    }
 }
+
+private fun Source.isImport(): Boolean = this is Source.Csv || this is Source.Api
