@@ -22,6 +22,7 @@ import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.RerunBlockedException
+import com.moneymanager.importengineapi.RerunPhases
 import com.moneymanager.importengineapi.applyCsvImportMutations
 import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.importengineapi.getOrCreateAttributeType
@@ -379,22 +380,33 @@ class SourceRerunE2ETest : DbTest() {
                 onProgress = { progress += it },
             )
 
-            // The delete batch, preparing the files and re-importing them each fill the bar from empty, in that order.
+            // Setting aside, preparing, re-importing, matching, settling and finishing each fill the bar from empty, in that order.
             assertEquals(
-                listOf("Setting aside what the files created", "Preparing files", "Re-importing files"),
+                listOf(
+                    "Setting aside what the files created",
+                    "Preparing files",
+                    "Re-importing files",
+                    "Matching records across sources",
+                    "Settling the transactions the files kept",
+                    "Finishing",
+                ),
                 progress.mapNotNull { it.phase }.map { it.name }.distinct(),
             )
-            assertTrue(progress.all { it.phase?.count == 3 }, "every emission names its phase of three: $progress")
-            (1..3).forEach { number ->
+            assertTrue(progress.all { it.phase?.count == RerunPhases.COUNT }, "every emission names its phase of six: $progress")
+            (1..RerunPhases.COUNT).forEach { number ->
                 val phase = progress.filter { it.phase?.number == number }
                 assertProgressesTo(phase)
                 assertEquals(1f, phase.last().fraction, "phase $number fills the bar: $phase")
             }
-            val files = progress.filter { it.phase?.number == 3 }
+            assertProgressesTo(progress.filter { it.phase == RerunPhases.SETTING_ASIDE }, "Set aside 2 transactions and 0 trades")
+            val files = progress.filter { it.phase == RerunPhases.REIMPORTING }
             assertEquals(0f, files.first().fraction, "the files start the bar again: $files")
-            assertProgressesTo(files, "Refreshing views")
-            assertEquals(1f, files.last().fraction, "the steps after the last file keep the files' bar full")
-            assertEquals(1, files.count { it.detail == "Matching observations" })
+            assertProgressesTo(progress.filter { it.phase == RerunPhases.FINISHING }, "Refreshing views", "Finished")
+            val last = files.last()
+            assertTrue(
+                progress.dropWhile { it !== last }.all { it.item == last.item?.copy(step = it.detail) && it.total == last.total },
+                "the steps after the last file keep its files and rows lines: $progress",
+            )
             assertEquals(before, transfersOn(monzo).map { it.id }.toSet())
         }
 

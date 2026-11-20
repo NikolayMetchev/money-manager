@@ -22,8 +22,10 @@ import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.RerunBlockedException
 import com.moneymanager.importengineapi.RerunFile
+import com.moneymanager.importengineapi.RerunPhases
 import com.moneymanager.importengineapi.RerunReads
 import com.moneymanager.importengineapi.executeRerun
+import com.moneymanager.importengineapi.inPhase
 import com.moneymanager.tasks.PhasedProgress
 import com.moneymanager.tasks.Progress
 import kotlinx.coroutines.Dispatchers
@@ -235,14 +237,20 @@ class Reimports(
                 filesUnchanged = unchanged.size,
             )
         }
-        // Three phases, each filling the bar from empty: the one batch setting the files aside, then runBulkReimport's two (preparing
-        // the files, re-importing them). The steps after the last file (settling, empty accounts, views) keep the
-        // files' bar where the run left it.
+        // The re-run's six phases (RerunPhases), each filling the bar from empty: runBulkReimport's two (preparing the files,
+        // re-importing them) are the second and third. After the last file each step keeps its files and rows lines.
         var lastFileProgress: Progress? = null
         val onFileProgress: suspend (Progress) -> Unit = { inner ->
-            val shifted = inner.copy(phase = inner.phase?.let { it.copy(number = it.number + 1, count = it.count + 1) })
+            val shifted = inner.copy(phase = inner.phase?.let { it.copy(number = it.number + 1, count = RerunPhases.COUNT) })
             lastFileProgress = shifted
             onProgress(shifted)
+        }
+        val afterFiles: suspend (Progress) -> Unit = { step ->
+            val last = lastFileProgress
+            onProgress(
+                last?.copy(detail = step.detail, fraction = step.fraction, phase = step.phase, item = last.item?.copy(step = step.detail))
+                    ?: step,
+            )
         }
         val outcome =
             importEngine.executeRerun(
@@ -251,13 +259,8 @@ class Reimports(
                 reads = reads,
                 maintenance = maintenance,
                 onProgress = { step ->
-                    val last = lastFileProgress
-                    when {
-                        last != null -> onProgress(last.copy(detail = step.detail, item = last.item?.copy(step = step.detail)))
-
-                        // The setting-aside batch; its closing "Re-importing" (no fraction) is the next phase's to say.
-                        step.fraction != null -> onProgress(step.copy(phase = REMOVAL_PHASE))
-                    }
+                    // The run says its own phases; executeRerun's mark of where it starts is for single-bar views.
+                    if (step.phase != RerunPhases.REIMPORTING) afterFiles(step)
                 },
             ) {
                 val strategies = csvImportStrategyRepository.getAllStrategies().first()
@@ -310,14 +313,16 @@ class Reimports(
                         }
                     }
                 if (booked.isEmpty()) {
+                    afterFiles(Progress("Nothing was booked to match", fraction = 1f, phase = RerunPhases.MATCHING))
                     result
                 } else {
                     // Match once over the booked files, while the re-run still holds the reservations for settling.
-                    lastFileProgress?.let { progress ->
-                        val step = "Matching observations"
-                        onProgress(progress.copy(detail = step, item = progress.item?.copy(step = step)))
-                    }
-                    val gone = importEngine.import(ImportBatch(syncMatches = true)).matchSync.deleted
+                    val gone =
+                        importEngine
+                            .import(
+                                ImportBatch(syncMatches = true),
+                                onProgress = { step -> step.inPhase(RerunPhases.MATCHING)?.let { afterFiles(it) } },
+                            ).matchSync.deleted
                     val folded = booked.sumOf { ids -> ids.count { it in gone } }
                     result.copy(transfersCreated = result.transfersCreated - folded, duplicatesSkipped = result.duplicatesSkipped + folded)
                 }
@@ -417,5 +422,3 @@ class Reimports(
 
     private suspend fun currencies(): List<Currency> = currencyRepository.getAllCurrencies().first()
 }
-
-private val REMOVAL_PHASE = Progress.Phase(1, 3, "Setting aside what the files created")

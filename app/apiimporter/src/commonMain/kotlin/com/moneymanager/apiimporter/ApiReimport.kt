@@ -21,6 +21,7 @@ import com.moneymanager.importengineapi.markApiSessionImported
 import com.moneymanager.importengineapi.planSourceRerun
 import com.moneymanager.tasks.PhasedProgress
 import com.moneymanager.tasks.Progress
+import com.moneymanager.tasks.foldPhases
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
@@ -84,6 +85,8 @@ suspend fun executeApiReimport(
         )
     }
     val importStartedAt = Clock.System.now()
+    // The re-run's phases each fill the bar from empty; this view has one bar for all of them.
+    val bar = onProgress?.let { foldPhases(it) }
     return importEngine.executeSourceRerun(
         plan = plan,
         resetRecords =
@@ -96,7 +99,7 @@ suspend fun executeApiReimport(
             ),
         reads = reads,
         maintenance = maintenance,
-        onProgress = onProgress,
+        onProgress = bar,
         refreshViews = refreshViews,
     ) {
         val rerun =
@@ -107,7 +110,7 @@ suspend fun executeApiReimport(
                 importEngine = importEngine,
                 counterpartyAccountNames = counterpartyAccountNames,
                 passThroughAccounts = passThroughAccounts,
-                onProgress = onProgress,
+                onProgress = bar,
                 engineBatchSize = if (onProgress == null) Int.MAX_VALUE else API_ENGINE_BATCH_SIZE,
             )
         importEngine.markApiSessionImported(

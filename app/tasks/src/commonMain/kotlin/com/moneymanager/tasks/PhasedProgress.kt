@@ -57,3 +57,22 @@ class PhasedProgress(
             }
         }
 }
+
+/**
+ * A sink for a view with one bar, fed by a run whose phases each fill the bar from empty: phase n of N at f becomes
+ * (n - 1 + f) / N of [onProgress]'s bar, which never moves back. An emission naming no phase is a step of the last
+ * phase named, and one with no fraction keeps the bar where it is.
+ */
+fun foldPhases(onProgress: suspend (Progress) -> Unit): suspend (Progress) -> Unit {
+    var current: Progress.Phase? = null
+    var bar = 0f
+    return { step ->
+        val phase = step.phase ?: current
+        current = phase
+        val fraction = step.fraction
+        if (fraction != null) {
+            bar = maxOf(bar, if (phase == null) fraction else (phase.number - 1 + fraction) / phase.count)
+        }
+        onProgress(step.copy(fraction = bar, phase = null))
+    }
+}

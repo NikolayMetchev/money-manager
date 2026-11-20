@@ -165,6 +165,8 @@ import kotlin.uuid.Uuid
  * ~8x slower than its deletes.
  */
 private const val DELETE_CHUNK_ROWS = 500
+private const val SETTLE_STEPS = 5
+private const val DROP_STEP = 3
 
 private const val OBSERVATION_CHUNK_ROWS = 500
 
@@ -643,12 +645,12 @@ class ImportEngineImpl(
             onProgress?.invoke(Progress("Refreshing matched transactions"))
             materialize(emptyList(), MaterializationRequest(Source.Reconciler, transfers.observedDuplicates))
         }
-        val matchSync = batch.takeIf { it.syncMatches }?.let { matchSync()?.run() } ?: MaterializationReport()
+        val matchSync = batch.takeIf { it.syncMatches }?.let { matchSync()?.run(onProgress) } ?: MaterializationReport()
         // A transaction a re-run took back was written with what its own record says: bring it to the merge of every
         // observation and link it has, as a fresh booking would be, writing only what differs (#1510).
         val retaken = transfers.retaken + observer?.claimed.orEmpty()
         if (retaken.isNotEmpty()) materialize(emptyList(), MaterializationRequest(Source.Reconciler, retaken))
-        val settled = batch.settle?.let { settle(it) }
+        val settled = batch.settle?.let { settle(it, onProgress) }
         val copied = if (batch.reconciliationCopies.isEmpty()) emptyList() else copyToRealAccounts(batch.reconciliationCopies)
 
         return ImportResult(
@@ -764,13 +766,18 @@ class ImportEngineImpl(
      * every id a person overrode, or that lost an observation, is rebuilt with the overrides on top. A conflict compares
      * the new merge with the one before the re-run.
      */
-    private suspend fun settle(reserved: ReservedTransactions): MaterializationReport {
+    private suspend fun settle(
+        reserved: ReservedTransactions,
+        onProgress: (suspend (Progress) -> Unit)?,
+    ): MaterializationReport {
         val observations = observationRepository ?: return MaterializationReport()
+        onProgress?.invoke(stepProgress("Booking again the reconciliation copies the files still report", 0, SETTLE_STEPS))
         val recopied = recopy(reserved)
         val remaining = reserved.ids - recopied.ids
         // What no record took back still stands as it was before the re-run (#1510): it goes now, and what it was
         // reconciled with is rebuilt, as a fresh import of the others has it.
         val vacant = remaining.intersect(observations.getVacantTransactionIds())
+        onProgress?.invoke(stepProgress("Deleting ${vacant.size} transactions no record took back", 1, SETTLE_STEPS))
         val partners = reconciledPartnersOf(vacant.toList(), emptySet())
         vacant.filterIsInstance<TransferId>().chunked(DELETE_CHUNK_ROWS).forEach { transactionRepository.deleteTransactions(it) }
         vacant.filterIsInstance<TradeId>().chunked(DELETE_CHUNK_ROWS).forEach { tradeRepository.deleteTrades(it) }
@@ -778,8 +785,12 @@ class ImportEngineImpl(
         observations.releaseTransactions(vacant)
         val reconciled =
             observations.getObservationsOfTransactions(partners - vacant).mapTo(mutableSetOf()) { it.transactionId }
+        onProgress?.invoke(stepProgress("Rebuilding ${reconciled.size} transactions they were reconciled with", 2, SETTLE_STEPS))
         if (reconciled.isNotEmpty()) materialize(emptyList(), MaterializationRequest(Source.Reconciler, reconciled))
         val pending = observations.getReserved()
+        onProgress?.invoke(
+            stepProgress("Dropping observations no record said again: 0 of ${pending.size} checked", DROP_STEP, SETTLE_STEPS),
+        )
         val shared =
             observations.getMaterializedIds(
                 pending.mapNotNullTo(mutableSetOf()) { observation ->
@@ -787,6 +798,7 @@ class ImportEngineImpl(
                 },
             )
         val lost = mutableSetOf<TransactionId>()
+        var checked = 0
         for (chunk in pending.chunked(OBSERVATION_CHUNK_ROWS)) {
             val dropped = mutableListOf<ObservationChange>()
             val keep = mutableListOf<ObservationId>()
@@ -804,13 +816,25 @@ class ImportEngineImpl(
                 }
             }
             observations.applyObservationChanges(emptyList(), dropped, emptyList(), reclaimed = keep)
+            checked += chunk.size
+            onProgress?.invoke(
+                Progress(
+                    "Dropping observations no record said again: $checked of ${pending.size} checked",
+                    fraction = (DROP_STEP + checked.toFloat() / pending.size) / SETTLE_STEPS,
+                ),
+            )
         }
         val rebuild =
             (reserved.priorMerges.keys - vacant - recopied.ids) +
                 observations.getObservationsOfTransactions(lost).mapTo(mutableSetOf()) { it.transactionId }
         val released = reserved.priorMerges.keys.filterTo(mutableSetOf()) { it in vacant }
-        if (rebuild.isEmpty()) return recopied.report.copy(releasedOverridden = released)
+        onProgress?.invoke(stepProgress("Rebuilding ${rebuild.size} transactions with hand edits or lost observations", 4, SETTLE_STEPS))
+        if (rebuild.isEmpty()) {
+            onProgress?.invoke(stepProgress("Settled", SETTLE_STEPS, SETTLE_STEPS))
+            return recopied.report.copy(releasedOverridden = released)
+        }
         val report = materialize(emptyList(), MaterializationRequest(Source.Manual, rebuild, priorMerges = reserved.priorMerges))
+        onProgress?.invoke(stepProgress("Settled", SETTLE_STEPS, SETTLE_STEPS))
         return report.copy(
             inserted = report.inserted + recopied.report.inserted,
             updated = report.updated + recopied.report.updated,

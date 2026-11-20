@@ -37,6 +37,7 @@ import com.moneymanager.observationmatcher.MatchResult
 import com.moneymanager.observationmatcher.ObservationRef
 import com.moneymanager.observationmatcher.ShapeReason
 import com.moneymanager.observationmatcher.TransactionTarget
+import com.moneymanager.tasks.Progress
 import kotlinx.coroutines.flow.first
 
 /**
@@ -61,9 +62,14 @@ internal class MatchSync(
     private val calendarFor: (List<AccountId>) -> BusinessDayCalendar,
     private val materialize: suspend (List<ObservationMutation>, MaterializationRequest) -> MaterializationReport,
 ) {
-    suspend fun run(): MaterializationReport {
+    suspend fun run(onProgress: (suspend (Progress) -> Unit)? = null): MaterializationReport {
+        onProgress?.invoke(stepProgress("Matching every source's records", 0, MATCH_STEPS))
         val plan = plan()
-        if (!plan.hasChanges) return MaterializationReport()
+        if (!plan.hasChanges) {
+            onProgress?.invoke(stepProgress("No matches changed", MATCH_STEPS, MATCH_STEPS))
+            return MaterializationReport()
+        }
+        onProgress?.invoke(stepProgress("Writing ${plan.links.writes.size} links between records", 1, MATCH_STEPS))
         if (plan.links.writes.isNotEmpty()) relationships?.apply(plan.links.writes)
         val result = plan.result
         val contentOf = plan.scope.associate { it.ref to it.content }
@@ -80,9 +86,14 @@ internal class MatchSync(
 
         val known = destinations.mapNotNull { (from, to) -> (to as? TransactionTarget.Existing)?.let { from to it.id } }.toMap()
         moveRelationships(known)
+        onProgress?.invoke(
+            stepProgress("Moving ${mutations.size} records and rebuilding ${plan.links.affected.size} linked transactions", 2, MATCH_STEPS),
+        )
         val report = materialize(mutations, MaterializationRequest(Source.Reconciler, plan.links.affected))
         val resolved = known + destinations.mapNotNull { (from, to) -> newIdOf(to, report)?.let { from to it } }
+        onProgress?.invoke(stepProgress("Pointing the staged rows at their transactions", 3, MATCH_STEPS))
         relinkRows(result.changes, resolved)
+        onProgress?.invoke(stepProgress("Matched", MATCH_STEPS, MATCH_STEPS))
         return report
     }
 
@@ -309,6 +320,8 @@ internal class MatchSync(
  * reconcilers until their outcomes are reconciled with today's (#1426).
  */
 private val WRITTEN_STAGE_REASONS = setOf(ShapeReason.TRADE_AGGREGATION)
+
+private const val MATCH_STEPS = 4
 
 /** Whether this link would hold together two observations a person split (#1430). */
 private fun ExclusionLink.holdsApart(apart: List<Pair<ObservationRef, ObservationRef>>): Boolean {
