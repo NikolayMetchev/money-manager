@@ -147,7 +147,7 @@ internal class AccountResolver(
 
     /**
      * A display name no other account holds, so the `account.name` UNIQUE constraint can never reject a
-     * create/rename. Identity still decides WHICH account an intent matches (see [AccountIndex.match]) — this
+     * create/rename. Identity still decides WHICH account an intent matches (see `AccountIndex.match`) — this
      * only disambiguates the display name, so genuinely distinct accounts that share a real-world name
      * (e.g. five different people all named "Nikolay Metchev", two banks both trading as "Payward Ltd.")
      * stay separate and readable rather than colliding. Shape matches the sibling-collision convention
