@@ -378,7 +378,7 @@ class TransactionWriteRepositoryImpl(
         attributes: List<NewAttribute>,
         source: Source,
     ): Boolean {
-        val current = transferSelectQueries.selectById(id.id, TransferMapper::mapRaw).awaitAsOneOrNull() ?: return false
+        val current = transferSelectQueries.selectById(id.id, TransferMapper::mapRaw).awaitAsList().singleOrNull() ?: return false
         val stored =
             transferAttributeSelectQueries
                 .selectByTransaction(id.id) { rowId, _, typeId, value, groupKey, _, _ -> (typeId to groupKey) to (rowId to value) }
