@@ -13,9 +13,12 @@
 # gazelle:kmp_allow_reference src/commonMain/kotlin/com/moneymanager/importer/ObservationMaterialization.kt
 # gazelle:kmp_allow_reference src/commonMain/kotlin/com/moneymanager/importer/PersonResolver.kt
 # gazelle:kmp_allow_reference src/commonMain/kotlin/com/moneymanager/importer/ReconciliationCopier.kt
+# gazelle:kmp_allow_reference src/commonMain/kotlin/com/moneymanager/importer/ReferenceDataWriter.kt
 # gazelle:kmp_allow_reference src/commonMain/kotlin/com/moneymanager/importer/RerunSettlement.kt
 # gazelle:kmp_allow_reference src/commonMain/kotlin/com/moneymanager/importer/ReversalLinker.kt
 # gazelle:kmp_allow_reference src/commonMain/kotlin/com/moneymanager/importer/SourceObservations.kt
+# gazelle:kmp_allow_reference src/commonMain/kotlin/com/moneymanager/importer/TradeImporter.kt
+# gazelle:kmp_allow_reference src/commonMain/kotlin/com/moneymanager/importer/TransferImporter.kt
 # gazelle:kmp_allow_reference src/commonMain/kotlin/com/moneymanager/importer/TransferWriter.kt
 # gazelle:kmp_export //app/importengineapi
 # gazelle:kmp_export //app/model/core
@@ -51,6 +54,9 @@ kmp_library(
         "src/commonMain/kotlin/com/moneymanager/importer/ReversalLinker.kt",
         "src/commonMain/kotlin/com/moneymanager/importer/ExistingTransferLoader.kt",
         "src/commonMain/kotlin/com/moneymanager/importer/TransferWriter.kt",
+        "src/commonMain/kotlin/com/moneymanager/importer/ReferenceDataWriter.kt",
+        "src/commonMain/kotlin/com/moneymanager/importer/TradeImporter.kt",
+        "src/commonMain/kotlin/com/moneymanager/importer/TransferImporter.kt",
     ],
     forbidden_reference_reason = "route writes through the ImportEngine (CLAUDE.md, \"Database Writes\")",
     native_targets = [
