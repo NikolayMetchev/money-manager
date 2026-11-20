@@ -33,21 +33,10 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.calendar.BusinessDayCalendar
 import com.moneymanager.domain.model.csv.ImportStatus
-import com.moneymanager.domain.model.observation.AttributeOverride
-import com.moneymanager.domain.model.observation.ImportGroupId
-import com.moneymanager.domain.model.observation.ImportGroupKey
 import com.moneymanager.domain.model.observation.ImportRecordId
 import com.moneymanager.domain.model.observation.ImportRecordKey
-import com.moneymanager.domain.model.observation.MaterializedTransaction
-import com.moneymanager.domain.model.observation.Observation
-import com.moneymanager.domain.model.observation.ObservationBooking
-import com.moneymanager.domain.model.observation.ObservationChange
-import com.moneymanager.domain.model.observation.ObservationContent
-import com.moneymanager.domain.model.observation.ObservationId
 import com.moneymanager.domain.model.observation.ObservationOwner
 import com.moneymanager.domain.model.observation.ObservedValues
-import com.moneymanager.domain.model.observation.TransferField
-import com.moneymanager.domain.model.observation.VacantObservation
 import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.domain.model.rules.widen
 import com.moneymanager.domain.model.withStatementAccount
@@ -75,7 +64,6 @@ import com.moneymanager.domain.repository.write.PersonAttributeWriteRepository
 import com.moneymanager.domain.repository.write.PersonOverrideWriteRepository
 import com.moneymanager.domain.repository.write.PersonWriteRepository
 import com.moneymanager.domain.repository.write.ReconciliationLinkWriteRepository
-import com.moneymanager.domain.repository.write.RecordObservationInsert
 import com.moneymanager.domain.repository.write.RelationshipTypeWriteRepository
 import com.moneymanager.domain.repository.write.RelationshipWrite
 import com.moneymanager.domain.repository.write.RelationshipWriteRepository
@@ -92,8 +80,6 @@ import com.moneymanager.importengineapi.ApiSessionMutation
 import com.moneymanager.importengineapi.ApiStrategyMutation
 import com.moneymanager.importengineapi.AssetAliasMutation
 import com.moneymanager.importengineapi.AttributeSlot
-import com.moneymanager.importengineapi.CopyEnd
-import com.moneymanager.importengineapi.CopyEnds
 import com.moneymanager.importengineapi.CsvImportMutation
 import com.moneymanager.importengineapi.CsvStrategyMutation
 import com.moneymanager.importengineapi.DedupePolicy
@@ -120,23 +106,16 @@ import com.moneymanager.importengineapi.LocalCryptoKey
 import com.moneymanager.importengineapi.LocalCurrencyKey
 import com.moneymanager.importengineapi.LocalPersonKey
 import com.moneymanager.importengineapi.LocalTradeKey
-import com.moneymanager.importengineapi.LocalTransactionKey
 import com.moneymanager.importengineapi.MaterializationReport
 import com.moneymanager.importengineapi.MaterializationRequest
-import com.moneymanager.importengineapi.Materializer
-import com.moneymanager.importengineapi.Materializer.column
-import com.moneymanager.importengineapi.ObservationDecision
 import com.moneymanager.importengineapi.ObservationExpander
 import com.moneymanager.importengineapi.ObservationKey
 import com.moneymanager.importengineapi.ObservationMutation
-import com.moneymanager.importengineapi.ObservationOwnerKey
 import com.moneymanager.importengineapi.ObservationSlot
-import com.moneymanager.importengineapi.ObservationTransaction
 import com.moneymanager.importengineapi.PassThroughMutation
 import com.moneymanager.importengineapi.PersonMatchKey
 import com.moneymanager.importengineapi.ReconciliationLinkMutation
 import com.moneymanager.importengineapi.RelationshipMutation
-import com.moneymanager.importengineapi.ReservedTransactions
 import com.moneymanager.importengineapi.RowOutcome
 import com.moneymanager.importengineapi.TradeAttributeMutation
 import com.moneymanager.importengineapi.TradeDedupePolicy
@@ -159,29 +138,15 @@ import kotlinx.coroutines.sync.withLock
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
-/**
- * Transfers and trades are deleted this many per database transaction, with a progress update after each:
- * a commit per row waits on the disk every time (synchronous=FULL), which made a re-import's delete phase
- * ~8x slower than its deletes.
- */
-private const val DELETE_CHUNK_ROWS = 500
-private const val SETTLE_STEPS = 5
-private const val DROP_STEP = 3
-
-private const val OBSERVATION_CHUNK_ROWS = 500
-
-/** The content hash of an API item's import record until the API sync (#1429) hashes what each item says. */
-private const val RECORD_UNHASHED = "unhashed"
-
 /** Upper bound on the legs walked along one pass-through chain; real chains are a few hops (card → Curve → PayPal → merchant). */
 private const val MAX_PASS_THROUGH_CHAIN_LEGS = 16
+
+internal val FEE_ACCOUNT_FOR_TYPE = AttributeTypeId(WellKnownIds.ACCOUNT_FEE_ACCOUNT_FOR_ATTR_TYPE_ID)
 
 /**
  * Attribute types that tie an account to a specific real bank account/counterparty identity. An
  * existing account carrying none of these is "unclaimed" — see [ImportEngineImpl.matchAccount].
  */
-private val FEE_ACCOUNT_FOR_TYPE = AttributeTypeId(WellKnownIds.ACCOUNT_FEE_ACCOUNT_FOR_ATTR_TYPE_ID)
-
 private val IDENTITY_ATTR_TYPE_IDS =
     setOf(
         AttributeTypeId(WellKnownIds.ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID),
@@ -238,6 +203,21 @@ class ImportEngineImpl(
     private val writes = MutableStateFlow(0L)
     override val writeVersion: StateFlow<Long> = writes.asStateFlow()
 
+    private val copier =
+        ReconciliationCopier(observationRepository, reconciliationLinkRepository, accountAttributeRepository, ::materialize)
+    private val rerun =
+        RerunSettlement(
+            observationRepository,
+            personOverrideRepository,
+            relationshipRepository,
+            transactionRepository,
+            tradeRepository,
+            copier,
+            ::placeholderTypeId,
+            ::materialize,
+        )
+    private val handEdits = HandEdits(observationRepository, personOverrideRepository)
+
     override suspend fun import(
         batch: ImportBatch,
         onProgress: (suspend (Progress) -> Unit)?,
@@ -266,7 +246,7 @@ class ImportEngineImpl(
 
         // ----- Config / staging / session / settings / device mutations -----
         // Read before a reset drops its file's observations: the transactions they shared with other records.
-        val sharedByResets = transactionsObservedByResets(batch)
+        val sharedByResets = rerun.transactionsObservedByResets(batch)
         val config = applyConfigMutations(batch)
 
         // ----- CREATE phase (first, so batch-local keys resolve for dependents) -----
@@ -461,7 +441,7 @@ class ImportEngineImpl(
 
         // ----- UPDATE phase -----
         // A person's edits become their overrides as well, so a rebuild from the observations keeps them.
-        val handEdits = handEditSnapshots(batch.transfers.updates())
+        val handEditSnapshots = handEdits.snapshot(batch.transfers.updates())
         transactionRepository.updateTransfers(
             batch.transfers.updates().map { intent ->
                 TransferEdit(
@@ -474,7 +454,7 @@ class ImportEngineImpl(
                 )
             },
         )
-        recordHandEdits(handEdits)
+        handEdits.record(handEditSnapshots)
         tradeRepository.updateTrades(
             batch.trades.updates().map { intent ->
                 TradeEdit(
@@ -576,7 +556,7 @@ class ImportEngineImpl(
         val transferDeleteIds = transferDeletes.map { requireNotNull(it.existingId) }
         val tradeDeleteIds = tradeDeletes.map { requireNotNull(it.existingId) }
         val stillObserved =
-            stillObserved(
+            rerun.stillObserved(
                 // A person deleting a transaction deletes it; only a source withdrawing its records leaves the others standing.
                 transferDeletes.filter { it.source.isImport() }.map { requireNotNull(it.existingId) } +
                     tradeDeletes.filter { it.source.isImport() }.map { requireNotNull(it.existingId) },
@@ -585,11 +565,11 @@ class ImportEngineImpl(
         // A re-run's reserved transactions keep their rows (#1510): each stands vacant, hidden from the re-run's own dedupe
         // and matching, until its record says it again (and it is written only if what it says changed) or the settle
         // deletes it. Their links stay with them.
-        val reserved = reserveVacated(batch, (transferDeleteIds + tradeDeleteIds).filterNot { it in stillObserved })
+        val reserved = rerun.reserveVacated(batch, (transferDeleteIds + tradeDeleteIds).filterNot { it in stillObserved })
         // What a withdrawn record was reconciled with is rebuilt once it goes: a link left with one member is pruned, so
         // the exclusion it held lifts, as a fresh import of the others has it.
         val partners =
-            reconciledPartnersOf(
+            rerun.reconciledPartnersOf(
                 transferDeletes.filter { it.source.isImport() }.map { requireNotNull(it.existingId) } +
                     tradeDeletes.filter { it.source.isImport() }.map { requireNotNull(it.existingId) },
                 stillObserved + reserved.ids,
@@ -637,8 +617,8 @@ class ImportEngineImpl(
         // observation and link it has, as a fresh booking would be, writing only what differs (#1510).
         val retaken = transfers.retaken + observer.claimed
         if (retaken.isNotEmpty()) materialize(emptyList(), MaterializationRequest(Source.Reconciler, retaken))
-        val settled = batch.settle?.let { settle(it, onProgress) }
-        val copied = if (batch.reconciliationCopies.isEmpty()) emptyList() else copyToRealAccounts(batch.reconciliationCopies)
+        val settled = batch.settle?.let { rerun.settle(it, onProgress) }
+        val copied = if (batch.reconciliationCopies.isEmpty()) emptyList() else copier.copyToRealAccounts(batch.reconciliationCopies)
 
         return ImportResult(
             accountsCreated = accountResolution.created,
@@ -692,330 +672,8 @@ class ImportEngineImpl(
         return ObservationMaterialization(observations, accountRepository, tradeRepository).apply(plan)
     }
 
-    /**
-     * What a [CsvImportMutation.Reserve] or an [ApiSessionMutation.Reserve] keeps (#1430, #1429). Of [vacating] (the deletes no other source still observes), each a
-     * reserved observation is on keeps its observations and its row (#1510), vacant until the re-run takes it back. A
-     * reserved observation on a transaction that keeps its row (one the file shared with another source) stays reserved on
-     * it too, so the record says it again there and a person's edits of it hold (#1432): the settle deletes it if the record
-     * doesn't. Ids a previous, stopped re-run left vacant stay vacant.
-     */
-    private suspend fun reserveVacated(
-        batch: ImportBatch,
-        vacating: List<TransactionId>,
-    ): ReservedTransactions {
-        val observations = observationRepository
-        if (batch.csvImportMutations.none { it is CsvImportMutation.Reserve } &&
-            batch.apiSessionMutations.none { it is ApiSessionMutation.Reserve }
-        ) {
-            return ReservedTransactions()
-        }
-        val vacatingIds = vacating.toSet()
-        // Only this batch's own files and sessions: a stopped re-run of another source leaves its reservations vacant, and settling them
-        // here would delete a pinned, split or copied transaction that run's records are still to take back.
-        val ownTransactions = transactionsObservedByResets(batch)
-        // An observation a person pinned or split stays reserved for its record to take back: deleting it would drop the
-        // decision with it. So does a copy (#1475): the settle books it again from what its record says now.
-        val decided =
-            personOverrideRepository.getAllPins().mapTo(mutableSetOf()) { it.observationId } +
-                personOverrideRepository.getAllSplits().flatMap { listOf(it.first, it.second) }
-        val reserved = observations.getReserved()
-        val reservedIds = reserved.mapTo(mutableSetOf()) { it.id }
-        // A split gives an observation a transaction of its own, which no source created and so no re-run deletes: when
-        // only reserved observations say it, it is vacated with the rest, so the record takes the id back.
-        val decidedAlone =
-            reserved
-                .asSequence()
-                .filter { it.id in decided || it.isCopy() }
-                .filter { it.transactionId !in vacatingIds && it.transactionId in ownTransactions }
-                .map { it.transactionId }
-                .toSet()
-                .filterTo(mutableSetOf()) { id -> observations.getObservationsOfTransaction(id).all { it.id in reservedIds } }
-        val kept =
-            reserved
-                .filter { it.transactionId in vacatingIds || it.transactionId in decidedAlone }
-                .mapTo(mutableSetOf()) { it.transactionId }
-        val overridden = personOverrideRepository.getOverriddenTransactions().intersect(kept)
-        val placeholderTypeId = if (overridden.isEmpty()) null else placeholderTypeId()
-        val priorMerges =
-            observations
-                .getObservationsOfTransactions(overridden)
-                .groupBy({ it.transactionId }, { it.content })
-                .mapNotNull { (id, contents) ->
-                    Materializer.merge(contents, placeholderTypeId)?.let { id to it }
-                }.toMap()
-        // What its import related them to waits with them, for the re-run to say again (#1510).
-        relationshipRepository.reserveImportMadeOf(kept)
-        return ReservedTransactions(kept, priorMerges)
-    }
-
-    /**
-     * Settles a re-run's [reserved] ids once it has run (#1430): an id nothing took back is released, a reserved
-     * observation its record didn't say again goes (a group's is kept: its other legs may come from files not re-run), and
-     * every id a person overrode, or that lost an observation, is rebuilt with the overrides on top. A conflict compares
-     * the new merge with the one before the re-run.
-     */
-    private suspend fun settle(
-        reserved: ReservedTransactions,
-        onProgress: (suspend (Progress) -> Unit)?,
-    ): MaterializationReport {
-        val observations = observationRepository
-        onProgress?.invoke(stepProgress("Booking again the reconciliation copies the files still report", 0, SETTLE_STEPS))
-        val recopied = recopy(reserved)
-        val remaining = reserved.ids - recopied.ids
-        // What no record took back still stands as it was before the re-run (#1510): it goes now, and what it was
-        // reconciled with is rebuilt, as a fresh import of the others has it.
-        val vacant = remaining.intersect(observations.getVacantTransactionIds())
-        onProgress?.invoke(stepProgress("Deleting ${vacant.size} transactions no record took back", 1, SETTLE_STEPS))
-        val partners = reconciledPartnersOf(vacant.toList(), emptySet())
-        relationshipRepository.deleteReserved(reserved.ids)
-        vacant.filterIsInstance<TransferId>().chunked(DELETE_CHUNK_ROWS).forEach { transactionRepository.deleteTransactions(it) }
-        vacant.filterIsInstance<TradeId>().chunked(DELETE_CHUNK_ROWS).forEach { tradeRepository.deleteTrades(it) }
-        observations.releaseTransactions(vacant)
-        val reconciled =
-            observations.getObservationsOfTransactions(partners - vacant).mapTo(mutableSetOf()) { it.transactionId }
-        onProgress?.invoke(stepProgress("Rebuilding ${reconciled.size} transactions they were reconciled with", 2, SETTLE_STEPS))
-        if (reconciled.isNotEmpty()) materialize(emptyList(), MaterializationRequest(Source.Reconciler, reconciled))
-        val pending = observations.getReserved()
-        onProgress?.invoke(
-            stepProgress("Dropping observations no record said again: 0 of ${pending.size} checked", DROP_STEP, SETTLE_STEPS),
-        )
-        val shared =
-            observations.getMaterializedIds(
-                pending.mapNotNullTo(mutableSetOf()) { observation ->
-                    observation.transactionId.takeIf { observation.owner !is ObservationOwner.Group && it !in reserved.ids }
-                },
-            )
-        val lost = mutableSetOf<TransactionId>()
-        var checked = 0
-        for (chunk in pending.chunked(OBSERVATION_CHUNK_ROWS)) {
-            val dropped = mutableListOf<ObservationChange>()
-            val keep = mutableListOf<ObservationId>()
-            for (observation in chunk) {
-                when {
-                    observation.owner is ObservationOwner.Group -> {
-                        keep += observation.id
-                    }
-
-                    observation.transactionId in reserved.ids || observation.transactionId in shared -> {
-                        // Includes pins and splits that remained on a transaction another source holds.
-                        dropped += ObservationChange(observation.owner, observation.slot, observation, null)
-                        lost += observation.transactionId
-                    }
-                }
-            }
-            observations.applyObservationChanges(emptyList(), dropped, emptyList(), reclaimed = keep)
-            checked += chunk.size
-            onProgress?.invoke(
-                Progress(
-                    "Dropping observations no record said again: $checked of ${pending.size} checked",
-                    fraction = (DROP_STEP + checked.toFloat() / pending.size) / SETTLE_STEPS,
-                ),
-            )
-        }
-        val rebuild =
-            (reserved.priorMerges.keys - vacant - recopied.ids) +
-                observations.getObservationsOfTransactions(lost).mapTo(mutableSetOf()) { it.transactionId }
-        val released = reserved.priorMerges.keys.filterTo(mutableSetOf()) { it in vacant }
-        onProgress?.invoke(stepProgress("Rebuilding ${rebuild.size} transactions with hand edits or lost observations", 4, SETTLE_STEPS))
-        if (rebuild.isEmpty()) {
-            onProgress?.invoke(stepProgress("Settled", SETTLE_STEPS, SETTLE_STEPS))
-            return recopied.report.copy(releasedOverridden = released)
-        }
-        val report = materialize(emptyList(), MaterializationRequest(Source.Manual, rebuild, priorMerges = reserved.priorMerges))
-        onProgress?.invoke(stepProgress("Settled", SETTLE_STEPS, SETTLE_STEPS))
-        return report.copy(
-            inserted = report.inserted + recopied.report.inserted,
-            updated = report.updated + recopied.report.updated,
-            conflicts = recopied.report.conflicts + report.conflicts,
-            releasedOverridden = released,
-        )
-    }
-
-    private class Recopied(
-        val ids: Set<TransactionId>,
-        val report: MaterializationReport,
-    )
-
-    /**
-     * Books again each copy (#1475) a re-run vacated, from what its record says now: the record said its slot again, on a
-     * transaction the source still counts, and the copy's wallets are still linked to one account each. The copy keeps its
-     * id, so the match and a person's edits stay on it, and a conflict compares with what it merged to before. A copy whose
-     * row is gone, excluded or no longer maps stays reserved, and the settle removes it like any record not said again.
-     */
-    private suspend fun recopy(reserved: ReservedTransactions): Recopied {
-        val observations = observationRepository
-        val copies = observations.getReserved().filter { it.isCopy() && it.transactionId in reserved.ids }
-        if (copies.isEmpty()) return Recopied(emptySet(), MaterializationReport())
-        val ends = loadCopyAccounts()
-        val ids = mutableSetOf<TransactionId>()
-        for (copy in copies) {
-            val content = recopiedContent(copy, observations, ends) ?: continue
-            if (content != copy.content) observations.updateContent(copy.id, content)
-            observations.unreserve(copy.id)
-            ids += copy.transactionId
-        }
-        if (ids.isEmpty()) return Recopied(emptySet(), MaterializationReport())
-        val report =
-            materialize(
-                emptyList(),
-                MaterializationRequest(Source.Reconciliation, ids, priorMerges = reserved.priorMerges.filterKeys { it in ids }),
-            )
-        return Recopied(ids, report)
-    }
-
-    /** What [copy] books now: what its record says again at the copied slot, mapped onto the real accounts, or null when it says nothing there any more. */
-    private suspend fun recopiedContent(
-        copy: Observation,
-        observations: ObservationWriteRepository,
-        ends: CopyAccounts,
-    ): ObservationContent? {
-        val base = copy.slot.removePrefix(ObservationSlot.COPY_PREFIX)
-        val said =
-            observations.getObservationsOf(copy.owner).firstOrNull {
-                it.slot == base && (copy.owner is ObservationOwner.Group || !observations.isReserved(it.id))
-            } ?: return null
-        return ends.contentOf(said.transactionId)?.takeIf { it.values.kind == copy.content.values.kind }
-    }
-
-    /**
-     * Copies each of [shadowTransactions] onto the real accounts (#1475, [ImportBatch.reconciliationCopies]): the record that
-     * says the shadow transaction says its copy too, in the [ObservationSlot.copy] of its slot, and the copy is materialized
-     * as a [Source.Reconciliation] transaction.
-     */
-    private suspend fun copyToRealAccounts(shadowTransactions: List<TransactionId>): List<TransactionId> {
-        val observations = observationRepository
-        val ends = loadCopyAccounts()
-        val keys = shadowTransactions.indices.map { LocalTransactionKey("copy-$it") }
-        val mutations =
-            shadowTransactions.mapIndexed { index, shadow ->
-                val said =
-                    observations
-                        .getObservationsOfTransaction(shadow)
-                        .filter { it.owner !is ObservationOwner.Manual && !it.isCopy() }
-                        .minWithOrNull(compareBy({ it.owner !is ObservationOwner.Record }, { it.id.id }))
-                requireNotNull(said) { "No record of a reconciliation source says $shadow" }
-                val slot = ObservationSlot.copy(said.slot)
-                require(observations.getObservationsOf(said.owner).none { it.slot == slot }) { "$shadow is copied already" }
-                val content = requireNotNull(ends.contentOf(shadow)) { "$shadow can't be copied onto the real accounts" }
-                ObservationMutation.Upsert(said.owner, slot, ObservationTransaction.New(keys[index]), content)
-            }
-        val report = materialize(mutations, MaterializationRequest(Source.Reconciliation))
-        return keys.map { requireNotNull(report.newTransactionIds[it]) { "A copy was not booked" } }
-    }
-
-    /** Where a copy's ends land ([CopyEnds]), with the real accounts' fee accounts, read once per settle or copy batch. */
-    private inner class CopyAccounts(
-        private val ends: CopyEnds,
-        private val feeAccountOf: Map<AccountId, AccountId>,
-    ) {
-        private fun accountOf(shadow: AccountId): AccountId? =
-            when (val end = ends.end(shadow)) {
-                is CopyEnd.Real -> end.account
-                is CopyEnd.FeeAccountOf -> feeAccountOf[end.account]
-                null -> null
-            }
-
-        /** What a copy of [shadow] says: its values on the real accounts, or null when it is excluded or doesn't map. */
-        suspend fun contentOf(shadow: TransactionId): ObservationContent? {
-            val materialized = observationRepository.getMaterialized(shadow) ?: return null
-            if (materialized.attributes.any { it.typeId.id == WellKnownIds.EXCLUDED_ATTR_TYPE_ID }) return null
-            val values =
-                when (val v = materialized.values) {
-                    is ObservedValues.Transfer -> {
-                        v.copy(
-                            sourceAccountId = accountOf(v.sourceAccountId) ?: return null,
-                            targetAccountId = accountOf(v.targetAccountId) ?: return null,
-                        )
-                    }
-
-                    is ObservedValues.Trade -> {
-                        v.copy(
-                            fromAccountId = (ends.end(v.fromAccountId) as? CopyEnd.Real)?.account ?: return null,
-                            toAccountId = (ends.end(v.toAccountId) as? CopyEnd.Real)?.account ?: return null,
-                        )
-                    }
-                }
-            return ObservationContent(values)
-        }
-    }
-
-    private suspend fun loadCopyAccounts(): CopyAccounts {
-        val links = reconciliationLinkRepository
-        val ends =
-            CopyEnds(
-                realOf = links.getLinks().first().groupBy({ it.shadowAccountId }, { it.realAccountId }),
-                walletOfFeeAccount =
-                    links
-                        .getShadowAccounts()
-                        .first()
-                        .mapNotNull { shadow -> shadow.feeAccountFor?.let { shadow.accountId to it } }
-                        .toMap(),
-            )
-        val feeAccountOf =
-            accountAttributeRepository
-                .getByType(FEE_ACCOUNT_FOR_TYPE)
-                .first()
-                .mapNotNull { attr -> attr.value.toLongOrNull()?.let { AccountId(it) to attr.accountId } }
-                .toMap()
-        return CopyAccounts(ends, feeAccountOf)
-    }
-
     private suspend fun placeholderTypeId(): AttributeTypeId? =
         attributeTypeRepository.getByName(WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME).first()?.id
-
-    /** The transactions the records of the files and API sessions [batch] resets observe, read before the reset drops them. */
-    private suspend fun transactionsObservedByResets(batch: ImportBatch): Set<TransactionId> {
-        val observations = observationRepository
-        val resetIds =
-            batch.csvImportMutations.mapNotNullTo(mutableSetOf()) {
-                when (it) {
-                    is CsvImportMutation.ResetToUnimported -> it.id
-                    is CsvImportMutation.Reserve -> it.id
-                    else -> null
-                }
-            }
-        val resetSessions =
-            batch.apiSessionMutations.mapNotNullTo(mutableSetOf()) {
-                when (it) {
-                    is ApiSessionMutation.ResetToUnimported -> it.sessionId
-                    is ApiSessionMutation.Reserve -> it.sessionId
-                    else -> null
-                }
-            }
-        return observations.getRecordTransactions(resetIds, resetSessions)
-    }
-
-    /**
-     * The transactions in a `reconciled` link with any of [deleting] that outlive the delete (neither among them nor
-     * [kept]), read before the rows and their memberships go.
-     */
-    private suspend fun reconciledPartnersOf(
-        deleting: List<TransactionId>,
-        kept: Set<TransactionId>,
-    ): Set<TransactionId> {
-        val gone = deleting.filterNot { it in kept }
-        if (gone.isEmpty()) return emptySet()
-        val goneIds = gone.mapTo(mutableSetOf()) { it.id }
-        return relationshipRepository
-            .getByTransactions(gone)
-            .filter { it.relationshipType.id.id == WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID }
-            .flatMap { link -> link.members.map { it.transactionId } }
-            .filterTo(mutableSetOf()) { it.id !in goneIds }
-    }
-
-    /**
-     * Which of [ids] another source's record still observes, once the batch's resets dropped its own sources'. The
-     * deleting sources' own records don't count: a file being unimported still has its records until a later reset.
-     */
-    private suspend fun stillObserved(
-        ids: List<TransactionId>,
-        deletingSources: Set<Source>,
-    ): Set<TransactionId> {
-        val observations = observationRepository
-        val csvImports = deletingSources.filterIsInstance<Source.Csv>().mapTo(mutableSetOf()) { it.importId }
-        val apiSessions = deletingSources.filterIsInstance<Source.Api>().mapTo(mutableSetOf()) { it.sessionId }
-        return observations.getTransactionsObservedByOtherRecords(ids, csvImports, apiSessions)
-    }
 
     private suspend fun matchSync(): MatchSync {
         val observations = observationRepository
@@ -1062,334 +720,6 @@ class ImportEngineImpl(
         for (record in records.getApiSessionRecords(sessionId)) {
             observations.getObservationsOf(ObservationOwner.Record(record.id)).forEach { observations.deleteObservation(it.id) }
             records.deleteRecord(record.id)
-        }
-    }
-
-    private data class SourceBooking(
-        val key: ObservationKey?,
-        val provenance: Source,
-        val transactionId: TransactionId,
-        val content: () -> ObservationContent,
-    )
-
-    /** Records what each source says and lets a re-import take back its reserved transaction IDs. */
-    private class SourceObservations(
-        private val observations: ObservationWriteRepository,
-        private val records: ImportRecordWriteRepository,
-        private val unidentifiedCounterpartyTypeId: AttributeTypeId?,
-    ) {
-        // Each staged file's or API session's records, read once per batch: the container they belong to, then their keys.
-        private val containerRecords = mutableMapOf<Any, MutableMap<ImportRecordKey, ImportRecordId>>()
-        private val groups = mutableMapOf<ImportGroupKey, ImportGroupId>()
-
-        // Each file or session reads only its own record slots. Groups may span files and have their own pool.
-        private val vacantRecords = mutableMapOf<Any, MutableMap<Pair<ObservationOwner, String>, VacantObservation>>()
-        private var vacantGroups: MutableMap<Pair<ObservationOwner, String>, VacantObservation>? = null
-        private val claimedIds = mutableSetOf<TransactionId>()
-
-        // The kept transactions this run took back, which the materializer brings to everything their observations say.
-        val claimed: Set<TransactionId> get() = claimedIds.toSet()
-
-        /**
-         * The id a re-run reserved for [key]'s slot, when its record said it before and nothing took it back yet: a new
-         * [kind] booking for it goes in under that id, so what a person decided about it still applies. Each id goes once.
-         */
-        suspend fun reuse(
-            key: ObservationKey?,
-            kind: TransactionKind,
-        ): TransactionId? {
-            val ownerKey = key?.owner ?: return null
-            val pool: MutableMap<Pair<ObservationOwner, String>, VacantObservation>
-            val owner =
-                when (ownerKey) {
-                    is ObservationOwnerKey.Record -> {
-                        val recordKey = ownerKey.key
-                        val known = recordsOf(recordKey)
-                        val id = known[recordKey] ?: return null
-                        pool =
-                            vacantRecords.getOrPut(recordKey.containerKey()) {
-                                observations.getVacantReservedRecords(known.values).associateByTo(mutableMapOf()) { it.owner to it.slot }
-                            }
-                        ObservationOwner.Record(id)
-                    }
-
-                    is ObservationOwnerKey.Group -> {
-                        pool = vacantGroups ?: observations
-                            .getVacantReservedGroups()
-                            .associateByTo(mutableMapOf()) { it.owner to it.slot }
-                            .also { vacantGroups = it }
-                        if (pool.isEmpty()) return null
-                        ObservationOwner.Group(groups.getOrPut(ownerKey.key) { records.getOrCreateGroup(ownerKey.key) })
-                    }
-
-                    else -> {
-                        return null
-                    }
-                }
-            val reserved = pool[owner to key.slot] ?: return null
-            val id = reserved.transactionId
-            if ((id is TransferId) != (kind == TransactionKind.TRANSFER)) return null
-            pool.remove(owner to key.slot)
-            // Several slots can observe the same transaction, and batched writes claim IDs before inserting any rows.
-            return id.takeIf { claimedIds.add(it) }
-        }
-
-        // Reserved record slots on transactions a re-run kept because other records still observe them (#1510).
-        private var sharedRecords: Map<Pair<ObservationOwner, String>, TransactionId>? = null
-
-        /**
-         * The transaction [key]'s record observed before that other records observe too, when a re-run reserved its slot: a
-         * [kind] booking for it joins that transaction rather than booking a twin the match sync would fold back into it.
-         */
-        suspend fun joined(
-            key: ObservationKey?,
-            kind: TransactionKind,
-        ): TransactionId? {
-            val recordKey = (key?.owner as? ObservationOwnerKey.Record)?.key ?: return null
-            val recordId = recordsOf(recordKey)[recordKey] ?: return null
-            val shared =
-                sharedRecords ?: run {
-                    val vacant = observations.getVacantTransactionIds()
-                    observations
-                        .getReserved()
-                        .filter { it.owner is ObservationOwner.Record && it.transactionId !in vacant }
-                        .associate { (it.owner to it.slot) to it.transactionId }
-                        .also { sharedRecords = it }
-                }
-            val id = shared[ObservationOwner.Record(recordId) to key.slot] ?: return null
-            if ((id is TransferId) != (kind == TransactionKind.TRANSFER)) return null
-            claimedIds += id
-            return id
-        }
-
-        fun transferContent(
-            leg: ExpandedTransfer,
-            approximateTime: Boolean,
-        ): ObservationContent = leg.observationContent(approximateTime, unidentifiedCounterpartyTypeId)
-
-        suspend fun recordTransfers(legs: List<TransferObservation>): Set<TransactionId> =
-            recordAll(
-                legs.map { (leg, id, approximate) ->
-                    SourceBooking(leg.key, leg.provenance, id) { transferContent(leg, approximate) }
-                },
-            )
-
-        suspend fun recordAll(bookings: List<SourceBooking>): Set<TransactionId> {
-            val loadedRecords =
-                bookings.mapNotNullTo(mutableSetOf()) { booking ->
-                    (booking.key?.owner as? ObservationOwnerKey.Record)?.key?.let { knownRecord(it) }
-                }
-            val stored = observations.getObservationsOfRecords(loadedRecords).associateBy { it.owner to it.slot }
-            val reserved = observations.getReservedIds(stored.values.map { it.id })
-            val changes = mutableListOf<ObservationChange>()
-            val reclaimed = mutableListOf<ObservationId>()
-            val booked = mutableMapOf<Pair<ObservationOwner, String>, TransactionId>()
-            val pending = linkedMapOf<Pair<ImportRecordKey, String>, RecordObservationInsert>()
-            val observed = mutableSetOf<TransactionId>()
-
-            suspend fun flushFresh() {
-                if (pending.isEmpty()) return
-                val inserted = observations.insertRecordObservations(RECORD_UNHASHED, pending.values.toList())
-                for ((key, id) in inserted) recordsOf(key)[key] = id
-                pending.clear()
-            }
-
-            suspend fun flushChanges() {
-                if (changes.isEmpty() && reclaimed.isEmpty()) return
-                observations.applyObservationChanges(emptyList(), changes, emptyList(), reclaimed = reclaimed)
-                changes.clear()
-                reclaimed.clear()
-            }
-
-            for (booking in bookings) {
-                val key = (booking.key?.owner as? ObservationOwnerKey.Record)?.key
-                val recordId = key?.let { knownRecord(it) }
-                val slot = booking.key?.slot ?: ObservationSlot.TRADE
-                val id = booking.transactionId
-                when {
-                    key != null && recordId == null -> {
-                        flushChanges()
-                        val insert = pending.getOrPut(key to slot) { RecordObservationInsert(key, slot, id, booking.content()) }
-                        observed += insert.transactionId
-                        if (pending.size >= OBSERVATION_CHUNK_ROWS) flushFresh()
-                    }
-
-                    recordId != null && recordId in loadedRecords -> {
-                        flushFresh()
-                        val owner = ObservationOwner.Record(recordId)
-                        val ownerSlot = owner to slot
-                        observed +=
-                            booked.getOrPut(ownerSlot) {
-                                val existing = stored[ownerSlot]
-                                if (existing != null && existing.id !in reserved) return@getOrPut existing.transactionId
-                                val content = booking.content()
-                                val target = if (existing == null) id else reclaimTarget(existing, id)
-                                if (existing != null) reclaimed += existing.id
-                                if (existing == null || existing.content != content || existing.transactionId != target) {
-                                    changes += ObservationChange(owner, slot, existing, ObservationBooking(existing?.id, target, content))
-                                }
-                                target
-                            }
-                        if (maxOf(changes.size, reclaimed.size) >= OBSERVATION_CHUNK_ROWS) flushChanges()
-                    }
-
-                    else -> {
-                        // Groups and repeated slots of newly created records need to see the earlier writes.
-                        flushFresh()
-                        flushChanges()
-                        // A source that keeps no observations (the sample generator) says nothing: its transaction isn't
-                        // observed, and rebuilding it from no observation would delete it.
-                        record(booking.key, booking.provenance, id, booking.content)?.let { observed += it }
-                    }
-                }
-            }
-            flushFresh()
-            flushChanges()
-            return observed
-        }
-
-        // A duplicate can say its own still-vacant id again, unless another slot of this run already took it back. Matching
-        // later decides whether the two are one.
-        private suspend fun reclaimTarget(
-            existing: Observation,
-            target: TransactionId,
-        ): TransactionId = existing.transactionId.takeIf { it != target && isVacant(it) && claimedIds.add(it) } ?: target
-
-        // Vacant: every observation of it is reserved, so nothing but this re-run's records says it any more (#1510).
-        private suspend fun isVacant(id: TransactionId): Boolean {
-            val all = observations.getObservationsOfTransaction(id).map { it.id }
-            return observations.getReservedIds(all).size == all.size
-        }
-
-        /**
-         * Records [content] for [key] (null: a trade no record backs) on [transactionId], when [provenance] says whose, and
-         * returns the transaction the observation is on (null when nothing was recorded).
-         */
-        suspend fun record(
-            key: ObservationKey?,
-            provenance: Source,
-            transactionId: TransactionId,
-            content: () -> ObservationContent,
-        ): TransactionId? {
-            val slot = key?.slot ?: ObservationSlot.TRADE
-            val (owner, fresh) = owner(key?.owner, provenance, transactionId) ?: return null
-            val existing = if (fresh) null else observations.getObservationsOf(owner).firstOrNull { it.slot == slot }
-            if (existing != null) {
-                // A slot its file's re-run reserved (#1430) is said again: it takes what the record says now, where it says it.
-                if (observations.isReserved(existing.id)) {
-                    val now = content()
-                    if (existing.content != now) observations.updateContent(existing.id, now)
-                    // Said as a duplicate of another transaction while its own stands vacant, it takes its own back (#1429): the
-                    // match sync decides whether the two are one, as a fresh import has it, and a person's work stays on its id.
-                    val target = reclaimTarget(existing, transactionId)
-                    if (existing.transactionId.id != target.id) observations.assignTransaction(existing.id, target)
-                    observations.unreserve(existing.id)
-                    return target
-                }
-                // Otherwise a record seen before already says this slot (a trade its re-import found again): it keeps what it said.
-                return existing.transactionId
-            }
-            observations.insertObservation(owner, slot, transactionId, content())
-            return transactionId
-        }
-
-        /**
-         * A trade booking that found [transactionId] standing rather than creating it: when its record's re-run reserved the
-         * slot on that very trade (a person's work kept it standing, #1430), the record takes the observation back, or the
-         * settle drops it and the trade is left unobserved. A trade another source booked stays that source's alone.
-         */
-        suspend fun reclaim(
-            key: ObservationKey?,
-            transactionId: TransactionId,
-            content: () -> ObservationContent,
-        ) {
-            val owner =
-                when (val ownerKey = key?.owner) {
-                    is ObservationOwnerKey.Record -> knownRecord(ownerKey.key)?.let { ObservationOwner.Record(it) }
-                    is ObservationOwnerKey.Group -> group(ownerKey).first
-                    else -> null
-                } ?: return
-            val existing = observations.getObservationsOf(owner).firstOrNull { it.slot == key?.slot } ?: return
-            if (existing.transactionId.id != transactionId.id || !observations.isReserved(existing.id)) return
-            val now = content()
-            if (existing.content != now) observations.updateContent(existing.id, now)
-            observations.unreserve(existing.id)
-        }
-
-        /** Whether [key]'s record said its slot before and its re-run reserved it (#1430). */
-        suspend fun isReserved(key: ObservationKey): Boolean {
-            val recordKey = (key.owner as? ObservationOwnerKey.Record)?.key ?: return false
-            val owner = ObservationOwner.Record(knownRecord(recordKey) ?: return false)
-            return observations.getObservationsOf(owner).any { it.slot == key.slot && observations.isReserved(it.id) }
-        }
-
-        /**
-         * The owner, and whether it is new (so says nothing yet); null for a booking no API item, person or reconciliation copy
-         * made. A person's entry and a reconciliation copy are owned by their creation's provenance row.
-         */
-        private suspend fun owner(
-            key: ObservationOwnerKey?,
-            provenance: Source,
-            transactionId: TransactionId,
-        ): Pair<ObservationOwner, Boolean>? {
-            val recordKey = (key as? ObservationOwnerKey.Record)?.key
-            return when {
-                recordKey != null -> {
-                    record(recordKey)
-                }
-
-                key is ObservationOwnerKey.Group -> {
-                    group(key)
-                }
-
-                provenance == Source.Manual &&
-                    (key == null || key is ObservationOwnerKey.Unrecorded) -> {
-                    observations.getCreationSourceId(transactionId)?.let { ObservationOwner.Manual(it) to true }
-                }
-
-                else -> {
-                    null
-                }
-            }
-        }
-
-        // A staged row's record is normally written once its run completes (with its content hash), so one met first here gets
-        // a hash that matches nothing, which that write then replaces: until it does, the file never looks unchanged.
-        private suspend fun record(key: ImportRecordKey): Pair<ObservationOwner, Boolean> {
-            val known = recordsOf(key)
-            known[key]?.let { return ObservationOwner.Record(it) to false }
-            val id = records.insertRecord(key, RECORD_UNHASHED)
-            known[key] = id
-            return ObservationOwner.Record(id) to true
-        }
-
-        private suspend fun knownRecord(key: ImportRecordKey): ImportRecordId? = recordsOf(key)[key]
-
-        private suspend fun recordsOf(key: ImportRecordKey): MutableMap<ImportRecordKey, ImportRecordId> =
-            containerRecords.getOrPut(key.containerKey()) {
-                val existing =
-                    when (key) {
-                        is ImportRecordKey.ApiItem -> records.getApiSessionRecords(key.sessionId)
-                        is ImportRecordKey.CsvRow -> records.getCsvImportRecords(key.csvImportId)
-                    }
-                existing.associateTo(mutableMapOf()) { it.key to it.id }
-            }
-
-        private fun ImportRecordKey.containerKey(): Any =
-            when (this) {
-                is ImportRecordKey.ApiItem -> sessionId
-                is ImportRecordKey.CsvRow -> csvImportId
-            }
-
-        // A group outlives each of its runs (its legs may come from several files), so it may already say a slot. Each run
-        // names every leg it joined, so its members are those of the latest run.
-        private suspend fun group(key: ObservationOwnerKey.Group): Pair<ObservationOwner, Boolean> {
-            val id = groups.getOrPut(key.key) { records.getOrCreateGroup(key.key) }
-            if (key.members.isNotEmpty()) {
-                val members = key.members.mapNotNullTo(mutableSetOf()) { (record(it).first as? ObservationOwner.Record)?.recordId }
-                records.setGroupMembers(id, members)
-            }
-            return ObservationOwner.Group(id) to false
         }
     }
 
@@ -1658,12 +988,6 @@ class ImportEngineImpl(
             retaken = observer.claimed,
         )
     }
-
-    private data class TransferObservation(
-        val leg: ExpandedTransfer,
-        val id: TransferId,
-        val approximate: Boolean,
-    )
 
     /**
      * A row that duplicates a transfer already booked (or one this batch books) says that transfer too: its main leg,
@@ -3430,35 +2754,6 @@ class ImportEngineImpl(
         records.writeRecords(emptyMap(), hashes)
     }
 
-    // What each transfer a person edits holds before the edit; none without the repositories to record overrides in.
-    private suspend fun handEditSnapshots(updates: List<ImportTransfer>): Map<TransferId, MaterializedTransaction> {
-        val observations = observationRepository
-        return updates
-            .filter { it.source == Source.Manual }
-            .mapNotNull { intent -> requireNotNull(intent.existingId).let { id -> observations.getMaterialized(id)?.let { id to it } } }
-            .toMap()
-    }
-
-    private suspend fun recordHandEdits(before: Map<TransferId, MaterializedTransaction>) {
-        val overrides = personOverrideRepository
-        for ((id, was) in before) {
-            val now = observationRepository.getMaterialized(id) ?: continue
-            overrides.recordTransferEdit(id, was, now)
-        }
-    }
-
-    private suspend fun applyObservationDecisions(decisions: List<ObservationDecision>) {
-        val overrides = personOverrideRepository
-        for (decision in decisions) {
-            when (decision) {
-                is ObservationDecision.Pin -> overrides.pin(decision.pin)
-                is ObservationDecision.Unpin -> overrides.unpin(decision.observationId)
-                is ObservationDecision.Split -> overrides.split(decision.split)
-                is ObservationDecision.Unsplit -> overrides.unsplit(decision.split)
-            }
-        }
-    }
-
     private suspend fun applyConfigMutations(batch: ImportBatch): ConfigOutcome {
         if (batch.reconciliationLinkMutations.isNotEmpty()) applyReconciliationLinkMutations(batch.reconciliationLinkMutations)
         for (m in batch.tradeAttributeMutations) {
@@ -3469,7 +2764,7 @@ class ImportEngineImpl(
             val value = (m as? TradeAttributeMutation.Set)?.value
             personOverrideRepository.setTradeAttributeOverride(m.tradeId, m.typeId.tradeOverride(value))
         }
-        if (batch.observationDecisions.isNotEmpty()) applyObservationDecisions(batch.observationDecisions)
+        if (batch.observationDecisions.isNotEmpty()) handEdits.applyDecisions(batch.observationDecisions)
         for (m in batch.passThroughMutations) {
             when (m) {
                 is PassThroughMutation.Create -> passThroughAccountRepository.create(m.account)
@@ -3778,34 +3073,4 @@ class ImportEngineImpl(
     // endregion
 }
 
-/**
- * Records what a person's edit of a transfer changed as their overrides, so a later rebuild from the observations keeps
- * it: each field whose stored value moved, each attribute set or changed, and each attribute removed. What the edit left
- * as it was records nothing, so an untouched field still follows what the sources say.
- */
-private suspend fun PersonOverrideWriteRepository.recordTransferEdit(
-    transferId: TransferId,
-    before: MaterializedTransaction,
-    after: MaterializedTransaction,
-) {
-    for (field in TransferField.entries) {
-        val value = after.values.column(field) ?: continue
-        if (value != before.values.column(field)) setTransferOverride(transferId, field, value)
-    }
-    val was = before.attributes.associate { (it.typeId to it.groupKey) to it.value }
-    val now = after.attributes.associate { (it.typeId to it.groupKey) to it.value }
-    for ((key, value) in now) {
-        if (was[key] != value) setTransferAttributeOverride(transferId, AttributeOverride.Set(key.first, key.second, value))
-    }
-    for (key in was.keys - now.keys) {
-        setTransferAttributeOverride(transferId, AttributeOverride.Removed(key.first, key.second))
-    }
-}
-
-private fun AttributeTypeId.tradeOverride(value: String?): AttributeOverride =
-    if (value == null) AttributeOverride.Removed(this, "") else AttributeOverride.Set(this, "", value)
-
 private fun Source.isImport(): Boolean = this is Source.Csv || this is Source.Api
-
-/** Whether this observation is a reconciliation copy (#1475): what its owner's record says on the real accounts. */
-private fun Observation.isCopy(): Boolean = slot.startsWith(ObservationSlot.COPY_PREFIX)
