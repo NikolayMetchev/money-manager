@@ -241,7 +241,7 @@ class Reimports(
         // re-importing them) are the second and third. After the last file each step keeps its files and rows lines.
         var lastFileProgress: Progress? = null
         val onFileProgress: suspend (Progress) -> Unit = { inner ->
-            val shifted = inner.copy(phase = inner.phase?.let { it.copy(number = it.number + 1, count = RerunPhases.COUNT) })
+            val shifted = inner.copy(phase = inner.phase?.let { if (it.number == 1) RerunPhases.PREPARING else RerunPhases.REIMPORTING })
             lastFileProgress = shifted
             onProgress(shifted)
         }
