@@ -21,6 +21,7 @@ import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.repository.write.CategoryWriteRepository
 import com.moneymanager.domain.repository.write.CurrencyWriteRepository
+import com.moneymanager.importengineapi.EditGate
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importer.ImportEngineImpl
 import com.moneymanager.presenter.error.ProvideSchemaAwareScope
@@ -58,7 +59,8 @@ class CategoriesScreenTest {
             cryptoRepository = mock(MockMode.autoUnit),
             tradeRepository = mock(MockMode.autoUnit),
             exchangeOrderRepository = mock(MockMode.autoUnit),
-            attributeTypeRepository = mock(MockMode.autoUnit),
+            // Every batch asks for the unidentified-counterparty type and the observations a reset or delete touches.
+            attributeTypeRepository = mock(MockMode.autoUnit) { every { getByName(any()) } returns flowOf(null) },
             relationshipTypeRepository = mock(MockMode.autoUnit),
             csvImportStrategyRepository = mock(MockMode.autoUnit),
             apiImportStrategyRepository = mock(MockMode.autoUnit),
@@ -68,6 +70,22 @@ class CategoriesScreenTest {
             settingsRepository = mock(MockMode.autoUnit),
             importDirectoryRepository = mock(MockMode.autoUnit),
             passThroughAccountRepository = mock(MockMode.autoUnit),
+            holidayCalendarRepository = mock(MockMode.autoUnit),
+            relationshipRepository = mock(MockMode.autoUnit),
+            reconciliationLinkRepository = mock(MockMode.autoUnit),
+            observationRepository =
+                mock(MockMode.autoUnit) {
+                    everySuspend { getRecordTransactions(any(), any()) } returns emptySet()
+                    everySuspend { getVacantTransactionIds() } returns emptySet()
+                    everySuspend { getAccountsWithObservations(any()) } returns emptySet()
+                    everySuspend { getObservationsOfTransactions(any()) } returns emptyList()
+                    everySuspend { getTransactionsObservedByOtherRecords(any(), any(), any()) } returns emptySet()
+                    everySuspend { getObservationsOfRecords(any()) } returns emptyList()
+                    everySuspend { getReservedIds(any()) } returns emptySet()
+                },
+            personOverrideRepository = mock(MockMode.autoUnit),
+            importRecordRepository = mock(MockMode.autoUnit),
+            editGate = EditGate.AlwaysWritable,
         )
 
     private val fakeCurrencyRepository: CurrencyWriteRepository =

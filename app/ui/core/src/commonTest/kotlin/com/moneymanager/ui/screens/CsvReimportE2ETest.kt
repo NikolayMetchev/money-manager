@@ -4,7 +4,6 @@ import com.moneymanager.csvimporter.BulkReimportResult
 import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.runCsvImport
 import com.moneymanager.database.di.DatabaseComponent
-import com.moneymanager.database.di.createImportEngine
 import com.moneymanager.database.di.openDatabaseComponent
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
@@ -31,7 +30,6 @@ import com.moneymanager.domain.model.rules.AccountNaming
 import com.moneymanager.domain.model.rules.AccountSide
 import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
-import com.moneymanager.importengineapi.EditGate
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.createAccountMapping
 import com.moneymanager.importengineapi.createCsvStrategy
@@ -86,7 +84,7 @@ class CsvReimportE2ETest {
         val databaseManager = createTestDatabaseManager()
         val db = databaseManager.openDatabase(testDbLocation!!)
         val dc = openDatabaseComponent(db)
-        val importEngine = createImportEngine(dc)
+        val importEngine = dc.importEngine
 
         val sourceAccountId =
             dc.accountRepository.createAccount(
@@ -290,8 +288,6 @@ class CsvReimportE2ETest {
             assertEquals(1, again.filesUnchanged)
             assertEquals(0, again.transfersCreated)
         }
-
-    private fun createImportEngine(dc: DatabaseComponent): ImportEngine = dc.createImportEngine(EditGate.AlwaysWritable)
 
     private fun createStrategy(
         sourceAccountId: AccountId,

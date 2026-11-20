@@ -1,7 +1,6 @@
 package com.moneymanager.tools.benchdb
 
 import com.moneymanager.database.JvmDatabaseManager
-import com.moneymanager.database.di.createImportEngine
 import com.moneymanager.database.di.openDatabaseComponent
 import com.moneymanager.database.di.toAppServices
 import com.moneymanager.domain.model.AccountId
@@ -11,7 +10,6 @@ import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Source
 import com.moneymanager.importengineapi.AccountMatchKey
 import com.moneymanager.importengineapi.AccountRef
-import com.moneymanager.importengineapi.EditGate
 import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
@@ -119,7 +117,7 @@ fun main(args: Array<String>) {
     runBlocking {
         val database = JvmDatabaseManager().openDatabase(DbLocation(output.path))
         val component = openDatabaseComponent(database)
-        val engine = component.createImportEngine(EditGate.AlwaysWritable)
+        val engine = component.importEngine
         val services = component.toAppServices(engine)
         engine.createCurrency("GBP", "Pound Sterling", 2, Source.SampleGenerator)
         engine.createCurrency("USD", "US Dollar", 2, Source.SampleGenerator)

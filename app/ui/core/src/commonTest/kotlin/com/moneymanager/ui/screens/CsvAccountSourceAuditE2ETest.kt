@@ -33,7 +33,6 @@ import com.moneymanager.domain.model.rules.AccountNaming
 import com.moneymanager.domain.model.rules.AccountSide
 import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
-import com.moneymanager.importer.ImportEngineImpl
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
@@ -134,30 +133,7 @@ class CsvAccountSourceAuditE2ETest {
                     accountMappingRepository = dc.accountMappingRepository,
                     accountRepository = dc.accountRepository,
                     maintenance = dc.maintenanceService,
-                    importEngine =
-                        ImportEngineImpl(
-                            transactionRepository = dc.transactionRepository,
-                            accountRepository = dc.accountRepository,
-                            accountAttributeRepository = dc.accountAttributeRepository,
-                            personRepository = dc.personRepository,
-                            personAttributeRepository = dc.personAttributeRepository,
-                            ownershipRepository = dc.personAccountOwnershipRepository,
-                            categoryRepository = dc.categoryRepository,
-                            currencyRepository = dc.currencyRepository,
-                            cryptoRepository = dc.cryptoRepository,
-                            tradeRepository = dc.tradeRepository,
-                            exchangeOrderRepository = dc.exchangeOrderRepository,
-                            attributeTypeRepository = dc.attributeTypeRepository,
-                            relationshipTypeRepository = dc.relationshipTypeRepository,
-                            csvImportStrategyRepository = dc.csvImportStrategyRepository,
-                            apiImportStrategyRepository = dc.apiImportStrategyRepository,
-                            accountMappingRepository = dc.accountMappingRepository,
-                            csvImportRepository = dc.csvImportRepository,
-                            apiSessionRepository = dc.apiSessionRepository,
-                            settingsRepository = dc.settingsRepository,
-                            importDirectoryRepository = dc.importDirectoryRepository,
-                            passThroughAccountRepository = dc.passThroughAccountRepository,
-                        ),
+                    importEngine = dc.importEngine,
                 )
             }
 

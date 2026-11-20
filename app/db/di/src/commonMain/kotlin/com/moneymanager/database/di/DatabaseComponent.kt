@@ -43,6 +43,7 @@ import com.moneymanager.domain.repository.write.TransactionWriteRepository
 import com.moneymanager.domain.repository.write.TransferAttributeWriteRepository
 import com.moneymanager.domain.repository.write.TransferSourceWriteRepository
 import com.moneymanager.domain.strategy.StrategyLibrary
+import com.moneymanager.importengineapi.EditGate
 import com.moneymanager.importengineapi.ImportEngine
 import dev.zacsweers.metro.DependencyGraph
 import dev.zacsweers.metro.Provides
@@ -106,6 +107,7 @@ interface DatabaseComponent {
         fun create(
             @Provides database: MoneyManagerDatabaseWrapper,
             @Provides deviceId: DeviceId,
+            @Provides editGate: EditGate,
         ): DatabaseComponent
     }
 }
@@ -113,9 +115,13 @@ interface DatabaseComponent {
 /**
  * Builds the [DatabaseComponent] for an open [database], recording this device first: every write records
  * which device made it, so the graph takes the [DeviceId] as an input rather than querying for it while it
- * is built.
+ * is built. Its one [ImportEngine] consults [editGate] before every write (a cloud-backed session locks it while
+ * the cloud copy is ahead).
  */
-suspend fun openDatabaseComponent(database: MoneyManagerDatabaseWrapper): DatabaseComponent {
+suspend fun openDatabaseComponent(
+    database: MoneyManagerDatabaseWrapper,
+    editGate: EditGate = EditGate.AlwaysWritable,
+): DatabaseComponent {
     val deviceId = DeviceWriteRepositoryImpl(database, DeviceReadRepositoryImpl(database)).getOrCreateDevice(getDeviceInfo())
-    return DatabaseComponent.create(database, deviceId)
+    return DatabaseComponent.create(database, deviceId, editGate)
 }
