@@ -107,8 +107,6 @@ class TradeWriteRepositoryImpl(
                         "A trade must exchange two different assets " +
                             "(from and to assets are both ${trade.from.asset.code})"
                     }
-                    writeQueries.bumpRevision(trade.id.id)
-                    val revision = selectQueries.selectRevision(trade.id.id).awaitAsOneOrNull() ?: return@forEach
                     writeQueries.update(
                         timestamp = trade.timestamp.toEpochMilliseconds(),
                         description = trade.description,
@@ -120,6 +118,7 @@ class TradeWriteRepositoryImpl(
                         to_amount = trade.to.amount.toString(),
                         id = trade.id.id,
                     )
+                    val revision = selectQueries.selectRevision(trade.id.id).awaitAsOneOrNull() ?: return@forEach
                     database.recordSource(deviceId, EntityType.TRADE, trade.id.id, revision, edit.source)
                 }
             }

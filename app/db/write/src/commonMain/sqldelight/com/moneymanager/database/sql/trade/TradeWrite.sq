@@ -8,7 +8,7 @@ DELETE FROM trade WHERE id = ?;
 
 update:
 UPDATE trade
-SET timestamp = ?, description = ?, from_account_id = ?, from_asset_id = ?, from_amount = ?,
+SET revision_id = revision_id + 1, timestamp = ?, description = ?, from_account_id = ?, from_asset_id = ?, from_amount = ?,
     to_account_id = ?, to_asset_id = ?, to_amount = ?
 WHERE id = ?;
 

@@ -457,8 +457,9 @@ class ObservationWriteRepositoryImpl(
                         values.toAmount.toString(),
                         id,
                     )
+                } else {
+                    database.tradeWriteQueries.bumpRevision(id)
                 }
-                database.tradeWriteQueries.bumpRevision(id)
                 removed.forEach { (typeId, _) -> database.tradeWriteQueries.deleteAttribute(id, typeId.id) }
                 changed.forEach { database.tradeWriteQueries.upsertAttribute(id, it.typeId.id, it.value) }
                 val revision = database.tradeSelectQueries.selectRevision(id).awaitAsOne()
