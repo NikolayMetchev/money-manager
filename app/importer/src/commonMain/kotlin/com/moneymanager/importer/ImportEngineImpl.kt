@@ -723,6 +723,9 @@ class ImportEngineImpl(
             return ReservedTransactions()
         }
         val vacatingIds = vacating.toSet()
+        // Only this batch's own files and sessions: a stopped re-run of another source leaves its reservations vacant, and settling them
+        // here would delete a pinned, split or copied transaction that run's records are still to take back.
+        val ownTransactions = transactionsObservedByResets(batch)
         // An observation a person pinned or split stays reserved for its record to take back: deleting it would drop the
         // decision with it. So does a copy (#1475): the settle books it again from what its record says now.
         val decided =
@@ -738,7 +741,7 @@ class ImportEngineImpl(
             reserved
                 .asSequence()
                 .filter { it.id in decided || it.isCopy() }
-                .filter { it.transactionId !in vacatingIds }
+                .filter { it.transactionId !in vacatingIds && it.transactionId in ownTransactions }
                 .map { it.transactionId }
                 .toSet()
                 .filterTo(mutableSetOf()) { id -> observations.getObservationsOfTransaction(id).all { it.id in reservedIds } }
