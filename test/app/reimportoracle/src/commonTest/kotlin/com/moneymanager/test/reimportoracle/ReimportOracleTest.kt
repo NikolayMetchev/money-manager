@@ -175,8 +175,8 @@ class ReimportOracleTest {
                     reimport(listOf(source), force = true)
                     // A CSV file creates every account its rows name before it pairs rows into trades, so a suspense account
                     // ("PayPal Conversions") nothing ends up using is created and removed again, by a first import too. Only an
-                    // account the run leaves changed counts here.
-                    val accountsChanged = counts.selectSurvivingAccountsAuditedAfter(accountAuditBefore).awaitAsList().isNotEmpty()
+                    // account that existed before the run and was changed or deleted by it counts here.
+                    val accountsChanged = counts.selectPreexistingAccountsAuditedAfter(accountAuditBefore).awaitAsList().isNotEmpty()
                     val grown =
                         auditCounts().filter { (table, count) -> count != before[table] && (table != "account_audit" || accountsChanged) }
                     if (grown.isEmpty()) {

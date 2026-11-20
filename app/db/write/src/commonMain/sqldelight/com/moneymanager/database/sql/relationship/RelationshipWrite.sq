@@ -30,6 +30,12 @@ WHERE relationship_member.transaction_id IN ?
 unreserve:
 DELETE FROM relationship_reserved WHERE relationship_id = ?;
 
--- What a re-run's records did not say again.
-deleteReserved:
-DELETE FROM relationship WHERE id IN (SELECT relationship_id FROM relationship_reserved);
+-- What a re-run's records did not say again, among the relationships it reserved on its own transactions: a reservation an
+-- interrupted re-run of another source left waits for that source's next re-run.
+deleteReservedOn:
+DELETE FROM relationship WHERE id IN (
+    SELECT relationship_reserved.relationship_id
+    FROM relationship_reserved
+    JOIN relationship_member ON relationship_member.relationship_id = relationship_reserved.relationship_id
+    WHERE relationship_member.transaction_id IN ?
+);

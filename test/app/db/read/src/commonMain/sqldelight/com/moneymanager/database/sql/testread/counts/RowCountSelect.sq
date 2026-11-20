@@ -71,6 +71,7 @@ SELECT 'transfer_audit' AS table_name, COUNT(*) AS row_count FROM transfer_audit
 maxAccountAuditId:
 SELECT COALESCE(MAX(id), 0) FROM account_audit;
 
--- The accounts audited after [after] that still exist: what a run left changed rather than created and removed again.
-selectSurvivingAccountsAuditedAfter:
-SELECT DISTINCT account_id FROM account_audit WHERE id > :after AND account_id IN (SELECT id FROM account);
+-- The accounts audited after [after] that already existed by then (each account's creation is audited), deleted since or not:
+-- what a run changed, rather than created and removed again.
+selectPreexistingAccountsAuditedAfter:
+SELECT DISTINCT account_id FROM account_audit WHERE id > :after AND account_id IN (SELECT account_id FROM account_audit WHERE id <= :after);

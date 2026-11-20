@@ -33,8 +33,11 @@ interface RelationshipWriteRepository : RelationshipReadRepository {
      */
     suspend fun reserveImportMadeOf(transactionIds: Collection<TransactionId>)
 
-    /** Deletes every relationship still reserved: what a re-run's records did not say again. */
-    suspend fun deleteReserved()
+    /**
+     * Deletes the relationships still reserved on [transactionIds], a re-run's own: what its records did not say again. Another
+     * source's reservations, left by a re-run that was stopped, stay for that source's next re-run.
+     */
+    suspend fun deleteReserved(transactionIds: Collection<TransactionId>)
 }
 
 /** One step of [RelationshipWriteRepository.apply]. */

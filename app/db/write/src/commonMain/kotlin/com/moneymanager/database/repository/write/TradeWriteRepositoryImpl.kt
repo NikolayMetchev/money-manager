@@ -51,6 +51,22 @@ class TradeWriteRepositoryImpl(
     /** Creates or reuses one trade. Must be called inside an open transaction. */
     private suspend fun createOne(trade: NewTrade): TradeCreateResult {
         val timestamp = trade.timestamp.toEpochMilliseconds()
+        // A re-run takes back the trade it kept standing (#1510), writing only what changed. One that still says what the
+        // record says is taken back before the identical-trade lookup below, which skips reserved trades: an identical trade
+        // another source booked would otherwise take the record, and this one (with its hand edits) would be settled away.
+        val reused = trade.reuseId
+        val current = reused?.let { selectQueries.selectByIds(listOf(it.id)).awaitAsOneOrNull() }
+        val unchanged =
+            current != null &&
+                current.timestamp == timestamp &&
+                current.description == trade.description &&
+                current.from_account_id == trade.fromAccountId.id &&
+                current.from_asset_id == trade.fromAmount.asset.id.id &&
+                current.from_amount == trade.fromAmount.amount.toString() &&
+                current.to_account_id == trade.toAccountId.id &&
+                current.to_asset_id == trade.toAmount.asset.id.id &&
+                current.to_amount == trade.toAmount.amount.toString()
+        if (reused != null && unchanged) return TradeCreateResult(reused, created = true)
         // Multiset idempotency: re-importing the same conversion must not double-book, but N
         // genuinely-repeated identical fills must book as N rows. Reuse the occurrence-th existing
         // identical trade (0-based, ordered by id); once exhausted, fall through to insert.
@@ -67,38 +83,26 @@ class TradeWriteRepositoryImpl(
                     occurrence = trade.occurrence.toLong(),
                 ).awaitAsOneOrNull()
         if (existing != null) return TradeCreateResult(TradeId(existing), created = false)
-        // A re-run takes back the trade it kept standing (#1510), writing only what changed.
-        trade.reuseId?.let { reused ->
-            val current = selectQueries.selectByIds(listOf(reused.id)).awaitAsOneOrNull() ?: return@let
-            val unchanged =
-                current.timestamp == timestamp &&
-                    current.description == trade.description &&
-                    current.from_account_id == trade.fromAccountId.id &&
-                    current.from_asset_id == trade.fromAmount.asset.id.id &&
-                    current.from_amount == trade.fromAmount.amount.toString() &&
-                    current.to_account_id == trade.toAccountId.id &&
-                    current.to_asset_id == trade.toAmount.asset.id.id &&
-                    current.to_amount == trade.toAmount.amount.toString()
-            if (!unchanged) {
-                writeQueries.update(
-                    timestamp = timestamp,
-                    description = trade.description,
-                    from_account_id = trade.fromAccountId.id,
-                    from_asset_id = trade.fromAmount.asset.id.id,
-                    from_amount = trade.fromAmount.amount.toString(),
-                    to_account_id = trade.toAccountId.id,
-                    to_asset_id = trade.toAmount.asset.id.id,
-                    to_amount = trade.toAmount.amount.toString(),
-                    id = reused.id,
-                )
-                database.recordSource(
-                    deviceId,
-                    EntityType.TRADE,
-                    reused.id,
-                    selectQueries.selectRevision(reused.id).awaitAsOne(),
-                    trade.source,
-                )
-            }
+        // A changed one is taken back unless the record now matches another trade, which it dedupes onto as a fresh import does.
+        if (reused != null && current != null) {
+            writeQueries.update(
+                timestamp = timestamp,
+                description = trade.description,
+                from_account_id = trade.fromAccountId.id,
+                from_asset_id = trade.fromAmount.asset.id.id,
+                from_amount = trade.fromAmount.amount.toString(),
+                to_account_id = trade.toAccountId.id,
+                to_asset_id = trade.toAmount.asset.id.id,
+                to_amount = trade.toAmount.amount.toString(),
+                id = reused.id,
+            )
+            database.recordSource(
+                deviceId,
+                EntityType.TRADE,
+                reused.id,
+                selectQueries.selectRevision(reused.id).awaitAsOne(),
+                trade.source,
+            )
             return TradeCreateResult(reused, created = true)
         }
         // Allocate a transaction id (insert + last_insert_rowid must share a connection), unless a re-run reserved one.

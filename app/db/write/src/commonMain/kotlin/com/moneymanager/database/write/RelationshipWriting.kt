@@ -47,6 +47,8 @@ suspend fun MoneyManagerDatabaseWrapper.insertRelationship(
                     .map { it.first }
                     .containsAll(union.keys)
             ) {
+                // Already said by one stored match: a re-run that reserved it takes it back (#1510).
+                relationshipWriteQueries.unreserve(existing.keys.single())
                 return null
             }
             union.map { (id, role) -> id to RelationshipRole.entries.first { it.id == role } }

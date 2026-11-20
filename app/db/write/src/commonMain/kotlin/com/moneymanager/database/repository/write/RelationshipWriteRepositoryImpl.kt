@@ -76,9 +76,11 @@ class RelationshipWriteRepositoryImpl(
             }
         }
 
-    override suspend fun deleteReserved(): Unit =
+    override suspend fun deleteReserved(transactionIds: Collection<TransactionId>): Unit =
         withContext(Dispatchers.Default) {
-            writeQueries.deleteReserved()
+            writeQueries.transaction {
+                transactionIds.map { it.id }.chunked(MAX_PIN_TRANSACTION_IDS).forEach { writeQueries.deleteReservedOn(it) }
+            }
         }
 }
 

@@ -103,6 +103,7 @@ fun SourceRerunPreview(
     Column {
         val transfers = plan.createdTransfers.size
         val trades = plan.tradeIds.size
+        val keep = if (transfers + trades == 1) "keeps its id if it still creates it" else "keep their ids where it still creates them"
         Text(
             text =
                 buildString {
@@ -113,7 +114,8 @@ fun SourceRerunPreview(
                     )
                     if (trades > 0) append(" and $trades trade${plural(trades)}")
                     append(
-                        " it created ${if (transfers + trades == 1) "keeps its id" else "keep their ids"}, and only what changed is written.",
+                        " it created $keep, " +
+                            "and only what changed is written. Any it no longer creates is deleted and listed in the report afterwards.",
                     )
                 },
             style = MaterialTheme.typography.bodySmall,

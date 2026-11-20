@@ -779,9 +779,9 @@ class ImportEngineImpl(
         val vacant = remaining.intersect(observations.getVacantTransactionIds())
         onProgress?.invoke(stepProgress("Deleting ${vacant.size} transactions no record took back", 1, SETTLE_STEPS))
         val partners = reconciledPartnersOf(vacant.toList(), emptySet())
+        relationshipRepository?.deleteReserved(reserved.ids)
         vacant.filterIsInstance<TransferId>().chunked(DELETE_CHUNK_ROWS).forEach { transactionRepository.deleteTransactions(it) }
         vacant.filterIsInstance<TradeId>().chunked(DELETE_CHUNK_ROWS).forEach { tradeRepository.deleteTrades(it) }
-        relationshipRepository?.deleteReserved()
         observations.releaseTransactions(vacant)
         val reconciled =
             observations.getObservationsOfTransactions(partners - vacant).mapTo(mutableSetOf()) { it.transactionId }
@@ -2716,7 +2716,9 @@ class ImportEngineImpl(
         val legs =
             candidates.mapNotNull { debit ->
                 val creditId = creditIdByDebitId[debit.id] ?: return@mapNotNull null
-                val credit = creditLegs[creditId] ?: return@mapNotNull null
+                // A vacant credit leg (#1510) is no conversion to suppress a trade with: no record would take it back, and settling
+                // would delete it, so the trade it records is booked instead.
+                val credit = creditLegs[creditId]?.takeUnless { it.id in vacant } ?: return@mapNotNull null
                 ExistingConversionLeg(
                     debitTransferId = debit.id,
                     accountId = debit.sourceAccountId,

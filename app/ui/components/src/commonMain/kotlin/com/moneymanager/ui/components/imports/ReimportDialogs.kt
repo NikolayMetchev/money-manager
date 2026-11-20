@@ -160,12 +160,12 @@ fun ReimportDialog(
                             if (kept ==
                                 1
                             ) {
-                                "The 1 transaction they created keeps its id"
+                                "The 1 transaction they created keeps its id if they still create it"
                             } else {
-                                "The $kept transactions they created keep their ids"
+                                "The $kept transactions they created keep their ids where they still create them"
                             }
                         ) +
-                        ", and only what changed is written.",
+                        ", and only what changed is written. Any they no longer create is deleted and listed in the report afterwards.",
                 style = MaterialTheme.typography.bodySmall,
             )
             Spacer(modifier = Modifier.height(12.dp))

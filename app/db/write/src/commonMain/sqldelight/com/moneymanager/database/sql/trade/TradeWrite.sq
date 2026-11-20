@@ -12,10 +12,12 @@ SET revision_id = revision_id + 1, timestamp = ?, description = ?, from_account_
     to_account_id = ?, to_asset_id = ?, to_amount = ?
 WHERE id = ?;
 
+-- An unchanged value is left alone, so a re-import that takes a trade back with the same attributes writes nothing.
 upsertAttribute:
 INSERT INTO trade_attribute(trade_id, attribute_type_id, attribute_value)
 VALUES (?, ?, ?)
-ON CONFLICT(trade_id, attribute_type_id) DO UPDATE SET attribute_value = excluded.attribute_value;
+ON CONFLICT(trade_id, attribute_type_id) DO UPDATE SET attribute_value = excluded.attribute_value
+WHERE attribute_value IS NOT excluded.attribute_value;
 
 deleteAttribute:
 DELETE FROM trade_attribute WHERE trade_id = ? AND attribute_type_id = ?;
