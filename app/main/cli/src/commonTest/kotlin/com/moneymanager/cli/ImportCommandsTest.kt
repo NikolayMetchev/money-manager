@@ -4,7 +4,6 @@ import com.moneymanager.credentialvault.CredentialBundle
 import com.moneymanager.credentialvault.StoredApiCredential
 import com.moneymanager.credentialvault.testing.TEST_VAULT_PASSWORD
 import com.moneymanager.credentialvault.testing.inMemoryCredentialVault
-import com.moneymanager.database.di.createImportEngine
 import com.moneymanager.database.di.openDatabaseComponent
 import com.moneymanager.database.di.toAppServices
 import com.moneymanager.domain.model.Account
@@ -16,7 +15,6 @@ import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryProvider
 import com.moneymanager.files.absolutePath
 import com.moneymanager.files.writeText
-import com.moneymanager.importengineapi.EditGate
 import com.moneymanager.query.AccountJson
 import com.moneymanager.query.Envelope
 import com.moneymanager.session.apiImportService
@@ -210,7 +208,7 @@ class ImportCommandsTest {
         val database = fixture.cli.databaseManager.openDatabase(fixture.db)
         try {
             val component = openDatabaseComponent(database)
-            val services = component.toAppServices(component.createImportEngine(EditGate.AlwaysWritable))
+            val services = component.toAppServices(component.importEngine)
             val writeLock = Mutex()
             val sources = TestCli.fileSources(fixture.cli.vault)
             runTask { services.importDirectoryService(sources, writeLock).importAll(this) }

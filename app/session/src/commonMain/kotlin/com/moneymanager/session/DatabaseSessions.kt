@@ -5,7 +5,6 @@ import com.moneymanager.credentialvault.CredentialVault
 import com.moneymanager.database.DatabaseManager
 import com.moneymanager.database.di.AppServices
 import com.moneymanager.database.di.DatabaseComponent
-import com.moneymanager.database.di.createImportEngine
 import com.moneymanager.database.di.openDatabaseComponent
 import com.moneymanager.database.di.toAppServices
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
@@ -121,9 +120,8 @@ class DatabaseSessions(
         val database = databaseManager.openDatabaseWithProgress(location, onProgress)
         return try {
             onProgress(Progress.counted("Preparing application services...", 1, 1))
-            val component = openDatabaseComponent(database)
-            val importEngine = component.createImportEngine(editGate)
-            val services = component.toAppServices(importEngine)
+            val component = openDatabaseComponent(database, editGate)
+            val services = component.toAppServices(component.importEngine)
             onProgress(Progress.counted("Verifying this device...", 1, 1))
             services.deviceId
             credentialVault.bindToDatabase(location.toString())
@@ -138,7 +136,7 @@ class DatabaseSessions(
             }
             localSettings.putString(KEY_LAST_DATABASE, location.toString())
             logger.i { "Database opened successfully" }
-            DatabaseSession(location, database, component, importEngine, services)
+            DatabaseSession(location, database, component, component.importEngine, services)
         } catch (expected: Exception) {
             // Cancellation included: a half-built session must not keep the file open.
             database.closeQuietly()

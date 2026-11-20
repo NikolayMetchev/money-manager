@@ -176,7 +176,6 @@ kmp_test(
         "//app/db/write",
         "//app/importdirectory",
         "//app/importengineapi",
-        "//app/importer",
         "//app/importfilesource/core",
         "//app/model/accountmapping",
         "//app/model/apistrategy",

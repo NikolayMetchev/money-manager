@@ -5,11 +5,9 @@ import com.moneymanager.domain.model.ImportDirectoryId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryProvider
-import com.moneymanager.importengineapi.EditGate
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.createImportDirectory
 import com.moneymanager.importengineapi.deleteCsvImport
-import com.moneymanager.importer.ImportEngineImpl
 import com.moneymanager.importfilesource.ImportFileEntry
 import com.moneymanager.importfilesource.ImportFileSource
 import com.moneymanager.importfilesource.ImportSubfolder
@@ -66,32 +64,6 @@ private class FakeFileSource(
 }
 
 class ImportDirectoryScannerTest : DbTest() {
-    private fun engine(): ImportEngine =
-        ImportEngineImpl(
-            transactionRepository = repositories.transactionRepository,
-            accountRepository = repositories.accountRepository,
-            accountAttributeRepository = repositories.accountAttributeRepository,
-            personRepository = repositories.personRepository,
-            personAttributeRepository = repositories.personAttributeRepository,
-            ownershipRepository = repositories.personAccountOwnershipRepository,
-            categoryRepository = repositories.categoryRepository,
-            currencyRepository = repositories.currencyRepository,
-            cryptoRepository = repositories.cryptoRepository,
-            tradeRepository = repositories.tradeRepository,
-            exchangeOrderRepository = repositories.exchangeOrderRepository,
-            attributeTypeRepository = repositories.attributeTypeRepository,
-            relationshipTypeRepository = repositories.relationshipTypeRepository,
-            csvImportStrategyRepository = repositories.csvImportStrategyRepository,
-            apiImportStrategyRepository = repositories.apiImportStrategyRepository,
-            accountMappingRepository = repositories.accountMappingRepository,
-            csvImportRepository = repositories.csvImportRepository,
-            apiSessionRepository = repositories.apiSessionRepository,
-            settingsRepository = repositories.settingsRepository,
-            importDirectoryRepository = repositories.importDirectoryRepository,
-            passThroughAccountRepository = repositories.passThroughAccountRepository,
-            editGate = EditGate.AlwaysWritable,
-        )
-
     private val csvV1 =
         """
         Date,Description,Amount
@@ -131,7 +103,7 @@ class ImportDirectoryScannerTest : DbTest() {
     @Test
     fun `scan downloads every file concurrently`() =
         runDbTest {
-            val engine = engine()
+            val engine = repositories.importEngine
             val directory = newDirectory(engine)
             val names = listOf("jan.csv", "feb.csv", "mar.csv")
             // No download may finish until all of them have started, which a one-at-a-time scan never reaches.
@@ -150,7 +122,7 @@ class ImportDirectoryScannerTest : DbTest() {
     @Test
     fun `scan stages a new csv then skips it when unchanged`() =
         runDbTest {
-            val engine = engine()
+            val engine = repositories.importEngine
             val directory = newDirectory(engine)
             val source = FakeFileSource(listOf(FileSpec("jan.csv", csvV1, 1_000)))
 
@@ -177,7 +149,7 @@ class ImportDirectoryScannerTest : DbTest() {
     @Test
     fun `deleting a staged import makes the next scan stage the file again`() =
         runDbTest {
-            val engine = engine()
+            val engine = repositories.importEngine
             val directory = newDirectory(engine)
             // A remote file whose hash never changes: only forgetting it can bring it back.
             val source = FakeFileSource(listOf(FileSpec("jan.csv", csvV1, 1_000, remoteContentHash = "md5-aaa")))
@@ -200,7 +172,7 @@ class ImportDirectoryScannerTest : DbTest() {
     @Test
     fun `scan skips unsupported files like docx and stages only supported ones`() =
         runDbTest {
-            val engine = engine()
+            val engine = repositories.importEngine
             val directory = newDirectory(engine)
             val source =
                 FakeFileSource(
@@ -227,7 +199,7 @@ class ImportDirectoryScannerTest : DbTest() {
     @Test
     fun `scan skips the download entirely when the remote content hash is unchanged`() =
         runDbTest {
-            val engine = engine()
+            val engine = repositories.importEngine
             val directory = newDirectory(engine)
             val source = FakeFileSource(listOf(FileSpec("jan.csv", csvV1, 1_000, remoteContentHash = "md5-aaa")))
 
@@ -244,7 +216,7 @@ class ImportDirectoryScannerTest : DbTest() {
     @Test
     fun `scan re-downloads and re-stages when the remote content hash changes`() =
         runDbTest {
-            val engine = engine()
+            val engine = repositories.importEngine
             val directory = newDirectory(engine)
             val file = FileSpec("jan.csv", csvV1, 1_000, remoteContentHash = "md5-aaa")
             val source = FakeFileSource(listOf(file))
@@ -268,7 +240,7 @@ class ImportDirectoryScannerTest : DbTest() {
     @Test
     fun `scan re-stages a changed csv as a new staging row`() =
         runDbTest {
-            val engine = engine()
+            val engine = repositories.importEngine
             val directory = newDirectory(engine)
             val file = FileSpec("jan.csv", csvV1, 1_000)
             val source = FakeFileSource(listOf(file))

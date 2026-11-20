@@ -135,6 +135,7 @@ import com.moneymanager.domain.repository.write.TransactionWriteRepository
 import com.moneymanager.domain.repository.write.TransferAttributeWriteRepository
 import com.moneymanager.domain.repository.write.TransferSourceWriteRepository
 import com.moneymanager.domain.strategy.StrategyLibrary
+import com.moneymanager.importengineapi.EditGate
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importer.ImportEngineImpl
 import dev.zacsweers.metro.BindingContainer
@@ -620,6 +621,7 @@ object RepositoryModule {
         observationRepository: ObservationWriteRepository,
         personOverrideRepository: PersonOverrideWriteRepository,
         importRecordRepository: ImportRecordWriteRepository,
+        editGate: EditGate,
     ): ImportEngine =
         ImportEngineImpl(
             transactionRepository = transactionRepository,
@@ -649,5 +651,6 @@ object RepositoryModule {
             observationRepository = observationRepository,
             personOverrideRepository = personOverrideRepository,
             importRecordRepository = importRecordRepository,
+            editGate = editGate,
         )
 }

@@ -42,7 +42,6 @@ import com.moneymanager.importengineapi.createTrade
 import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.importengineapi.personalCounterpartyKey
 import com.moneymanager.importengineapi.updateTrade
-import com.moneymanager.importer.ImportEngineImpl
 import com.moneymanager.tasks.Progress
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
@@ -61,31 +60,6 @@ import kotlin.uuid.Uuid
 class ImportEngineDbTest : DbTest() {
     private val baseTime = Instant.fromEpochMilliseconds(1_700_000_000_000)
 
-    private fun engine() =
-        ImportEngineImpl(
-            transactionRepository = repositories.transactionRepository,
-            accountRepository = repositories.accountRepository,
-            accountAttributeRepository = repositories.accountAttributeRepository,
-            personRepository = repositories.personRepository,
-            personAttributeRepository = repositories.personAttributeRepository,
-            ownershipRepository = repositories.personAccountOwnershipRepository,
-            categoryRepository = repositories.categoryRepository,
-            currencyRepository = repositories.currencyRepository,
-            cryptoRepository = repositories.cryptoRepository,
-            tradeRepository = repositories.tradeRepository,
-            exchangeOrderRepository = repositories.exchangeOrderRepository,
-            attributeTypeRepository = repositories.attributeTypeRepository,
-            relationshipTypeRepository = repositories.relationshipTypeRepository,
-            csvImportStrategyRepository = repositories.csvImportStrategyRepository,
-            apiImportStrategyRepository = repositories.apiImportStrategyRepository,
-            accountMappingRepository = repositories.accountMappingRepository,
-            csvImportRepository = repositories.csvImportRepository,
-            apiSessionRepository = repositories.apiSessionRepository,
-            settingsRepository = repositories.settingsRepository,
-            importDirectoryRepository = repositories.importDirectoryRepository,
-            passThroughAccountRepository = repositories.passThroughAccountRepository,
-        )
-
     private suspend fun gbp(): Currency =
         repositories.currencyRepository
             .getAllCurrencies()
@@ -99,7 +73,7 @@ class ImportEngineDbTest : DbTest() {
             val currencies = repositories.currencyRepository.getAllCurrencies().first()
             val gbp = currencies.first { it.code == "GBP" }
             val eur = currencies.first { it.code == "EUR" }
-            val engine = engine()
+            val engine = repositories.importEngine
             val tradeId =
                 engine.createTrade(
                     timestamp = baseTime,
@@ -225,7 +199,7 @@ class ImportEngineDbTest : DbTest() {
             // A provider can mint several external ids for one merchant within a single import (Monzo
             // issued two ids for "Curve"). Both intents must land on one account, not fork a duplicate.
             val result =
-                engine().import(
+                repositories.importEngine.import(
                     ImportBatch(
                         accountsToCreate =
                             listOf(
@@ -253,7 +227,7 @@ class ImportEngineDbTest : DbTest() {
                     .first { it.name == "Savings" }
                     .id
             val currency = gbp()
-            val txId = engine().getOrCreateAttributeType("Transaction ID")
+            val txId = repositories.importEngine.getOrCreateAttributeType("Transaction ID")
 
             fun batch(
                 timestamp: Instant,
@@ -280,8 +254,8 @@ class ImportEngineDbTest : DbTest() {
                     },
             )
 
-            assertEquals(1, engine().import(batch(baseTime, "Rent")).transfersImported)
-            val result = engine().import(batch(baseTime + 365.days, "Rent (corrected)"))
+            assertEquals(1, repositories.importEngine.import(batch(baseTime, "Rent")).transfersImported)
+            val result = repositories.importEngine.import(batch(baseTime + 365.days, "Rent (corrected)"))
 
             assertEquals(0, result.transfersImported)
             assertEquals(1, result.updated)
@@ -302,7 +276,7 @@ class ImportEngineDbTest : DbTest() {
             // names are globally unique, so the second one is disambiguated by account-number last-4
             // rather than colliding — but it remains a genuinely separate account, not a merge.
             val result =
-                engine().import(
+                repositories.importEngine.import(
                     ImportBatch(
                         accountsToCreate =
                             listOf(
@@ -340,7 +314,7 @@ class ImportEngineDbTest : DbTest() {
             val key = LocalAccountKey("cash")
             val externalIdType = AttributeTypeId(WellKnownIds.ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID)
             val created =
-                engine().import(
+                repositories.importEngine.import(
                     ImportBatch(
                         accountsToCreate =
                             listOf(
@@ -363,7 +337,7 @@ class ImportEngineDbTest : DbTest() {
             // A later import knows the account only by its bank details — once by the old identity, once by
             // the new one. Neither may create an account.
             val second =
-                engine().import(
+                repositories.importEngine.import(
                     ImportBatch(
                         accountsToCreate =
                             listOf(
@@ -419,9 +393,13 @@ class ImportEngineDbTest : DbTest() {
                         ),
                 )
 
-            val cashId = engine().import(batch()).createdAccountIds.getValue(LocalAccountKey("cash"))
+            val cashId =
+                repositories.importEngine
+                    .import(batch())
+                    .createdAccountIds
+                    .getValue(LocalAccountKey("cash"))
             val afterFirst = repositories.accountAttributeRepository.getByAccount(cashId).first()
-            engine().import(batch())
+            repositories.importEngine.import(batch())
             val afterSecond = repositories.accountAttributeRepository.getByAccount(cashId).first()
 
             assertEquals(5, afterFirst.size)
@@ -444,7 +422,7 @@ class ImportEngineDbTest : DbTest() {
     fun importedBankIdentity_storesSortCodeAndAccountNumberInOneUuidGroup() =
         runDbTest {
             val result =
-                engine().import(
+                repositories.importEngine.import(
                     ImportBatch(
                         accountsToCreate =
                             listOf(
@@ -504,18 +482,18 @@ class ImportEngineDbTest : DbTest() {
                         ),
                 )
 
-            val created = engine().import(incoming())
+            val created = repositories.importEngine.import(incoming())
             assertEquals(2, created.accountsCreated)
             val keepId = created.createdAccountIds.getValue(LocalAccountKey("old"))
             val dropId = created.createdAccountIds.getValue(LocalAccountKey("new"))
 
-            engine().import(
+            repositories.importEngine.import(
                 ImportBatch.manualEdits(accountMerges = listOf(AccountMergeRequest(deletedId = dropId, survivingId = keepId))),
             )
             assertNull(repositories.accountRepository.getAccountById(dropId).first())
 
             // The survivor now owns both identities, so re-importing the same data creates nothing.
-            val second = engine().import(incoming())
+            val second = repositories.importEngine.import(incoming())
             assertEquals(0, second.accountsCreated)
             assertEquals(0, accountsNamed("NIKOLAY IVANOV METCHEV"))
             assertEquals(keepId, second.createdAccountIds.getValue(LocalAccountKey("new")))
@@ -526,7 +504,7 @@ class ImportEngineDbTest : DbTest() {
     fun unmergingReturnsTheCarriedBankIdentityToTheRestoredAccount() =
         runDbTest {
             val created =
-                engine().import(
+                repositories.importEngine.import(
                     ImportBatch(
                         accountsToCreate =
                             listOf(
@@ -552,7 +530,7 @@ class ImportEngineDbTest : DbTest() {
             val keepBefore = repositories.accountAttributeRepository.getByAccount(keepId).first()
             val dropBefore = repositories.accountAttributeRepository.getByAccount(dropId).first()
 
-            engine().import(
+            repositories.importEngine.import(
                 ImportBatch.manualEdits(accountMerges = listOf(AccountMergeRequest(deletedId = dropId, survivingId = keepId))),
             )
             val merge =
@@ -560,7 +538,7 @@ class ImportEngineDbTest : DbTest() {
                     .getReversibleMerges()
                     .first()
                     .first()
-            engine().import(ImportBatch.manualEdits(accountUnmerges = listOf(merge.id)))
+            repositories.importEngine.import(ImportBatch.manualEdits(accountUnmerges = listOf(merge.id)))
 
             fun signature(attrs: List<com.moneymanager.domain.model.AccountAttribute>) =
                 attrs.map { Triple(it.attributeType.id, it.value, it.groupKey) }.toSet()
@@ -575,7 +553,7 @@ class ImportEngineDbTest : DbTest() {
             val existing = createSourceAccount()
 
             val ids =
-                engine().createAccounts(
+                repositories.importEngine.createAccounts(
                     listOf(
                         Account(id = AccountId(0), name = "Checking", openingDate = baseTime),
                         // The same name twice in one list must also collapse onto one account.
@@ -596,13 +574,13 @@ class ImportEngineDbTest : DbTest() {
             val currency = gbp()
             val source = Source.SampleGenerator
 
-            val first = engine().import(batchWithCounterparty(sourceId, currency, "Coffee", source))
+            val first = repositories.importEngine.import(batchWithCounterparty(sourceId, currency, "Coffee", source))
             assertEquals(1, first.accountsCreated)
             assertEquals(1, first.transfersImported)
             assertEquals(0, first.duplicates)
 
             // Re-import the identical batch: counterparty reused by name, transfer deduped.
-            val second = engine().import(batchWithCounterparty(sourceId, currency, "Coffee", source))
+            val second = repositories.importEngine.import(batchWithCounterparty(sourceId, currency, "Coffee", source))
             assertEquals(0, second.accountsCreated)
             assertEquals(0, second.transfersImported)
             assertEquals(1, second.duplicates)
@@ -629,7 +607,7 @@ class ImportEngineDbTest : DbTest() {
             val currency = gbp()
             val counterparty = LocalAccountKey("shop")
             val created =
-                engine().import(
+                repositories.importEngine.import(
                     ImportBatch(
                         transfers =
                             (0 until 3).map { i ->
@@ -660,7 +638,7 @@ class ImportEngineDbTest : DbTest() {
             assertEquals(3, ids.size)
 
             val progress = mutableListOf<Progress>()
-            engine().import(
+            repositories.importEngine.import(
                 ImportBatch(
                     transfers =
                         ids.map { id ->
@@ -701,11 +679,11 @@ class ImportEngineDbTest : DbTest() {
             val sourceId = createSourceAccount()
             val currency = gbp()
             val source = Source.SampleGenerator
-            val extId = engine().getOrCreateAttributeType("external-id")
-            val note = engine().getOrCreateAttributeType("note")
+            val extId = repositories.importEngine.getOrCreateAttributeType("external-id")
+            val note = repositories.importEngine.getOrCreateAttributeType("note")
 
             // First import creates the transfer with two attributes.
-            engine().import(
+            repositories.importEngine.import(
                 batchWithAttributes(
                     sourceId,
                     currency,
@@ -723,7 +701,7 @@ class ImportEngineDbTest : DbTest() {
             // Re-import the same row (same core fields) but drop one attribute and change the other's value.
             // Core fields match, attributes differ -> UPDATED; the re-supplied external-id already exists.
             val result =
-                engine().import(
+                repositories.importEngine.import(
                     batchWithAttributes(sourceId, currency, source, listOf(NewAttribute(extId, "xyz"))),
                 )
             assertEquals(0, result.transfersImported)
@@ -745,14 +723,14 @@ class ImportEngineDbTest : DbTest() {
             val currency = gbp()
             val source = Source.SampleGenerator
 
-            engine().import(
+            repositories.importEngine.import(
                 batchWithCounterparty(sourceId, currency, "Tesco groceries weekly shop", source, "tesco", "Tesco"),
             )
 
             // A genuinely different description (low similarity) must NOT be treated as a fuzzy duplicate.
             val changedBatch =
                 batchWithCounterparty(sourceId, currency, "British Gas direct debit", source, "tesco", "Tesco")
-            val result = engine().import(changedBatch)
+            val result = repositories.importEngine.import(changedBatch)
             assertEquals(1, result.transfersImported)
             assertEquals(0, result.duplicates)
             assertEquals(0, result.accountsCreated) // counterparty reused by name
@@ -802,7 +780,7 @@ class ImportEngineDbTest : DbTest() {
                         ),
                 )
 
-            val result = engine().import(batch)
+            val result = repositories.importEngine.import(batch)
             assertEquals(2, result.peopleCreated)
 
             val people = repositories.personRepository.getAllPeople().first()
@@ -817,7 +795,7 @@ class ImportEngineDbTest : DbTest() {
         runDbTest {
             val key = LocalCategoryKey("food")
             val created =
-                engine().import(
+                repositories.importEngine.import(
                     ImportBatch.manualEdits(
                         categories = listOf(ImportCategoryIntent(key = key, source = Source.Manual, name = "Food")),
                     ),
@@ -830,7 +808,7 @@ class ImportEngineDbTest : DbTest() {
                     .any { it.id == id && it.name == "Food" },
             )
 
-            engine().import(
+            repositories.importEngine.import(
                 ImportBatch.manualEdits(
                     categories =
                         listOf(
@@ -852,7 +830,7 @@ class ImportEngineDbTest : DbTest() {
                     ?.name,
             )
 
-            engine().import(
+            repositories.importEngine.import(
                 ImportBatch.manualEdits(
                     categories =
                         listOf(
@@ -874,7 +852,7 @@ class ImportEngineDbTest : DbTest() {
             val accountKey = LocalAccountKey("savings")
             val personKey = LocalPersonKey("owner")
             val result =
-                engine().import(
+                repositories.importEngine.import(
                     ImportBatch.manualEdits(
                         accounts =
                             listOf(
@@ -910,7 +888,7 @@ class ImportEngineDbTest : DbTest() {
         runDbTest {
             val key = LocalAccountKey("acct")
             val accountId =
-                engine()
+                repositories.importEngine
                     .import(
                         ImportBatch.manualEdits(
                             accounts =
@@ -921,7 +899,7 @@ class ImportEngineDbTest : DbTest() {
                     ).createdAccountIds
                     .getValue(key)
 
-            engine().import(
+            repositories.importEngine.import(
                 ImportBatch.manualEdits(
                     accounts =
                         listOf(
@@ -947,7 +925,7 @@ class ImportEngineDbTest : DbTest() {
                     ?.name,
             )
 
-            engine().import(
+            repositories.importEngine.import(
                 ImportBatch.manualEdits(
                     accounts =
                         listOf(
@@ -968,7 +946,7 @@ class ImportEngineDbTest : DbTest() {
         runDbTest {
             val key = LocalPersonKey("p")
             val personId: PersonId =
-                engine()
+                repositories.importEngine
                     .import(
                         ImportBatch.manualEdits(
                             people = listOf(ImportPersonIntent(key = key, source = Source.Manual, firstName = "Temp")),
@@ -982,7 +960,7 @@ class ImportEngineDbTest : DbTest() {
                     .any { it.id == personId },
             )
 
-            engine().import(
+            repositories.importEngine.import(
                 ImportBatch.manualEdits(
                     people =
                         listOf(
@@ -1012,7 +990,7 @@ class ImportEngineDbTest : DbTest() {
             val funded = LocalAccountKey("funded")
             // Create two accounts plus one transfer into the dropped account, so the merge reassigns it.
             val created =
-                engine().import(
+                repositories.importEngine.import(
                     ImportBatch.manualEdits(
                         accounts =
                             listOf(
@@ -1036,7 +1014,7 @@ class ImportEngineDbTest : DbTest() {
             val keepId = created.createdAccountIds.getValue(keepKey)
             val dropId = created.createdAccountIds.getValue(dropKey)
 
-            engine().import(
+            repositories.importEngine.import(
                 ImportBatch.manualEdits(accountMerges = listOf(AccountMergeRequest(deletedId = dropId, survivingId = keepId))),
             )
             assertNull(repositories.accountRepository.getAccountById(dropId).first())
@@ -1046,7 +1024,7 @@ class ImportEngineDbTest : DbTest() {
                     .getReversibleMerges()
                     .first()
                     .first()
-            engine().import(ImportBatch.manualEdits(accountUnmerges = listOf(merge.id)))
+            repositories.importEngine.import(ImportBatch.manualEdits(accountUnmerges = listOf(merge.id)))
             assertTrue(repositories.accountRepository.getAccountById(dropId).first() != null)
         }
 
@@ -1080,7 +1058,7 @@ class ImportEngineDbTest : DbTest() {
             )
 
             suspend fun importBoth() =
-                engine().import(
+                repositories.importEngine.import(
                     ImportBatch(
                         transfers = listOf(payment(0, declined = false), payment(1, declined = true)),
                         accountsToCreate =
@@ -1139,7 +1117,7 @@ class ImportEngineDbTest : DbTest() {
             val amount = Money(1010, currency)
 
             val result =
-                engine().import(
+                repositories.importEngine.import(
                     ImportBatch(
                         transfers =
                             listOf(
@@ -1304,7 +1282,7 @@ class ImportEngineDbTest : DbTest() {
             val amount = Money(2700, currency)
 
             val result =
-                engine().import(
+                repositories.importEngine.import(
                     ImportBatch(
                         transfers =
                             listOf(
@@ -1433,7 +1411,7 @@ class ImportEngineDbTest : DbTest() {
             )
 
             val result =
-                engine().import(
+                repositories.importEngine.import(
                     ImportBatch(
                         transfers =
                             listOf(
@@ -1504,7 +1482,7 @@ class ImportEngineDbTest : DbTest() {
             // The originals are consumed: a second identical cancellation finds nothing to reverse.
             // The account intents resolve to the already-created accounts by name (nothing new is made).
             val second =
-                engine().import(
+                repositories.importEngine.import(
                     ImportBatch(
                         transfers =
                             listOf(chainRow(2, baseTime.plus(2.hours), "Cancellation: Crv*Paypal *Thepihut 0", incoming = true)),
@@ -1616,7 +1594,7 @@ class ImportEngineDbTest : DbTest() {
             val amount = Money(36358, currency)
 
             val result =
-                engine().import(
+                repositories.importEngine.import(
                     ImportBatch(
                         transfers =
                             listOf(
@@ -1692,7 +1670,7 @@ class ImportEngineDbTest : DbTest() {
             val amount = Money(36358, currency)
 
             val first =
-                engine().import(
+                repositories.importEngine.import(
                     ImportBatch(
                         transfers =
                             listOf(passThroughRow(0, cardId, curve, merchant, amount, baseTime, "Crv*Navan", incoming = false)),
@@ -1701,7 +1679,7 @@ class ImportEngineDbTest : DbTest() {
                     ),
                 )
             val second =
-                engine().import(
+                repositories.importEngine.import(
                     ImportBatch(
                         transfers =
                             listOf(
@@ -1739,7 +1717,7 @@ class ImportEngineDbTest : DbTest() {
 
             // The observed Crypto.com sequence: charge, refund, refund reversal, refund again.
             val result =
-                engine().import(
+                repositories.importEngine.import(
                     ImportBatch(
                         transfers =
                             listOf(
@@ -1805,7 +1783,7 @@ class ImportEngineDbTest : DbTest() {
             // batchSize = 1 puts every row in its own chunk (own transaction), so the refund's in-batch
             // reversal target lives in an earlier chunk and must resolve to the already-created real id.
             val result =
-                engine().import(
+                repositories.importEngine.import(
                     ImportBatch(
                         transfers =
                             listOf(
@@ -1844,7 +1822,7 @@ class ImportEngineDbTest : DbTest() {
             val merchant = LocalAccountKey("merchant")
 
             val result =
-                engine().import(
+                repositories.importEngine.import(
                     ImportBatch(
                         transfers =
                             listOf(
@@ -1879,7 +1857,7 @@ class ImportEngineDbTest : DbTest() {
             val amount = Money(1400, currency)
 
             val result =
-                engine().import(
+                repositories.importEngine.import(
                     ImportBatch(
                         transfers =
                             listOf(
@@ -1910,7 +1888,7 @@ class ImportEngineDbTest : DbTest() {
     fun updateWithoutExistingIdFailsValidation() =
         runDbTest {
             assertFailsWith<IllegalArgumentException> {
-                engine().import(
+                repositories.importEngine.import(
                     ImportBatch.manualEdits(
                         categories =
                             listOf(
@@ -1929,7 +1907,7 @@ class ImportEngineDbTest : DbTest() {
     @Test
     fun cryptoTrade_createsCryptoAssetAndTrade_withFullPrecisionBalances() =
         runDbTest {
-            val e = engine()
+            val e = repositories.importEngine
             val bank = repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Bank", openingDate = baseTime))
             val wallet =
                 repositories.accountRepository.createAccount(
@@ -1987,7 +1965,7 @@ class ImportEngineDbTest : DbTest() {
     @Test
     fun orderIntents_upsertOrdersAndLinkFills_andStandaloneOrdersImport() =
         runDbTest {
-            val e = engine()
+            val e = repositories.importEngine
             val exchange =
                 repositories.accountRepository.createAccount(
                     Account(id = AccountId(0), name = "Exchange", openingDate = baseTime),
