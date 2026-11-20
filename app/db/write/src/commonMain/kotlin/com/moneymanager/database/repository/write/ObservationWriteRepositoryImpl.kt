@@ -164,7 +164,12 @@ class ObservationWriteRepositoryImpl(
                 }
             } &&
                 rows.filterIsInstance<MaterializedWrite.Update>().all { update ->
-                    getMaterialized(TransferId(update.transactionId)) == update.before
+                    val id =
+                        when (update.before.values.kind) {
+                            TransactionKind.TRANSFER -> TransferId(update.transactionId)
+                            TransactionKind.TRADE -> TradeId(update.transactionId)
+                        }
+                    getMaterialized(id) == update.before
                 }
         if (!valid) throw StaleObservationCommitException()
     }

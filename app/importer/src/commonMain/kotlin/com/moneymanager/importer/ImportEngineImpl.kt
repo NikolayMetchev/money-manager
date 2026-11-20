@@ -276,6 +276,7 @@ class ImportEngineImpl(
                     records,
                     csvImportRepository,
                     transactionRepository,
+                    tradeRepository,
                     relationships,
                     overrides,
                     materializer,
@@ -289,12 +290,13 @@ class ImportEngineImpl(
                     emptySet(),
                 )
             val replacedBookings = createdBookings.filterNotTo(mutableSetOf()) { it in stillObserved }
-            val plannedBookings = mutableSetOf<TransferId>()
+            val plannedBookings = mutableSetOf<TransactionId>()
             val earlierBookings = mutableListOf<Transfer>()
             var allocatedLocals = 0
             var allocatedRecords = 0
             val changes =
                 requests.map { request ->
+                    if (request.groupedTrades.isNotEmpty() && requests.size != 1) return@withLock null
                     require(request.version == version && request.application.id == request.id && request.records.id == request.id)
                     val change =
                         planner.plan(request, allocatedLocals, allocatedRecords, replacedBookings, earlierBookings)

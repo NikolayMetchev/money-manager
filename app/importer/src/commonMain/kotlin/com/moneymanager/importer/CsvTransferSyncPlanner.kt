@@ -3,8 +3,12 @@ package com.moneymanager.importer
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.Trade
+import com.moneymanager.domain.model.TradeId
+import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.observation.ImportRecord
 import com.moneymanager.domain.model.observation.ImportRecordId
@@ -22,6 +26,7 @@ import com.moneymanager.domain.repository.ImportRecordReadRepository
 import com.moneymanager.domain.repository.ObservationReadRepository
 import com.moneymanager.domain.repository.PersonOverrideReadRepository
 import com.moneymanager.domain.repository.RelationshipReadRepository
+import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.CsvTransferSync
@@ -46,6 +51,7 @@ internal class CsvTransferSyncPlanner(
     private val records: ImportRecordReadRepository,
     private val csv: CsvImportReadRepository,
     private val transfers: TransactionReadRepository,
+    private val trades: TradeReadRepository,
     private val relationships: RelationshipReadRepository,
     private val overrides: PersonOverrideReadRepository,
     private val materializer: ObservationMaterializationPlanner,
@@ -65,6 +71,7 @@ internal class CsvTransferSyncPlanner(
         val staged = csv.getImportRows(id, limit = hashes.size, offset = 0).associateBy { it.rowIndex }
         val recordsByRow = records.getCsvImportRecords(id).associateBy { (it.key as ImportRecordKey.CsvRow).rowIndex }
         if (staged.keys != hashes.keys || recordsByRow.keys.any { it !in staged }) return null
+        if (request.groupedTrades.isNotEmpty()) return planGroupedTrades(request, staged, recordsByRow)
         val bookings = staged.filterValues { it.importStatus == ImportStatus.IMPORTED }.mapValues { it.value.transferId ?: return null }
         if (staged.any { (index, row) ->
                 when (row.importStatus) {
@@ -265,6 +272,92 @@ internal class CsvTransferSyncPlanner(
             ObservedAssetId(transfer.amount.asset.id.id),
             transfer.amount.amount,
         )
+
+    private suspend fun planGroupedTrades(
+        request: CsvTransferSync,
+        staged: Map<Long, CsvRow>,
+        recordsByRow: Map<Long, ImportRecord>,
+    ): CsvTransferChanges? {
+        if (request.rows.isNotEmpty() || staged.keys != recordsByRow.keys) return null
+        val groups = request.groupedTrades
+        val groupedRows = groups.flatMapTo(mutableSetOf()) { it.rowIndexes }
+        if (staged.any { (index, row) ->
+                if (index in
+                    groupedRows
+                ) {
+                    row.importStatus != ImportStatus.IMPORTED
+                } else {
+                    row.importStatus != ImportStatus.SKIPPED ||
+                        row.transferId != null
+                }
+            } || csv.getTransferIdsCreatedByImport(request.id).isNotEmpty()
+        ) {
+            return null
+        }
+        val existingIds = csv.getTradeIdsCreatedByImport(request.id)
+        if (existingIds.size != groups.size || relationships.getByTransactions(existingIds).isNotEmpty()) return null
+        if (observations.getObservationsOfRecords(recordsByRow.values.map { it.id }).isNotEmpty()) return null
+        val accounts = groups.flatMapTo(mutableSetOf()) { listOf(it.trade.fromAccountId, it.trade.toAccountId) }
+        if (csv.getAccountsCreatedByImport(request.id).any { it !in accounts }) return null
+        val wanted = groups.map { it.trade.observed() }
+        val tuples = wanted.map { it.copy(description = "") }.toSet()
+        if (tuples.size != groups.size) return null
+        if (accounts.any { account ->
+                trades.getTradesByAccount(account).first().any { it.id !in existingIds && it.observed().copy(description = "") in tuples }
+            }
+        ) {
+            return null
+        }
+        val tradeById = trades.getTradesByIds(existingIds).associateBy { it.id }
+        val proposed = mutableMapOf<TradeId, Trade>()
+        val mutations =
+            groups.zip(wanted).map { (input, values) ->
+                val group = records.getGroup(input.key) ?: return null
+                if (group.members != input.rowIndexes.mapTo(mutableSetOf()) { recordsByRow.getValue(it).id }) return null
+                val owner = ObservationOwner.Group(group.id)
+                val booking = observations.getObservationsOf(owner).singleOrNull() ?: return null
+                val id = booking.transactionId as? TradeId ?: return null
+                if (id !in tradeById || booking.slot != ObservationSlot.TRADE || booking.content.attributes.isNotEmpty()) return null
+                if (input.rowIndexes.any { staged.getValue(it).transferId?.id != id.id }) return null
+                if (observations.isReserved(booking.id)) return null
+                if (observations.getObservationsOfTransaction(id).size != 1) return null
+                if (proposed.put(id, input.trade.copy(id = id, timestamp = values.timestamp)) != null) return null
+                ObservationMutation.Upsert(owner, booking.slot, ObservationTransaction.Existing(id), booking.content.copy(values = values))
+            }
+        val source = Source.Csv(request.id)
+        val changes = materializer.plan(mutations, MaterializationRequest(source))
+        if (changes.rows.any { it !is MaterializedWrite.Update }) return null
+        val updates =
+            changes.rows.map { write ->
+                val id = TradeId(write.transactionId)
+                PlannedUpdate(tradeById.getValue(id).planned(), proposed.getValue(id).planned())
+            }
+        val hashes = request.records.contentHashes
+        return CsvTransferChanges(
+            changes,
+            ImportPlan(updated = updates.filter { it.fields.isNotEmpty() }, conflicts = changes.report.conflicts),
+            recordsByRow
+                .mapNotNull { (index, record) ->
+                    val hash = hashes.getValue(index)
+                    if (record.contentHash == hash) null else record.id to hash
+                }.toMap(),
+            emptyMap(),
+            emptyList(),
+            existingIds,
+        )
+    }
+
+    private fun Trade.observed(): ObservedValues.Trade =
+        ObservedValues.Trade(
+            Instant.fromEpochMilliseconds(timestamp.toEpochMilliseconds()),
+            description,
+            fromAccountId,
+            ObservedAssetId(from.asset.id.id),
+            from.amount,
+            toAccountId,
+            ObservedAssetId(to.asset.id.id),
+            to.amount,
+        )
 }
 
 internal data class CsvTransferChanges(
@@ -273,7 +366,7 @@ internal data class CsvTransferChanges(
     val hashes: Map<ImportRecordId, String>,
     val statuses: Map<Long, ImportStatus>,
     val newRecords: List<ImportRecord>,
-    val transactionIds: Set<TransferId>,
+    val transactionIds: Set<TransactionId>,
 ) {
     val hasWrites: Boolean
         get() =

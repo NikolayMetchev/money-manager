@@ -6,11 +6,14 @@ import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.ImportFileKind
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.Trade
+import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
+import com.moneymanager.domain.model.csvstrategy.LegAssembly
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.importFileKind
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
@@ -21,6 +24,7 @@ import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.ImportRecordReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.assetAliasMap
+import com.moneymanager.importengineapi.CsvGroupedTradeSync
 import com.moneymanager.importengineapi.CsvImportMutation
 import com.moneymanager.importengineapi.CsvTransferSync
 import com.moneymanager.importengineapi.CsvTransferSyncRow
@@ -208,7 +212,8 @@ class Reimports(
         val strategy = plannedStrategy ?: strategyFor(file, csvImportStrategyRepository.getAllStrategies().first()) ?: return null
         val config = strategy.config
         if (strategy.worksheetName != null || config.pdfLines != null || config.reconciliation != null ||
-            config.legGroups.isNotEmpty() || config.crossSourceReconcileWindow != null ||
+            config.legGroups.any { it.assembly !is LegAssembly.Trade || it.isCrossFileTrade() || it.reconcileWindowSeconds != null } ||
+            config.crossSourceReconcileWindow != null ||
             config.placeholderReconcileWindow != null || config.duplicateDateTolerance != null ||
             config.fundingAttributeMatch != null
         ) {
@@ -247,8 +252,15 @@ class Reimports(
                 accountOwnerNames = accounts.getAccountOwnerNames(),
             ).prepareImport(rows)
         if (mapped.newAccounts.isNotEmpty() || mapped.errorRows.isNotEmpty() ||
-            mapped.validTransfers.size + mapped.skippedRowIndexes.size != rows.size ||
-            mapped.validTransfers.any { !it.isIndependentBooking() }
+            mapped.validTransfers.size + mapped.skippedRowIndexes.size != rows.size
+        ) {
+            return null
+        }
+        val assembled = assembleCsvTradeGroups(effective, mapped.validTransfers)
+        val groupedRows = assembled.flatMapTo(mutableSetOf()) { it.group.ownRowIndexes }
+        if (mapped.validTransfers.any { row ->
+                !row.isIndependentBooking(allowGroup = row.rowIndex in groupedRows)
+            } || (assembled.isNotEmpty() && groupedRows.size != mapped.validTransfers.size)
         ) {
             return null
         }
@@ -256,7 +268,10 @@ class Reimports(
         return CsvTransferSync(
             id = file.id,
             fileChecksum = file.fileChecksum,
-            rows = mapped.validTransfers.associate { it.rowIndex to CsvTransferSyncRow(it.transfer, it.statementAccountId) },
+            rows =
+                mapped.validTransfers
+                    .filterNot { it.rowIndex in groupedRows }
+                    .associate { it.rowIndex to CsvTransferSyncRow(it.transfer, it.statementAccountId) },
             application =
                 CsvImportMutation.RecordApplication(
                     file.id,
@@ -269,6 +284,22 @@ class Reimports(
             records = recordRowsMutation(file, rows, inputsHash),
             version = version,
             dedupePolicy = effective.dedupePolicy(unidentifiedCounterpartyTypeId = null),
+            groupedTrades =
+                assembled.map { trade ->
+                    CsvGroupedTradeSync(
+                        trade.groupKey(effective),
+                        trade.group.ownRowIndexes.toSet(),
+                        Trade(
+                            TradeId(0),
+                            timestamp = trade.timestamp,
+                            description = trade.description,
+                            fromAccountId = trade.ownerAccountId,
+                            from = trade.fromAmount,
+                            toAccountId = trade.ownerAccountId,
+                            to = trade.toAmount,
+                        ),
+                    )
+                },
         )
     }
 
@@ -560,7 +591,7 @@ class Reimports(
 
 private val REMOVAL_PHASE = Progress.Phase(1, 3, "Removing what the files created")
 
-private fun CsvTransferWithAttributes.isIndependentBooking(): Boolean =
+private fun CsvTransferWithAttributes.isIndependentBooking(allowGroup: Boolean): Boolean =
     attributes.isEmpty() && feeAmount == null && tradeTo == null && personalCounterpartyName == null &&
-        passThrough == null && groupLeg == null && fundingMatchValue == null && unidentifiedCounterpartyAccountId == null &&
+        passThrough == null && (groupLeg == null || allowGroup) && fundingMatchValue == null && unidentifiedCounterpartyAccountId == null &&
         conversion == null && discoveredMappings.isEmpty()

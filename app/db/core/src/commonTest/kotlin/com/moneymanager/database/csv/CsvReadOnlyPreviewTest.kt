@@ -23,10 +23,13 @@ import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
+import com.moneymanager.domain.model.csvstrategy.LegAssembly
+import com.moneymanager.domain.model.csvstrategy.LegGroupRule
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.observation.ObservationOwner
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ConditionOp
+import com.moneymanager.domain.model.rules.LegRole
 import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
@@ -66,6 +69,27 @@ import kotlin.uuid.Uuid
 class CsvReadOnlyPreviewTest : DbTest() {
     private val now = Instant.fromEpochMilliseconds(1_765_000_000_000)
     private val headings = listOf("Date", "Time", "Currency", "Amount", "Corrected", "Description", "Corrected description")
+
+    @Test
+    fun reimportCorrectsAnAssembledTradeUnderItsExistingId() =
+        runDbTest {
+            val (id, strategy) = stage(grouped = true)
+            val tradeIds = repositories.csvImportRepository.getTradeIdsCreatedByImport(id)
+            val previous = repositories.tradeRepository.getTradesByIds(tradeIds).single()
+            repositories.importEngine.updateCsvStrategy(corrected(strategy))
+            val before = auditCount("trade_audit")
+            val reimports = repositories.reimports()
+            val prepared = assertNotNull(reimports.preview(reimports.planFile(id), null, null))
+
+            val result = reimports.applyPreview(prepared)
+
+            val update = result.plan.updated.single()
+            assertEquals(previous.id, update.after.id)
+            val current = repositories.tradeRepository.getTradesByIds(tradeIds).single()
+            assertEquals(Money.fromDisplayValue("15.00", previous.from.asset), current.from)
+            assertEquals(previous.to, current.to)
+            assertEquals(before + 1, auditCount("trade_audit"))
+        }
 
     @Test
     fun reimportChangesTheDateAccountAndCurrencyUnderTheExistingId() =
@@ -399,11 +423,13 @@ class CsvReadOnlyPreviewTest : DbTest() {
 
     private suspend fun rows(id: CsvImportId) = repositories.csvImportRepository.getImportRows(id, limit = 10, offset = 0)
 
-    private suspend fun transferAuditCount(): Long =
+    private suspend fun transferAuditCount(): Long = auditCount("transfer_audit")
+
+    private suspend fun auditCount(table: String): Long =
         database.testReads.rowCountSelectQueries
             .countAuditRowsByTable()
             .awaitAsList()
-            .single { it.table_name == "transfer_audit" }
+            .single { it.table_name == table }
             .row_count
 
     private suspend fun transfer(id: CsvImportId): Transfer =
@@ -461,6 +487,8 @@ class CsvReadOnlyPreviewTest : DbTest() {
         includeUnchangedRow: Boolean = false,
         suffix: String = "",
         existingAccounts: Pair<AccountId, AccountId>? = null,
+        grouped: Boolean = false,
+        extension: String = "csv",
     ): Fixture {
         val db = repositories
         val engine = db.importEngine
@@ -471,6 +499,7 @@ class CsvReadOnlyPreviewTest : DbTest() {
             existingAccounts?.second
                 ?: engine.createAccount(Account(id = AccountId(0), name = "Shop$suffix", openingDate = now), Source.Manual)
         db.currencyRepository.upsertCurrencyByCode("GBP", "Pound sterling")
+        if (grouped) db.currencyRepository.upsertCurrencyByCode("EUR", "Euro")
         val strategy =
             CsvImportStrategy(
                 id = CsvImportStrategyId(Uuid.random()),
@@ -478,6 +507,22 @@ class CsvReadOnlyPreviewTest : DbTest() {
                 config =
                     CsvStrategyConfig(
                         identificationColumns = headings.toSet(),
+                        legGroups = if (grouped) listOf(LegGroupRule(name = "exchange", assembly = LegAssembly.Trade())) else emptyList(),
+                        rules =
+                            if (grouped) {
+                                listOf(
+                                    StrategyRule(
+                                        conditions = emptyList(),
+                                        actions = listOf(RuleAction.Leg("exchange", LegRole.BySign("Amount"))),
+                                    ),
+                                    StrategyRule(
+                                        conditions = listOf(Condition("Amount", ConditionOp.POSITIVE)),
+                                        actions = listOf(RuleAction.SetDirection(incoming = true)),
+                                    ),
+                                )
+                            } else {
+                                emptyList()
+                            },
                         fieldMappings =
                             mapOf(
                                 TransferField.TIMESTAMP to
@@ -498,11 +543,14 @@ class CsvReadOnlyPreviewTest : DbTest() {
         db.csvImportStrategyRepository.createStrategy(strategy, Source.Manual)
         val id =
             db.csvImportRepository.createImport(
-                fileName = "independent$suffix.csv",
+                fileName = "independent$suffix.$extension",
                 headers = headings,
                 rows =
                     buildList {
-                        if (existingAccounts == null) {
+                        if (grouped) {
+                            add(listOf("2026-01-01", "10:00:00", "GBP", "-10.00", "-15.00", "Debit", "Debit"))
+                            add(listOf("2026-01-01", "10:00:00", "EUR", "12.00", "12.00", "Credit", "Credit"))
+                        } else if (existingAccounts == null) {
                             add(listOf("2026-01-01", "10:00:00", "GBP", "10.00", "12.00", "Old description", "New description"))
                         } else {
                             add(listOf("2026-02-15", "10:00:00", "GBP", "50.00", "50.00", "Other statement", "Other statement"))

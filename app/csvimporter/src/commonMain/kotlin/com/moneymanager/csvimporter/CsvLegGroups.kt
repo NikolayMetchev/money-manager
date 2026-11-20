@@ -147,6 +147,18 @@ fun groupTradeLegs(
         )
     }
 
+/** The trades whose group includes at least one leg in the file being processed. */
+internal fun assembleCsvTradeGroups(
+    strategy: CsvImportStrategy,
+    rows: List<CsvTransferWithAttributes>,
+): List<AssembledTrade> =
+    strategy.config.legGroups.withIndex().flatMap { (index, rule) ->
+        val assembly = rule.assembly as? LegAssembly.Trade ?: return@flatMap emptyList()
+        groupTradeLegs(rows, index, rule)
+            .filter { it.ownRowIndexes.isNotEmpty() }
+            .mapNotNull { it.assemble(assembly) }
+    }
+
 /**
  * Folds a group into one trade, or returns null when it does not resolve — no legs on a side, more
  * than one asset on a side, a zero total, or legs that disagree about which account they belong to.
