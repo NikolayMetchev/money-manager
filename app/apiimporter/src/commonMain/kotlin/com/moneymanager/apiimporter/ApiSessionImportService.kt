@@ -1220,12 +1220,20 @@ private suspend fun fetchResponse(
         retries += 1
     }
     if (response.statusCode == 200) return response
+    if (response.statusCode == HTTP_UNAUTHORIZED) throw ApiAuthException("HTTP ${response.statusCode}: ${response.body}")
     throw ApiSessionImportException("HTTP ${response.statusCode}: ${response.body}")
 }
 
-class ApiSessionImportException(
+open class ApiSessionImportException(
     message: String,
 ) : Exception(message)
+
+/** The provider rejected the access token (HTTP 401): it expired or was revoked, so a person must create a new one. */
+class ApiAuthException(
+    message: String,
+) : ApiSessionImportException(message)
+
+private const val HTTP_UNAUTHORIZED = 401
 
 private data class ApiImportAccount(
     /** The provider's id, as requests carry it (`{account.id}`). */

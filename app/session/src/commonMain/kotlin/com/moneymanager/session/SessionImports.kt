@@ -1,7 +1,9 @@
 package com.moneymanager.session
 
 import com.moneymanager.apiimport.API_DOWNLOAD_IMPORT_ALL_TASK_KEY
+import com.moneymanager.apiimport.ApiCredentialDownload
 import com.moneymanager.apiimport.ApiDownloadAndImportAllResult
+import com.moneymanager.apiimport.ApiDownloadOutcome
 import com.moneymanager.apiimport.ApiImportService
 import com.moneymanager.apiimport.ApiSessionNeedsAttention
 import com.moneymanager.credentialvault.CredentialVault
@@ -78,6 +80,7 @@ data class ImportRunOutcome(
         get() =
             directories?.needsAttention.orEmpty().map { it.toAttention() } +
                 apis?.needsAttention.orEmpty().map { it.toAttention() } +
+                apis?.credentials.orEmpty().mapNotNull { it.tokenExpiredAttention() } +
                 listOfNotNull(vaultLocked?.let { ImportAttention("vaultLocked", "APIs", "the credential vault is locked: $it") })
 
     fun summary(): String = listOfNotNull(directories?.summary(), apis?.summary(), *errors.toTypedArray()).joinToString(" ")
@@ -248,6 +251,12 @@ fun NeedsAttention.toAttention(): ImportAttention =
         subject = subject,
         reason = reason.description,
     )
+
+/** A connection whose saved token the provider rejected: a person must create a new one. */
+fun ApiCredentialDownload.tokenExpiredAttention(): ImportAttention? =
+    (download as? ApiDownloadOutcome.AuthFailed)?.let {
+        ImportAttention(kind = "tokenExpired", subject = it.strategyName, reason = it.message)
+    }
 
 fun ApiSessionNeedsAttention.toAttention(): ImportAttention =
     ImportAttention(

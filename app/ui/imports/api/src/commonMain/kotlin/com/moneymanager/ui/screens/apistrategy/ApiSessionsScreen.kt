@@ -65,6 +65,7 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.apiimport.API_DOWNLOAD_ALL_TASK_KEY
 import com.moneymanager.apiimport.API_IMPORT_ALL_TASK_KEY
 import com.moneymanager.apiimport.API_SESSIONS_ARCHIVE_IMPORT_TASK_KEY
+import com.moneymanager.apiimport.ApiDownloadOutcome
 import com.moneymanager.apiimport.ApiImportListener
 import com.moneymanager.apiimport.ApiImportService
 import com.moneymanager.apiimport.apiDownloadTaskKey
@@ -207,6 +208,8 @@ fun ApiSessionsScreen(
 
     // Per-credential download result state (cleared when a new download starts)
     var downloadResultByCredential by remember { mutableStateOf<Map<ApiCredentialId, ApiSessionDownloadResult>>(emptyMap()) }
+    // Credentials whose last download was rejected as unauthorised: the card asks for a new token.
+    var authFailureByCredential by remember { mutableStateOf<Map<ApiCredentialId, ApiDownloadOutcome.AuthFailed>>(emptyMap()) }
 
     // Credentials whose next download should ignore what earlier sessions already covered. Consumed by
     // that download, so the box visibly unticks rather than silently leaving every later download a
@@ -311,12 +314,15 @@ fun ApiSessionsScreen(
     ) {
         if (taskManager.isRunning(apiDownloadTaskKey(credential.id))) return
         downloadResultByCredential = downloadResultByCredential - credential.id
+        authFailureByCredential = authFailureByCredential - credential.id
         taskManager.start(
             key = apiDownloadTaskKey(credential.id),
             title = "Download",
             initialDetail = "Fetching credentials.",
         ) {
-            apiImportService.download(this, credential, forceFull, importListener).message
+            val outcome = apiImportService.download(this, credential, forceFull, importListener)
+            if (outcome is ApiDownloadOutcome.AuthFailed) authFailureByCredential = authFailureByCredential + (credential.id to outcome)
+            outcome.message
         }
     }
 
@@ -574,6 +580,18 @@ fun ApiSessionsScreen(
                                 sessions = credentialSessions,
                                 isDownloading = isDownloading,
                                 downloadResult = downloadResultByCredential[credential.id],
+                                authFailure = authFailureByCredential[credential.id],
+                                strategy = strategyIdByCredential[credential.id]?.let { id -> strategies.firstOrNull { it.id == id } },
+                                otherTokens =
+                                    vaultBundle
+                                        ?.apiCredentials
+                                        .orEmpty()
+                                        .filter {
+                                            it.strategyName !=
+                                                strategyNameByCredential[credential.id]
+                                        }.map { it.token }
+                                        .toSet(),
+                                onTokenSaved = { startDownload(credential, false) },
                                 downloadProgress = tasks.runningProgress(apiDownloadTaskKey(credential.id)),
                                 importResultBySession = importResultBySession,
                                 importErrorBySession = importErrorBySession,
@@ -880,6 +898,10 @@ private fun CredentialCard(
     sessions: List<ApiSession>,
     isDownloading: Boolean,
     downloadResult: ApiSessionDownloadResult?,
+    authFailure: ApiDownloadOutcome.AuthFailed?,
+    strategy: ApiImportStrategy?,
+    otherTokens: Set<String>,
+    onTokenSaved: () -> Unit,
     downloadProgress: Progress?,
     importResultBySession: Map<ApiSessionId, ApiSessionImportResult>,
     importErrorBySession: Map<ApiSessionId, String>,
@@ -970,6 +992,24 @@ private fun CredentialCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                 )
+            }
+            if (authFailure != null) {
+                Text(
+                    text = authFailure.message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+                if (strategy != null) {
+                    ApiConnectionRow(
+                        strategy = strategy,
+                        credential = secrets,
+                        tokensUsedElsewhere = otherTokens,
+                        expanded = true,
+                        onExpandedChange = {},
+                        onSaved = onTokenSaved,
+                        onSkip = {},
+                    )
+                }
             }
             if (importedSessionCount > 0) {
                 OutlinedButton(

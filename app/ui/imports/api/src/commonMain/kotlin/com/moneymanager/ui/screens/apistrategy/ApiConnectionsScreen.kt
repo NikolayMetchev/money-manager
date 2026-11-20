@@ -213,7 +213,7 @@ internal fun nextApiToSetUp(
 }
 
 @Composable
-private fun ApiConnectionRow(
+internal fun ApiConnectionRow(
     strategy: ApiImportStrategy,
     credential: StoredApiCredential?,
     tokensUsedElsewhere: Set<String>,
