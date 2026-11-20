@@ -378,7 +378,7 @@ class TransactionWriteRepositoryImpl(
         attributes: List<NewAttribute>,
         source: Source,
     ): Boolean {
-        val current = transferSelectQueries.selectById(id.id).awaitAsOneOrNull() ?: return false
+        val current = transferSelectQueries.selectById(id.id, TransferMapper::mapRaw).awaitAsOneOrNull() ?: return false
         val stored =
             transferAttributeSelectQueries
                 .selectByTransaction(id.id) { rowId, _, typeId, value, groupKey, _, _ -> (typeId to groupKey) to (rowId to value) }
@@ -386,12 +386,12 @@ class TransactionWriteRepositoryImpl(
                 .toMap()
         val wanted = attributes.associate { (it.typeId.id to it.groupKey) to it.value }
         val sameFields =
-            current.timestamp == transfer.timestamp.toEpochMilliseconds() &&
+            current.timestamp.toEpochMilliseconds() == transfer.timestamp.toEpochMilliseconds() &&
                 current.description == transfer.description &&
-                current.source_account_id == transfer.sourceAccountId.id &&
-                current.target_account_id == transfer.targetAccountId.id &&
-                current.asset_id == transfer.amount.asset.id.id &&
-                current.amount == transfer.amount.amount.toString()
+                current.sourceAccountId == transfer.sourceAccountId &&
+                current.targetAccountId == transfer.targetAccountId &&
+                current.amount.asset.id == transfer.amount.asset.id &&
+                current.amount.amount == transfer.amount.amount
         // What else it carries (another record's attributes, a link's exclusion) the materializer settles after the import.
         if (sameFields && wanted.all { (slot, value) -> stored[slot]?.second == value }) return true
         transferWriteQueries.update(
