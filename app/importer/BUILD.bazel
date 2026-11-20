@@ -5,6 +5,7 @@
 # take a write repository.
 # gazelle:kmp_forbid_reference \b[A-Za-z]+WriteRepository\b route writes through the ImportEngine (CLAUDE.md, "Database Writes")
 # gazelle:kmp_allow_reference src/commonMain/kotlin/com/moneymanager/importer/AccountResolver.kt
+# gazelle:kmp_allow_reference src/commonMain/kotlin/com/moneymanager/importer/ConfigMutationWriter.kt
 # gazelle:kmp_allow_reference src/commonMain/kotlin/com/moneymanager/importer/HandEdits.kt
 # gazelle:kmp_allow_reference src/commonMain/kotlin/com/moneymanager/importer/ImportEngineImpl.kt
 # gazelle:kmp_allow_reference src/commonMain/kotlin/com/moneymanager/importer/MatchSync.kt
@@ -43,6 +44,7 @@ kmp_library(
         "src/commonMain/kotlin/com/moneymanager/importer/SourceObservations.kt",
         "src/commonMain/kotlin/com/moneymanager/importer/AccountResolver.kt",
         "src/commonMain/kotlin/com/moneymanager/importer/PersonResolver.kt",
+        "src/commonMain/kotlin/com/moneymanager/importer/ConfigMutationWriter.kt",
     ],
     forbidden_reference_reason = "route writes through the ImportEngine (CLAUDE.md, \"Database Writes\")",
     native_targets = [

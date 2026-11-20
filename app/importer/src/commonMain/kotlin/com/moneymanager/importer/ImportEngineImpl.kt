@@ -1,19 +1,10 @@
 package com.moneymanager.importer
 
-import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.ApiCredentialId
-import com.moneymanager.domain.model.ApiImportStrategyId
-import com.moneymanager.domain.model.ApiRequestId
-import com.moneymanager.domain.model.ApiResponseId
-import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CryptoId
-import com.moneymanager.domain.model.CsvImportId
-import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.CurrencyId
-import com.moneymanager.domain.model.ImportDirectoryId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.NewRelationship
@@ -30,9 +21,6 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.calendar.BusinessDayCalendar
 import com.moneymanager.domain.model.csv.ImportStatus
-import com.moneymanager.domain.model.observation.ImportRecordId
-import com.moneymanager.domain.model.observation.ImportRecordKey
-import com.moneymanager.domain.model.observation.ObservationOwner
 import com.moneymanager.domain.model.observation.ObservedValues
 import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.domain.model.rules.widen
@@ -70,22 +58,15 @@ import com.moneymanager.domain.repository.write.TradeWriteRepository
 import com.moneymanager.domain.repository.write.TransactionWriteRepository
 import com.moneymanager.domain.repository.write.TransferEdit
 import com.moneymanager.domain.repository.write.TransferUpdate
-import com.moneymanager.importengineapi.AccountMappingMutation
 import com.moneymanager.importengineapi.AccountMatchKey
 import com.moneymanager.importengineapi.AccountRef
-import com.moneymanager.importengineapi.ApiSessionMutation
-import com.moneymanager.importengineapi.ApiStrategyMutation
 import com.moneymanager.importengineapi.AssetAliasMutation
-import com.moneymanager.importengineapi.CsvImportMutation
-import com.moneymanager.importengineapi.CsvStrategyMutation
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.EditGate
 import com.moneymanager.importengineapi.ExpandedRow
 import com.moneymanager.importengineapi.ExpandedTransfer
 import com.moneymanager.importengineapi.ExpansionRow
-import com.moneymanager.importengineapi.HolidayCalendarMutation
 import com.moneymanager.importengineapi.ImportBatch
-import com.moneymanager.importengineapi.ImportDirectoryMutation
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportResult
@@ -105,11 +86,8 @@ import com.moneymanager.importengineapi.ObservationExpander
 import com.moneymanager.importengineapi.ObservationKey
 import com.moneymanager.importengineapi.ObservationMutation
 import com.moneymanager.importengineapi.ObservationSlot
-import com.moneymanager.importengineapi.PassThroughMutation
-import com.moneymanager.importengineapi.ReconciliationLinkMutation
 import com.moneymanager.importengineapi.RelationshipMutation
 import com.moneymanager.importengineapi.RowOutcome
-import com.moneymanager.importengineapi.TradeAttributeMutation
 import com.moneymanager.importengineapi.TradeDedupePolicy
 import com.moneymanager.importengineapi.WriteIntent
 import com.moneymanager.importengineapi.forRow
@@ -195,6 +173,25 @@ class ImportEngineImpl(
     private val handEdits = HandEdits(observationRepository, personOverrideRepository)
     private val accountResolver = AccountResolver(accountRepository, accountAttributeRepository)
     private val personResolver = PersonResolver(personRepository, personAttributeRepository, ownershipRepository)
+    private val configMutations =
+        ConfigMutationWriter(
+            accountAttributeRepository,
+            accountMappingRepository,
+            apiImportStrategyRepository,
+            apiSessionRepository,
+            csvImportRepository,
+            csvImportStrategyRepository,
+            holidayCalendarRepository,
+            importDirectoryRepository,
+            importRecordRepository,
+            observationRepository,
+            passThroughAccountRepository,
+            personOverrideRepository,
+            reconciliationLinkRepository,
+            settingsRepository,
+            tradeRepository,
+            handEdits,
+        )
 
     override suspend fun import(
         batch: ImportBatch,
@@ -225,7 +222,7 @@ class ImportEngineImpl(
         // ----- Config / staging / session / settings / device mutations -----
         // Read before a reset drops its file's observations: the transactions they shared with other records.
         val sharedByResets = rerun.transactionsObservedByResets(batch)
-        val config = applyConfigMutations(batch)
+        val config = configMutations.applyConfigMutations(batch)
 
         // ----- CREATE phase (first, so batch-local keys resolve for dependents) -----
         val createdCurrencyIds = mutableMapOf<LocalCurrencyKey, CurrencyId>()
@@ -689,16 +686,6 @@ class ImportEngineImpl(
         val unidentified =
             attributeTypeRepository.getByName(WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME).first()?.id
         return SourceObservations(observations, importRecordRepository, unidentified)
-    }
-
-    /** Deletes [sessionId]'s import records, which restrict the session's deletion, and their observations first. */
-    private suspend fun deleteSessionRecords(sessionId: ApiSessionId) {
-        val records = importRecordRepository
-        val observations = observationRepository
-        for (record in records.getApiSessionRecords(sessionId)) {
-            observations.getObservationsOf(ObservationOwner.Record(record.id)).forEach { observations.deleteObservation(it.id) }
-            records.deleteRecord(record.id)
-        }
     }
 
     // region Operation dispatch
@@ -1953,31 +1940,6 @@ class ImportEngineImpl(
             null -> error("Missing account reference")
         }
 
-    // region Config / staging / session / settings / device mutations
-
-    private class ConfigOutcome(
-        val csvStrategyIds: Map<String, CsvImportStrategyId>,
-        val apiStrategyIds: Map<String, ApiImportStrategyId>,
-        val accountMappingIds: Map<String, Long>,
-        val csvImportIds: Map<String, CsvImportId>,
-        val importDirectoryIds: Map<String, ImportDirectoryId>,
-        val apiCredentialIds: Map<String, ApiCredentialId>,
-        val apiSessionIds: Map<String, ApiSessionId>,
-        val apiRequestIds: Map<String, ApiRequestId>,
-        val apiResponseIds: Map<String, ApiResponseId>,
-    )
-
-    // Fail fast rather than silently overwrite a generated id when two create mutations share a read-back
-    // key in one batch — a duplicate key would otherwise drop the earlier id from the ImportResult map.
-    private fun <K, V> MutableMap<K, V>.putUnique(
-        key: K,
-        value: V,
-        label: String,
-    ) {
-        require(key !in this) { "Duplicate $label read-back key in ImportBatch: $key" }
-        this[key] = value
-    }
-
     /**
      * Fails a shadow-only batch (see [ImportBatch.shadowSource]) that names an existing account outside
      * [source]'s shadow accounts — the last line of defence keeping reconciliation data off real accounts.
@@ -2020,389 +1982,6 @@ class ImportEngineImpl(
         val strays = referenced - accountResolver.shadowAccountIds(source)
         require(strays.isEmpty()) { "Reconciliation import for '$source' references non-shadow account(s) $strays" }
     }
-
-    private suspend fun applyReconciliationLinkMutations(mutations: List<ReconciliationLinkMutation>) {
-        val repository = reconciliationLinkRepository
-        val sourceByShadow =
-            accountAttributeRepository
-                .getByType(AttributeTypeId(WellKnownIds.ACCOUNT_RECONCILIATION_SOURCE_ATTR_TYPE_ID))
-                .first()
-                .associate { it.accountId to it.value }
-        for (m in mutations) {
-            when (m) {
-                is ReconciliationLinkMutation.SetLinks -> {
-                    require(m.shadowAccountId in sourceByShadow) { "Account ${m.shadowAccountId} is not a shadow account" }
-                    val shadowTargets = m.realAccountIds.filter { it in sourceByShadow }
-                    require(shadowTargets.isEmpty()) { "Cannot link a shadow account to shadow account(s) $shadowTargets" }
-                    repository.setLinks(m.shadowAccountId, m.realAccountIds)
-                    // Unlinking a wallet completely is a decision automatic linking must respect;
-                    // linking it again withdraws that decision.
-                    val declinedTypeId = AttributeTypeId(WellKnownIds.ACCOUNT_RECONCILIATION_AUTO_LINK_DECLINED_ATTR_TYPE_ID)
-                    val declined =
-                        accountAttributeRepository.getByAccount(m.shadowAccountId).first().filter {
-                            it.attributeType.id ==
-                                declinedTypeId
-                        }
-                    when {
-                        m.realAccountIds.isEmpty() && declined.isEmpty() -> {
-                            accountAttributeRepository.insert(m.shadowAccountId, declinedTypeId, "true")
-                        }
-
-                        m.realAccountIds.isNotEmpty() -> {
-                            declined.forEach { accountAttributeRepository.delete(it.id) }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    /** Brings the file's import records to [mutation]'s hashes, writing only the rows whose hash is new or changed. */
-    private suspend fun recordRows(
-        records: ImportRecordWriteRepository,
-        mutation: CsvImportMutation.RecordRows,
-    ) {
-        val stored = records.getCsvImportRecords(mutation.id).associateBy { (it.key as ImportRecordKey.CsvRow).rowIndex }
-        val inserts = mutableMapOf<ImportRecordKey, String>()
-        val hashes = mutableMapOf<ImportRecordId, String>()
-        for ((rowIndex, hash) in mutation.contentHashes) {
-            val record = stored[rowIndex]
-            when {
-                record == null -> inserts[ImportRecordKey.CsvRow(mutation.id, rowIndex)] = hash
-                record.contentHash != hash -> hashes[record.id] = hash
-            }
-        }
-        records.writeRecords(inserts, hashes)
-    }
-
-    // Without the records repository there are no records to hash, so the session is never unchanged and its re-import runs.
-    private suspend fun recordItems(mutation: ApiSessionMutation.RecordItems) {
-        val records = importRecordRepository
-        val hashes =
-            records
-                .getApiSessionRecords(mutation.sessionId)
-                .filter { it.contentHash != mutation.contentHash }
-                .associate { it.id to mutation.contentHash }
-        records.writeRecords(emptyMap(), hashes)
-    }
-
-    private suspend fun applyConfigMutations(batch: ImportBatch): ConfigOutcome {
-        if (batch.reconciliationLinkMutations.isNotEmpty()) applyReconciliationLinkMutations(batch.reconciliationLinkMutations)
-        for (m in batch.tradeAttributeMutations) {
-            when (m) {
-                is TradeAttributeMutation.Set -> tradeRepository.setAttributeByHand(m.tradeId, m.typeId, m.value, Source.Manual)
-                is TradeAttributeMutation.Remove -> tradeRepository.setAttributeByHand(m.tradeId, m.typeId, null, Source.Manual)
-            }
-            val value = (m as? TradeAttributeMutation.Set)?.value
-            personOverrideRepository.setTradeAttributeOverride(m.tradeId, m.typeId.tradeOverride(value))
-        }
-        if (batch.observationDecisions.isNotEmpty()) handEdits.applyDecisions(batch.observationDecisions)
-        for (m in batch.passThroughMutations) {
-            when (m) {
-                is PassThroughMutation.Create -> passThroughAccountRepository.create(m.account)
-                is PassThroughMutation.Update -> passThroughAccountRepository.update(m.account)
-                is PassThroughMutation.Delete -> passThroughAccountRepository.delete(m.id)
-            }
-        }
-        for (m in batch.holidayCalendarMutations) {
-            val repository = holidayCalendarRepository
-            when (m) {
-                is HolidayCalendarMutation.Upsert -> repository.upsert(m.calendar)
-                is HolidayCalendarMutation.Delete -> repository.delete(m.code)
-            }
-        }
-        val csvStrategyIds = mutableMapOf<String, CsvImportStrategyId>()
-        for (m in batch.csvStrategyMutations) {
-            when (m) {
-                is CsvStrategyMutation.Create -> {
-                    csvStrategyIds.putUnique(m.key, csvImportStrategyRepository.createStrategy(m.strategy, m.source), "CsvStrategy")
-                }
-
-                is CsvStrategyMutation.Update -> {
-                    val previous = csvImportStrategyRepository.getStrategyById(m.strategy.id).first()
-                    require(previous == null || m.strategy.keepsImportSettingsOf(previous)) {
-                        "\"${m.strategy.name}\" can't stop setting its source account or currency: the files imported with it re-import with them"
-                    }
-                    csvImportStrategyRepository.updateStrategy(m.strategy, m.source)
-                }
-
-                is CsvStrategyMutation.Delete -> {
-                    csvImportStrategyRepository.deleteStrategy(m.id)
-                }
-            }
-        }
-
-        val apiStrategyIds = mutableMapOf<String, ApiImportStrategyId>()
-        for (m in batch.apiStrategyMutations) {
-            when (m) {
-                is ApiStrategyMutation.Create -> {
-                    apiStrategyIds.putUnique(m.key, apiImportStrategyRepository.createStrategy(m.strategy, m.source), "ApiStrategy")
-                }
-
-                is ApiStrategyMutation.Update -> {
-                    apiImportStrategyRepository.updateStrategy(m.strategy, m.source)
-                }
-
-                is ApiStrategyMutation.Delete -> {
-                    apiImportStrategyRepository.deleteStrategy(m.id)
-                }
-            }
-        }
-
-        val accountMappingIds = mutableMapOf<String, Long>()
-        for (m in batch.accountMappingMutations) {
-            when (m) {
-                is AccountMappingMutation.Create -> {
-                    accountMappingIds.putUnique(
-                        m.key,
-                        accountMappingRepository.createMapping(m.valuePattern, m.accountId, m.strategyId),
-                        "AccountMapping",
-                    )
-                }
-
-                is AccountMappingMutation.CreateBatch -> {
-                    accountMappingRepository.createMappings(m.mappings)
-                }
-
-                is AccountMappingMutation.Update -> {
-                    accountMappingRepository.updateMapping(m.mapping)
-                }
-
-                is AccountMappingMutation.Delete -> {
-                    accountMappingRepository.deleteMapping(m.id)
-                }
-            }
-        }
-
-        val csvImportIds = mutableMapOf<String, CsvImportId>()
-        for (m in batch.csvImportMutations) {
-            when (m) {
-                is CsvImportMutation.Create -> {
-                    csvImportIds.putUnique(
-                        m.key,
-                        csvImportRepository.createImport(
-                            m.fileName,
-                            m.headers,
-                            m.rows,
-                            m.fileChecksum,
-                            m.fileLastModified,
-                            m.xlsxBytes,
-                            m.xlsxWorksheetName,
-                            m.pdf,
-                        ),
-                        "CsvImport",
-                    )
-                }
-
-                is CsvImportMutation.Restage -> {
-                    csvImportRepository.restageImport(m.id, m.headers, m.rows, m.worksheetName, m.pdfRulesHash)
-                }
-
-                is CsvImportMutation.Repopulate -> {
-                    csvImportRepository.repopulateImport(
-                        m.id,
-                        m.headers,
-                        m.rows,
-                        m.fileChecksum,
-                        m.fileLastModified,
-                        m.carriedRows,
-                        m.rowIndexRemap,
-                        m.xlsxBytes,
-                        m.pdf,
-                    )
-                }
-
-                is CsvImportMutation.Delete -> {
-                    csvImportRepository.deleteImport(m.id)
-                }
-
-                is CsvImportMutation.SetIgnored -> {
-                    csvImportRepository.setImportIgnored(m.id, m.ignored)
-                }
-
-                is CsvImportMutation.ResetToUnimported -> {
-                    csvImportRepository.resetToUnimported(m.id)
-                }
-
-                is CsvImportMutation.UpdateRowStatuses -> {
-                    csvImportRepository.updateRowStatusesBatch(m.id, m.status, m.rowIndexes)
-                }
-
-                is CsvImportMutation.Reserve -> {
-                    csvImportRepository.reserveForRerun(m.id, RECORD_UNHASHED)
-                }
-
-                is CsvImportMutation.SaveErrors -> {
-                    csvImportRepository.saveErrors(m.id, m.errors)
-                }
-
-                is CsvImportMutation.ClearError -> {
-                    csvImportRepository.clearError(m.id, m.rowIndex)
-                }
-
-                is CsvImportMutation.ClearErrors -> {
-                    csvImportRepository.clearErrors(m.id, m.rowIndexes)
-                }
-
-                is CsvImportMutation.RecordApplication -> {
-                    csvImportRepository.recordImportApplication(
-                        m.id,
-                        m.strategyId,
-                        m.strategyName,
-                        m.appliedAt,
-                        m.accountId,
-                        m.currencyId,
-                    )
-                }
-
-                is CsvImportMutation.RecordRows -> {
-                    recordRows(importRecordRepository, m)
-                }
-            }
-        }
-
-        val importDirectoryIds = mutableMapOf<String, ImportDirectoryId>()
-        for (m in batch.importDirectoryMutations) {
-            when (m) {
-                is ImportDirectoryMutation.Create -> {
-                    importDirectoryIds.putUnique(
-                        m.key,
-                        importDirectoryRepository.createDirectory(m.directory, m.source),
-                        "ImportDirectory",
-                    )
-                }
-
-                is ImportDirectoryMutation.Update -> {
-                    importDirectoryRepository.updateDirectory(m.directory, m.source)
-                }
-
-                is ImportDirectoryMutation.Delete -> {
-                    importDirectoryRepository.deleteDirectory(m.id)
-                }
-
-                is ImportDirectoryMutation.RecordFileImported -> {
-                    importDirectoryRepository.recordFileImported(
-                        m.directoryId,
-                        m.fileRef,
-                        m.fileName,
-                        m.lastModified,
-                        m.checksum,
-                        m.remoteContentHash,
-                        m.csvImportId,
-                        m.importedAt,
-                    )
-                }
-            }
-        }
-
-        val apiCredentialIds = mutableMapOf<String, ApiCredentialId>()
-        val apiSessionIds = mutableMapOf<String, ApiSessionId>()
-        val apiRequestIds = mutableMapOf<String, ApiRequestId>()
-        val apiResponseIds = mutableMapOf<String, ApiResponseId>()
-        for (m in batch.apiSessionMutations) {
-            when (m) {
-                is ApiSessionMutation.EnsureCredential -> {
-                    apiCredentialIds.putUnique(
-                        m.key,
-                        apiSessionRepository.ensureCredential(m.strategyId, m.createdAt),
-                        "ApiCredential",
-                    )
-                }
-
-                is ApiSessionMutation.UpdateCredentialStrategy -> {
-                    apiSessionRepository.updateCredentialStrategy(
-                        m.credentialId,
-                        m.strategyId,
-                    )
-                }
-
-                is ApiSessionMutation.CreateSession -> {
-                    apiSessionIds.putUnique(
-                        m.key,
-                        apiSessionRepository.createSession(m.deviceId, m.createdAt, expiresAt = null, m.credentialId),
-                        "ApiSession",
-                    )
-                }
-
-                is ApiSessionMutation.InsertRequest -> {
-                    apiRequestIds.putUnique(
-                        m.key,
-                        apiSessionRepository.insertRequest(m.sessionId, m.method, m.url, m.headers),
-                        "ApiRequest",
-                    )
-                }
-
-                is ApiSessionMutation.RecordDownloadCoverage -> {
-                    apiSessionRepository.recordDownloadCoverage(m.sessionId, m.endpointKey, m.coversUntil)
-                }
-
-                is ApiSessionMutation.InsertResponse -> {
-                    apiResponseIds.putUnique(
-                        m.key,
-                        apiSessionRepository.insertResponse(m.requestId, m.sessionId, m.json),
-                        "ApiResponse",
-                    )
-                }
-
-                is ApiSessionMutation.DeleteSession -> {
-                    accountAttributeRepository.releaseApiSession(m.id)
-                    deleteSessionRecords(m.id)
-                    apiSessionRepository.deleteSession(m.id)
-                }
-
-                is ApiSessionMutation.InsertResponseTransactions -> {
-                    apiSessionRepository.insertResponseTransactions(m.transactions)
-                }
-
-                is ApiSessionMutation.DeleteResponseTransactionsBySession -> {
-                    apiSessionRepository.deleteResponseTransactionsBySession(m.sessionId)
-                }
-
-                is ApiSessionMutation.ReleaseAdoptedAttributes -> {
-                    accountAttributeRepository.releaseApiSession(m.sessionId)
-                }
-
-                is ApiSessionMutation.RecordItems -> {
-                    recordItems(m)
-                }
-
-                is ApiSessionMutation.Reserve -> {
-                    observationRepository.reserveApiSession(m.sessionId)
-                }
-
-                is ApiSessionMutation.ResetToUnimported -> {
-                    accountAttributeRepository.releaseApiSession(m.sessionId)
-                    deleteSessionRecords(m.sessionId)
-                    apiSessionRepository.deleteResponseTransactionsBySession(m.sessionId)
-                    apiSessionRepository.deleteSessionImports(m.sessionId)
-                }
-
-                is ApiSessionMutation.MarkSessionImported -> {
-                    apiSessionRepository.markSessionImported(m.id, m.revisionId, m.importedAt, m.importDurationMillis)
-                }
-            }
-        }
-
-        batch.settings?.let { s ->
-            s.defaultCurrencyId?.let { settingsRepository.setDefaultCurrencyId(it) }
-            s.defaultLocation?.let { settingsRepository.setDefaultLocation(it.code) }
-            s.setupWizardCompleted?.let { settingsRepository.setSetupWizardCompleted(it) }
-        }
-
-        return ConfigOutcome(
-            csvStrategyIds = csvStrategyIds,
-            apiStrategyIds = apiStrategyIds,
-            accountMappingIds = accountMappingIds,
-            csvImportIds = csvImportIds,
-            importDirectoryIds = importDirectoryIds,
-            apiCredentialIds = apiCredentialIds,
-            apiSessionIds = apiSessionIds,
-            apiRequestIds = apiRequestIds,
-            apiResponseIds = apiResponseIds,
-        )
-    }
-
-    // endregion
 }
 
 private fun Source.isImport(): Boolean = this is Source.Csv || this is Source.Api
