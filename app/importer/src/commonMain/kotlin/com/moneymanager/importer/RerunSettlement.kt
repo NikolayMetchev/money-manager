@@ -46,7 +46,7 @@ internal class RerunSettlement(
     private val transactionRepository: TransactionWriteRepository,
     private val tradeRepository: TradeWriteRepository,
     private val copier: ReconciliationCopier,
-    private val placeholderTypeId: suspend () -> AttributeTypeId?,
+    private val placeholderTypeId: () -> AttributeTypeId?,
     private val materialize: suspend (List<ObservationMutation>, MaterializationRequest) -> MaterializationReport,
 ) {
     /**

@@ -122,13 +122,10 @@ class ImportDeduper(
         existing.groupBy { it.transfer.amount }
 
     // The reconciliation exclusion attribute type (when the policy enables cross-source reconciliation),
-    // ignored in attribute comparison so a reconciled transfer still dedupes cleanly on re-import.
+    // ignored in attribute comparison so a reconciled transfer still dedupes cleanly on re-import. UniqueIdentifier has always
+    // compared the marker like any attribute; ignoring it there too would change which of its rows read UPDATED.
     private val reconciledExclusionTypeId: AttributeTypeId? =
-        when (policy) {
-            is DedupePolicy.FuzzyAllFields -> policy.reconciledExclusionAttributeTypeId
-            is DedupePolicy.ApiMultiKey -> policy.reconciledExclusionAttributeTypeId
-            else -> null
-        }
+        policy.reconciledExclusionAttributeTypeId.takeUnless { policy is DedupePolicy.UniqueIdentifier }
 
     private val existingByUniqueKey: Map<Map<String, String>, ExistingTransferInfo> =
         existing.filter { it.uniqueKey.isNotEmpty() }.associateBy { it.uniqueKey }

@@ -52,24 +52,7 @@ internal class TradeImporter(
         val createdTradeIds = mutableMapOf<LocalTradeKey, TradeId>()
         val dedupedTradeKeys = mutableSetOf<LocalTradeKey>()
 
-        // Multiset idempotency (see NewTrade.occurrence): N intents sharing the exact same
-        // field tuple (e.g. an exchange order split into several byte-identical fills) must book as N
-        // trades, not collapse to one. Count how many identical tuples this pass has already claimed and
-        // pass that count as the occurrence index, so each one reuses a distinct existing row (re-import)
-        // or inserts a distinct new one (first import). The key must group exactly the intents that
-        // createTrades cannot tell apart, so the timestamp is the persisted millisecond value — an Instant
-        // can carry sub-ms precision (e.g. Kraken's float epoch-seconds) that the trade row does not.
-        // The description is deliberately absent: it plays no part in identifying a conversion (see
-        // TradeSelect.sq's selectMatchingTradeId), so two rows describing one movement differently share
-        // an occurrence counter and the second reuses the first's trade instead of double-booking.
-        data class TradeTupleKey(
-            val timestampMs: Long?,
-            val fromAccountId: AccountId?,
-            val fromAmount: Money?,
-            val toAccountId: AccountId?,
-            val toAmount: Money?,
-        )
-        val tradeOccurrences = mutableMapOf<TradeTupleKey, Int>()
+        val occurrences = TradeOccurrences()
         // Cross-source reconcile (opt-in): two sources describing one conversion rarely agree on the
         // exact tuple the writer matches on, so load the window they could disagree within and match in
         // memory. A hit suppresses the write and reports the existing trade, which is the only way a
@@ -96,17 +79,7 @@ internal class TradeImporter(
                 }
                 continue
             }
-            val tupleKey =
-                TradeTupleKey(
-                    intent.timestamp?.toEpochMilliseconds(),
-                    intent.fromAccountId,
-                    intent.fromAmount,
-                    intent.toAccountId,
-                    intent.toAmount,
-                )
-            val occurrence = tradeOccurrences[tupleKey] ?: 0
-            tradesToWrite +=
-                intent to
+            val trade =
                 NewTrade(
                     timestamp = requireNotNull(intent.timestamp),
                     description = requireNotNull(intent.description),
@@ -115,11 +88,10 @@ internal class TradeImporter(
                     toAccountId = requireNotNull(intent.toAccountId),
                     toAmount = requireNotNull(intent.toAmount),
                     source = intent.source,
-                    occurrence = occurrence,
                     attributes = intent.attributes,
                     reuseId = observer.reuse(intent.observationKey(), TransactionKind.TRADE) as TradeId?,
                 )
-            tradeOccurrences[tupleKey] = occurrence + 1
+            tradesToWrite += intent to trade.copy(occurrence = occurrences.next(trade))
         }
         val tradeResults =
             if (tradesToWrite.isEmpty()) emptyList() else tradeRepository.createTrades(tradesToWrite.map { it.second })
@@ -213,26 +185,23 @@ internal class TradeImporter(
         toImport: List<Classified>,
         observer: SourceObservations,
     ) {
-        val occurrences = mutableMapOf<List<Any>, Int>()
+        val occurrences = TradeOccurrences()
         val expanded = toImport.mapNotNull { ObservationExpander.expandConversion(it.transfer) }
         val trades =
             expanded.map { trade ->
-                // Keyed on the persisted millisecond, as createTrades matches on it (see the leg-group trade loop).
-                val key = listOf(trade.timestamp.toEpochMilliseconds(), trade.accountId, trade.fromAmount, trade.toAmount)
-                val occurrence = occurrences[key] ?: 0
-                occurrences[key] = occurrence + 1
-                NewTrade(
-                    timestamp = trade.timestamp,
-                    description = trade.description,
-                    fromAccountId = trade.accountId,
-                    fromAmount = trade.fromAmount,
-                    toAccountId = trade.accountId,
-                    toAmount = trade.toAmount,
-                    source = trade.provenance,
-                    occurrence = occurrence,
-                    attributes = trade.attributes,
-                    reuseId = observer.reuse(trade.key, TransactionKind.TRADE) as TradeId?,
-                )
+                val conversion =
+                    NewTrade(
+                        timestamp = trade.timestamp,
+                        description = trade.description,
+                        fromAccountId = trade.accountId,
+                        fromAmount = trade.fromAmount,
+                        toAccountId = trade.accountId,
+                        toAmount = trade.toAmount,
+                        source = trade.provenance,
+                        attributes = trade.attributes,
+                        reuseId = observer.reuse(trade.key, TransactionKind.TRADE) as TradeId?,
+                    )
+                conversion.copy(occurrence = occurrences.next(conversion))
             }
         if (trades.isEmpty()) return
         val results = tradeRepository.createTrades(trades)
@@ -330,5 +299,35 @@ internal class TradeImporter(
                 )
             }
         return if (legs.isEmpty()) null else ConversionTradeReconciler(policy.window, legs, creates)
+    }
+}
+
+/**
+ * Multiset idempotency (see [NewTrade.occurrence]): N trades sharing the exact same field tuple (e.g. an exchange order split
+ * into several byte-identical fills) must book as N trades, not collapse to one. [next] counts how many identical tuples this
+ * pass has already claimed and returns that count as the occurrence index, so each one reuses a distinct existing row
+ * (re-import) or inserts a distinct new one (first import). The key groups exactly the trades createTrades cannot tell apart, so
+ * the timestamp is the persisted millisecond value — an Instant can carry sub-ms precision (e.g. Kraken's float epoch-seconds)
+ * that the trade row does not. The description is deliberately absent: it plays no part in identifying a conversion (see
+ * TradeSelect.sq's selectMatchingTradeId), so two rows describing one movement differently share an occurrence counter and the
+ * second reuses the first's trade instead of double-booking.
+ */
+private class TradeOccurrences {
+    private data class Key(
+        val timestampMs: Long,
+        val fromAccountId: AccountId,
+        val fromAmount: Money,
+        val toAccountId: AccountId,
+        val toAmount: Money,
+    )
+
+    private val claimed = mutableMapOf<Key, Int>()
+
+    /** The occurrence index of [trade], counting it. */
+    fun next(trade: NewTrade): Int {
+        val key = Key(trade.timestamp.toEpochMilliseconds(), trade.fromAccountId, trade.fromAmount, trade.toAccountId, trade.toAmount)
+        val occurrence = claimed[key] ?: 0
+        claimed[key] = occurrence + 1
+        return occurrence
     }
 }

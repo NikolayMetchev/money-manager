@@ -49,8 +49,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-internal val FEE_ACCOUNT_FOR_TYPE = AttributeTypeId(WellKnownIds.ACCOUNT_FEE_ACCOUNT_FOR_ATTR_TYPE_ID)
-
 /**
  * Database-backed [ImportEngine]. Takes a fully-built [ImportBatch] and performs the whole import:
  * creates (or reuses) accounts, people and ownerships, resolves transfer account references,
@@ -205,6 +203,8 @@ class ImportEngineImpl(
         // ----- Lookup-table resolution (first: ids feed attributes/relationships built by callers) -----
         val attributeTypeIds = batch.attributeTypeNames.associateWith { attributeTypeRepository.getOrCreate(it) }
         val relationshipTypeIds = batch.relationshipTypeNames.associateWith { relationshipTypeRepository.getOrCreate(it) }
+        // Read once, after the batch's own attribute types exist: every observation step of the batch merges with it.
+        placeholderType = attributeTypeRepository.getByName(WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME).first()?.id
 
         // ----- Config / staging / session / settings / device mutations -----
         // Read before a reset drops its file's observations: the transactions they shared with other records.
@@ -348,8 +348,10 @@ class ImportEngineImpl(
         return ObservationMaterialization(observations, accountRepository, tradeRepository).apply(plan)
     }
 
-    private suspend fun placeholderTypeId(): AttributeTypeId? =
-        attributeTypeRepository.getByName(WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME).first()?.id
+    /** The `unidentified-counterparty` attribute type of the batch being applied, which marks a record's placeholder end. */
+    private var placeholderType: AttributeTypeId? = null
+
+    private fun placeholderTypeId(): AttributeTypeId? = placeholderType
 
     private suspend fun matchSync(): MatchSync {
         val observations = observationRepository
@@ -382,10 +384,6 @@ class ImportEngineImpl(
      * Records what API items and hand entries say about the transactions this batch books, beside the rows themselves
      * (#1429, #1430): the observations staged files will be matched against once they sync (#1428).
      */
-    private suspend fun sourceObservations(): SourceObservations {
-        val observations = observationRepository
-        val unidentified =
-            attributeTypeRepository.getByName(WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME).first()?.id
-        return SourceObservations(observations, importRecordRepository, unidentified)
-    }
+    private fun sourceObservations(): SourceObservations =
+        SourceObservations(observationRepository, importRecordRepository, placeholderType)
 }

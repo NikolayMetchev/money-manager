@@ -3,7 +3,6 @@ package com.moneymanager.importer
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.ApiCredentialId
 import com.moneymanager.domain.model.ApiSessionId
-import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.WellKnownIds
@@ -83,11 +82,7 @@ class MatchScopeLoader(
         stored: List<Observation>,
         families: Map<String, MatchFamily>,
     ): List<MatchObservation> {
-        val shadow =
-            accountAttributes
-                .getByType(AttributeTypeId(WellKnownIds.ACCOUNT_RECONCILIATION_SOURCE_ATTR_TYPE_ID))
-                .first()
-                .mapTo(mutableSetOf()) { it.accountId }
+        val shadow = accountAttributes.shadowSources().keys
         val approximateType = attributeTypes.getByName(WellKnownIds.TIMESTAMP_APPROXIMATE_ATTR_TYPE_NAME).first()?.id
         val chainOwners = stored.filter { it.slot.startsWith(CONDUIT_SLOT_PREFIX) }.mapTo(mutableSetOf()) { it.owner }
         val owners = stored.map { it.owner }
