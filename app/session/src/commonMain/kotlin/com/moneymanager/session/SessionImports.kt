@@ -78,10 +78,12 @@ data class ImportRunOutcome(
 ) {
     val needsAttention: List<ImportAttention>
         get() =
-            directories?.needsAttention.orEmpty().map { it.toAttention() } +
-                apis?.needsAttention.orEmpty().map { it.toAttention() } +
-                apis?.credentials.orEmpty().mapNotNull { it.tokenExpiredAttention() } +
-                listOfNotNull(vaultLocked?.let { ImportAttention("vaultLocked", "APIs", "the credential vault is locked: $it") })
+            buildList {
+                directories?.needsAttention.orEmpty().mapTo(this) { it.toAttention() }
+                apis?.needsAttention.orEmpty().mapTo(this) { it.toAttention() }
+                apis?.credentials.orEmpty().mapNotNullTo(this) { it.tokenExpiredAttention() }
+                vaultLocked?.let { add(ImportAttention("vaultLocked", "APIs", "the credential vault is locked: $it")) }
+            }
 
     fun summary(): String = listOfNotNull(directories?.summary(), apis?.summary(), *errors.toTypedArray()).joinToString(" ")
 }
