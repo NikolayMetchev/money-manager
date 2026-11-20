@@ -226,7 +226,7 @@ class CsvReimportE2ETest {
         }
 
     @Test
-    fun `re-import re-creates transfers with the changed amount and currency mappings`() =
+    fun `re-import updates transfers in place with the changed amount and currency mappings`() =
         runBlocking {
             val fixture = setUpImportedCsv()
             val dc = fixture.dc
@@ -260,7 +260,14 @@ class CsvReimportE2ETest {
                 )
 
             val result = fixture.reimport(changedStrategy)
-            assertEquals(2, result.transfersCreated)
+            // Each row keeps its transfer, updated where it stands (#1510).
+            assertEquals(0, result.transfersCreated)
+            assertEquals(
+                rowsBefore.mapNotNull { it.transferId?.id }.toSet(),
+                result.plan.updated
+                    .map { it.after.id.id }
+                    .toSet(),
+            )
 
             val rowsAfter = dc.csvImportRepository.getImportRows(fixture.csvImport.id, limit = 1000, offset = 0)
             assertTrue(rowsAfter.all { it.importStatus == ImportStatus.IMPORTED })
