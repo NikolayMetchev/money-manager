@@ -2,7 +2,6 @@ package com.moneymanager.database.csv
 
 import app.cash.sqldelight.async.coroutines.awaitAsList
 import com.moneymanager.csvimporter.applyStagedCsv
-import com.moneymanager.database.di.createImportEngine
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
@@ -36,7 +35,6 @@ import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.CsvImportMutation
 import com.moneymanager.importengineapi.ImportBatch
-import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.MaterializationRequest
@@ -312,7 +310,7 @@ class CsvReimportInPlaceTest : DbTest() {
             val removedId = assertNotNull(staged[0].transferId)
             val neighbor = staged[1]
             val original = repositories.transactionRepository.getTransactionsByIds(listOf(removedId)).getValue(removedId)
-            editDescription(original, "My description")
+            editDescriptionByHand(original)
             val engine = repositories.importEngine
             engine.updateCsvStrategy(skipFirst(strategy))
             val reimports = repositories.reimports()
@@ -355,7 +353,7 @@ class CsvReimportInPlaceTest : DbTest() {
             val fixture = stage()
             val (id, strategy) = fixture
             val original = transfer(id)
-            editDescription(original, "My description")
+            editDescriptionByHand(original)
             repositories.importEngine.updateCsvStrategy(corrected(strategy))
             val staged = rows(id)
             val reimports = repositories.reimports()
@@ -370,13 +368,13 @@ class CsvReimportInPlaceTest : DbTest() {
                     .fields,
             )
             assertEquals(
-                "My description",
+                HAND_DESCRIPTION,
                 result.plan.conflicts
                     .single()
                     .overrideValue,
             )
             assertEquals(original.id, after.id)
-            assertEquals("My description", after.description)
+            assertEquals(HAND_DESCRIPTION, after.description)
             assertEquals(Money.fromDisplayValue("12.00", after.amount.asset), after.amount)
             assertEquals(staged, rows(id))
             assertEquals(ImportStatus.IMPORTED, rows(id).single().importStatus)
@@ -410,12 +408,9 @@ class CsvReimportInPlaceTest : DbTest() {
             .values
             .single()
 
-    private suspend fun editDescription(
-        transfer: Transfer,
-        description: String,
-        engine: ImportEngine = repositories.importEngine,
-    ) {
-        engine.import(
+    /** A person changes [transfer]'s description to [HAND_DESCRIPTION]. */
+    private suspend fun editDescriptionByHand(transfer: Transfer) {
+        repositories.importEngine.import(
             ImportBatch.manualEdits(
                 transfers =
                     listOf(
@@ -426,7 +421,7 @@ class CsvReimportInPlaceTest : DbTest() {
                             fromAccount = AccountRef.Existing(transfer.sourceAccountId),
                             toAccount = AccountRef.Existing(transfer.targetAccountId),
                             timestamp = transfer.timestamp,
-                            description = description,
+                            description = HAND_DESCRIPTION,
                             amount = transfer.amount,
                         ),
                     ),
@@ -558,3 +553,5 @@ class CsvReimportInPlaceTest : DbTest() {
         val shop: AccountId,
     )
 }
+
+private const val HAND_DESCRIPTION = "My description"
