@@ -126,6 +126,7 @@ private val EXCLUDED_FROM_AUDIT =
         "observation_gross_amount",
         "observation_own_end",
         "observation_reserved",
+        "relationship_reserved",
         "transfer_override",
         "transfer_attribute_override",
         "transfer_attribute_removal",

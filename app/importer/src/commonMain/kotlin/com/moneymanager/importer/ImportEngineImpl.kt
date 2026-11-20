@@ -461,13 +461,14 @@ class ImportEngineImpl(
         // exact tuple the writer matches on, so load the window they could disagree within and match in
         // memory. A hit suppresses the write and reports the existing trade, which is the only way a
         // trade can be linked to its duplicate (see TradeDedupePolicy).
-        val tradeReconciler = buildTradeReconciler(batch)
+        val vacant = observationRepository?.getVacantTransactionIds().orEmpty()
+        val tradeReconciler = buildTradeReconciler(batch, vacant)
         // The same movement again, but recorded by the other source as *transfers*: a conversion whose
         // credits it could not attribute to its debits. There is no trade id to report for such a
         // match, so the order links resolved below would have nothing to point at - hence trades an
         // order claims are held back from it. A conversion is never part of an order.
         val orderLinkedTradeKeys = batch.orders.flatMapTo(mutableSetOf()) { it.tradeKeys }
-        val conversionReconciler = buildConversionTradeReconciler(batch, orderLinkedTradeKeys)
+        val conversionReconciler = buildConversionTradeReconciler(batch, orderLinkedTradeKeys, vacant)
         val observer = sourceObservations()
         val tradesToWrite = mutableListOf<Pair<ImportTradeIntent, NewTrade>>()
         for (intent in batch.trades.creates()) {
@@ -510,10 +511,11 @@ class ImportEngineImpl(
         }
         val tradeResults =
             if (tradesToWrite.isEmpty()) emptyList() else tradeRepository.createTrades(tradesToWrite.map { it.second })
-        for ((intent, tradeResult) in tradesToWrite.map { it.first }.zip(tradeResults)) {
+        for ((toWrite, tradeResult) in tradesToWrite.zip(tradeResults)) {
+            val (intent, written) = toWrite
             // A re-imported trade loses the attributes its source owns but no longer reports (e.g. the
-            // `excluded` of a trade the source has since un-deleted), like a transfer UPDATE.
-            if (!tradeResult.created) {
+            // `excluded` of a trade the source has since un-deleted), like a transfer UPDATE; so does one a re-run takes back.
+            if (!tradeResult.created || written.reuseId != null) {
                 val reported = intent.attributes.mapTo(mutableSetOf()) { it.typeId }
                 val stale = intent.ownedAttributes.filterKeys { it !in reported }
                 if (stale.isNotEmpty()) {
@@ -716,23 +718,28 @@ class ImportEngineImpl(
                     tradeDeletes.filter { it.source.isImport() }.map { requireNotNull(it.existingId) },
                 (transferDeletes.map { it.source } + tradeDeletes.map { it.source }).toSet(),
             )
+        // A re-run's reserved transactions keep their rows (#1510): each stands vacant, hidden from the re-run's own dedupe
+        // and matching, until its record says it again (and it is written only if what it says changed) or the settle
+        // deletes it. Their links stay with them.
+        val reserved = reserveVacated(batch, (transferDeleteIds + tradeDeleteIds).filterNot { it in stillObserved })
         // What a withdrawn record was reconciled with is rebuilt once it goes: a link left with one member is pruned, so
         // the exclusion it held lifts, as a fresh import of the others has it.
         val partners =
             reconciledPartnersOf(
                 transferDeletes.filter { it.source.isImport() }.map { requireNotNull(it.existingId) } +
                     tradeDeletes.filter { it.source.isImport() }.map { requireNotNull(it.existingId) },
-                stillObserved,
+                stillObserved + reserved.ids,
             )
-        val reserved = reserveVacated(batch, (transferDeleteIds + tradeDeleteIds).filterNot { it in stillObserved })
         transferDeleteIds.filterNot { it in stillObserved }.chunked(DELETE_CHUNK_ROWS).forEach { chunk ->
-            observationRepository?.deleteObservationsOfTransactions(chunk.filterNot { it in reserved.ids })
-            transactionRepository.deleteTransactions(chunk)
+            val gone = chunk.filterNot { it in reserved.ids }
+            observationRepository?.deleteObservationsOfTransactions(gone)
+            transactionRepository.deleteTransactions(gone)
             reportDeleted(chunk.size)
         }
         tradeDeleteIds.filterNot { it in stillObserved }.chunked(DELETE_CHUNK_ROWS).forEach { chunk ->
-            observationRepository?.deleteObservationsOfTransactions(chunk.filterNot { it in reserved.ids })
-            tradeRepository.deleteTrades(chunk)
+            val gone = chunk.filterNot { it in reserved.ids }
+            observationRepository?.deleteObservationsOfTransactions(gone)
+            tradeRepository.deleteTrades(gone)
             reportDeleted(chunk.size)
         }
         // A transaction the reset left with no observation at all stays as its import booked it until the file's re-import:
@@ -763,6 +770,10 @@ class ImportEngineImpl(
             materialize(emptyList(), MaterializationRequest(Source.Reconciler, transfers.observedDuplicates))
         }
         val matchSync = batch.takeIf { it.syncMatches }?.let { matchSync()?.run() } ?: MaterializationReport()
+        // A transaction a re-run took back was written with what its own record says: bring it to the merge of every
+        // observation and link it has, as a fresh booking would be, writing only what differs (#1510).
+        val retaken = transfers.retaken + observer?.claimed.orEmpty()
+        if (retaken.isNotEmpty()) materialize(emptyList(), MaterializationRequest(Source.Reconciler, retaken))
         val settled = batch.settle?.let { settle(it) }
         val copied = if (batch.reconciliationCopies.isEmpty()) emptyList() else copyToRealAccounts(batch.reconciliationCopies)
 
@@ -820,10 +831,10 @@ class ImportEngineImpl(
 
     /**
      * What a [CsvImportMutation.Reserve] or an [ApiSessionMutation.Reserve] keeps (#1430, #1429). Of [vacating] (the deletes no other source still observes), each a
-     * reserved observation is on keeps its observations, pointing at an id with no row, for the re-run to take back. A
+     * reserved observation is on keeps its observations and its row (#1510), vacant until the re-run takes it back. A
      * reserved observation on a transaction that keeps its row (one the file shared with another source) stays reserved on
      * it too, so the record says it again there and a person's edits of it hold (#1432): the settle deletes it if the record
-     * doesn't. Ids a previous, stopped re-run left vacant stay.
+     * doesn't. Ids a previous, stopped re-run left vacant stay vacant.
      */
     private suspend fun reserveVacated(
         batch: ImportBatch,
@@ -836,7 +847,6 @@ class ImportEngineImpl(
             return ReservedTransactions()
         }
         val vacatingIds = vacating.toSet()
-        val alreadyVacant = observations.getVacantReserved().mapTo(mutableSetOf()) { it.id }
         // An observation a person pinned or split stays reserved for its record to take back: deleting it would drop the
         // decision with it. So does a copy (#1475): the settle books it again from what its record says now.
         val decided =
@@ -852,12 +862,10 @@ class ImportEngineImpl(
             reserved
                 .asSequence()
                 .filter { it.id in decided || it.isCopy() }
-                .filter { it.id !in alreadyVacant && it.transactionId !in vacatingIds }
+                .filter { it.transactionId !in vacatingIds }
                 .map { it.transactionId }
                 .toSet()
                 .filterTo(mutableSetOf()) { id -> observations.getObservationsOfTransaction(id).all { it.id in reservedIds } }
-        transactionRepository.deleteTransactions(decidedAlone.filterIsInstance<TransferId>())
-        tradeRepository.deleteTrades(decidedAlone.filterIsInstance<TradeId>())
         val kept =
             reserved
                 .filter { it.transactionId in vacatingIds || it.transactionId in decidedAlone }
@@ -871,6 +879,8 @@ class ImportEngineImpl(
                 .mapNotNull { (id, contents) ->
                     Materializer.merge(contents, placeholderTypeId)?.let { id to it }
                 }.toMap()
+        // What its import related them to waits with them, for the re-run to say again (#1510).
+        relationshipRepository?.reserveImportMadeOf(kept)
         return ReservedTransactions(kept, priorMerges)
     }
 
@@ -884,8 +894,17 @@ class ImportEngineImpl(
         val observations = observationRepository ?: return MaterializationReport()
         val recopied = recopy(reserved)
         val remaining = reserved.ids - recopied.ids
-        val vacant = remaining - observations.getMaterializedIds(remaining)
+        // What no record took back still stands as it was before the re-run (#1510): it goes now, and what it was
+        // reconciled with is rebuilt, as a fresh import of the others has it.
+        val vacant = remaining.intersect(observations.getVacantTransactionIds())
+        val partners = reconciledPartnersOf(vacant.toList(), emptySet())
+        vacant.filterIsInstance<TransferId>().chunked(DELETE_CHUNK_ROWS).forEach { transactionRepository.deleteTransactions(it) }
+        vacant.filterIsInstance<TradeId>().chunked(DELETE_CHUNK_ROWS).forEach { tradeRepository.deleteTrades(it) }
+        relationshipRepository?.deleteReserved()
         observations.releaseTransactions(vacant)
+        val reconciled =
+            observations.getObservationsOfTransactions(partners - vacant).mapTo(mutableSetOf()) { it.transactionId }
+        if (reconciled.isNotEmpty()) materialize(emptyList(), MaterializationRequest(Source.Reconciler, reconciled))
         val pending = observations.getReserved()
         val shared =
             observations.getMaterializedIds(
@@ -1193,6 +1212,9 @@ class ImportEngineImpl(
         private var vacantGroups: MutableMap<Pair<ObservationOwner, String>, VacantObservation>? = null
         private val claimedIds = mutableSetOf<TransactionId>()
 
+        // The kept transactions this run took back, which the materializer brings to everything their observations say.
+        val claimed: Set<TransactionId> get() = claimedIds.toSet()
+
         /**
          * The id a re-run reserved for [key]'s slot, when its record said it before and nothing took it back yet: a new
          * [kind] booking for it goes in under that id, so what a person decided about it still applies. Each id goes once.
@@ -1236,6 +1258,35 @@ class ImportEngineImpl(
             pool.remove(owner to key.slot)
             // Several slots can observe the same transaction, and batched writes claim IDs before inserting any rows.
             return id.takeIf { claimedIds.add(it) }
+        }
+
+        // Reserved record slots on transactions a re-run kept because other records still observe them (#1510).
+        private var sharedRecords: Map<Pair<ObservationOwner, String>, TransactionId>? = null
+
+        /**
+         * The transaction [key]'s record observed before that other records observe too, when a re-run reserved its slot: a
+         * [kind] booking for it joins that transaction rather than booking a twin the match sync would fold back into it.
+         */
+        suspend fun joined(
+            key: ObservationKey?,
+            kind: TransactionKind,
+        ): TransactionId? {
+            val recordKey = (key?.owner as? ObservationOwnerKey.Record)?.key ?: return null
+            val repository = records ?: return null
+            val recordId = recordsOf(recordKey, repository)[recordKey] ?: return null
+            val shared =
+                sharedRecords ?: run {
+                    val vacant = observations.getVacantTransactionIds()
+                    observations
+                        .getReserved()
+                        .filter { it.owner is ObservationOwner.Record && it.transactionId !in vacant }
+                        .associate { (it.owner to it.slot) to it.transactionId }
+                        .also { sharedRecords = it }
+                }
+            val id = shared[ObservationOwner.Record(recordId) to key.slot] ?: return null
+            if ((id is TransferId) != (kind == TransactionKind.TRANSFER)) return null
+            claimedIds += id
+            return id
         }
 
         fun transferContent(
@@ -1323,11 +1374,18 @@ class ImportEngineImpl(
             return observed
         }
 
-        // A duplicate can say its own still-vacant id again. Matching later decides whether the two are one.
+        // A duplicate can say its own still-vacant id again, unless another slot of this run already took it back. Matching
+        // later decides whether the two are one.
         private suspend fun reclaimTarget(
             existing: Observation,
             target: TransactionId,
-        ): TransactionId = existing.transactionId.takeIf { it != target && observations.getMaterialized(it) == null } ?: target
+        ): TransactionId = existing.transactionId.takeIf { it != target && isVacant(it) && claimedIds.add(it) } ?: target
+
+        // Vacant: every observation of it is reserved, so nothing but this re-run's records says it any more (#1510).
+        private suspend fun isVacant(id: TransactionId): Boolean {
+            val all = observations.getObservationsOfTransaction(id).map { it.id }
+            return observations.getReservedIds(all).size == all.size
+        }
 
         /**
          * Records [content] for [key] (null: a trade no record backs) on [transactionId], when [provenance] says whose, and
@@ -1616,6 +1674,8 @@ class ImportEngineImpl(
         val orderedRowOutcomes: List<RowOutcome>,
         /** The existing transactions this batch's duplicate rows now also observe, which their merge must take in. */
         val observedDuplicates: Set<TransactionId> = emptySet(),
+        /** The kept transactions a re-run took back (#1510). */
+        val retaken: Set<TransactionId> = emptySet(),
     )
 
     /**
@@ -1659,8 +1719,11 @@ class ImportEngineImpl(
 
         onProgress?.invoke(Progress("Detecting duplicates"))
         val calendars = settlementCalendars(batch.dedupePolicy)
-        val existing = loadExisting(resolvedTransfers, batch, calendars)
-        val existingRelationships = existingRelationships(existing)
+        // A re-run's vacated rows stand for what it is re-booking, so it books them afresh rather than matching them (#1510).
+        val vacant = observationRepository?.getVacantTransactionIds().orEmpty()
+        val existing = loadExisting(resolvedTransfers, batch, calendars).filterNot { it.transferId in vacant }
+        val existingRelationships =
+            existingRelationships(existing).filterNot { relationship -> relationship.members.any { it.transactionId in vacant } }
         val onward = passThroughOnward(existing, existingRelationships)
         val classified = ImportDeduper(batch.dedupePolicy, existing, ownSourceLegs(resolvedTransfers, existing)).classify(resolvedTransfers)
 
@@ -1681,7 +1744,10 @@ class ImportEngineImpl(
             }
         val createdLegs = mutableListOf<Pair<ExpandedTransfer, TransferId>>()
         val observer = sourceObservations()
-        val createdIds = writeTransfers(toImport, toUpdate, batchSize, onProgress, engineOwnedTypeId, createdLegs, observer)
+        // A re-run's row that still says its reserved transaction is recorded as its observation and brought to the merge of every
+        // record on it below (#1510): writing what this row alone says first would rewrite a twin only to write it back.
+        val directUpdates = if (observer == null) toUpdate else toUpdate.filterNot { observer.isReserved(it.transfer.observationKey()) }
+        val createdIds = writeTransfers(toImport, directUpdates, batchSize, onProgress, engineOwnedTypeId, createdLegs, observer)
         if (observer != null) {
             if (createdLegs.isNotEmpty()) onProgress?.invoke(Progress("Recording observations"))
             val approximate =
@@ -1729,6 +1795,7 @@ class ImportEngineImpl(
             rowOutcomes = rowOutcomes,
             orderedRowOutcomes = orderedRowOutcomes,
             observedDuplicates = observedDuplicates,
+            retaken = observer?.claimed.orEmpty(),
         )
     }
 
@@ -2685,7 +2752,10 @@ class ImportEngineImpl(
      * by the policy's tolerance, mirroring [loadExisting]'s slack: an existing trade stamped just
      * outside the batch's own span is exactly the one a second-vs-millisecond disagreement produces.
      */
-    private suspend fun buildTradeReconciler(batch: ImportBatch): TradeReconciler? {
+    private suspend fun buildTradeReconciler(
+        batch: ImportBatch,
+        vacant: Set<TransactionId>,
+    ): TradeReconciler? {
         val policy = batch.tradeDedupePolicy as? TradeDedupePolicy.Fuzzy ?: return null
         val creates = batch.trades.creates().filter { it.timestamp != null }
         if (creates.isEmpty()) return null
@@ -2693,7 +2763,7 @@ class ImportEngineImpl(
         if (accountIds.isEmpty()) return null
         val minTs = creates.minOf { requireNotNull(it.timestamp) } - policy.window
         val maxTs = creates.maxOf { requireNotNull(it.timestamp) } + policy.window
-        val existing = tradeRepository.getTradesByAccountsAndDateRange(accountIds, minTs, maxTs)
+        val existing = tradeRepository.getTradesByAccountsAndDateRange(accountIds, minTs, maxTs).filterNot { it.id in vacant }
         return if (existing.isEmpty()) null else TradeReconciler(policy, existing)
     }
 
@@ -2711,6 +2781,7 @@ class ImportEngineImpl(
     private suspend fun buildConversionTradeReconciler(
         batch: ImportBatch,
         orderLinkedTradeKeys: Set<LocalTradeKey>,
+        vacant: Set<TransactionId>,
     ): ConversionTradeReconciler? {
         val policy = batch.tradeDedupePolicy as? TradeDedupePolicy.Fuzzy ?: return null
         val typeName = policy.conversionRelationshipTypeName ?: return null
@@ -2732,6 +2803,7 @@ class ImportEngineImpl(
                 // A conversion's debit leg is the one the asset LEFT the owner account on; the credit
                 // leg runs the other way and is matched through the relationship, never directly.
                 .filter { it.sourceAccountId in accountIds }
+                .filterNot { it.id in vacant }
         if (candidates.isEmpty()) return null
 
         val creditIdByDebitId =
@@ -3095,9 +3167,16 @@ class ImportEngineImpl(
             val payload = buildCreatePayload(chunk, priorIds)
             // A leg whose record a re-run reserved an id for goes back in under it (#1430).
             val reusedIds = mutableMapOf<TransferId, TransferId>()
+            val joinedIds = mutableMapOf<TransferId, TransferId>()
             if (observer != null) {
                 chunk.flatMap { it.legs }.forEachIndexed { i, leg ->
-                    (observer.reuse(leg.key, TransactionKind.TRANSFER) as TransferId?)?.let { reusedIds[payload.transfers[i].id] = it }
+                    val placeholder = payload.transfers[i].id
+                    val reused = observer.reuse(leg.key, TransactionKind.TRANSFER) as TransferId?
+                    if (reused != null) {
+                        reusedIds[placeholder] = reused
+                    } else {
+                        (observer.joined(leg.key, TransactionKind.TRANSFER) as TransferId?)?.let { joinedIds[placeholder] = it }
+                    }
                 }
             }
             // Updates ride with the final create chunk (one transaction in the common single-chunk case).
@@ -3112,6 +3191,7 @@ class ImportEngineImpl(
                     updates = updates,
                     updateSources = updateSources,
                     reusedIds = reusedIds,
+                    joinedIds = joinedIds,
                 )
             // Keep only the main transfers' ids (fee transfers are interleaved), aligned to [toImport].
             createdIds += payload.mainResultIndices.map { allCreatedIds[it] }

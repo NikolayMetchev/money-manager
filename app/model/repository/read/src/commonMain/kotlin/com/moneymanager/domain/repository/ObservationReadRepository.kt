@@ -59,14 +59,17 @@ interface ObservationReadRepository {
     suspend fun getAccountsWithObservations(accountIds: Collection<AccountId>): Set<AccountId>
 
     /**
-     * The observations a re-run reserved (#1430) whose transaction has no row yet: the ids its records may take back.
-     * Reservations only exist while a re-run is under way.
+     * The observations a re-run reserved (#1430) on a transaction nothing else says: the ids its records may take back. The
+     * transaction's row stays as it was until the re-run settles (#1510). Reservations only exist while a re-run is under way.
      */
     suspend fun getVacantReserved(): List<VacantObservation>
 
     suspend fun getVacantReservedRecords(recordIds: Collection<ImportRecordId>): List<VacantObservation>
 
     suspend fun getVacantReservedGroups(): List<VacantObservation>
+
+    /** The transactions every observation of which a re-run reserved (#1510): what its own dedupe and matching don't see. */
+    suspend fun getVacantTransactionIds(): Set<TransactionId>
 
     /** Every observation still reserved, vacant or not: what settling a re-run resolves. */
     suspend fun getReserved(): List<Observation>

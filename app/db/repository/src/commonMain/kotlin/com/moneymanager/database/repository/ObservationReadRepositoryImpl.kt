@@ -223,6 +223,12 @@ class ObservationReadRepositoryImpl(
     override suspend fun getVacantReservedGroups(): List<VacantObservation> =
         queries.selectVacantReservedGroups(::vacantObservation).awaitAsList()
 
+    override suspend fun getVacantTransactionIds(): Set<TransactionId> =
+        queries
+            .selectVacantTransactionIds { id, kind -> storedTransactionId(id, kind) }
+            .awaitAsList()
+            .toSet()
+
     override suspend fun getReserved(): List<Observation> = load(queries.selectReserved(::Header).awaitAsList())
 
     override suspend fun isReserved(id: ObservationId): Boolean = queries.isReserved(id.id).awaitAsOne() > 0

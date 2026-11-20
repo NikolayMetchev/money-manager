@@ -272,15 +272,16 @@ WHERE observation_id IN (
   SELECT observation_id FROM trade_observation WHERE from_account_id IN :accountIds OR to_account_id IN :accountIds
 );
 
--- The reserved observations whose transaction has no row yet (#1430): the ids a re-run's rows may take back, by the
--- owner and slot that said them. Reservations only exist while a re-run is under way.
+-- The reserved observations whose transaction nothing else says (#1430, #1510): the transaction stands vacant, its row kept
+-- as it was while a re-run is under way, and the re-run's records may take its id back, by the owner and slot that said it.
+-- Reservations only exist while a re-run is under way.
 selectVacantReserved:
 SELECT observation.id, observation.transaction_id, observation.kind, observation_owner.owner_kind, observation_owner.owner_id, observation_owner.slot
 FROM observation_reserved
 JOIN observation ON observation.id = observation_reserved.observation_id
 JOIN observation_owner ON observation_owner.observation_id = observation.id
-WHERE NOT EXISTS (SELECT 1 FROM transfer WHERE transfer.id = observation.transaction_id)
-  AND NOT EXISTS (SELECT 1 FROM trade WHERE trade.id = observation.transaction_id)
+WHERE NOT EXISTS (SELECT 1 FROM observation other WHERE other.transaction_id = observation.transaction_id
+                AND other.id NOT IN (SELECT observation_id FROM observation_reserved))
 ORDER BY observation.id;
 
 selectVacantReservedRecords:
@@ -289,16 +290,16 @@ FROM observation_record
 JOIN observation_reserved USING (observation_id)
 JOIN observation ON observation.id = observation_record.observation_id
 WHERE observation_record.record_id IN ?
-  AND NOT EXISTS (SELECT 1 FROM transfer WHERE transfer.id = observation.transaction_id)
-  AND NOT EXISTS (SELECT 1 FROM trade WHERE trade.id = observation.transaction_id);
+  AND NOT EXISTS (SELECT 1 FROM observation other WHERE other.transaction_id = observation.transaction_id
+                  AND other.id NOT IN (SELECT observation_id FROM observation_reserved));
 
 selectVacantReservedGroups:
 SELECT observation.id, observation.transaction_id, observation.kind, 'GROUP', observation_group.group_id, observation_group.slot
 FROM observation_group
 JOIN observation_reserved USING (observation_id)
 JOIN observation ON observation.id = observation_group.observation_id
-WHERE NOT EXISTS (SELECT 1 FROM transfer WHERE transfer.id = observation.transaction_id)
-  AND NOT EXISTS (SELECT 1 FROM trade WHERE trade.id = observation.transaction_id);
+WHERE NOT EXISTS (SELECT 1 FROM observation other WHERE other.transaction_id = observation.transaction_id
+                AND other.id NOT IN (SELECT observation_id FROM observation_reserved));
 
 -- Every observation still reserved, with its transaction: what settling a re-run resolves.
 selectReserved:
@@ -310,3 +311,6 @@ ORDER BY observation.id;
 
 isReserved:
 SELECT COUNT(*) FROM observation_reserved WHERE observation_id = ?;
+
+selectVacantTransactionIds:
+SELECT transaction_id, kind FROM vacant_transaction;

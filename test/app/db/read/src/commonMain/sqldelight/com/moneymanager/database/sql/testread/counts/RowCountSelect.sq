@@ -67,3 +67,10 @@ SELECT 'transfer_attribute_audit' AS table_name, COUNT(*) AS row_count FROM tran
 UNION ALL
 SELECT 'transfer_audit' AS table_name, COUNT(*) AS row_count FROM transfer_audit
 ;
+
+maxAccountAuditId:
+SELECT COALESCE(MAX(id), 0) FROM account_audit;
+
+-- The accounts audited after [after] that still exist: what a run left changed rather than created and removed again.
+selectSurvivingAccountsAuditedAfter:
+SELECT DISTINCT account_id FROM account_audit WHERE id > :after AND account_id IN (SELECT id FROM account);

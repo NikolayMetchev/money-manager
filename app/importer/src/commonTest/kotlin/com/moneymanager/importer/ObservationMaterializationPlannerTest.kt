@@ -172,6 +172,8 @@ class ObservationMaterializationPlannerTest {
 
         override suspend fun getVacantReservedGroups(): Nothing = error("Unexpected group reservation lookup")
 
+        override suspend fun getVacantTransactionIds(): Nothing = error("Unexpected vacancy lookup")
+
         override suspend fun getMaterializedIds(transactionIds: Collection<TransactionId>): Nothing =
             error("Unexpected row lookup: $transactionIds")
 

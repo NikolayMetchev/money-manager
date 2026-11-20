@@ -67,6 +67,40 @@ class TradeWriteRepositoryImpl(
                     occurrence = trade.occurrence.toLong(),
                 ).awaitAsOneOrNull()
         if (existing != null) return TradeCreateResult(TradeId(existing), created = false)
+        // A re-run takes back the trade it kept standing (#1510), writing only what changed.
+        trade.reuseId?.let { reused ->
+            val current = selectQueries.selectByIds(listOf(reused.id)).awaitAsOneOrNull() ?: return@let
+            val unchanged =
+                current.timestamp == timestamp &&
+                    current.description == trade.description &&
+                    current.from_account_id == trade.fromAccountId.id &&
+                    current.from_asset_id == trade.fromAmount.asset.id.id &&
+                    current.from_amount == trade.fromAmount.amount.toString() &&
+                    current.to_account_id == trade.toAccountId.id &&
+                    current.to_asset_id == trade.toAmount.asset.id.id &&
+                    current.to_amount == trade.toAmount.amount.toString()
+            if (!unchanged) {
+                writeQueries.update(
+                    timestamp = timestamp,
+                    description = trade.description,
+                    from_account_id = trade.fromAccountId.id,
+                    from_asset_id = trade.fromAmount.asset.id.id,
+                    from_amount = trade.fromAmount.amount.toString(),
+                    to_account_id = trade.toAccountId.id,
+                    to_asset_id = trade.toAmount.asset.id.id,
+                    to_amount = trade.toAmount.amount.toString(),
+                    id = reused.id,
+                )
+                database.recordSource(
+                    deviceId,
+                    EntityType.TRADE,
+                    reused.id,
+                    selectQueries.selectRevision(reused.id).awaitAsOne(),
+                    trade.source,
+                )
+            }
+            return TradeCreateResult(reused, created = true)
+        }
         // Allocate a transaction id (insert + last_insert_rowid must share a connection), unless a re-run reserved one.
         val id =
             trade.reuseId?.id ?: run {
