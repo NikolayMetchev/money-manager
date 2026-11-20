@@ -380,9 +380,11 @@ class SourceRerunE2ETest : DbTest() {
                 onProgress = { progress += it },
             )
 
-            // Setting aside, preparing, re-importing, matching, settling and finishing each fill the bar from empty, in that order.
+            // Checking, setting aside, preparing, re-importing, matching, settling and finishing each fill the bar from empty, in that
+            // order.
             assertEquals(
                 listOf(
+                    "Checking what changed",
                     "Setting aside what the files created",
                     "Preparing files",
                     "Re-importing files",
@@ -392,12 +394,13 @@ class SourceRerunE2ETest : DbTest() {
                 ),
                 progress.mapNotNull { it.phase }.map { it.name }.distinct(),
             )
-            assertTrue(progress.all { it.phase?.count == RerunPhases.COUNT }, "every emission names its phase of six: $progress")
+            assertTrue(progress.all { it.phase?.count == RerunPhases.COUNT }, "every emission names its phase of seven: $progress")
             (1..RerunPhases.COUNT).forEach { number ->
                 val phase = progress.filter { it.phase?.number == number }
                 assertProgressesTo(phase)
                 assertEquals(1f, phase.last().fraction, "phase $number fills the bar: $phase")
             }
+            assertProgressesTo(progress.filter { it.phase == RerunPhases.CHECKING }, "2 of 2 files changed")
             assertProgressesTo(progress.filter { it.phase == RerunPhases.SETTING_ASIDE }, "Set aside 2 transactions and 0 trades")
             val files = progress.filter { it.phase == RerunPhases.REIMPORTING }
             assertEquals(0f, files.first().fraction, "the files start the bar again: $files")

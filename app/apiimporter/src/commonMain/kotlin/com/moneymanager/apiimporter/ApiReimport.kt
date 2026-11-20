@@ -13,6 +13,7 @@ import com.moneymanager.importengineapi.ApiSessionMutation
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportPlan
+import com.moneymanager.importengineapi.RerunPhases
 import com.moneymanager.importengineapi.RerunReads
 import com.moneymanager.importengineapi.SourceRerunPlan
 import com.moneymanager.importengineapi.SourceRerunResult
@@ -76,7 +77,12 @@ suspend fun executeApiReimport(
     require((plan.source as? Source.Api)?.sessionId == session.id) {
         "plan is for ${plan.source} but executeApiReimport was called with session ${session.id}"
     }
-    if (isApiSessionUnchanged(session, strategy, apiReads, counterpartyAccountNames, passThroughAccounts)) {
+    // The re-run's phases each fill the bar from empty; this view has one bar for all of them.
+    val bar = onProgress?.let { foldPhases(it) }
+    bar?.invoke(Progress("Checking whether the session changed", fraction = 0f, phase = RerunPhases.CHECKING))
+    val unchanged = isApiSessionUnchanged(session, strategy, apiReads, counterpartyAccountNames, passThroughAccounts)
+    bar?.invoke(Progress(if (unchanged) "Nothing changed" else "The session changed", fraction = 1f, phase = RerunPhases.CHECKING))
+    if (unchanged) {
         return SourceRerunResult(
             rerun = ApiRerunCounts(transactionsImported = 0, tradesImported = 0),
             deletedTransfers = 0,
@@ -85,8 +91,6 @@ suspend fun executeApiReimport(
         )
     }
     val importStartedAt = Clock.System.now()
-    // The re-run's phases each fill the bar from empty; this view has one bar for all of them.
-    val bar = onProgress?.let { foldPhases(it) }
     return importEngine.executeSourceRerun(
         plan = plan,
         resetRecords =

@@ -292,15 +292,17 @@ private fun settingAside(step: Progress): Progress? {
 fun Progress.inPhase(phase: Progress.Phase): Progress? = takeIf { it.fraction != null }?.copy(phase = phase)
 
 /**
- * A re-run's phases, each filling the bar from empty: [executeRerun] reports setting aside, settling and finishing, and its
- * run the three between (a run that has none of its own is all [REIMPORTING]).
+ * A re-run's phases, each filling the bar from empty: its caller first checks which sources changed ([CHECKING]),
+ * [executeRerun] reports setting aside, settling and finishing, and its run the three between (a run that has none of its own
+ * is all [REIMPORTING]).
  */
 object RerunPhases {
-    const val COUNT = 6
-    val SETTING_ASIDE = Progress.Phase(1, COUNT, "Setting aside what the files created")
-    val PREPARING = Progress.Phase(2, COUNT, "Preparing files")
-    val REIMPORTING = Progress.Phase(3, COUNT, "Re-importing files")
-    val MATCHING = Progress.Phase(4, COUNT, "Matching records across sources")
-    val SETTLING = Progress.Phase(5, COUNT, "Settling the transactions the files kept")
-    val FINISHING = Progress.Phase(6, COUNT, "Finishing")
+    const val COUNT = 7
+    val CHECKING = Progress.Phase(1, COUNT, "Checking what changed")
+    val SETTING_ASIDE = Progress.Phase(2, COUNT, "Setting aside what the files created")
+    val PREPARING = Progress.Phase(3, COUNT, "Preparing files")
+    val REIMPORTING = Progress.Phase(4, COUNT, "Re-importing files")
+    val MATCHING = Progress.Phase(5, COUNT, "Matching records across sources")
+    val SETTLING = Progress.Phase(6, COUNT, "Settling the transactions the files kept")
+    val FINISHING = Progress.Phase(7, COUNT, "Finishing")
 }

@@ -6,10 +6,12 @@ import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.CryptoReadRepository
@@ -177,7 +179,10 @@ class Reimports(
         onProgress: suspend (Progress) -> Unit,
         fileLabel: (CsvImport) -> String = { it.originalFileName },
         stopRequested: () -> Boolean = { false },
-    ): BulkReimportResult = writeLock.withLock { reimportAllLocked(plan, accountId, currencyId, onProgress, fileLabel, stopRequested) }
+    ): BulkReimportResult {
+        if (writeLock.isLocked) onProgress(Progress("Waiting for another import to finish", phase = RerunPhases.CHECKING))
+        return writeLock.withLock { reimportAllLocked(plan, accountId, currencyId, onProgress, fileLabel, stopRequested) }
+    }
 
     /**
      * Plans [files]' re-import ([planAll]) and refuses it now if any file can't be imported again ([checkReimportable]),
@@ -223,8 +228,7 @@ class Reimports(
         val picked = plan.runFiles()
         checkReimportable(plan, accountId, currencyId)
         val skipped = plan.files.count { it.rowCount > 0 && plan.strategies[it.source] == null && it !in picked }
-        // A file nothing it reads changed would book what it booked: it is left out of the run, so it writes nothing.
-        val unchanged = picked.filter { isUnchanged(it, plan, accountId, currencyId) }.toSet()
+        val unchanged = unchangedFiles(picked, plan, accountId, currencyId, onProgress, fileLabel)
         val run = picked - unchanged
         val rerunFiles = plan.rerunFiles.filter { rerun -> run.any { it.source == rerun.file } }
         if (picked.isNotEmpty() && run.isEmpty()) {
@@ -237,8 +241,8 @@ class Reimports(
                 filesUnchanged = unchanged.size,
             )
         }
-        // The re-run's six phases (RerunPhases), each filling the bar from empty: runBulkReimport's two (preparing the files,
-        // re-importing them) are the second and third. After the last file each step keeps its files and rows lines.
+        // The re-run's phases (RerunPhases), each filling the bar from empty: runBulkReimport's two (preparing the files,
+        // re-importing them) are the third and fourth. After the last file each step keeps its files and rows lines.
         var lastFileProgress: Progress? = null
         val onFileProgress: suspend (Progress) -> Unit = { inner ->
             val shifted = inner.copy(phase = inner.phase?.let { if (it.number == 1) RerunPhases.PREPARING else RerunPhases.REIMPORTING })
@@ -393,16 +397,81 @@ class Reimports(
         )
 
     /**
+     * The files of [picked] that nothing they read changed: they would book what they booked, so they are left out of the
+     * run and write nothing. Reported as [RerunPhases.CHECKING], a step per file, since comparing every row of a large
+     * import takes a while.
+     */
+    @Suppress("LongParameterList")
+    private suspend fun unchangedFiles(
+        picked: List<CsvImport>,
+        plan: ReimportAllPlan,
+        accountId: AccountId?,
+        currencyId: CurrencyId?,
+        onProgress: suspend (Progress) -> Unit,
+        fileLabel: (CsvImport) -> String,
+    ): Set<CsvImport> {
+        val count = picked.size
+        onProgress(Progress("Reading the mappings, aliases and accounts the files read", fraction = 0f, phase = RerunPhases.CHECKING))
+        // Without import records nothing can be compared: every file runs.
+        val records = importRecords
+        val inputs =
+            records?.let {
+                SharedInputs(
+                    mappings = accountMappingRepository.getAllMappings().first(),
+                    assetAliases = cryptoRepository.assetAliasMap(),
+                    attributeAccountMatchers = AttributeAccountMatcher.registry(accountAttributeRepository.getAll().first()),
+                    passThroughAccounts = passThroughAccountRepository.getAll().first(),
+                )
+            }
+        val unchanged = mutableSetOf<CsvImport>()
+        picked.forEachIndexed { index, file ->
+            val name = fileLabel(file)
+            onProgress(
+                Progress(
+                    detail = "Comparing the ${file.rowCount} rows of $name with what they booked",
+                    fraction = index.toFloat() / count,
+                    processed = index,
+                    total = count,
+                    item = Progress.Item(done = index, count = count, noun = "file", name = name, step = "Comparing its rows"),
+                    phase = RerunPhases.CHECKING,
+                ),
+            )
+            if (records != null && inputs != null && isUnchanged(file, plan, accountId, currencyId, records, inputs)) unchanged += file
+        }
+        val changed = count - unchanged.size
+        onProgress(
+            Progress(
+                detail = "$changed of $count file${if (count == 1) "" else "s"} changed",
+                fraction = 1f,
+                processed = count,
+                total = count,
+                phase = RerunPhases.CHECKING,
+            ),
+        )
+        return unchanged
+    }
+
+    /** What every file's [stagedInputsHash] reads besides its own strategy and account, read once per run. */
+    private class SharedInputs(
+        val mappings: List<AccountMapping>,
+        val assetAliases: Map<String, String>,
+        val attributeAccountMatchers: Map<String, AttributeAccountMatcher>,
+        val passThroughAccounts: List<PassThroughAccount>,
+    )
+
+    /**
      * Whether re-importing [file] as [plan] would run it would change nothing: its rows and every input its import
      * reads ([stagedInputsHash]) hash to what its import records hold. A file without records always runs.
      */
+    @Suppress("LongParameterList")
     private suspend fun isUnchanged(
         file: CsvImport,
         plan: ReimportAllPlan,
         accountId: AccountId?,
         currencyId: CurrencyId?,
+        records: ImportRecordReadRepository,
+        inputs: SharedInputs,
     ): Boolean {
-        val records = importRecords ?: return false
         val strategy = plan.strategies[file.source] ?: return false
         val imported = plan.imported.getValue(file.source)
         val settings = ImportedSettings(imported.accountId ?: accountId, imported.currencyId ?: currencyId)
@@ -411,10 +480,10 @@ class Reimports(
             stagedInputsHash(
                 strategy = effective,
                 sourceAccount = effectiveSourceFor(effective, settings.accountId),
-                mappings = accountMappingRepository.getAllMappings().first(),
-                assetAliases = cryptoRepository.assetAliasMap(),
-                attributeAccountMatchers = AttributeAccountMatcher.registry(accountAttributeRepository.getAll().first()),
-                passThroughAccounts = passThroughAccountRepository.getAll().first(),
+                mappings = inputs.mappings,
+                assetAliases = inputs.assetAliases,
+                attributeAccountMatchers = inputs.attributeAccountMatchers,
+                passThroughAccounts = inputs.passThroughAccounts,
             )
         val rows = reads.csvImportRepository.getImportRows(file.id, limit = file.rowCount.coerceAtLeast(1), offset = 0)
         return isUnchanged(file, rows, records.getCsvImportRecords(file.id), inputsHash)
