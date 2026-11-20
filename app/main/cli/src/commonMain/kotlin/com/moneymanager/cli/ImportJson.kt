@@ -229,6 +229,7 @@ private fun ApiCredentialDownload.toJson(): ConnectionDownloadJson {
                 error != null -> "failed"
                 outcome is ApiDownloadOutcome.Downloaded -> ConnectionDownloadJson.DOWNLOADED
                 outcome is ApiDownloadOutcome.NotDownloaded -> "notDownloaded"
+                outcome is ApiDownloadOutcome.AuthFailed -> "tokenExpired"
                 else -> "busy"
             },
         sessionId = (outcome as? ApiDownloadOutcome.Downloaded)?.sessionId?.id,

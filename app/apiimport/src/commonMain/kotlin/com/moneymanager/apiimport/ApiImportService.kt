@@ -2,6 +2,7 @@ package com.moneymanager.apiimport
 
 import co.touchlab.kermit.Logger
 import com.moneymanager.apiimporter.API_ENGINE_BATCH_SIZE
+import com.moneymanager.apiimporter.ApiAuthException
 import com.moneymanager.apiimporter.ApiCounterpartySuggestion
 import com.moneymanager.apiimporter.ApiDownloadCredentials
 import com.moneymanager.apiimporter.ApiDownloadNotPossibleException
@@ -73,6 +74,22 @@ sealed interface ApiDownloadOutcome {
     data class NotDownloaded(
         override val message: String,
     ) : ApiDownloadOutcome
+
+    /**
+     * The provider rejected the saved access token (it expired or was revoked). A person creates a new one at
+     * [tokenPageUrl] (when the strategy names one) and saves it, following [connectInstructions].
+     */
+    data class AuthFailed(
+        val strategyName: String,
+        val tokenPageUrl: String?,
+        val connectInstructions: List<String>,
+        val detail: String,
+    ) : ApiDownloadOutcome {
+        override val message: String
+            get() =
+                "$strategyName rejected the saved access token (it has probably expired)." +
+                    (tokenPageUrl?.let { " Create a new one at $it and save it." } ?: " Create a new one and save it.")
+    }
 }
 
 /**
@@ -276,6 +293,14 @@ class ApiImportService(
                     onPhase = { task.report(it) },
                     onProgress = { task.report(it) },
                 )
+            } catch (rejected: ApiAuthException) {
+                logger.w { "Download for '${strategy.name}' (session #$sessionId) rejected the token: ${rejected.message}" }
+                return ApiDownloadOutcome.AuthFailed(
+                    strategyName = strategy.name,
+                    tokenPageUrl = strategy.config.tokenPageUrl,
+                    connectInstructions = strategy.config.connectInstructions,
+                    detail = rejected.message.orEmpty(),
+                )
             } catch (notPossible: ApiDownloadNotPossibleException) {
                 logger.w { "Download for '${strategy.name}' (session #$sessionId) not possible: ${notPossible.message}" }
                 return ApiDownloadOutcome.NotDownloaded(notPossible.message)
@@ -464,6 +489,10 @@ class ApiImportService(
         when {
             error != null -> {
                 task.reportIssue("${strategyName ?: "Connection"}: download failed: $error")
+            }
+
+            outcome is ApiDownloadOutcome.AuthFailed -> {
+                task.reportIssue("${strategyName ?: "Connection"}: ${outcome.message}")
             }
 
             outcome is ApiDownloadOutcome.NotDownloaded -> {

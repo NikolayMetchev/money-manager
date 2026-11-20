@@ -199,6 +199,7 @@ and the materialized views are refreshed once at the end.
 - `connections`: `[{ id, strategy, status, sessionId, message }]`. `status` is one of:
   - `downloaded`;
   - `notDownloaded`: no strategy, no secrets in the vault, or blocked by region;
+  - `tokenExpired`: the provider rejected the saved access token (HTTP 401); create a new one at the strategy's token page and save it. Also listed in `needsAttention` with kind `tokenExpired`;
   - `failed`;
   - `busy`: already downloading elsewhere.
 - `sessions`: `[{ id, connectionId, strategy, status, accounts, transactions, people, duplicates, errors, error }]`.
@@ -215,6 +216,7 @@ and the materialized views are refreshed once at the end.
 | `reimportSuggested` | file name | re-importing it (its columns changed) |
 | `unassignedCard` | card reference | assigning it to an account (Imports → Reconciliation → Card Last-4) |
 | `counterparties` | `"<strategy> session #<id>"` | confirming the account names when importing the session in the app |
+| `tokenExpired` | strategy name | creating a new access token at the strategy's token page and saving it under the connection in the app |
 | `vaultLocked` | `"APIs"` | `import all` only: unlocking the vault (`--vault-password-stdin` or `MM_VAULT_PASSWORD`) |
 
 The exit code is `3` when anything needs attention or any folder, file, connection or session failed. The summary
