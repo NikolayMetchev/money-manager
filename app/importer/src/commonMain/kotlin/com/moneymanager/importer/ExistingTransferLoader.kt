@@ -394,23 +394,3 @@ internal class ExistingTransferLoader(
             minOf(reached.start, widened.start)..maxOf(reached.endInclusive, widened.endInclusive)
         }
 }
-
-/** Every window within which a rule of this policy pairs an incoming row with an existing leg. */
-internal fun DedupePolicy.windows(): List<SettlementWindow> =
-    when (this) {
-        is DedupePolicy.UniqueIdentifier -> {
-            listOfNotNull(reconcileWindow, unidentifiedCounterpartyWindow)
-        }
-
-        is DedupePolicy.ApiMultiKey -> {
-            listOfNotNull(reconcileWindow, unidentifiedCounterpartyWindow, internalTransferWindow)
-        }
-
-        is DedupePolicy.FuzzyAllFields -> {
-            listOfNotNull(SettlementWindow.Elapsed(dateTolerance.inWholeSeconds), reconcileWindow, unidentifiedCounterpartyWindow)
-        }
-
-        DedupePolicy.None -> {
-            emptyList()
-        }
-    }
