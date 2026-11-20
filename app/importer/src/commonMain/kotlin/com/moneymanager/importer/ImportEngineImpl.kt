@@ -6,24 +6,16 @@ import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CryptoId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Money
-import com.moneymanager.domain.model.NewAttribute
-import com.moneymanager.domain.model.NewRelationship
 import com.moneymanager.domain.model.Relationship
-import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Trade
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.TransactionKind
 import com.moneymanager.domain.model.Transfer
-import com.moneymanager.domain.model.TransferAttribute
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
-import com.moneymanager.domain.model.calendar.BusinessDayCalendar
 import com.moneymanager.domain.model.csv.ImportStatus
-import com.moneymanager.domain.model.observation.ObservedValues
-import com.moneymanager.domain.model.rules.SettlementWindow
-import com.moneymanager.domain.model.rules.widen
 import com.moneymanager.domain.model.withStatementAccount
 import com.moneymanager.domain.repository.write.AccountAttributeWriteRepository
 import com.moneymanager.domain.repository.write.AccountMappingWriteRepository
@@ -57,13 +49,11 @@ import com.moneymanager.domain.repository.write.TradeEdit
 import com.moneymanager.domain.repository.write.TradeWriteRepository
 import com.moneymanager.domain.repository.write.TransactionWriteRepository
 import com.moneymanager.domain.repository.write.TransferEdit
-import com.moneymanager.domain.repository.write.TransferUpdate
 import com.moneymanager.importengineapi.AccountMatchKey
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.AssetAliasMutation
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.EditGate
-import com.moneymanager.importengineapi.ExpandedRow
 import com.moneymanager.importengineapi.ExpandedTransfer
 import com.moneymanager.importengineapi.ExpansionRow
 import com.moneymanager.importengineapi.ImportBatch
@@ -73,8 +63,6 @@ import com.moneymanager.importengineapi.ImportResult
 import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTradeIntent
 import com.moneymanager.importengineapi.ImportTransfer
-import com.moneymanager.importengineapi.LegLink
-import com.moneymanager.importengineapi.LegLinkTarget
 import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.importengineapi.LocalCategoryKey
 import com.moneymanager.importengineapi.LocalCryptoKey
@@ -83,17 +71,14 @@ import com.moneymanager.importengineapi.LocalTradeKey
 import com.moneymanager.importengineapi.MaterializationReport
 import com.moneymanager.importengineapi.MaterializationRequest
 import com.moneymanager.importengineapi.ObservationExpander
-import com.moneymanager.importengineapi.ObservationKey
 import com.moneymanager.importengineapi.ObservationMutation
 import com.moneymanager.importengineapi.ObservationSlot
 import com.moneymanager.importengineapi.RelationshipMutation
 import com.moneymanager.importengineapi.RowOutcome
 import com.moneymanager.importengineapi.TradeDedupePolicy
 import com.moneymanager.importengineapi.WriteIntent
-import com.moneymanager.importengineapi.forRow
 import com.moneymanager.importengineapi.observationContent
 import com.moneymanager.importengineapi.observationKey
-import com.moneymanager.importengineapi.observationOwner
 import com.moneymanager.tasks.Progress
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -103,9 +88,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.Instant
-
-/** Upper bound on the legs walked along one pass-through chain; real chains are a few hops (card → Curve → PayPal → merchant). */
-private const val MAX_PASS_THROUGH_CHAIN_LEGS = 16
 
 internal val FEE_ACCOUNT_FOR_TYPE = AttributeTypeId(WellKnownIds.ACCOUNT_FEE_ACCOUNT_FOR_ATTR_TYPE_ID)
 
@@ -173,6 +155,21 @@ class ImportEngineImpl(
     private val handEdits = HandEdits(observationRepository, personOverrideRepository)
     private val accountResolver = AccountResolver(accountRepository, accountAttributeRepository)
     private val personResolver = PersonResolver(personRepository, personAttributeRepository, ownershipRepository)
+    private val transferWriter = TransferWriter(transactionRepository, relationshipTypeRepository, relationshipRepository)
+    private val existingTransfers =
+        ExistingTransferLoader(
+            transactionRepository,
+            accountAttributeRepository,
+            attributeTypeRepository,
+            csvImportRepository,
+            apiSessionRepository,
+            settingsRepository,
+            holidayCalendarRepository,
+            relationshipRepository,
+            observationRepository,
+            importRecordRepository,
+        )
+    private val reversalLinker = ReversalLinker(transactionRepository, relationshipTypeRepository)
     private val configMutations =
         ConfigMutationWriter(
             accountAttributeRepository,
@@ -653,7 +650,7 @@ class ImportEngineImpl(
     private suspend fun matchSync(): MatchSync {
         val observations = observationRepository
         val importRecords = importRecordRepository
-        val calendars = loadSettlementCalendars()
+        val calendars = existingTransfers.loadSettlementCalendars()
         return MatchSync(
             loader =
                 MatchScopeLoader(
@@ -882,16 +879,26 @@ class ImportEngineImpl(
             }
 
         onProgress?.invoke(Progress("Detecting duplicates"))
-        val calendars = settlementCalendars(batch.dedupePolicy)
+        val calendars = existingTransfers.settlementCalendars(batch.dedupePolicy)
         // A re-run's vacated rows stand for what it is re-booking, so it books them afresh rather than matching them (#1510).
         val vacant = observationRepository.getVacantTransactionIds()
-        val existing = loadExisting(resolvedTransfers, batch, calendars).filterNot { it.transferId in vacant }
+        val existing = existingTransfers.loadExisting(resolvedTransfers, batch, calendars).filterNot { it.transferId in vacant }
         val existingRelationships =
-            existingRelationships(existing).filterNot { relationship -> relationship.members.any { it.transactionId in vacant } }
-        val onward = passThroughOnward(existing, existingRelationships)
-        val classified = ImportDeduper(batch.dedupePolicy, existing, ownSourceLegs(resolvedTransfers, existing)).classify(resolvedTransfers)
+            existingTransfers.existingRelationships(existing).filterNot { relationship ->
+                relationship.members.any {
+                    it.transactionId in
+                        vacant
+                }
+            }
+        val onward = existingTransfers.passThroughOnward(existing, existingRelationships)
+        val classified =
+            ImportDeduper(
+                batch.dedupePolicy,
+                existing,
+                existingTransfers.ownSourceLegs(resolvedTransfers, existing),
+            ).classify(resolvedTransfers)
 
-        val toImport = resolveReversalLinks(classified.filter { it.status == ImportStatus.IMPORTED })
+        val toImport = reversalLinker.resolveReversalLinks(classified.filter { it.status == ImportStatus.IMPORTED })
         val toUpdate = classified.filter { it.status == ImportStatus.UPDATED }
         val duplicates = classified.count { it.status == ImportStatus.DUPLICATE }
         val excluded = resolvedTransfers.count { it.excludedFromBalances }
@@ -911,7 +918,16 @@ class ImportEngineImpl(
         // A re-run's row that still says its reserved transaction is recorded as its observation and brought to the merge of every
         // record on it below (#1510): writing what this row alone says first would rewrite a twin only to write it back.
         val directUpdates = toUpdate.filterNot { observer.isReserved(it.transfer.observationKey()) }
-        val createdIds = writeTransfers(toImport, directUpdates, batchSize, onProgress, engineOwnedTypeId, createdLegs, observer)
+        val createdIds =
+            transferWriter.writeTransfers(
+                toImport,
+                directUpdates,
+                batchSize,
+                onProgress,
+                engineOwnedTypeId,
+                createdLegs,
+                observer,
+            )
         if (createdLegs.isNotEmpty()) onProgress?.invoke(Progress("Recording observations"))
         val approximate =
             toImport.mapNotNullTo(mutableSetOf()) { c -> c.transfer.takeIf { it.approximateUntil != null }?.observationKey() }
@@ -1053,221 +1069,6 @@ class ImportEngineImpl(
     }
 
     /**
-     * Pairs each pass-through row's spend legs with the movements they reverse: per leg, the nearest
-     * not-yet-reversed spend leg running in the OPPOSITE direction between the same pair of chain
-     * accounts with the same amount, at or before the row's timestamp. An incoming refund thus links
-     * each of its legs to the original charge's corresponding leg, a subsequent "refund reversal"
-     * (outgoing again) links to the refund it undoes, and so on — each pair consumes one earlier leg (a
-     * leg is reversed at most once, enforced against the DB via the query's NOT EXISTS and within this
-     * batch via the claimed sets). Candidates come from the DB and from earlier rows in [toImport]; on
-     * a timestamp tie the in-batch leg wins (it is the later write). Legs without a match are imported
-     * unlinked.
-     */
-    private suspend fun resolveReversalLinks(toImport: List<Classified>): List<Classified> {
-        if (toImport.none { it.transfer.passThrough != null }) return toImport
-        val reversalTypeId = relationshipTypeRepository.getOrCreate(WellKnownIds.REVERSAL_RELATIONSHIP_TYPE_NAME)
-        val claimedExisting = mutableSetOf<TransferId>()
-        val claimedInBatch = mutableSetOf<LegKey>()
-        val batchSpendLegs = mutableListOf<BatchSpendLeg>()
-        val existingCandidates = loadReversalCandidates(toImport, reversalTypeId)
-        return toImport.mapIndexed { index, classified ->
-            val t = classified.transfer
-            val passThrough = t.passThrough ?: return@mapIndexed classified
-            // The chain's nodes: conduits (outermost first) then the merchant; leg i moves between
-            // nodes[i] and nodes[i+1] (reversed for an incoming refund).
-            val nodes = (passThrough.conduits + passThrough.merchantTarget).map { it.requireExistingId() }
-            val timestamp = requireNotNull(t.timestamp)
-            val amount = passThrough.amount
-
-            val links = mutableMapOf<Int, ReversalLink>()
-            for (legIndex in passThrough.conduits.indices) {
-                val spendSource = if (passThrough.incoming) nodes[legIndex + 1] else nodes[legIndex]
-                val spendTarget = if (passThrough.incoming) nodes[legIndex] else nodes[legIndex + 1]
-
-                // The reversed candidate runs the opposite way: its source/target are this leg's swapped.
-                val inBatchMatch =
-                    batchSpendLegs
-                        .filter { leg ->
-                            LegKey(leg.toImportIndex, leg.legIndex) !in claimedInBatch &&
-                                leg.source == spendTarget &&
-                                leg.target == spendSource &&
-                                leg.amount == amount &&
-                                leg.timestamp <= timestamp
-                        }.maxWithOrNull(compareBy({ it.timestamp }, { it.toImportIndex }))
-                val existingMatch =
-                    existingCandidates[ReversalCandidateKey(spendTarget, spendSource, amount)]
-                        ?.firstOrNull { it.timestamp <= timestamp && it.id !in claimedExisting }
-
-                val link =
-                    when {
-                        inBatchMatch != null && (existingMatch == null || existingMatch.timestamp <= inBatchMatch.timestamp) -> {
-                            claimedInBatch += LegKey(inBatchMatch.toImportIndex, inBatchMatch.legIndex)
-                            ReversalLink(ReversalTarget.BatchRow(inBatchMatch.toImportIndex, inBatchMatch.legIndex), reversalTypeId)
-                        }
-
-                        existingMatch != null -> {
-                            claimedExisting += existingMatch.id
-                            ReversalLink(ReversalTarget.Existing(existingMatch.id), reversalTypeId)
-                        }
-
-                        else -> {
-                            null
-                        }
-                    }
-                if (link != null) links[legIndex] = link
-                batchSpendLegs += BatchSpendLeg(index, legIndex, spendSource, spendTarget, amount, timestamp)
-            }
-            if (links.isEmpty()) classified else classified.copy(reversalLinks = links)
-        }
-    }
-
-    /**
-     * Loads the existing-DB reversal candidates for every pass-through spend leg of [toImport] in one
-     * query, grouped by directed (source, target, amount), newest first within each group. Every spend
-     * leg has at least one conduit endpoint, so bounding the query by the batch's conduit accounts (and
-     * the legs' amounts and max timestamp) covers all per-leg lookups; the currency check the old
-     * per-leg query did via asset_id happens here through the [Money] group key. The DB is not written
-     * while legs are resolved, so this snapshot is equivalent to querying per leg.
-     */
-    private suspend fun loadReversalCandidates(
-        toImport: List<Classified>,
-        reversalTypeId: RelationshipTypeId,
-    ): Map<ReversalCandidateKey, List<Transfer>> {
-        val conduitAccounts = mutableSetOf<AccountId>()
-        val amounts = mutableSetOf<Money>()
-        var maxTimestamp: Instant? = null
-        for (classified in toImport) {
-            val passThrough = classified.transfer.passThrough ?: continue
-            passThrough.conduits.forEach { conduitAccounts += it.requireExistingId() }
-            amounts += passThrough.amount
-            val timestamp = requireNotNull(classified.transfer.timestamp)
-            if (maxTimestamp == null || timestamp > maxTimestamp) maxTimestamp = timestamp
-        }
-        if (conduitAccounts.isEmpty() || maxTimestamp == null) return emptyMap()
-        return transactionRepository
-            .getUnreversedTransfersTouchingAccounts(conduitAccounts, amounts, maxTimestamp, reversalTypeId)
-            .groupBy { ReversalCandidateKey(it.sourceAccountId, it.targetAccountId, it.amount) }
-    }
-
-    /** Directed reversal-candidate lookup key: candidates running source → target of exactly amount. */
-    private data class ReversalCandidateKey(
-        val source: AccountId,
-        val target: AccountId,
-        val amount: Money,
-    )
-
-    /** Identifies one spend leg of one to-import row: (index into the to-import list, leg index). */
-    private data class LegKey(
-        val toImportIndex: Int,
-        val legIndex: Int,
-    )
-
-    /** A pass-through spend leg produced by an earlier row in the current to-import list. */
-    private class BatchSpendLeg(
-        val toImportIndex: Int,
-        val legIndex: Int,
-        val source: AccountId,
-        val target: AccountId,
-        val amount: Money,
-        val timestamp: Instant,
-    )
-
-    private fun AccountRef.requireExistingId(): AccountId =
-        when (this) {
-            is AccountRef.Existing -> id
-            is AccountRef.Local -> error("Unresolved account reference: $key")
-        }
-
-    // endregion
-
-    // region Transfers
-
-    /**
-     * Existing records of the batch's own source (see [ImportDeduper]'s `ownSourceLegs`): what its CSV files created on
-     * an earlier import, and the other lines of the statements it covers. An account books a movement once, on one
-     * date, so every export of its statements records it at that time; a record carrying the batch's unique identifier
-     * ([ExistingTransferInfo.uniqueKey]), booked from the statement of an account the batch's rows are statements of,
-     * at a time and amount none of those rows records, is another line of that account's statements (an equal purchase
-     * two days earlier, posted onto the next month's card statement), never another source's record of a row's
-     * movement. Another export of the same statement still reconciles, as does a second account's export of a
-     * transfer between the two: its lines are that account's statement.
-     */
-    private suspend fun ownSourceLegs(
-        transfers: List<ImportTransfer>,
-        existing: List<ExistingTransferInfo>,
-    ): Set<TransferId> {
-        val ownFiles =
-            transfers
-                .mapNotNullTo(mutableSetOf()) { (it.source as? Source.Csv)?.importId }
-                .flatMapTo(mutableSetOf()) { csvImportRepository.getTransferIdsCreatedByImport(it) }
-        val statementLines =
-            transfers.mapNotNullTo(mutableSetOf()) { transfer ->
-                (transfer.source as? Source.Csv)?.statementAccountId?.let { StatementLine(it, transfer.timestamp, transfer.amount) }
-            }
-        val identified = existing.filter { it.uniqueKey.isNotEmpty() }.associateBy { it.transferId }
-        if (statementLines.isEmpty() || identified.isEmpty()) return ownFiles
-        val statementAccounts = statementLines.mapTo(mutableSetOf()) { it.account }
-        val otherLines =
-            csvImportRepository
-                .getStatementAccounts(identified.keys)
-                .filter { (id, account) ->
-                    val transfer = identified.getValue(id).transfer
-                    account in statementAccounts && StatementLine(account, transfer.timestamp, transfer.amount) !in statementLines
-                }.keys
-        return ownFiles + otherLines
-    }
-
-    /** One line of [account]'s statement: what it booked, and when. */
-    private data class StatementLine(
-        val account: AccountId,
-        val timestamp: Instant?,
-        val amount: Money?,
-    )
-
-    /**
-     * The relationships touching [existing], loaded once for the deduper. Among them: the `reconciled`
-     * links whose related end another record already reconciled against (a leg only ever stands for one movement,
-     * so a second row must not be excused against it — that would drop a genuine movement from the
-     * balances), and the `pass-through` links that chain a conduit's legs together.
-     */
-    private suspend fun existingRelationships(existing: List<ExistingTransferInfo>): List<Relationship> {
-        val repository = relationshipRepository
-        if (existing.isEmpty()) return emptyList()
-        return repository.getByTransactions(existing.map { it.transferId })
-    }
-
-    /**
-     * For every existing leg that a `pass-through` relationship continues, the legs after it along its
-     * chain (main -> leg 1 -> leg 2 …), in order — see [ImportDeduper]'s `passThroughOnward`. A chain's
-     * onward legs start at the conduit the batch's own legs touch, so they are almost always among
-     * [existing]; any that are not are fetched by id.
-     */
-    private suspend fun passThroughOnward(
-        existing: List<ExistingTransferInfo>,
-        relationships: List<Relationship>,
-    ): Map<TransferId, List<Transfer>> {
-        val next =
-            relationships
-                .filter { it.relationshipType.id.id == WellKnownIds.PASS_THROUGH_RELATIONSHIP_TYPE_ID }
-                .mapNotNull { it.transferPair }
-                .toMap()
-        if (next.isEmpty()) return emptyMap()
-        val known = existing.associate { it.transferId to it.transfer }
-        val missing = next.values.filterNot { it in known }
-        val transfers = if (missing.isEmpty()) known else known + transactionRepository.getTransactionsByIds(missing)
-        return next.keys.associateWith { start ->
-            buildList {
-                var id = next[start]
-                // A chain is a handful of hops; the bound only guards against a malformed cycle.
-                while (id != null && size < MAX_PASS_THROUGH_CHAIN_LEGS) {
-                    add(transfers[id] ?: break)
-                    id = next[id]
-                }
-            }
-        }
-    }
-
-    /**
      * A [TradeReconciler] over the trades the batch's own trades could be duplicating, or null when the
      * batch opts out, has no trades, or nothing exists to match. The window is loaded once and widened
      * by the policy's tolerance, mirroring [loadExisting]'s slack: an existing trade stamped just
@@ -1352,593 +1153,6 @@ class ImportEngineImpl(
             }
         return if (legs.isEmpty()) null else ConversionTradeReconciler(policy.window, legs, creates)
     }
-
-    /**
-     * The locations a business-day window of [policy] counts on: every account's `location` attribute, the default
-     * location and the calendars they name. A policy with clock-time windows only reads none of them.
-     */
-    private suspend fun settlementCalendars(policy: DedupePolicy): SettlementCalendars =
-        if (policy.windows().none { it is SettlementWindow.BusinessDays }) SettlementCalendars.WEEKENDS_ONLY else loadSettlementCalendars()
-
-    private suspend fun loadSettlementCalendars(): SettlementCalendars {
-        val locations =
-            accountAttributeRepository
-                .getByType(AttributeTypeId(WellKnownIds.ACCOUNT_LOCATION_ATTR_TYPE_ID))
-                .first()
-                .associate { it.accountId to it.value }
-        return SettlementCalendars(locations, settingsRepository.getDefaultLocation().first(), holidayCalendarRepository.getAll().first())
-    }
-
-    private suspend fun loadExisting(
-        transfers: List<ImportTransfer>,
-        batch: ImportBatch,
-        calendars: SettlementCalendars,
-    ): List<ExistingTransferInfo> {
-        if (transfers.isEmpty()) return emptyList()
-
-        val accountIds =
-            transfers
-                .flatMap {
-                    // Include any funding-card reconcile account: the funding leg lives on it (and on the
-                    // conduit), so load its history even when the batch never moves money to/from it.
-                    listOfNotNull(requireId(it.fromAccount), requireId(it.toAccount), it.reconcileFundingAccountId) +
-                        // Every conduit of a pass-through chain: an inner one (PayPal behind Curve) is never the
-                        // main transfer's account, yet its own statement's legs are what the chain reconciles with.
-                        it.passThrough
-                            ?.conduits
-                            .orEmpty()
-                            .map(::requireId)
-                }.toSet()
-
-        val rawTransfers =
-            when (batch.dedupePolicy) {
-                is DedupePolicy.FuzzyAllFields -> {
-                    val policy = batch.dedupePolicy as DedupePolicy.FuzzyAllFields
-                    // Widen the load window by the dedupe slack so an existing transfer whose timestamp
-                    // sits just outside the incoming batch's own span — but still within the fuzzy date
-                    // tolerance or the cross-source reconcile window — is available as a candidate. This
-                    // matters for date-only exports (e.g. Curve stamps a date that parses to noon) where
-                    // the counterpart card leg lands hours later the same day, or a day or two later.
-                    val range =
-                        policy.windows().reach(
-                            transfers.minOf { requireNotNull(it.timestamp) }..transfers.maxOf { requireNotNull(it.timestamp) },
-                            calendars.strictest,
-                            times = 1,
-                        )
-                    accountIds
-                        .flatMap {
-                            transactionRepository.getTransactionsByAccountAndDateRange(it, range.start, range.endInclusive).first()
-                        }.distinctBy { it.id }
-                }
-
-                is DedupePolicy.UniqueIdentifier -> {
-                    loadAroundBatch(transfers, accountIds.toList(), batch.dedupePolicy.windows(), calendars)
-                }
-
-                is DedupePolicy.ApiMultiKey -> {
-                    // The own account may be the source or the target depending on direction; the app
-                    // accounts bridged for internal-transfer reconciliation hold legs the batch never touches.
-                    val policy = batch.dedupePolicy as DedupePolicy.ApiMultiKey
-                    loadAroundBatch(
-                        transfers,
-                        (accountIds + policy.internalTransferBridges.map { it.appAccountId }).toList(),
-                        policy.windows(),
-                        calendars,
-                    )
-                }
-
-                is DedupePolicy.None -> {
-                    emptyList()
-                }
-            }
-        // A leg another source could only date approximately may truly sit far outside the date range
-        // above, so load those few legs on the batch's accounts whatever their date.
-        val approximateLegs =
-            if (batch.dedupePolicy is DedupePolicy.FuzzyAllFields) {
-                transactionRepository.getTransactionsByAccountsWithAttributeType(
-                    accountIds,
-                    WellKnownIds.TIMESTAMP_APPROXIMATE_ATTR_TYPE_NAME,
-                )
-            } else {
-                emptyList()
-            }
-
-        val uniqueKeyExtractor = batch.uniqueKeyExtractor
-        val apiIdExtractor = batch.apiIdExtractor
-        val candidates = sourceTransferSnapshots((rawTransfers + approximateLegs).distinctBy { it.id }, transfers, batch.strategyId)
-        return candidates.map { transfer ->
-            ExistingTransferInfo(
-                transferId = transfer.id,
-                transfer = transfer,
-                attributes = transfer.attributes.associate { it.attributeType.id to it.value },
-                uniqueKey = uniqueKeyExtractor?.extract(transfer).orEmpty(),
-                apiId = apiIdExtractor?.extract(transfer),
-            )
-        }
-    }
-
-    /** Recognize an unchanged source row even when another observation contributed attributes to its transaction. */
-    private suspend fun sourceTransferSnapshots(
-        candidates: List<Transfer>,
-        incoming: List<ImportTransfer>,
-        strategyId: String?,
-    ): List<Transfer> {
-        if (candidates.isEmpty() || incoming.isEmpty()) return candidates
-        val observations = observationRepository
-        val records = importRecordRepository
-        val loader =
-            MatchScopeLoader(
-                observations,
-                records,
-                csvImportRepository,
-                apiSessionRepository,
-                accountAttributeRepository,
-                attributeTypeRepository,
-            )
-        val families =
-            incoming
-                .mapNotNull {
-                    when {
-                        strategyId == null -> loader.familyOf(it.source)
-                        it.source is Source.Csv -> MatchScopeLoader.csvFamily(strategyId)
-                        it.source is Source.Api -> MatchScopeLoader.apiFamily(strategyId)
-                        else -> null
-                    }
-                }.toSet()
-        if (families.isEmpty()) return candidates
-        val stored = observations.getObservationsOfTransactions(candidates.map { it.id })
-        if (stored.isEmpty()) return candidates
-        val reservedIds = observations.getReservedIds(stored.map { it.id })
-        val reserved = stored.filter { it.id in reservedIds }.mapTo(mutableSetOf()) { it.transactionId }
-        val byId = candidates.associateBy { it.id }
-        val types = attributeTypeRepository.getAll().first().associateBy { it.id }
-        val snapshots =
-            loader.toMatch(stored, emptyMap()).mapNotNull { observation ->
-                // A re-run must reclaim its reserved slot through the normal update/create path.
-                if (observation.current in reserved) return@mapNotNull null
-                if (observation.family !in families || observation.ref.slot != ObservationSlot.MAIN) return@mapNotNull null
-                val values =
-                    observation.content.values as? ObservedValues.Transfer
-                        ?: return@mapNotNull null
-                val transfer = byId[observation.current] ?: return@mapNotNull null
-                if (transfer.amount.asset.id.id != values.assetId.id) return@mapNotNull null
-                transfer.copy(
-                    timestamp = values.timestamp,
-                    description = values.description,
-                    sourceAccountId = values.sourceAccountId,
-                    targetAccountId = values.targetAccountId,
-                    amount = transfer.amount.copy(amount = values.amount),
-                    attributes =
-                        observation.content.attributes.map { attribute ->
-                            TransferAttribute(
-                                0,
-                                transfer.id,
-                                types.getValue(attribute.typeId),
-                                attribute.value,
-                                attribute.groupKey,
-                            )
-                        },
-                )
-            }
-
-        data class SnapshotKey(
-            val timestamp: Instant?,
-            val description: String,
-            val source: AccountId,
-            val target: AccountId,
-            val amount: Money?,
-            val attributes: Map<AttributeTypeId, String>,
-        )
-        val incomingKeys =
-            incoming.mapNotNullTo(mutableSetOf()) { row ->
-                val from = (row.fromAccount as? AccountRef.Existing)?.id ?: return@mapNotNullTo null
-                val to = (row.toAccount as? AccountRef.Existing)?.id ?: return@mapNotNullTo null
-                SnapshotKey(
-                    row.timestamp,
-                    row.description,
-                    from,
-                    to,
-                    row.amount,
-                    row.attributes.associate { it.typeId to it.value },
-                )
-            }
-        val identical =
-            snapshots
-                .filter { snapshot ->
-                    SnapshotKey(
-                        snapshot.timestamp,
-                        snapshot.description,
-                        snapshot.sourceAccountId,
-                        snapshot.targetAccountId,
-                        snapshot.amount,
-                        snapshot.attributes.associate { it.attributeType.id to it.value },
-                    ) in incomingKeys
-                }.associateBy { it.id }
-        return candidates.map { identical[it.id] ?: it }
-    }
-
-    /**
-     * The existing transfers on [accountIds] a unique-id policy can match the batch against, instead of each
-     * account's whole history: everything near the batch in time, plus the few records that may match from
-     * any distance — those carrying one of the batch's own ids, and those dated only approximately.
-     *
-     * Every other rule pairs an existing leg with a batch row inside one of the policy's [windows], or (the
-     * split-conduit pass) with an existing placeholder that is itself inside the window of a batch row, so
-     * widening by every window twice covers each one. A leg outside that cannot match anything; loading it changed
-     * nothing but the cost, which on a large database was most of a re-import.
-     *
-     * The result keeps the order the full-history load gave (account by account, newest first), since the
-     * deduper's indexes keep the first or last of several candidates.
-     */
-    private suspend fun loadAroundBatch(
-        transfers: List<ImportTransfer>,
-        accountIds: List<AccountId>,
-        windows: List<SettlementWindow>,
-        calendars: SettlementCalendars,
-    ): List<Transfer> {
-        val timestamps = transfers.map { it.timestamp ?: return loadFullHistory(accountIds) }
-        // An approximately-dated row may have happened as late as its approximateUntil.
-        val latest = transfers.maxOf { maxOf(requireNotNull(it.timestamp), it.approximateUntil ?: Instant.DISTANT_PAST) }
-        val range = windows.reach(timestamps.min()..latest, calendars.strictest, times = 2)
-        val from = range.start
-        val until = range.endInclusive
-        val ids = transfers.flatMap { it.uniqueKey?.values.orEmpty() + listOfNotNull(it.apiId) }
-        val loaded =
-            accountIds.flatMap { transactionRepository.getTransactionsByAccountAndDateRange(it, from, until).first() } +
-                transactionRepository.getTransactionsByAccountsWithAttributeValues(accountIds, ids) +
-                transactionRepository.getTransactionsByAccountsWithAttributeType(
-                    accountIds,
-                    WellKnownIds.TIMESTAMP_APPROXIMATE_ATTR_TYPE_NAME,
-                )
-        val byAccount = mutableMapOf<AccountId, MutableList<Transfer>>()
-        for (transfer in loaded.distinctBy { it.id }.sortedByDescending { it.timestamp }) {
-            byAccount.getOrPut(transfer.sourceAccountId) { mutableListOf() } += transfer
-            if (transfer.targetAccountId != transfer.sourceAccountId) {
-                byAccount.getOrPut(transfer.targetAccountId) { mutableListOf() } += transfer
-            }
-        }
-        return accountIds.flatMap { byAccount[it].orEmpty() }.distinctBy { it.id }
-    }
-
-    private suspend fun loadFullHistory(accountIds: List<AccountId>): List<Transfer> =
-        accountIds.flatMap { transactionRepository.getTransactionsByAccount(it).first() }.distinctBy { it.id }
-
-    /** Every window within which a rule of this policy pairs an incoming row with an existing leg. */
-    private fun DedupePolicy.windows(): List<SettlementWindow> =
-        when (this) {
-            is DedupePolicy.UniqueIdentifier -> {
-                listOfNotNull(reconcileWindow, unidentifiedCounterpartyWindow)
-            }
-
-            is DedupePolicy.ApiMultiKey -> {
-                listOfNotNull(reconcileWindow, unidentifiedCounterpartyWindow, internalTransferWindow)
-            }
-
-            is DedupePolicy.FuzzyAllFields -> {
-                listOfNotNull(SettlementWindow.Elapsed(dateTolerance.inWholeSeconds), reconcileWindow, unidentifiedCounterpartyWindow)
-            }
-
-            DedupePolicy.None -> {
-                emptyList()
-            }
-        }
-
-    /** [range] widened [times] over by each of these windows: every instant a match could carry. */
-    private fun List<SettlementWindow>.reach(
-        range: ClosedRange<Instant>,
-        calendar: BusinessDayCalendar,
-        times: Int,
-    ): ClosedRange<Instant> =
-        fold(range) { reached, window ->
-            val widened = (1..times).fold(range) { r, _ -> window.widen(r.start, r.endInclusive, calendar) }
-            minOf(reached.start, widened.start)..maxOf(reached.endInclusive, widened.endInclusive)
-        }
-
-    /**
-     * Creates the IMPORTED transfers and applies the UPDATED ones. [batchSize] transfers are written per
-     * database transaction: the default ([Int.MAX_VALUE]) writes everything (creates + updates) in one
-     * transaction — the historical behaviour — while a smaller value chunks the creates across several
-     * transactions and reports per-chunk progress, so a huge batch (e.g. sample-data generation) doesn't
-     * freeze on one giant transaction. Updates ride with the final create chunk, so the single-chunk case
-     * still applies creates and updates atomically together. Returns the created ids, aligned to
-     * [toImport] order.
-     */
-    private suspend fun writeTransfers(
-        toImport: List<Classified>,
-        toUpdate: List<Classified>,
-        batchSize: Int,
-        onProgress: (suspend (Progress) -> Unit)?,
-        engineOwnedTypeId: AttributeTypeId?,
-        createdLegs: MutableList<Pair<ExpandedTransfer, TransferId>>,
-        observer: SourceObservations,
-    ): List<TransferId> {
-        if (toImport.isEmpty() && toUpdate.isEmpty()) return emptyList()
-
-        val effectiveBatchSize = batchSize.coerceAtLeast(1)
-        if (toImport.isEmpty()) {
-            // No creates, only updates: apply them in their own transaction.
-            val (updates, updateSources) = buildUpdates(toUpdate, engineOwnedTypeId)
-            transactionRepository.importTransfers(
-                transfers = emptyList(),
-                newAttributes = emptyMap(),
-                newRelationships = emptyMap(),
-                sources = emptyList(),
-                updates = updates,
-                updateSources = updateSources,
-            )
-            return emptyList()
-        }
-
-        // Resolve (get-or-create) every relationship type named by a batch relationship once, so the
-        // expander (pure) can look ids up synchronously.
-        val batchRelTypeIds: Map<String, RelationshipTypeId> =
-            toImport
-                .flatMap { it.transfer.batchRelationships }
-                .map { it.typeName }
-                .distinct()
-                .associateWith { relationshipTypeRepository.getOrCreate(it) }
-        val expanded = ObservationExpander.expandTransfers(toImport.toExpansionRows(), batchRelTypeIds)
-
-        val total = toImport.size
-        val createdIds = mutableListOf<TransferId>()
-        // Real ids of the legs already-written chunks created, so a link whose target landed in an earlier
-        // chunk (its temp id no longer resolvable) still links by real id.
-        val priorIds = mutableMapOf<ObservationKey, TransferId>()
-        var written = 0
-        // Fast-path the common single-transaction case (default batchSize) so it doesn't copy the whole list.
-        val chunks = if (effectiveBatchSize >= expanded.size) listOf(expanded) else expanded.chunked(effectiveBatchSize)
-        chunks.forEachIndexed { index, chunk ->
-            val payload = buildCreatePayload(chunk, priorIds)
-            // A leg whose record a re-run reserved an id for goes back in under it (#1430).
-            val reusedIds = mutableMapOf<TransferId, TransferId>()
-            val joinedIds = mutableMapOf<TransferId, TransferId>()
-            chunk.flatMap { it.legs }.forEachIndexed { i, leg ->
-                val placeholder = payload.transfers[i].id
-                val reused = observer.reuse(leg.key, TransactionKind.TRANSFER) as TransferId?
-                if (reused != null) {
-                    reusedIds[placeholder] = reused
-                } else {
-                    (observer.joined(leg.key, TransactionKind.TRANSFER) as TransferId?)?.let { joinedIds[placeholder] = it }
-                }
-            }
-            // Updates ride with the final create chunk (one transaction in the common single-chunk case).
-            val (updates, updateSources) =
-                if (index == chunks.lastIndex) buildUpdates(toUpdate, engineOwnedTypeId) else emptyList<TransferUpdate>() to emptyList()
-            val allCreatedIds =
-                transactionRepository.importTransfers(
-                    transfers = payload.transfers,
-                    newAttributes = payload.newAttributes,
-                    newRelationships = payload.newRelationships,
-                    sources = payload.sources,
-                    updates = updates,
-                    updateSources = updateSources,
-                    reusedIds = reusedIds,
-                    joinedIds = joinedIds,
-                )
-            // Keep only the main transfers' ids (fee transfers are interleaved), aligned to [toImport].
-            createdIds += payload.mainResultIndices.map { allCreatedIds[it] }
-            chunk.flatMap { it.legs }.forEachIndexed { i, leg ->
-                priorIds[leg.key] = allCreatedIds[i]
-                createdLegs += leg to allCreatedIds[i]
-            }
-            written += chunk.size
-            onProgress?.invoke(
-                Progress(
-                    detail = "Importing transactions",
-                    fraction = written.toFloat() / total,
-                    processed = written,
-                    total = total,
-                ),
-            )
-        }
-        require(toImport.size == createdIds.size)
-        return createdIds
-    }
-
-    /** What the expander needs of each row to import: the row and what classification decided about it. */
-    private fun List<Classified>.toExpansionRows(): List<ExpansionRow> {
-        val owners = map { it.transfer.observationOwner() }
-        return map { classified ->
-            ExpansionRow(
-                transfer = classified.transfer,
-                reversals =
-                    classified.reversalLinks.mapValues { (_, link) ->
-                        val target =
-                            when (val reversed = link.target) {
-                                is ReversalTarget.Existing -> {
-                                    LegLinkTarget.Existing(reversed.id)
-                                }
-
-                                is ReversalTarget.BatchRow -> {
-                                    LegLinkTarget.Expanded(
-                                        ObservationKey(owners[reversed.toImportIndex], ObservationSlot.conduit(reversed.legIndex)),
-                                    )
-                                }
-                            }
-                        LegLink(target, link.typeId)
-                    },
-            )
-        }
-    }
-
-    /** The transfers (with fees expanded), attributes, relationships and sources to create for one chunk. */
-    private class CreatePayload(
-        val transfers: List<Transfer>,
-        val newAttributes: Map<TransferId, List<NewAttribute>>,
-        val newRelationships: Map<TransferId, List<NewRelationship>>,
-        val sources: List<Source>,
-        // Indices into [transfers] of each main transfer, so callers map results back to chunk order.
-        val mainResultIndices: List<Int>,
-    )
-
-    /**
-     * Writes [chunk]'s expanded legs with negative temp ids, so newAttributes/newRelationships can be keyed before
-     * real ids exist. A link resolves to a leg of this chunk by its temp id (the repository's in-batch id map is per
-     * importTransfers call, so a main and its fee and spend legs stay in one chunk), else to a leg [priorIds] holds
-     * from an earlier chunk; one to a leg of a later chunk is dropped.
-     */
-    private fun buildCreatePayload(
-        chunk: List<ExpandedRow>,
-        priorIds: Map<ObservationKey, TransferId>,
-    ): CreatePayload {
-        val legs = chunk.flatMap { it.legs }
-        val tempIds = legs.indices.map { TransferId(-(it + 1).toLong()) }
-        // Last wins, as the expander's own row-key lookup does.
-        val tempIdByKey = legs.zip(tempIds).associate { (leg, id) -> leg.key to id }
-        val newAttributes = mutableMapOf<TransferId, List<NewAttribute>>()
-        val newRelationships = mutableMapOf<TransferId, List<NewRelationship>>()
-        legs.forEachIndexed { i, leg ->
-            if (leg.attributes.isNotEmpty()) newAttributes[tempIds[i]] = leg.attributes
-            val relationships =
-                leg.links.mapNotNull { link ->
-                    val target =
-                        when (val t = link.target) {
-                            is LegLinkTarget.Existing -> t.id
-                            is LegLinkTarget.Expanded -> tempIdByKey[t.key] ?: priorIds[t.key]
-                        }
-                    target?.let { NewRelationship(relatedTransferId = it, typeId = link.typeId) }
-                }
-            if (relationships.isNotEmpty()) newRelationships[tempIds[i]] = relationships
-        }
-        val transfers =
-            legs.mapIndexed { i, leg ->
-                Transfer(
-                    id = tempIds[i],
-                    timestamp = leg.timestamp,
-                    description = leg.description,
-                    sourceAccountId = leg.sourceAccountId,
-                    targetAccountId = leg.targetAccountId,
-                    amount = leg.amount,
-                )
-            }
-        val mainResultIndices = chunk.runningFold(0) { start, row -> start + row.legs.size }.dropLast(1)
-        return CreatePayload(transfers, newAttributes, newRelationships, legs.map { it.provenance }, mainResultIndices)
-    }
-
-    private suspend fun buildUpdates(
-        toUpdate: List<Classified>,
-        engineOwnedTypeId: AttributeTypeId?,
-    ): Pair<List<TransferUpdate>, List<Source>> {
-        val updates = mutableListOf<TransferUpdate>()
-        val orderedUpdateSources = mutableListOf<Source>()
-        val excludedTypeId = AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID)
-        // Main transfers whose exclusion the source now asserts (true) or has withdrawn (false).
-        val exclusionChanges = mutableMapOf<TransferId, ExclusionChange>()
-        for (classified in toUpdate) {
-            val existingId = classified.existing ?: continue
-            val t = classified.transfer
-            val reported = t.attributes.mapTo(mutableSetOf()) { it.typeId }
-            val removed = t.ownedAttributes.filterKeys { it !in reported && it != engineOwnedTypeId }
-            val source = t.source.forRow(requireNotNull(t.rowKey))
-            updates +=
-                TransferUpdate(
-                    transfer =
-                        Transfer(
-                            id = existingId,
-                            timestamp = requireNotNull(t.timestamp),
-                            description = t.description,
-                            sourceAccountId = requireId(t.fromAccount),
-                            targetAccountId = requireId(t.toAccount),
-                            amount = requireNotNull(t.amount),
-                        ),
-                    newAttributes = t.attributes,
-                    removedAttributes = removed,
-                )
-            orderedUpdateSources += source
-            if (t.ownedAttributes.containsKey(excludedTypeId)) {
-                exclusionChanges[existingId] =
-                    ExclusionChange(t.attributes.firstOrNull { it.typeId == excludedTypeId }, t.ownedAttributes[excludedTypeId], source)
-            }
-        }
-        derivedLegExclusionUpdates(exclusionChanges, excludedTypeId, updates.mapTo(mutableSetOf()) { it.transfer.id })
-            .forEach { (update, source) ->
-                updates += update
-                orderedUpdateSources += source
-            }
-        return updates to orderedUpdateSources
-    }
-
-    /**
-     * The legs derived from a main transfer — its fee and its pass-through spend legs (C1→C2, …, Cn→merchant,
-     * each linked to the next) — follow its exclusion when a re-import changes it, as they do on creation
-     * (see buildCreatePayload): a row the source deleted mustn't move balances through them, and one it
-     * un-deleted must again.
-     */
-    private suspend fun derivedLegExclusionUpdates(
-        exclusionChanges: Map<TransferId, ExclusionChange>,
-        excludedTypeId: AttributeTypeId,
-        alreadyUpdated: Set<TransferId>,
-    ): List<Pair<TransferUpdate, Source>> {
-        val relationships = relationshipRepository
-        if (exclusionChanges.isEmpty()) return emptyList()
-        val derivedTypes = setOf(WellKnownIds.FEE_RELATIONSHIP_TYPE_ID, WellKnownIds.PASS_THROUGH_RELATIONSHIP_TYPE_ID)
-        // Derived leg -> the main transfer it hangs off, walking fee/pass-through links outwards (primary -> related).
-        val mainOf = mutableMapOf<TransferId, TransferId>()
-        var frontier: Map<TransferId, TransferId> = exclusionChanges.keys.associateWith { it }
-        while (frontier.isNotEmpty()) {
-            val next =
-                relationships
-                    .getByTransactions(frontier.keys)
-                    .filter { it.relationshipType.id.id in derivedTypes }
-                    .mapNotNull { it.transferPair }
-                    .filter { (main, leg) -> main in frontier && leg !in mainOf && leg !in exclusionChanges }
-                    .associate { (main, leg) -> leg to frontier.getValue(main) }
-            mainOf += next
-            frontier = next
-        }
-        mainOf.keys.removeAll(alreadyUpdated)
-        if (mainOf.isEmpty()) return emptyList()
-        return transactionRepository.getTransactionsByIds(mainOf.keys).mapNotNull { (legId, leg) ->
-            val change = exclusionChanges.getValue(mainOf.getValue(legId))
-            val stored = leg.attributes.firstOrNull { it.attributeType.id == excludedTypeId }
-            when {
-                change.exclusion != null && stored == null -> {
-                    TransferUpdate(leg, listOf(change.exclusion)) to change.source
-                }
-
-                // Only lift an exclusion the source itself set (see ImportTransfer.ownedAttributes).
-                change.exclusion == null && stored != null && change.ownedValues.let { it == null || stored.value in it } -> {
-                    TransferUpdate(leg, emptyList(), mapOf(excludedTypeId to change.ownedValues)) to change.source
-                }
-
-                else -> {
-                    null
-                }
-            }
-        }
-    }
-
-    // endregion
-
-    /** A re-imported main transfer's exclusion as its source now reports it (null = not excluded). */
-    private data class ExclusionChange(
-        val exclusion: NewAttribute?,
-        val ownedValues: Set<String>?,
-        val source: Source,
-    )
-
-    private fun resolveRef(
-        ref: AccountRef,
-        keyToId: Map<LocalAccountKey, AccountId>,
-    ): AccountRef =
-        when (ref) {
-            is AccountRef.Existing -> {
-                ref
-            }
-
-            is AccountRef.Local -> {
-                AccountRef.Existing(
-                    keyToId[ref.key] ?: error("Unresolved account reference: ${ref.key}"),
-                )
-            }
-        }
-
-    private fun requireId(ref: AccountRef?): AccountId =
-        when (ref) {
-            is AccountRef.Existing -> ref.id
-            is AccountRef.Local -> error("Unresolved account reference: ${ref.key}")
-            null -> error("Missing account reference")
-        }
 
     /**
      * Fails a shadow-only batch (see [ImportBatch.shadowSource]) that names an existing account outside
