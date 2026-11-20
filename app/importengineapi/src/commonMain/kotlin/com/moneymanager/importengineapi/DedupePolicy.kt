@@ -33,6 +33,9 @@ sealed interface DedupePolicy {
      */
     val reconciledExclusionAttributeTypeId: AttributeTypeId?
 
+    /** Every window within which a rule of this policy pairs an incoming row with an existing leg. */
+    fun windows(): List<SettlementWindow>
+
     /**
      * Match by [ImportTransfer.uniqueKey]: identical existing transfer -> DUPLICATE, an existing
      * transfer with the same key but differing fields -> UPDATED. Also dedupes within the same batch
@@ -60,7 +63,9 @@ sealed interface DedupePolicy {
         val unidentifiedCounterpartyAttributeTypeId: AttributeTypeId? = null,
         /** Window for [unidentifiedCounterpartyAttributeTypeId]; see [ApiMultiKey.unidentifiedCounterpartyWindow]. */
         val unidentifiedCounterpartyWindow: SettlementWindow? = null,
-    ) : DedupePolicy
+    ) : DedupePolicy {
+        override fun windows(): List<SettlementWindow> = listOfNotNull(reconcileWindow, unidentifiedCounterpartyWindow)
+    }
 
     /**
      * Match against existing transfers by all fields: first an exact core-field + attribute match,
@@ -101,7 +106,10 @@ sealed interface DedupePolicy {
         val unidentifiedCounterpartyAttributeTypeId: AttributeTypeId? = null,
         /** Window for [unidentifiedCounterpartyAttributeTypeId]; null: [dateTolerance], as clock time. */
         val unidentifiedCounterpartyWindow: SettlementWindow? = null,
-    ) : DedupePolicy
+    ) : DedupePolicy {
+        override fun windows(): List<SettlementWindow> =
+            listOfNotNull(SettlementWindow.Elapsed(dateTolerance.inWholeSeconds), reconcileWindow, unidentifiedCounterpartyWindow)
+    }
 
     /**
      * API multi-key dedupe: an incoming transfer is a DUPLICATE if it matches an existing transfer by
@@ -152,10 +160,15 @@ sealed interface DedupePolicy {
          * export stamps the movement hours (sometimes a day) away from the bank feed's own timestamp.
          */
         val unidentifiedCounterpartyWindow: SettlementWindow? = null,
-    ) : DedupePolicy
+    ) : DedupePolicy {
+        override fun windows(): List<SettlementWindow> =
+            listOfNotNull(reconcileWindow, unidentifiedCounterpartyWindow, internalTransferWindow)
+    }
 
     /** No deduplication — every transfer is imported. */
     data object None : DedupePolicy {
         override val reconciledExclusionAttributeTypeId: AttributeTypeId? get() = null
+
+        override fun windows(): List<SettlementWindow> = emptyList()
     }
 }
