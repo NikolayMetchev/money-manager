@@ -1,6 +1,7 @@
 package com.moneymanager.test.reimportoracle
 
 import app.cash.sqldelight.async.coroutines.awaitAsList
+import app.cash.sqldelight.async.coroutines.awaitAsOne
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.TransferId
@@ -154,6 +155,36 @@ class ReimportOracleTest {
                     val expected = importAndSnapshot()
                     reimport(listOf(source), force = true)
                     difference(expected, db.canonicalSnapshot(), "forced re-import of ${source.file.fileName}")
+                }
+            }
+        }
+
+    /**
+     * A forced re-run of one unchanged source writes nothing (#1510): its transactions stay standing through the re-run, and
+     * each record that says what it said before takes its own back without a write.
+     */
+    @Test
+    fun g_forcing_a_reimport_of_an_unchanged_source_writes_no_audit_rows() =
+        oracle(Assertion.FORCED_NO_AUDIT_WRITES) { scenario ->
+            OracleDatabase.with(scenario) {
+                import()
+                scenario.sources.firstNotNullOfOrNull { source ->
+                    val before = auditCounts()
+                    val counts = database.testReads.rowCountSelectQueries
+                    val accountAuditBefore = counts.maxAccountAuditId().awaitAsOne()
+                    reimport(listOf(source), force = true)
+                    // A CSV file creates every account its rows name before it pairs rows into trades, so a suspense account
+                    // ("PayPal Conversions") nothing ends up using is created and removed again, by a first import too. Every other
+                    // account audited by the run counts here: one that existed before it, or one it created and kept.
+                    val accountsChanged = counts.selectAccountsAuditedAfterExceptTransient(accountAuditBefore).awaitAsList().isNotEmpty()
+                    val grown =
+                        auditCounts().filter { (table, count) -> count != before[table] && (table != "account_audit" || accountsChanged) }
+                    if (grown.isEmpty()) {
+                        null
+                    } else {
+                        "forcing a re-import of ${source.file.fileName} wrote audit rows: " +
+                            grown.entries.joinToString { (table, count) -> "$table ${before[table]} -> $count" }
+                    }
                 }
             }
         }
@@ -393,6 +424,7 @@ enum class Assertion {
     NO_AUDIT_WRITES,
     UNIMPORT,
     FORCED_REIMPORT,
+    FORCED_NO_AUDIT_WRITES,
     FORCED_BULK_CSV_REIMPORT,
     COPY_UNCHANGED,
     COPY_CHANGED,

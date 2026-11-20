@@ -148,10 +148,13 @@ SELECT * FROM transfer_with_asset
 WHERE (source_account_id IN :accountIds OR target_account_id IN :accountIds)
   AND amount IN :amounts
   AND timestamp <= :maxTimestamp
+  AND id NOT IN (SELECT transaction_id FROM vacant_transaction)
   AND NOT EXISTS (
       SELECT 1 FROM relationship_pair
       WHERE relationship_pair.related_id = transfer_with_asset.id
         AND relationship_pair.relationship_type_id = :reversalTypeId
+        -- A refund a re-run left vacant no longer reverses anything (#1510).
+        AND relationship_pair.primary_id NOT IN (SELECT transaction_id FROM vacant_transaction)
   )
 ORDER BY timestamp DESC, id DESC;
 

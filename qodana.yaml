@@ -59,11 +59,12 @@ bootstrap: >-
 profile:
   path: .qodana/profile.xml
 exclude:
-  # The Bazel IDE model uses commonTest/kotlin/com/moneymanager as the CSV importer's test
+  # The Bazel IDE model uses commonTest/kotlin/com/moneymanager as these modules' test
   # source root with an empty package prefix. The file's package matches its Kotlin source path.
   - name: PackageDirectoryMismatch
     paths:
       - app/csvimporter/src/commonTest/kotlin/com/moneymanager/csvimporter/BarclaycardCsvMapperTest.kt
+      - app/db/core/src/commonTest/kotlin/com/moneymanager/database/csv/CsvReimportInPlaceTest.kt
 
   # Compose @Composable functions are PascalCase by convention; the community linter has no
   # Compose awareness. ktlint (compose ruleset) polices naming in these modules instead.
@@ -93,6 +94,7 @@ exclude:
       - app/db/write/src/commonMain/kotlin/com/moneymanager/database/repository/write/CsvImportReadRepositoryImpl.kt
       - app/db/write/src/commonMain/kotlin/com/moneymanager/database/repository/write/CsvImportWriteRepositoryImpl.kt
       - app/db/write/src/commonMain/kotlin/com/moneymanager/database/repository/write/TradeWriteRepositoryImpl.kt
+      - app/db/write/src/commonMain/kotlin/com/moneymanager/database/repository/write/TransactionWriteRepositoryImpl.kt
       # The version check after `json.decodeFromString` (in a try whose catch throws) runs — the vault's
       # "newer version is refused" test exercises it; the linter resolves the reified call to Nothing.
       - utils/credentialvault/src/commonMain/kotlin/com/moneymanager/credentialvault/CredentialVaultImpl.kt

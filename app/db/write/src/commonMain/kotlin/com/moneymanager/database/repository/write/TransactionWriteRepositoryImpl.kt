@@ -174,6 +174,7 @@ class TransactionWriteRepositoryImpl(
         updates: List<TransferUpdate>,
         updateSources: List<Source>,
         reusedIds: Map<TransferId, TransferId>,
+        joinedIds: Map<TransferId, TransferId>,
     ): List<TransferId> =
         withContext(Dispatchers.Default) {
             require(sources.size == transfers.size) { "sources must align 1:1 with transfers" }
@@ -185,7 +186,7 @@ class TransactionWriteRepositoryImpl(
                 if (transfers.isNotEmpty()) {
                     database.beginCreationMode()
                     try {
-                        createdIds += insertNewTransfers(transfers, newAttributes, newRelationships, sources, reusedIds)
+                        createdIds += insertNewTransfers(transfers, newAttributes, newRelationships, sources, reusedIds, joinedIds)
                     } finally {
                         database.endCreationMode()
                     }
@@ -294,14 +295,27 @@ class TransactionWriteRepositoryImpl(
         newRelationships: Map<TransferId, List<NewRelationship>>,
         sources: List<Source>,
         reusedIds: Map<TransferId, TransferId> = emptyMap(),
+        joinedIds: Map<TransferId, TransferId> = emptyMap(),
     ): List<TransferId> {
         val createdIds = mutableListOf<TransferId>()
         // Pass 1: insert transfers + attributes and record source, building the input(temp) id -> real id
         // map so relationships can reference siblings created in the same batch (e.g. a fee transfer).
         val idMap = mutableMapOf<TransferId, TransferId>()
         transfers.forEachIndexed { index, transfer ->
+            val joined = joinedIds[transfer.id]
+            if (joined != null) {
+                createdIds += joined
+                idMap[transfer.id] = joined
+                return@forEachIndexed
+            }
+            val reused = reusedIds[transfer.id]
+            if (reused != null && retake(reused, transfer, newAttributes[transfer.id].orEmpty(), sources[index])) {
+                createdIds += reused
+                idMap[transfer.id] = reused
+                return@forEachIndexed
+            }
             val generatedId =
-                reusedIds[transfer.id]?.id ?: run {
+                reused?.id ?: run {
                     transactionIdWriteQueries.insert()
                     transactionIdWriteQueries.lastInsertedId().awaitAsOne()
                 }
@@ -351,6 +365,64 @@ class TransactionWriteRepositoryImpl(
             }
         }
         return createdIds
+    }
+
+    /**
+     * Takes back [id], a transfer a re-run kept standing (#1510), as [transfer] with [attributes], writing only what
+     * changed: nothing at all when the record says what it said before. False when [id] has no row to take back. Must be
+     * called inside an open transaction with creation mode active, so the attribute changes don't bump the revision again.
+     */
+    private suspend fun retake(
+        id: TransferId,
+        transfer: Transfer,
+        attributes: List<NewAttribute>,
+        source: Source,
+    ): Boolean {
+        val current = transferSelectQueries.selectById(id.id, TransferMapper::mapRaw).awaitAsList().singleOrNull() ?: return false
+        val stored =
+            transferAttributeSelectQueries
+                .selectByTransaction(id.id) { rowId, _, typeId, value, groupKey, _, _ -> (typeId to groupKey) to (rowId to value) }
+                .awaitAsList()
+                .toMap()
+        val wanted = attributes.associate { (it.typeId.id to it.groupKey) to it.value }
+        val sameFields =
+            current.timestamp.toEpochMilliseconds() == transfer.timestamp.toEpochMilliseconds() &&
+                current.description == transfer.description &&
+                current.sourceAccountId == transfer.sourceAccountId &&
+                current.targetAccountId == transfer.targetAccountId &&
+                current.amount.asset.id == transfer.amount.asset.id &&
+                current.amount.amount == transfer.amount.amount
+        // What else it carries (another record's attributes, a link's exclusion) the materializer settles after the import.
+        if (sameFields && wanted.all { (slot, value) -> stored[slot]?.second == value }) return true
+        transferWriteQueries.update(
+            timestamp = transfer.timestamp.toEpochMilliseconds(),
+            description = transfer.description,
+            source_account_id = transfer.sourceAccountId.id,
+            target_account_id = transfer.targetAccountId.id,
+            asset_id = transfer.amount.asset.id.id,
+            amount = transfer.amount.amount.toString(),
+            id = id.id,
+        )
+        wanted.forEach { (slot, value) ->
+            val row = stored[slot]
+            when {
+                row == null -> {
+                    transferAttributeWriteQueries.insert(
+                        transaction_id = id.id,
+                        attribute_type_id = slot.first,
+                        attribute_value = value,
+                        group_key = slot.second,
+                    )
+                }
+
+                row.second != value -> {
+                    transferAttributeWriteQueries.updateValue(value, row.first)
+                }
+            }
+        }
+        val revision = transferSelectQueries.selectRevisionById(id.id).awaitAsOne()
+        database.recordSource(deviceId, EntityType.TRANSFER, id.id, revision, source)
+        return true
     }
 
     override suspend fun deleteTransactions(ids: Collection<TransferId>): Unit =

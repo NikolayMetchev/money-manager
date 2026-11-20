@@ -1221,14 +1221,7 @@ suspend fun runCsvImport(
     // with the same second) are assembled here: each resolvable group folds into one trade and its legs
     // drop out of the transfer list. A group that does not resolve assembles to null and its rows stay
     // ordinary transfers, so nothing is ever dropped for want of a clean pairing.
-    val assembledTrades =
-        strategy.config.legGroups.withIndex().flatMap { (index, rule) ->
-            val assembly = rule.assembly as? LegAssembly.Trade ?: return@flatMap emptyList()
-            // A cross-file group is only this file's to book when one of its legs is this file's.
-            groupTradeLegs(finalPrep.validTransfers + foreignLegs, index, rule)
-                .filter { group -> group.ownRowIndexes.isNotEmpty() }
-                .mapNotNull { it.assemble(assembly) }
-        }
+    val assembledTrades = assembleCsvTradeGroups(strategy, finalPrep.validTransfers + foreignLegs)
     val assembledRowIndexes: Set<Long> = assembledTrades.flatMapTo(mutableSetOf()) { it.group.rowIndexes }
     // A leg whose partner is in a file not staged yet waits: booking it alone would count the exchange twice once
     // the partner arrives and the trade is booked.

@@ -36,6 +36,13 @@ CREATE TABLE relationship_member (
     FOREIGN KEY (transaction_id) REFERENCES transaction_id(id) ON DELETE RESTRICT
 );
 
+-- A relationship an import made on a transaction its re-run vacated (#1510). The re-run keeps it, and the record that
+-- says it again takes it back without writing; settling the re-run deletes whatever is still reserved.
+CREATE TABLE relationship_reserved (
+    relationship_id INTEGER PRIMARY KEY NOT NULL,
+    FOREIGN KEY (relationship_id) REFERENCES relationship(id) ON DELETE CASCADE
+);
+
 CREATE INDEX idx_relationship_member_transaction ON relationship_member(transaction_id, role);
 CREATE INDEX idx_relationship_member_role ON relationship_member(relationship_id, role);
 

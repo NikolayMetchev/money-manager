@@ -50,6 +50,8 @@ interface TransactionWriteRepository : TransactionReadRepository {
      * @param updateSources Per-update [Source]s aligned 1:1 with [updates].
      * @param reusedIds New transfers (by placeholder id) to insert under an id they had before (#1430): a re-import gives a
      *   row's transaction back the id it had, so what a person decided about it still applies.
+     * @param joinedIds New transfers (by placeholder id) that are a transaction other records also observe, which a re-run
+     *   kept (#1510): nothing is written for them, their record joins that transaction and the materializer settles it.
      * @return Generated transaction ids in the same order as [transfers].
      */
     suspend fun importTransfers(
@@ -60,8 +62,11 @@ interface TransactionWriteRepository : TransactionReadRepository {
         updates: List<TransferUpdate>,
         updateSources: List<Source>,
         reusedIds: Map<TransferId, TransferId> = emptyMap(),
+        joinedIds: Map<TransferId, TransferId> = emptyMap(),
     ): List<TransferId> {
-        require(reusedIds.isEmpty()) { "Default importTransfers cannot reuse ids; override importTransfers in this implementation." }
+        require(reusedIds.isEmpty() && joinedIds.isEmpty()) {
+            "Default importTransfers cannot reuse ids; override importTransfers in this implementation."
+        }
         // The default path delegates to createTransfers, which has no way to persist relationships.
         // Fail loudly rather than silently dropping them; the real DB impl overrides this method.
         require(newRelationships.isEmpty()) {

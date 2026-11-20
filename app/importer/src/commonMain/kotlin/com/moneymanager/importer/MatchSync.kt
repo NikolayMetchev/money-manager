@@ -33,9 +33,11 @@ import com.moneymanager.importengineapi.matchFamily
 import com.moneymanager.observationmatcher.AssignmentChange
 import com.moneymanager.observationmatcher.ExclusionLink
 import com.moneymanager.observationmatcher.MatchObservation
+import com.moneymanager.observationmatcher.MatchResult
 import com.moneymanager.observationmatcher.ObservationRef
 import com.moneymanager.observationmatcher.ShapeReason
 import com.moneymanager.observationmatcher.TransactionTarget
+import com.moneymanager.tasks.Progress
 import kotlinx.coroutines.flow.first
 
 /**
@@ -60,7 +62,42 @@ internal class MatchSync(
     private val calendarFor: (List<AccountId>) -> BusinessDayCalendar,
     private val materialize: suspend (List<ObservationMutation>, MaterializationRequest) -> MaterializationReport,
 ) {
-    suspend fun run(): MaterializationReport {
+    suspend fun run(onProgress: (suspend (Progress) -> Unit)? = null): MaterializationReport {
+        onProgress?.invoke(stepProgress("Matching every source's records", 0, MATCH_STEPS))
+        val plan = plan()
+        if (!plan.hasChanges) {
+            onProgress?.invoke(stepProgress("No matches changed", MATCH_STEPS, MATCH_STEPS))
+            return MaterializationReport()
+        }
+        onProgress?.invoke(stepProgress("Writing ${plan.links.writes.size} links between records", 1, MATCH_STEPS))
+        if (plan.links.writes.isNotEmpty()) relationships?.apply(plan.links.writes)
+        val result = plan.result
+        val contentOf = plan.scope.associate { it.ref to it.content }
+        val mutations =
+            result.changes.map { change ->
+                ObservationMutation.Upsert(change.ref.owner, change.ref.slot, change.to.asTransaction(), contentOf.getValue(change.ref))
+            }
+        // Where each released transaction's observations went; a split sends them to several, and then nothing moves.
+        val destinations =
+            result.changes
+                .filter { it.from in result.released }
+                .groupBy({ requireNotNull(it.from) }, { it.to })
+                .mapValues { (_, targets) -> targets.distinct().singleOrNull() }
+
+        val known = destinations.mapNotNull { (from, to) -> (to as? TransactionTarget.Existing)?.let { from to it.id } }.toMap()
+        moveRelationships(known)
+        onProgress?.invoke(
+            stepProgress("Moving ${mutations.size} records and rebuilding ${plan.links.affected.size} linked transactions", 2, MATCH_STEPS),
+        )
+        val report = materialize(mutations, MaterializationRequest(Source.Reconciler, plan.links.affected))
+        val resolved = known + destinations.mapNotNull { (from, to) -> newIdOf(to, report)?.let { from to it } }
+        onProgress?.invoke(stepProgress("Pointing the staged rows at their transactions", 3, MATCH_STEPS))
+        relinkRows(result.changes, resolved)
+        onProgress?.invoke(stepProgress("Matched", MATCH_STEPS, MATCH_STEPS))
+        return report
+    }
+
+    private suspend fun plan(): MatchPlan {
         val typeIds = attributeTypes.getAll().first().associate { it.name to it.id }
         val allAccounts = accounts.getAllAccounts().first()
         // An account name can repeat; a bridge names the first account of that name, as the importer picks it.
@@ -105,32 +142,21 @@ internal class MatchSync(
         val moved = result.changes.mapTo(mutableSetOf()) { it.ref }
         val wanted = links + result.exclusions.filterNot { it.holdsApart(apart) }
         val (writable, held) = wanted.partition { link -> (link.matched + link.excluded).none { it in moved } }
-        val relinked = syncLinks(writable, held, scope)
-        if (result.changes.isEmpty() && relinked.isEmpty()) return MaterializationReport()
-
-        val contentOf = scope.associate { it.ref to it.content }
-        val mutations =
-            result.changes.map { change ->
-                ObservationMutation.Upsert(change.ref.owner, change.ref.slot, change.to.asTransaction(), contentOf.getValue(change.ref))
-            }
-        // Where each released transaction's observations went; a split sends them to several, and then nothing moves.
-        val destinations =
-            result.changes
-                .filter { it.from in result.released }
-                .groupBy({ requireNotNull(it.from) }, { it.to })
-                .mapValues { (_, targets) -> targets.distinct().singleOrNull() }
-
-        val known = destinations.mapNotNull { (from, to) -> (to as? TransactionTarget.Existing)?.let { from to it.id } }.toMap()
-        moveRelationships(known)
-        val report =
-            materialize(
-                mutations,
-                MaterializationRequest(Source.Reconciler, relinked),
-            )
-        val resolved = known + destinations.mapNotNull { (from, to) -> newIdOf(to, report)?.let { from to it } }
-        relinkRows(result.changes, resolved)
-        return report
+        return MatchPlan(result, scope, planLinks(writable, held, scope))
     }
+
+    private data class MatchPlan(
+        val result: MatchResult,
+        val scope: List<MatchObservation>,
+        val links: LinkChanges,
+    ) {
+        val hasChanges: Boolean get() = result.changes.isNotEmpty() || links.writes.isNotEmpty()
+    }
+
+    private data class LinkChanges(
+        val writes: List<RelationshipWrite> = emptyList(),
+        val affected: Set<TransactionId> = emptySet(),
+    )
 
     /** One stored exclusion link, optionally excluding the superseded legs it points to as well. */
     private data class PlannedLink(
@@ -147,15 +173,15 @@ internal class MatchSync(
      * person split two of its observations, so it explains no exclusion any more. What [held] links cover (their records
      * move this run, so they are written on the next) stays as it is, and so does a link touching a frozen record.
      */
-    private suspend fun syncLinks(
+    private suspend fun planLinks(
         writable: List<ExclusionLink>,
         held: List<ExclusionLink>,
         scope: List<MatchObservation>,
-    ): Set<TransactionId> {
-        val repository = relationships ?: return emptySet()
+    ): LinkChanges {
+        val repository = relationships ?: return LinkChanges()
         val transactionOf = scope.mapNotNull { o -> o.current?.let { o.ref to it } }.toMap()
         val inScope = transactionOf.values.mapTo(mutableSetOf()) { it.id }
-        if (inScope.isEmpty()) return emptySet()
+        if (inScope.isEmpty()) return LinkChanges()
         val planned = writable.flatMapTo(mutableSetOf()) { plan(it, transactionOf) }
         val heldIds = held.map { link -> (link.matched + link.excluded).mapNotNullTo(mutableSetOf()) { transactionOf[it]?.id } }
         val stored =
@@ -182,8 +208,7 @@ internal class MatchSync(
                 !keep
             }
         val creates = planned - kept
-        if (deletes.isEmpty() && creates.isEmpty()) return emptySet()
-        repository.apply(
+        return LinkChanges(
             deletes.map { RelationshipWrite.Delete(it.id) } +
                 creates.map { link ->
                     RelationshipWrite.Create(
@@ -194,9 +219,9 @@ internal class MatchSync(
                         excludesRelated = link.excludesRelated,
                     )
                 },
+            deletes.flatMapTo(mutableSetOf()) { link -> link.members.map { it.transactionId } } +
+                creates.flatMap { it.related + it.primary },
         )
-        return deletes.flatMapTo(mutableSetOf()) { link -> link.members.map { it.transactionId } } +
-            creates.flatMap { it.related + it.primary }
     }
 
     /** The stored links [link] makes: one per transaction it excludes, none when a record it names has none yet. */
@@ -295,6 +320,8 @@ internal class MatchSync(
  * reconcilers until their outcomes are reconciled with today's (#1426).
  */
 private val WRITTEN_STAGE_REASONS = setOf(ShapeReason.TRADE_AGGREGATION)
+
+private const val MATCH_STEPS = 4
 
 /** Whether this link would hold together two observations a person split (#1430). */
 private fun ExclusionLink.holdsApart(apart: List<Pair<ObservationRef, ObservationRef>>): Boolean {

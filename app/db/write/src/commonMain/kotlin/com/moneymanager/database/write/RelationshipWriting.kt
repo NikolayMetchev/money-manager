@@ -47,11 +47,17 @@ suspend fun MoneyManagerDatabaseWrapper.insertRelationship(
                     .map { it.first }
                     .containsAll(union.keys)
             ) {
+                // Already said by one stored match: a re-run that reserved it takes it back (#1510).
+                relationshipWriteQueries.unreserve(existing.keys.single())
                 return null
             }
             union.map { (id, role) -> id to RelationshipRole.entries.first { it.id == role } }
         } else {
-            if (existing.values.any { it == wanted }) return null
+            // Said again, it stands as it is; a re-run that reserved it takes it back (#1510).
+            existing.entries.firstOrNull { it.value == wanted }?.let {
+                relationshipWriteQueries.unreserve(it.key)
+                return null
+            }
             members
         }
     if (exclusive) existing.keys.forEach { relationshipWriteQueries.deleteById(it) }

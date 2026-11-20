@@ -13,6 +13,7 @@ import com.moneymanager.importengineapi.ApiSessionMutation
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportPlan
+import com.moneymanager.importengineapi.RerunPhases
 import com.moneymanager.importengineapi.RerunReads
 import com.moneymanager.importengineapi.SourceRerunPlan
 import com.moneymanager.importengineapi.SourceRerunResult
@@ -21,6 +22,7 @@ import com.moneymanager.importengineapi.markApiSessionImported
 import com.moneymanager.importengineapi.planSourceRerun
 import com.moneymanager.tasks.PhasedProgress
 import com.moneymanager.tasks.Progress
+import com.moneymanager.tasks.foldPhases
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
@@ -75,7 +77,12 @@ suspend fun executeApiReimport(
     require((plan.source as? Source.Api)?.sessionId == session.id) {
         "plan is for ${plan.source} but executeApiReimport was called with session ${session.id}"
     }
-    if (isApiSessionUnchanged(session, strategy, apiReads, counterpartyAccountNames, passThroughAccounts)) {
+    // The re-run's phases each fill the bar from empty; this view has one bar for all of them.
+    val bar = onProgress?.let { foldPhases(it) }
+    bar?.invoke(Progress("Checking whether the session changed", fraction = 0f, phase = RerunPhases.CHECKING))
+    val unchanged = isApiSessionUnchanged(session, strategy, apiReads, counterpartyAccountNames, passThroughAccounts)
+    bar?.invoke(Progress(if (unchanged) "Nothing changed" else "The session changed", fraction = 1f, phase = RerunPhases.CHECKING))
+    if (unchanged) {
         return SourceRerunResult(
             rerun = ApiRerunCounts(transactionsImported = 0, tradesImported = 0),
             deletedTransfers = 0,
@@ -96,7 +103,7 @@ suspend fun executeApiReimport(
             ),
         reads = reads,
         maintenance = maintenance,
-        onProgress = onProgress,
+        onProgress = bar,
         refreshViews = refreshViews,
     ) {
         val rerun =
@@ -107,7 +114,7 @@ suspend fun executeApiReimport(
                 importEngine = importEngine,
                 counterpartyAccountNames = counterpartyAccountNames,
                 passThroughAccounts = passThroughAccounts,
-                onProgress = onProgress,
+                onProgress = bar,
                 engineBatchSize = if (onProgress == null) Int.MAX_VALUE else API_ENGINE_BATCH_SIZE,
             )
         importEngine.markApiSessionImported(
@@ -146,8 +153,8 @@ data class ApiBulkReimportResult(
  *
  * A session that fails does not abort the run: it is logged, recorded in
  * [ApiBulkReimportResult.failures] and the remaining sessions are still re-imported — mirroring how
- * the CSV and QIF bulk re-import collects per-file failures. Materialized views are refreshed once at the end
- * whatever happens, since the sessions that did run have already changed the data they describe.
+ * the CSV and QIF bulk re-import collects per-file failures. A run that attempted writes refreshes materialized
+ * views once, even if it was interrupted after changing the data they describe.
  */
 @Suppress("LongParameterList")
 suspend fun bulkReimportApiSessions(
@@ -170,7 +177,13 @@ suspend fun bulkReimportApiSessions(
             .sortedBy { it.createdAt }
 
     var importPlan = ImportPlan()
-    return reimportSessionsResiliently(sessions, maintenance, onProgress) { session, sessionProgress ->
+    val version = importEngine.writeVersion.value
+    return reimportSessionsResiliently(
+        sessions,
+        maintenance,
+        onProgress,
+        refreshRequired = { importEngine.writeVersion.value != version },
+    ) { session, sessionProgress ->
         val result =
             executeApiReimport(
                 plan = planApiReimport(session.id, apiSessionRepository, reads),
@@ -193,13 +206,13 @@ suspend fun bulkReimportApiSessions(
 
 /**
  * Runs [reimport] over [sessions] in order, tolerating a failing session, and refreshes the
- * materialized views exactly once at the end — including on the failure path, since a session that
- * got as far as deleting its transfers has already invalidated them.
+ * materialized views once when the run may have changed them, including after a partial failure.
  */
 internal suspend fun reimportSessionsResiliently(
     sessions: List<ApiSession>,
     maintenance: Maintenance,
     onProgress: (suspend (Progress) -> Unit)?,
+    refreshRequired: () -> Boolean,
     reimport: suspend (ApiSession, (suspend (Progress) -> Unit)?) -> Unit,
 ): ApiBulkReimportResult {
     var reimported = 0
@@ -243,7 +256,11 @@ internal suspend fun reimportSessionsResiliently(
 
     // NonCancellable so a cancelled run doesn't leave stale balances behind either.
     val refreshFailure =
-        runCatching { withContext(NonCancellable) { maintenance.refreshMaterializedViews() } }.exceptionOrNull()
+        if (refreshRequired()) {
+            runCatching { withContext(NonCancellable) { maintenance.refreshMaterializedViews() } }.exceptionOrNull()
+        } else {
+            null
+        }
 
     // A refresh that fails while the run is already unwinding must not replace the exception that ended
     // it — the caller needs to see the cancellation or error that actually happened.

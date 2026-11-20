@@ -15,6 +15,7 @@ import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.importengineapi.AccountRef
+import com.moneymanager.importengineapi.CsvImportMutation
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.createAccount
@@ -414,6 +415,28 @@ class CryptoComCsvE2ETest : DbTest() {
             val deposits = depositsOf2000(cashId)
             assertEquals(2, deposits.size, "$deposits")
             assertTrue(deposits.none { d -> d.attributes.any { it.attributeType.name == "excluded" } }, "both records count: $deposits")
+        }
+
+    // A re-run stopped after setting the wallet's file aside leaves its separated deposit vacant, waiting for that file's records to
+    // take it back. Re-running another file must leave it alone (#1510): settling it there would delete the person's decision.
+    @Test
+    fun rerunningAnotherFile_leavesTheSeparatedRecordOfAStoppedRerunStanding() =
+        runDbTest {
+            val (cashId, deposit) = importBankDepositThenTheWalletsRecord()
+            val (first, second) = repositories.observationRepository.getObservationsOfTransaction(deposit.id)
+            repositories.importEngine.separateObservations(first.id, second.id)
+            val card = stage("card_transactions_record_20231120_210200.csv", cardRows)
+            assertEquals(1, applyAll(listOf(card)).filesImported)
+            val fiat =
+                repositories.csvImportRepository
+                    .getAllImports()
+                    .first()
+                    .single { it.originalFileName.startsWith("fiat_") }
+
+            repositories.importEngine.import(ImportBatch(csvImportMutations = listOf(CsvImportMutation.Reserve(fiat.id))))
+            repositories.reimports(maintenance).reimportFile(card.id)
+
+            assertEquals(2, depositsOf2000(cashId).size, "the stopped run's separated record still stands")
         }
 
     @Test

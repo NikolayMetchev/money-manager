@@ -15,3 +15,27 @@ DELETE FROM relationship WHERE id = ?;
 -- A re-run's vacant transaction leaves every relationship it was kept in (#1430); one left with a single member is pruned.
 deleteMembersOfTransaction:
 DELETE FROM relationship_member WHERE transaction_id = ?;
+
+-- Reserves the relationships a CSV or API import (source types 2 and 5) made on the transactions a re-run vacates (#1510).
+reserveImportMadeOf:
+INSERT OR IGNORE INTO relationship_reserved (relationship_id)
+SELECT DISTINCT relationship_member.relationship_id
+FROM relationship_member
+JOIN entity_source ON entity_source.entity_type_id = 13
+                  AND entity_source.entity_id = relationship_member.relationship_id
+                  AND entity_source.revision_id = 1
+WHERE relationship_member.transaction_id IN ?
+  AND entity_source.source_type_id IN (2, 5);
+
+unreserve:
+DELETE FROM relationship_reserved WHERE relationship_id = ?;
+
+-- What a re-run's records did not say again, among the relationships it reserved on its own transactions: a reservation an
+-- interrupted re-run of another source left waits for that source's next re-run.
+deleteReservedOn:
+DELETE FROM relationship WHERE id IN (
+    SELECT relationship_reserved.relationship_id
+    FROM relationship_reserved
+    JOIN relationship_member ON relationship_member.relationship_id = relationship_reserved.relationship_id
+    WHERE relationship_member.transaction_id IN ?
+);

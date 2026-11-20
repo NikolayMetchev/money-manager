@@ -146,7 +146,7 @@ suspend fun <R> ImportEngine.executeRerun(
     refreshViews: Boolean = true,
     run: suspend () -> R,
 ): RerunOutcome<R> {
-    onProgress?.invoke(Progress("Reading transactions for the re-import report", fraction = 0f))
+    onProgress?.invoke(Progress("Reading what the files created, for the report", fraction = 0f, phase = RerunPhases.SETTING_ASIDE))
     val before =
         TransactionSnapshot.read(
             files.flatMap { it.createdTransfers.entries }.associate { it.key to it.value },
@@ -161,7 +161,6 @@ suspend fun <R> ImportEngine.executeRerun(
 
     // The record resets ride in the delete batch. What the deleted transfers had reconciled away is shown again by the
     // engine, once its link is left with one member.
-    onProgress?.invoke(Progress(REMOVING, fraction = 0f))
     val reserved =
         import(
             resetRecords.copy(
@@ -186,11 +185,21 @@ suspend fun <R> ImportEngine.executeRerun(
                 csvImportMutations = resetRecords.csvImportMutations + resets,
                 apiSessionMutations = resetRecords.apiSessionMutations + apiResets,
             ),
-            onProgress = onProgress?.let { sink -> { sink(it.copy(detail = REMOVING)) } },
+            onProgress = onProgress?.let { sink -> { step -> settingAside(step)?.let { sink(it) } } },
         ).reserved
-    onProgress?.invoke(Progress("Removed what the import created", fraction = 1f))
+    onProgress?.invoke(
+        Progress(
+            "Set aside ${plural(
+                files.sumOf { it.createdTransfers.size },
+                "transaction",
+            )} and ${plural(files.sumOf { it.tradeIds.size }, "trade")}",
+            fraction = 1f,
+            phase = RerunPhases.SETTING_ASIDE,
+        ),
+    )
 
-    onProgress?.invoke(Progress("Re-importing"))
+    // Only marks where the run starts, for a view folding the phases into one bar: a run with phases of its own says them.
+    onProgress?.invoke(Progress("Re-importing", fraction = 0f, phase = RerunPhases.REIMPORTING))
     // Applying a staged file deletes the accounts it left empty itself, so those the run removed count as cleaned up too.
     val created = files.flatMapTo(mutableSetOf()) { it.createdAccountIds }
     val createdNames =
@@ -217,10 +226,16 @@ suspend fun <R> ImportEngine.executeRerun(
         }
 
     // The records took their old ids back, so a person's overrides, pins and links on them still hold: settling releases
-    // the ids no record took back and rebuilds the overridden ones (#1430). A hand edit on a released id is reported.
-    val settled = if (reserved.ids.isEmpty()) MaterializationReport() else import(ImportBatch(settle = reserved)).materialization
+    // the ids no record took back and rebuilds the overridden ones (#1430). A hand edit on a released id is reported. It runs
+    // even when nothing was vacated: a reserved observation on a transaction another source keeps goes if its record didn't say it.
+    val settled =
+        import(
+            ImportBatch(settle = reserved),
+            onProgress = onProgress?.let { sink -> { step -> step.inPhase(RerunPhases.SETTLING)?.let { sink(it) } } },
+        ).materialization
 
-    onProgress?.invoke(Progress("Cleaning up empty accounts"))
+    val finishing = if (refreshViews) FINISHING_STEPS + 1 else FINISHING_STEPS
+    onProgress?.invoke(Progress("Deleting the empty accounts the files created", fraction = 0f, phase = RerunPhases.FINISHING))
     val deletedEmptyAccounts =
         files
             .firstOrNull()
@@ -233,6 +248,7 @@ suspend fun <R> ImportEngine.executeRerun(
                 )
             }.orEmpty() + emptiedByRun
 
+    onProgress?.invoke(Progress("Reading the transactions for the report", fraction = 1f / finishing, phase = RerunPhases.FINISHING))
     val after =
         TransactionSnapshot.read(
             files.flatMap { reads.transferSourceRepository.getTransfersCreatedBy(it.file).entries }.associate { it.key to it.value },
@@ -242,9 +258,10 @@ suspend fun <R> ImportEngine.executeRerun(
         )
 
     if (refreshViews) {
-        onProgress?.invoke(Progress("Refreshing views"))
+        onProgress?.invoke(Progress("Refreshing views", fraction = 2f / finishing, phase = RerunPhases.FINISHING))
         maintenance.refreshMaterializedViews()
     }
+    onProgress?.invoke(Progress("Finished", fraction = 1f, phase = RerunPhases.FINISHING))
 
     return RerunOutcome(
         result = result,
@@ -254,4 +271,38 @@ suspend fun <R> ImportEngine.executeRerun(
     )
 }
 
-private const val REMOVING = "Removing what the import created"
+private const val FINISHING_STEPS = 2
+
+private fun plural(
+    count: Int,
+    noun: String,
+): String = if (count == 1) "1 $noun" else "$count ${noun}s"
+
+/** The engine's delete batch, said as what it does to a re-run: it sets the transactions aside, counted. */
+private fun settingAside(step: Progress): Progress? {
+    val total = step.total ?: return null
+    return Progress(
+        "Setting aside ${step.processed ?: 0} of $total transactions and trades",
+        fraction = step.fraction ?: return null,
+        phase = RerunPhases.SETTING_ASIDE,
+    )
+}
+
+/** [this] engine step as a step of [phase]; null for the engine's steps that carry no fraction. */
+fun Progress.inPhase(phase: Progress.Phase): Progress? = takeIf { it.fraction != null }?.copy(phase = phase)
+
+/**
+ * A re-run's phases, each filling the bar from empty: its caller first checks which sources changed ([CHECKING]),
+ * [executeRerun] reports setting aside, settling and finishing, and its run the three between (a run that has none of its own
+ * is all [REIMPORTING]).
+ */
+object RerunPhases {
+    const val COUNT = 7
+    val CHECKING = Progress.Phase(1, COUNT, "Checking what changed")
+    val SETTING_ASIDE = Progress.Phase(2, COUNT, "Setting aside what the files created")
+    val PREPARING = Progress.Phase(3, COUNT, "Preparing files")
+    val REIMPORTING = Progress.Phase(4, COUNT, "Re-importing files")
+    val MATCHING = Progress.Phase(5, COUNT, "Matching records across sources")
+    val SETTLING = Progress.Phase(6, COUNT, "Settling the transactions the files kept")
+    val FINISHING = Progress.Phase(7, COUNT, "Finishing")
+}

@@ -1,7 +1,6 @@
 package com.moneymanager.database.repository.write
 
 import app.cash.sqldelight.async.coroutines.awaitAsOne
-import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.write.recordSource
 import com.moneymanager.domain.model.AccountId
@@ -23,10 +22,8 @@ import com.moneymanager.domain.model.observation.ObservationId
 import com.moneymanager.domain.model.observation.ObservationOwner
 import com.moneymanager.domain.model.observation.ObservedValues
 import com.moneymanager.domain.repository.ObservationReadRepository
-import com.moneymanager.domain.repository.write.CsvObservationCommit
 import com.moneymanager.domain.repository.write.ObservationWriteRepository
 import com.moneymanager.domain.repository.write.RecordObservationInsert
-import com.moneymanager.domain.repository.write.StaleObservationCommitException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
@@ -40,8 +37,6 @@ class ObservationWriteRepositoryImpl(
     ObservationReadRepository by reader {
     private val queries = database.observationWriteQueries
     private val selectQueries = database.observationSelectQueries
-
-    override suspend fun changeToken(): Long = withContext(coroutineContext) { database.dataChangeToken() }
 
     override suspend fun insertRecordObservations(
         contentHash: String,
@@ -62,13 +57,11 @@ class ObservationWriteRepositoryImpl(
         newTransactions: Collection<TransactionId>,
         observations: List<ObservationChange>,
         rows: List<MaterializedWrite>,
-        csv: CsvObservationCommit?,
         reclaimed: Collection<ObservationId>,
     ): Map<TransactionId, TransactionId> {
-        if (csv == null && newTransactions.isEmpty() && observations.isEmpty() && rows.isEmpty() && reclaimed.isEmpty()) return emptyMap()
+        if (newTransactions.isEmpty() && observations.isEmpty() && rows.isEmpty() && reclaimed.isEmpty()) return emptyMap()
         return withContext(coroutineContext) {
             queries.transactionWithResult {
-                if (csv != null) verifyCsvCommit(csv, observations, rows)
                 val ids = newTransactions.associateWith { allocate(it.kind()) }
                 for (change in observations) {
                     val before = change.before
@@ -108,41 +101,9 @@ class ObservationWriteRepositoryImpl(
                         }
                     }
                 }
-                if (csv != null) {
-                    csv.hashes.forEach { (recordId, hash) ->
-                        database.importRecordWriteQueries.updateContentHash(hash, recordId.id)
-                    }
-                    database.recordCsvApplication(
-                        csv.importId,
-                        csv.strategyId,
-                        csv.strategyName,
-                        csv.appliedAt,
-                        csv.accountId,
-                        csv.currencyId,
-                    )
-                }
                 ids
             }
         }
-    }
-
-    private suspend fun verifyCsvCommit(
-        csv: CsvObservationCommit,
-        changes: List<ObservationChange>,
-        rows: List<MaterializedWrite>,
-    ) {
-        val file = database.csvImportSelectQueries.selectImportById(csv.importId.id.toString()).awaitAsOneOrNull()
-        val valid =
-            file?.file_checksum == csv.fileChecksum && database.dataChangeToken() == csv.changeToken &&
-                changes.all { change ->
-                    val before = checkNotNull(change.before)
-                    getObservationsOfTransaction(before.transactionId).singleOrNull() == before
-                } &&
-                rows.all { row ->
-                    val update = row as MaterializedWrite.Update
-                    getMaterialized(TransferId(update.transactionId)) == update.before
-                }
-        if (!valid) throw StaleObservationCommitException()
     }
 
     private suspend fun allocate(kind: TransactionKind): TransactionId {
@@ -433,8 +394,9 @@ class ObservationWriteRepositoryImpl(
                         values.toAmount.toString(),
                         id,
                     )
+                } else {
+                    database.tradeWriteQueries.bumpRevision(id)
                 }
-                database.tradeWriteQueries.bumpRevision(id)
                 removed.forEach { (typeId, _) -> database.tradeWriteQueries.deleteAttribute(id, typeId.id) }
                 changed.forEach { database.tradeWriteQueries.upsertAttribute(id, it.typeId.id, it.value) }
                 val revision = database.tradeSelectQueries.selectRevision(id).awaitAsOne()

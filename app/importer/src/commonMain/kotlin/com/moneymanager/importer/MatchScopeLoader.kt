@@ -170,9 +170,19 @@ class MatchScopeLoader(
         when (owner) {
             is ObservationOwner.Record -> {
                 val record = checkNotNull(recordsById[owner.recordId]) { "observation owner ${owner.recordId} has no record" }
+                val hash = record.contentHash
                 when (val key = record.key) {
-                    is ImportRecordKey.CsvRow -> Origin(csvFamily(key.csvImportId), csvContainer(key.csvImportId), record.contentHash)
-                    is ImportRecordKey.ApiItem -> Origin(apiFamily(key.sessionId), apiContainer(key.sessionId), record.contentHash)
+                    is ImportRecordKey.CsvRow -> {
+                        Origin(
+                            csvFamily(key.csvImportId),
+                            csvContainer(key.csvImportId),
+                            hash,
+                        )
+                    }
+
+                    is ImportRecordKey.ApiItem -> {
+                        Origin(apiFamily(key.sessionId), apiContainer(key.sessionId), hash)
+                    }
                 }
             }
 

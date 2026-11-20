@@ -7,6 +7,7 @@ import com.moneymanager.domain.model.RelationshipId
 import com.moneymanager.domain.model.RelationshipMember
 import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.repository.RelationshipReadRepository
 import com.moneymanager.domain.repository.write.RelationshipWrite
 import com.moneymanager.domain.repository.write.RelationshipWriteRepository
@@ -66,6 +67,20 @@ class RelationshipWriteRepositoryImpl(
     override suspend fun delete(id: RelationshipId): Unit =
         withContext(Dispatchers.Default) {
             writeQueries.deleteById(id.id)
+        }
+
+    override suspend fun reserveImportMadeOf(transactionIds: Collection<TransactionId>): Unit =
+        withContext(Dispatchers.Default) {
+            writeQueries.transaction {
+                transactionIds.map { it.id }.chunked(MAX_PIN_TRANSACTION_IDS).forEach { writeQueries.reserveImportMadeOf(it) }
+            }
+        }
+
+    override suspend fun deleteReserved(transactionIds: Collection<TransactionId>): Unit =
+        withContext(Dispatchers.Default) {
+            writeQueries.transaction {
+                transactionIds.map { it.id }.chunked(MAX_PIN_TRANSACTION_IDS).forEach { writeQueries.deleteReservedOn(it) }
+            }
         }
 }
 

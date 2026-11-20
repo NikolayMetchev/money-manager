@@ -103,12 +103,20 @@ fun SourceRerunPreview(
     Column {
         val transfers = plan.createdTransfers.size
         val trades = plan.tradeIds.size
+        val keep = if (transfers + trades == 1) "keeps its id if it still creates it" else "keep their ids where it still creates them"
         Text(
             text =
                 buildString {
-                    append("Deletes the $transfers transaction${plural(transfers)}")
+                    append(
+                        "Imports every $recordNoun again with the current strategy and mappings. The $transfers transaction${plural(
+                            transfers,
+                        )}",
+                    )
                     if (trades > 0) append(" and $trades trade${plural(trades)}")
-                    append(" it created, then imports every $recordNoun again with the current strategy and mappings.")
+                    append(
+                        " it created $keep, " +
+                            "and only what changed is written. Any it no longer creates is deleted and listed in the report afterwards.",
+                    )
                 },
             style = MaterialTheme.typography.bodySmall,
         )

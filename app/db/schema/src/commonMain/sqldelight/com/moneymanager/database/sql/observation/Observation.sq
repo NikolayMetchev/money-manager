@@ -190,3 +190,13 @@ CREATE TABLE observation_reserved (
     observation_id INTEGER PRIMARY KEY NOT NULL,
     FOREIGN KEY (observation_id) REFERENCES observation(id) ON DELETE CASCADE
 );
+
+-- The transactions a re-run left vacant (#1510): every observation on them is reserved. Their rows stay as they were until
+-- the re-run's records take them back or settling deletes them, and meanwhile the re-run's own dedupe and matching treat
+-- them as gone.
+CREATE VIEW vacant_transaction AS
+SELECT DISTINCT observation.transaction_id, observation.kind
+FROM observation_reserved
+JOIN observation ON observation.id = observation_reserved.observation_id
+WHERE NOT EXISTS (SELECT 1 FROM observation other WHERE other.transaction_id = observation.transaction_id
+                  AND other.id NOT IN (SELECT observation_id FROM observation_reserved));

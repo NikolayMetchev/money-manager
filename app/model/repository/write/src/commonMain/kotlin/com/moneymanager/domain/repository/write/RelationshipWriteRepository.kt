@@ -4,6 +4,7 @@ import com.moneymanager.domain.model.RelationshipId
 import com.moneymanager.domain.model.RelationshipMember
 import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.repository.RelationshipReadRepository
 
 interface RelationshipWriteRepository : RelationshipReadRepository {
@@ -25,6 +26,18 @@ interface RelationshipWriteRepository : RelationshipReadRepository {
      * re-import rebuilds thousands of links, and a commit per link made that the slowest step.
      */
     suspend fun apply(writes: List<RelationshipWrite>)
+
+    /**
+     * Reserves the relationships a CSV or API import made on [transactionIds], which a re-run vacates (#1510): creating one
+     * again takes it back, and [deleteReserved] deletes the rest once the re-run has run.
+     */
+    suspend fun reserveImportMadeOf(transactionIds: Collection<TransactionId>)
+
+    /**
+     * Deletes the relationships still reserved on [transactionIds], a re-run's own: what its records did not say again. Another
+     * source's reservations, left by a re-run that was stopped, stay for that source's next re-run.
+     */
+    suspend fun deleteReserved(transactionIds: Collection<TransactionId>)
 }
 
 /** One step of [RelationshipWriteRepository.apply]. */

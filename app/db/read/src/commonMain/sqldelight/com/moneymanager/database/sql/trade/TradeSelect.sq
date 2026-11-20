@@ -45,6 +45,8 @@ WHERE timestamp = ?
   AND to_account_id = ?
   AND to_asset_id = ?
   AND to_amount = ?
+  -- A trade a re-run left vacant is the one it is re-booking, never a twin of it (#1510).
+  AND id NOT IN (SELECT transaction_id FROM vacant_transaction)
 ORDER BY id
 LIMIT 1 OFFSET :occurrence;
 

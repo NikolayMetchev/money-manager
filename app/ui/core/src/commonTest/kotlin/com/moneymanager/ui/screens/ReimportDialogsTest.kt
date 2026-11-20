@@ -147,7 +147,7 @@ class ReimportDialogsTest {
                 }
             }
 
-            waitUntilAtLeastOneExists(hasText("Deletes the 2 transactions they created."), timeoutMillis = 15_000)
+            waitUntilAtLeastOneExists(hasText("The 2 transactions they created keep their ids", substring = true), timeoutMillis = 15_000)
             onNodeWithText("Re-import MonzoDataExport.csv").assertExists()
             onNodeWithText("Strategy: ", substring = true).assertExists()
 
@@ -199,7 +199,7 @@ class ReimportDialogsTest {
                 }
             }
 
-            waitUntilAtLeastOneExists(hasText("Deletes the 2 transactions they created."), timeoutMillis = 15_000)
+            waitUntilAtLeastOneExists(hasText("The 2 transactions they created keep their ids", substring = true), timeoutMillis = 15_000)
             onNodeWithText("Re-import 1 file").performClick()
 
             waitUntilAtLeastOneExists(hasText("Hand-edited transactions no longer imported (1)"), timeoutMillis = 15_000)
