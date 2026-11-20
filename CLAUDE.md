@@ -188,7 +188,7 @@ workflow because label events start it: any other label's run skips, without can
 | `app/importdirectory/` | `ImportDirectoryService`: import-directory orchestration the desktop app, CLI and TUI share. "Download all" (concurrent, discovers subfolders while downloading, one failing folder never stops the rest), single-folder download and re-download, each folder a child task of the `TaskScope` it's given; plan + apply for CSV/QIF/OFX "import all" / "re-import all". Plans return the files that need a person (`NeedsAttention`: no strategy, a source account nobody set) instead of skipping them silently. Owns the write lock its concurrent runs share, so build one per session (`SessionImports`, `app/session`) |
 | `app/apiimport/` | `ApiImportService`: API-connection orchestration the desktop app, CLI and TUI share. Creates missing connection rows from the unlocked vault (`ensureConnections`), downloads a credential's new session (secrets from the vault, incremental unless forced, the statement-region gate from `currentCountryCode()`), imports a session (then marks it imported and refreshes the materialized views), and "download & import all": every download a child task, one import queue. Sessions whose counterparties need confirming come back as `needsAttention` |
 | `app/importengineapi/` | `ImportEngine` interface + `ImportBatch`/`ImportResult` model + `ImportEngine.*` write helpers (DB-free) |
-| `app/importer/` | `ImportEngineImpl` — the **sole** DB writer (consumes write repositories) |
+| `app/importer/` | `ImportEngineImpl` — the **sole** DB writer (consumes write repositories): a thin facade whose `applyBatch` runs the batch as named phases, each its own collaborator (`BatchValidation`, `ConfigMutationWriter`, `ReferenceDataWriter`, `TradeImporter`, `AccountResolver`, `PersonResolver`, `TransferImporter`, `RerunSettlement`, `SourceObservations`, `ReconciliationCopier`, `HandEdits`), then the match and materialize steps |
 | `app/csvimporter/`, `app/apiimporter/` | Parse/download sources and build an `ImportBatch` (DB-free, enforced). A QIF or OFX file (a document format, `ImportFileKind.isDocument`) is staged as a CSV import of its rows over its fixed columns (`stageDocumentImport`: `QifColumns`, one row per transaction or split; `OfxColumns`, one row per `STMTTRN`, its date-time split into Date, Time and UTC Offset), so from then on it is a CSV import like any other. A document is matched to a strategy as a whole (any one row may name the institution), and `documentKind()` tells a QIF or OFX strategy by its identification columns |
 | `app/reconciliation/` | Source-agnostic reconciliation: leg matcher + shadow→real auto-link planner (DB-free, enforced) |
 | `app/strategies/` | Built-in strategy/pass-through definitions in Kotlin — rendered to the `webpage/strategy-library` catalog site by `tools/strategy-catalog` on Pages deploys (DB-free, nothing checked in or seeded). The catalog also publishes the asset list: the ISO 4217 currencies and crypto coins with their aliases (see **Money and Currency Handling**) |
@@ -342,7 +342,9 @@ module that only reads never even has the write interfaces on its compile classp
 inject the write repositories (`# gazelle:kmp_visibility` in its BUILD file): `app/db/core` + `app/db/write` (impls),
 `app/di/core` + `app/db/di` (wiring), `app/importer` (the engine) and `test/app/db` (fixtures), so any other module
 that depends on it fails analysis. Within `app/importer`, `kmp_forbid_reference` keeps `*WriteRepository` to
-`ImportEngineImpl.kt` and its match and materialize steps (`MatchSync.kt`, `ObservationMaterialization.kt`).
+`ImportEngineImpl.kt` and the phases it delegates to (the files its BUILD file's `# gazelle:kmp_allow_reference` lines name):
+the collaborators above and its match and materialize steps (`MatchSync.kt`, `ObservationMaterialization.kt`). A new
+phase that takes a write repository adds its file there.
 
 **The one exception:** `openDatabaseComponent` (`app/db/di`) records this device with `DeviceWriteRepositoryImpl`
 before it builds the graph, and passes the `DeviceId` to `DatabaseComponent.Factory.create`. Every write-repo impl,
@@ -350,7 +352,7 @@ and so the engine, needs the `DeviceId`, so it can't come from the engine. Build
 `openDatabaseComponent`, never `DatabaseComponent.create`.
 
 **How to apply:** to add a write (new field, entity, or config), extend `ImportBatch`/`ImportResult`
-and `ImportEngineImpl`, add a helper if useful, and call it — never inject a `*WriteRepository` outside
+and the engine phase that owns that kind of write (a new phase only for a new kind), add a helper if useful, and call it — never inject a `*WriteRepository` outside
 the engine.
 
 ## Remote Storage (Cloud-backed databases)
