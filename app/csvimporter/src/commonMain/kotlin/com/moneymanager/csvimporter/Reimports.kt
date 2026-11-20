@@ -4,18 +4,12 @@ import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
-import com.moneymanager.domain.model.ImportFileKind
 import com.moneymanager.domain.model.Source
-import com.moneymanager.domain.model.Trade
-import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImport
-import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
-import com.moneymanager.domain.model.csvstrategy.LegAssembly
 import com.moneymanager.domain.model.csvstrategy.TransferField
-import com.moneymanager.domain.model.importFileKind
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.CryptoReadRepository
@@ -24,32 +18,21 @@ import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.ImportRecordReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.assetAliasMap
-import com.moneymanager.importengineapi.CsvGroupedTradeSync
-import com.moneymanager.importengineapi.CsvImportMutation
-import com.moneymanager.importengineapi.CsvTransferSync
-import com.moneymanager.importengineapi.CsvTransferSyncRow
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
-import com.moneymanager.importengineapi.ImportPlanVersion
-import com.moneymanager.importengineapi.PreparedImport
 import com.moneymanager.importengineapi.RerunBlockedException
 import com.moneymanager.importengineapi.RerunFile
 import com.moneymanager.importengineapi.RerunReads
-import com.moneymanager.importengineapi.dedupePolicy
 import com.moneymanager.importengineapi.executeRerun
 import com.moneymanager.tasks.PhasedProgress
 import com.moneymanager.tasks.Progress
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlin.time.Clock
 
 /**
  * The source account and currency a file was last imported with, as its latest application recorded
@@ -178,167 +161,10 @@ class Reimports(
         )
     }
 
-    /** Previews CSV files whose rows produce independent transfers. */
-    suspend fun preview(
-        selection: ReimportAllPlan,
-        accountId: AccountId?,
-        currencyId: CurrencyId?,
-    ): PreparedImport? = writeLock.withLock { planInPlace(selection.files, accountId, currencyId) }
-
-    private suspend fun planInPlace(
-        files: List<CsvImport>,
-        accountId: AccountId?,
-        currencyId: CurrencyId?,
-        strategies: Map<Source, CsvImportStrategy?> = emptyMap(),
-    ): PreparedImport? {
-        val version = importEngine.planVersion() ?: return null
-        val requests =
-            files.map { file ->
-                prepareTransferSync(file, accountId, currencyId, strategies[file.source], version) ?: return null
-            }
-        return importEngine.plan(requests)
-    }
-
-    private suspend fun prepareTransferSync(
-        picked: CsvImport,
-        accountId: AccountId?,
-        currencyId: CurrencyId?,
-        plannedStrategy: CsvImportStrategy?,
-        version: ImportPlanVersion,
-    ): CsvTransferSync? {
-        val kind = importFileKind(picked.originalFileName) ?: return null
-        val file = reads.csvImportRepository.getImport(picked.id).first() ?: return null
-        if (file.lastAppliedAt == null || file.rowCount == 0) return null
-        val strategy = plannedStrategy ?: strategyFor(file, csvImportStrategyRepository.getAllStrategies().first()) ?: return null
-        val config = strategy.config
-        if (kind == ImportFileKind.XLSX && strategy.worksheetName != null &&
-            reads.csvImportRepository.getXlsxBlob(file.id)?.worksheetName != strategy.worksheetName
-        ) {
-            return null
-        }
-        if (kind == ImportFileKind.PDF) {
-            val stagedPdf = reads.csvImportRepository.getPdfSource(file.id) ?: return null
-            val rulesHash = config.pdfLines?.let { PdfRowAssembler.rulesHash(it) }
-            if (stagedPdf.stagedRulesHash != rulesHash) return null
-        }
-        if (config.reconciliation != null ||
-            config.legGroups.any { it.assembly !is LegAssembly.Trade || it.isCrossFileTrade() || it.reconcileWindowSeconds != null } ||
-            config.crossSourceReconcileWindow != null ||
-            config.placeholderReconcileWindow != null || config.duplicateDateTolerance != null ||
-            config.fundingAttributeMatch != null
-        ) {
-            return null
-        }
-
-        val saved = file.importedSettings
-        val effective = strategy.withCurrency((saved.currencyId ?: currencyId).takeIf { strategy.needsCurrencyOverride() })
-        val source = effectiveSourceFor(effective, saved.accountId ?: accountId)
-        val mappings = accountMappingRepository.getAllMappings().first()
-        val aliases = cryptoRepository.assetAliasMap()
-        val passThroughs = passThroughAccountRepository.getAll().first()
-        val matchers = AttributeAccountMatcher.registry(accountAttributeRepository.getAll().first())
-        val rows = reads.csvImportRepository.getImportRows(file.id, limit = file.rowCount, offset = 0)
-        if (rows.any {
-                it.importStatus != null && it.importStatus != ImportStatus.IMPORTED && it.importStatus != ImportStatus.SKIPPED
-            }
-        ) {
-            return null
-        }
-        val accounts = reads.accountRepository
-        val mapped =
-            buildCsvMapper(
-                strategy = effective,
-                columns = file.columns,
-                accounts = accounts.accountsVisibleTo(effective),
-                currencies = currencies(),
-                accountMappings = mappings,
-                sourceAccountOverride = source,
-                passThroughAccounts = passThroughs,
-                historicalAccountNames = accounts.getPreviousAccountNames(),
-                cryptoAssets = cryptoRepository.getAllCryptoAssets().first(),
-                attributeAccountMatchers = matchers,
-                assetAliases = aliases,
-                fileName = file.originalFileName,
-                accountOwnerNames = accounts.getAccountOwnerNames(),
-            ).prepareImport(rows)
-        if (mapped.newAccounts.isNotEmpty() || mapped.errorRows.isNotEmpty() ||
-            mapped.validTransfers.size + mapped.skippedRowIndexes.size != rows.size
-        ) {
-            return null
-        }
-        val assembled = assembleCsvTradeGroups(effective, mapped.validTransfers)
-        val groupedRows = assembled.flatMapTo(mutableSetOf()) { it.group.ownRowIndexes }
-        if (mapped.validTransfers.any { row ->
-                !row.isIndependentBooking(allowGroup = row.rowIndex in groupedRows)
-            } || (assembled.isNotEmpty() && groupedRows.size != mapped.validTransfers.size)
-        ) {
-            return null
-        }
-        val inputsHash = stagedInputsHash(effective, source, mappings, aliases, matchers, passThroughs)
-        return CsvTransferSync(
-            id = file.id,
-            fileChecksum = file.fileChecksum,
-            rows =
-                mapped.validTransfers
-                    .filterNot { it.rowIndex in groupedRows }
-                    .associate { it.rowIndex to CsvTransferSyncRow(it.transfer, it.statementAccountId) },
-            application =
-                CsvImportMutation.RecordApplication(
-                    file.id,
-                    effective.id,
-                    effective.name,
-                    Clock.System.now(),
-                    source,
-                    (effective.config.fieldMappings[TransferField.CURRENCY] as? HardCodedCurrencyMapping)?.currencyId,
-                ),
-            records = recordRowsMutation(file, rows, inputsHash),
-            version = version,
-            dedupePolicy = effective.dedupePolicy(unidentifiedCounterpartyTypeId = null),
-            groupedTrades =
-                assembled.map { trade ->
-                    CsvGroupedTradeSync(
-                        trade.groupKey(effective),
-                        trade.group.ownRowIndexes.toSet(),
-                        Trade(
-                            TradeId(0),
-                            timestamp = trade.timestamp,
-                            description = trade.description,
-                            fromAccountId = trade.ownerAccountId,
-                            from = trade.fromAmount,
-                            toAccountId = trade.ownerAccountId,
-                            to = trade.toAmount,
-                        ),
-                    )
-                },
-        )
-    }
-
-    suspend fun applyPreview(plan: PreparedImport): BulkReimportResult = writeLock.withLock { applyInPlace(plan) }
-
-    private suspend fun applyInPlace(plan: PreparedImport): BulkReimportResult {
-        currentCoroutineContext().ensureActive()
-        return withContext(NonCancellable) {
-            val applied = importEngine.apply(plan)
-            // Finish rebuilding balances if cancellation arrives after SQLite commits the transaction changes.
-            if (applied != null && (applied.created.isNotEmpty() || applied.updated.isNotEmpty() || applied.removed.isNotEmpty())) {
-                maintenance.refreshMaterializedViews()
-            }
-            BulkReimportResult(
-                filesImported = plan.changedFiles,
-                filesUnchanged = plan.files - plan.changedFiles,
-                transfersCreated = applied?.created.orEmpty().size,
-                duplicatesSkipped = 0,
-                filesSkippedNoStrategy = 0,
-                filesFailed = 0,
-                plan = applied ?: plan.preview,
-            )
-        }
-    }
-
     /**
-     * Re-imports every file of [plan]. Eligible CSVs update in one commit. Otherwise one batch deletes what the
-     * files created and resets their rows, then replays them in their original import order. Each row can take its old
-     * ids back. The run releases unclaimed ids, deletes empty accounts and refreshes the materialized views.
+     * Re-imports every file of [plan] (#1510): one batch sets aside what the files created and resets their
+     * rows, then replays them through the normal importer in their original import order. Each row takes its old ids back and
+     * writes only what changed. The run releases unclaimed ids, deletes empty accounts and refreshes the materialized views.
      * [accountId] and [currencyId] are for the files whose last import didn't record them. Progress names each
      * file by [fileLabel], and once [stopRequested] says yes no further file starts (see [runBulkReimport]).
      */
@@ -392,32 +218,24 @@ class Reimports(
         fileLabel: (CsvImport) -> String,
         stopRequested: () -> Boolean,
     ): BulkReimportResult {
-        val run = plan.runFiles()
+        val picked = plan.runFiles()
         checkReimportable(plan, accountId, currencyId)
-        val skipped = plan.files.count { it.rowCount > 0 && plan.strategies[it.source] == null && it !in run }
-        if (run.isNotEmpty() && run.all { isUnchanged(it, plan, accountId, currencyId) }) {
-            // Nothing any file reads changed, so importing them again would book what they booked: the run writes nothing.
+        val skipped = plan.files.count { it.rowCount > 0 && plan.strategies[it.source] == null && it !in picked }
+        // A file nothing it reads changed would book what it booked: it is left out of the run, so it writes nothing.
+        val unchanged = picked.filter { isUnchanged(it, plan, accountId, currencyId) }.toSet()
+        val run = picked - unchanged
+        val rerunFiles = plan.rerunFiles.filter { rerun -> run.any { it.source == rerun.file } }
+        if (picked.isNotEmpty() && run.isEmpty()) {
             return BulkReimportResult(
                 filesImported = 0,
                 transfersCreated = 0,
                 duplicatesSkipped = 0,
                 filesSkippedNoStrategy = skipped,
                 filesFailed = 0,
-                filesUnchanged = run.size,
+                filesUnchanged = unchanged.size,
             )
         }
-        if (run.isNotEmpty() && run.size == plan.files.size) {
-            if (stopRequested()) return BulkReimportResult(0, 0, 0, 0, 0, filesNotStarted = run.size)
-            val prepared = planInPlace(run, accountId, currencyId, plan.strategies)
-            if (prepared != null) {
-                val label = run.singleOrNull()?.let(fileLabel) ?: "${run.size} files"
-                onProgress(Progress("Updating $label", fraction = 0f))
-                val result = applyInPlace(prepared)
-                onProgress(Progress("Re-imported $label", fraction = 1f))
-                return result
-            }
-        }
-        // Three phases, each filling the bar from empty: the one delete batch, then runBulkReimport's two (preparing
+        // Three phases, each filling the bar from empty: the one batch setting the files aside, then runBulkReimport's two (preparing
         // the files, re-importing them). The steps after the last file (settling, empty accounts, views) keep the
         // files' bar where the run left it.
         var lastFileProgress: Progress? = null
@@ -428,7 +246,7 @@ class Reimports(
         }
         val outcome =
             importEngine.executeRerun(
-                files = plan.rerunFiles,
+                files = rerunFiles,
                 resetRecords = ImportBatch(),
                 reads = reads,
                 maintenance = maintenance,
@@ -437,7 +255,7 @@ class Reimports(
                     when {
                         last != null -> onProgress(last.copy(detail = step.detail, item = last.item?.copy(step = step.detail)))
 
-                        // The delete batch; its closing "Re-importing" (no fraction) is the next phase's to say.
+                        // The setting-aside batch; its closing "Re-importing" (no fraction) is the next phase's to say.
                         step.fraction != null -> onProgress(step.copy(phase = REMOVAL_PHASE))
                     }
                 },
@@ -507,6 +325,7 @@ class Reimports(
         return outcome.result.copy(
             filesSkippedNoStrategy = outcome.result.filesSkippedNoStrategy + skipped,
             emptyAccountsDeleted = outcome.deletedEmptyAccounts.size,
+            filesUnchanged = unchanged.size,
             plan = outcome.plan,
         )
     }
@@ -599,9 +418,4 @@ class Reimports(
     private suspend fun currencies(): List<Currency> = currencyRepository.getAllCurrencies().first()
 }
 
-private val REMOVAL_PHASE = Progress.Phase(1, 3, "Removing what the files created")
-
-private fun CsvTransferWithAttributes.isIndependentBooking(allowGroup: Boolean): Boolean =
-    attributes.isEmpty() && feeAmount == null && tradeTo == null && personalCounterpartyName == null &&
-        passThrough == null && (groupLeg == null || allowGroup) && fundingMatchValue == null && unidentifiedCounterpartyAccountId == null &&
-        conversion == null && discoveredMappings.isEmpty()
+private val REMOVAL_PHASE = Progress.Phase(1, 3, "Setting aside what the files created")

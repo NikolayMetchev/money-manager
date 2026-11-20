@@ -106,9 +106,15 @@ fun SourceRerunPreview(
         Text(
             text =
                 buildString {
-                    append("Deletes the $transfers transaction${plural(transfers)}")
+                    append(
+                        "Imports every $recordNoun again with the current strategy and mappings. The $transfers transaction${plural(
+                            transfers,
+                        )}",
+                    )
                     if (trades > 0) append(" and $trades trade${plural(trades)}")
-                    append(" it created, then imports every $recordNoun again with the current strategy and mappings.")
+                    append(
+                        " it created ${if (transfers + trades == 1) "keeps its id" else "keep their ids"}, and only what changed is written.",
+                    )
                 },
             style = MaterialTheme.typography.bodySmall,
         )

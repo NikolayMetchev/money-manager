@@ -15,9 +15,7 @@ import com.moneymanager.domain.model.observation.ImportRecord
 import com.moneymanager.domain.model.observation.ImportRecordId
 import com.moneymanager.domain.model.observation.ImportRecordKey
 import com.moneymanager.domain.model.observation.Observation
-import com.moneymanager.domain.model.observation.ObservationChange
 import com.moneymanager.domain.model.observation.ObservationEnd
-import com.moneymanager.domain.model.observation.ObservationId
 import com.moneymanager.domain.model.observation.ObservationOwner
 import com.moneymanager.domain.model.observation.ObservedValues
 import com.moneymanager.domain.model.rules.SettlementWindow
@@ -78,30 +76,12 @@ class MatchScopeLoader(
     suspend fun load(
         accountIds: Collection<AccountId>,
         families: Map<String, MatchFamily>,
-        changes: List<ObservationChange> = emptyList(),
-        newRecords: List<ImportRecord> = emptyList(),
-        recordHashes: Map<ImportRecordId, String> = emptyMap(),
-        csvFamilies: Map<CsvImportId, String> = emptyMap(),
-    ): List<MatchObservation> {
-        val stored = observations.getObservationsOnAccounts(accountIds)
-        if (changes.isEmpty() && recordHashes.isEmpty() && csvFamilies.isEmpty()) return toMatch(stored, families)
-        val replaced = changes.mapNotNullTo(mutableSetOf()) { it.before?.id }
-        val proposed =
-            changes.mapIndexedNotNull { index, change ->
-                change.after?.let {
-                    Observation(it.storedId ?: ObservationId(-index.toLong() - 1), change.owner, change.slot, it.transactionId, it.content)
-                }
-            }
-        return toMatch(stored.filterNot { it.id in replaced } + proposed, families, newRecords, recordHashes, csvFamilies)
-    }
+    ): List<MatchObservation> = toMatch(observations.getObservationsOnAccounts(accountIds), families)
 
     /** [stored] as the matcher sees it. */
     suspend fun toMatch(
         stored: List<Observation>,
         families: Map<String, MatchFamily>,
-        newRecords: List<ImportRecord> = emptyList(),
-        recordHashes: Map<ImportRecordId, String> = emptyMap(),
-        csvFamilies: Map<CsvImportId, String> = emptyMap(),
     ): List<MatchObservation> {
         val shadow =
             accountAttributes
@@ -112,7 +92,7 @@ class MatchScopeLoader(
         val chainOwners = stored.filter { it.slot.startsWith(CONDUIT_SLOT_PREFIX) }.mapTo(mutableSetOf()) { it.owner }
         val owners = stored.map { it.owner }
         val recordsById =
-            (records.getRecords(owners.filterIsInstance<ObservationOwner.Record>().map { it.recordId }) + newRecords).associateBy { it.id }
+            records.getRecords(owners.filterIsInstance<ObservationOwner.Record>().map { it.recordId }).associateBy { it.id }
         val groupsById =
             records.getGroupsById(owners.filterIsInstance<ObservationOwner.Group>().map { it.groupId }).associateBy { it.id }
         val feeOwners = stored.filter { it.slot == ObservationSlot.FEE }.mapTo(mutableSetOf()) { it.owner }
@@ -129,7 +109,7 @@ class MatchScopeLoader(
                 if (observation.slot.startsWith(ObservationSlot.COPY_PREFIX)) {
                     Origin(MANUAL_FAMILY, "$COPY_CONTAINER:${observation.owner}", observation.slot)
                 } else {
-                    origins.getOrPut(observation.owner) { originOf(observation.owner, recordsById, groupsById, recordHashes, csvFamilies) }
+                    origins.getOrPut(observation.owner) { originOf(observation.owner, recordsById, groupsById) }
                 }
             val family = families[origin.family]
             val attributes = observation.content.attributes
@@ -186,17 +166,15 @@ class MatchScopeLoader(
         owner: ObservationOwner,
         recordsById: Map<ImportRecordId, ImportRecord>,
         groupsById: Map<ImportGroupId, ImportGroup>,
-        recordHashes: Map<ImportRecordId, String>,
-        csvFamilies: Map<CsvImportId, String>,
     ): Origin =
         when (owner) {
             is ObservationOwner.Record -> {
                 val record = checkNotNull(recordsById[owner.recordId]) { "observation owner ${owner.recordId} has no record" }
-                val hash = recordHashes[record.id] ?: record.contentHash
+                val hash = record.contentHash
                 when (val key = record.key) {
                     is ImportRecordKey.CsvRow -> {
                         Origin(
-                            csvFamilies[key.csvImportId] ?: csvFamily(key.csvImportId),
+                            csvFamily(key.csvImportId),
                             csvContainer(key.csvImportId),
                             hash,
                         )

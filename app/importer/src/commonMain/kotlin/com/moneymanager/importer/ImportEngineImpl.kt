@@ -61,7 +61,6 @@ import com.moneymanager.domain.repository.write.CategoryWriteRepository
 import com.moneymanager.domain.repository.write.CryptoWriteRepository
 import com.moneymanager.domain.repository.write.CsvImportStrategyWriteRepository
 import com.moneymanager.domain.repository.write.CsvImportWriteRepository
-import com.moneymanager.domain.repository.write.CsvObservationCommit
 import com.moneymanager.domain.repository.write.CurrencyWriteRepository
 import com.moneymanager.domain.repository.write.ExchangeOrderWriteRepository
 import com.moneymanager.domain.repository.write.HolidayCalendarWriteRepository
@@ -81,7 +80,6 @@ import com.moneymanager.domain.repository.write.RelationshipTypeWriteRepository
 import com.moneymanager.domain.repository.write.RelationshipWrite
 import com.moneymanager.domain.repository.write.RelationshipWriteRepository
 import com.moneymanager.domain.repository.write.SettingsWriteRepository
-import com.moneymanager.domain.repository.write.StaleObservationCommitException
 import com.moneymanager.domain.repository.write.TradeEdit
 import com.moneymanager.domain.repository.write.TradeWriteRepository
 import com.moneymanager.domain.repository.write.TransactionWriteRepository
@@ -98,7 +96,6 @@ import com.moneymanager.importengineapi.CopyEnd
 import com.moneymanager.importengineapi.CopyEnds
 import com.moneymanager.importengineapi.CsvImportMutation
 import com.moneymanager.importengineapi.CsvStrategyMutation
-import com.moneymanager.importengineapi.CsvTransferSync
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.EditGate
 import com.moneymanager.importengineapi.ExpandedRow
@@ -111,8 +108,6 @@ import com.moneymanager.importengineapi.ImportDirectoryMutation
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportOwnershipIntent
-import com.moneymanager.importengineapi.ImportPlan
-import com.moneymanager.importengineapi.ImportPlanVersion
 import com.moneymanager.importengineapi.ImportResult
 import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTradeIntent
@@ -139,12 +134,10 @@ import com.moneymanager.importengineapi.ObservationSlot
 import com.moneymanager.importengineapi.ObservationTransaction
 import com.moneymanager.importengineapi.PassThroughMutation
 import com.moneymanager.importengineapi.PersonMatchKey
-import com.moneymanager.importengineapi.PreparedImport
 import com.moneymanager.importengineapi.ReconciliationLinkMutation
 import com.moneymanager.importengineapi.RelationshipMutation
 import com.moneymanager.importengineapi.ReservedTransactions
 import com.moneymanager.importengineapi.RowOutcome
-import com.moneymanager.importengineapi.StaleImportPlanException
 import com.moneymanager.importengineapi.TradeAttributeMutation
 import com.moneymanager.importengineapi.TradeDedupePolicy
 import com.moneymanager.importengineapi.WriteIntent
@@ -254,125 +247,6 @@ class ImportEngineImpl(
     private val commitLock = Mutex()
     private val writes = MutableStateFlow(0L)
     override val writeVersion: StateFlow<Long> = writes.asStateFlow()
-
-    override suspend fun planVersion(): ImportPlanVersion? = commitLock.withLock { currentPlanVersion() }
-
-    private suspend fun currentPlanVersion(): ImportPlanVersion? =
-        observationRepository?.let { ImportPlanVersion(writes.value, it.changeToken()) }
-
-    override suspend fun plan(requests: List<CsvTransferSync>): PreparedImport? =
-        commitLock.withLock {
-            val version = requests.firstOrNull()?.version ?: return@withLock null
-            val observations = observationRepository ?: return@withLock null
-            val overrides = personOverrideRepository ?: return@withLock null
-            val records = importRecordRepository ?: return@withLock null
-            val relationships = relationshipRepository ?: return@withLock null
-            if (currentPlanVersion() != version) throw StaleImportPlanException()
-            require(requests.map { it.id }.distinct().size == requests.size)
-            val materializer = ObservationMaterializationPlanner(observations, overrides, relationships, placeholderTypeId(), records)
-            val planner =
-                CsvTransferSyncPlanner(
-                    observations,
-                    records,
-                    csvImportRepository,
-                    transactionRepository,
-                    tradeRepository,
-                    relationships,
-                    overrides,
-                    materializer,
-                    ::sourceTransferSnapshots,
-                )
-            val createdBookings = requests.flatMapTo(mutableSetOf()) { csvImportRepository.getTransferIdsCreatedByImport(it.id) }
-            val stillObserved =
-                observations.getTransactionsObservedByOtherRecords(
-                    createdBookings,
-                    requests.mapTo(mutableSetOf()) { it.id },
-                    emptySet(),
-                )
-            val replacedBookings = createdBookings.filterNotTo(mutableSetOf()) { it in stillObserved }
-            val plannedBookings = mutableSetOf<TransactionId>()
-            val earlierBookings = mutableListOf<Transfer>()
-            var allocatedLocals = 0
-            var allocatedRecords = 0
-            val changes =
-                requests.map { request ->
-                    if (request.groupedTrades.isNotEmpty() && requests.size != 1) return@withLock null
-                    require(request.version == version && request.application.id == request.id && request.records.id == request.id)
-                    val change =
-                        planner.plan(request, allocatedLocals, allocatedRecords, replacedBookings, earlierBookings)
-                            ?: return@withLock null
-                    // Plans that both change the same transaction need one merged materialization.
-                    if (change.transactionIds.any { !plannedBookings.add(it) }) return@withLock null
-                    allocatedLocals += change.materialization.newTransactions.size
-                    allocatedRecords += change.newRecords.size
-                    request.rows.values.forEach { input ->
-                        earlierBookings += input.transfer.copy(id = TransferId(-earlierBookings.size.toLong() - 1))
-                    }
-                    request to change
-                }
-            val matcher = matchSync() ?: return@withLock null
-            if (matcher.needsWrites(
-                    proposed = changes.flatMap { (_, change) -> change.materialization.observations },
-                    newRecords = changes.flatMap { (_, change) -> change.newRecords },
-                    recordHashes = changes.flatMap { (_, change) -> change.hashes.entries }.associate { it.toPair() },
-                    csvFamilies = requests.associate { it.id to MatchScopeLoader.csvFamily(it.application.strategyId.toString()) },
-                )
-            ) {
-                return@withLock null
-            }
-            if (currentPlanVersion() != version) throw StaleImportPlanException()
-            CsvPreparedImport(this, version, changes)
-        }
-
-    override suspend fun apply(plan: PreparedImport): ImportPlan? {
-        require(plan is CsvPreparedImport && plan.engine === this)
-        return commitLock.withLock {
-            editGate.ensureWritable()
-            if (currentPlanVersion() != plan.version) throw StaleImportPlanException()
-            if (plan.changedFiles == 0) return@withLock null
-            try {
-                val ids =
-                    checkNotNull(observationRepository).applyObservationChanges(
-                        newTransactions = plan.changed.flatMap { (_, change) -> change.materialization.newTransactions.values },
-                        observations = plan.changed.flatMap { (_, change) -> change.materialization.observations },
-                        rows = plan.changed.flatMap { (_, change) -> change.materialization.rows },
-                        csv =
-                            plan.changed.map { (request, change) ->
-                                val application = request.application
-                                CsvObservationCommit(
-                                    plan.version.database,
-                                    application.id,
-                                    request.fileChecksum,
-                                    application.strategyId,
-                                    application.strategyName,
-                                    application.appliedAt,
-                                    application.accountId,
-                                    application.currencyId,
-                                    change.hashes,
-                                    change.statuses,
-                                    change.newRecords,
-                                )
-                            },
-                    )
-                plan.preview.copy(created = plan.preview.created.map { it.copy(id = ids.getValue(it.id)) })
-            } catch (_: StaleObservationCommitException) {
-                throw StaleImportPlanException()
-            } finally {
-                writes.update { it + 1 }
-            }
-        }
-    }
-
-    private class CsvPreparedImport(
-        val engine: ImportEngineImpl,
-        val version: ImportPlanVersion,
-        entries: List<Pair<CsvTransferSync, CsvTransferChanges>>,
-    ) : PreparedImport {
-        val changed = entries.filter { (_, changes) -> changes.hasWrites }
-        override val preview = entries.fold(ImportPlan()) { combined, (_, changes) -> combined + changes.preview }
-        override val files = entries.size
-        override val changedFiles = changed.size
-    }
 
     override suspend fun import(
         batch: ImportBatch,

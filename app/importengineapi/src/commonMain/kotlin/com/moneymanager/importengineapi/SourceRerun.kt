@@ -217,8 +217,9 @@ suspend fun <R> ImportEngine.executeRerun(
         }
 
     // The records took their old ids back, so a person's overrides, pins and links on them still hold: settling releases
-    // the ids no record took back and rebuilds the overridden ones (#1430). A hand edit on a released id is reported.
-    val settled = if (reserved.ids.isEmpty()) MaterializationReport() else import(ImportBatch(settle = reserved)).materialization
+    // the ids no record took back and rebuilds the overridden ones (#1430). A hand edit on a released id is reported. It runs
+    // even when nothing was vacated: a reserved observation on a transaction another source keeps goes if its record didn't say it.
+    val settled = import(ImportBatch(settle = reserved)).materialization
 
     onProgress?.invoke(Progress("Cleaning up empty accounts"))
     val deletedEmptyAccounts =

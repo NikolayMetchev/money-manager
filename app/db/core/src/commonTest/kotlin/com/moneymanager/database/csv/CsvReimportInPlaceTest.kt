@@ -35,7 +35,6 @@ import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.CsvImportMutation
-import com.moneymanager.importengineapi.EditGate
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportOperation
@@ -45,12 +44,10 @@ import com.moneymanager.importengineapi.ObservationMutation
 import com.moneymanager.importengineapi.ObservationSlot
 import com.moneymanager.importengineapi.ObservationTransaction
 import com.moneymanager.importengineapi.PlannedField
-import com.moneymanager.importengineapi.StaleImportPlanException
 import com.moneymanager.importengineapi.applyCsvImportMutations
 import com.moneymanager.importengineapi.createAccount
 import com.moneymanager.importengineapi.updateCsvStrategy
 import com.moneymanager.test.database.DbTest
-import com.moneymanager.test.database.planFile
 import com.moneymanager.test.database.read.testReads
 import com.moneymanager.test.database.reimportFile
 import com.moneymanager.test.database.reimports
@@ -59,14 +56,13 @@ import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
-class CsvReadOnlyPreviewTest : DbTest() {
+class CsvReimportInPlaceTest : DbTest() {
     private val now = Instant.fromEpochMilliseconds(1_765_000_000_000)
     private val headings = listOf("Date", "Time", "Currency", "Amount", "Corrected", "Description", "Corrected description")
 
@@ -96,10 +92,7 @@ class CsvReadOnlyPreviewTest : DbTest() {
             val previous = repositories.tradeRepository.getTradesByIds(tradeIds).single()
             repositories.importEngine.updateCsvStrategy(corrected(strategy))
             val before = auditCount("trade_audit")
-            val reimports = repositories.reimports()
-            val prepared = assertNotNull(reimports.preview(reimports.planFile(id), null, null))
-
-            val result = reimports.applyPreview(prepared)
+            val result = repositories.reimports().reimportFile(id)
 
             val update = result.plan.updated.single()
             assertEquals(previous.id, update.after.id)
@@ -164,7 +157,7 @@ class CsvReadOnlyPreviewTest : DbTest() {
 
             val result = reimports.reimportFile(id)
 
-            assertEquals(1, result.transfersCreated)
+            assertEquals(1, result.plan.created.size)
             val after = rows(id)
             assertEquals(original, after[0])
             val created = result.plan.created.single()
@@ -191,7 +184,7 @@ class CsvReadOnlyPreviewTest : DbTest() {
             val result = reimports.reimportFile(id)
 
             assertEquals(1, result.filesImported)
-            assertEquals(0, result.transfersCreated)
+            assertEquals(0, result.plan.created.size)
             val update = result.plan.updated.single()
             assertEquals(correctedId, update.after.id)
             assertEquals(staged, rows(id))
@@ -237,10 +230,7 @@ class CsvReadOnlyPreviewTest : DbTest() {
             )
             engine.updateCsvStrategy(skipFirst(first.strategy))
             val before = transferAuditCount()
-            val reimports = repositories.reimports()
-            val prepared = assertNotNull(reimports.preview(reimports.planFile(first.id), null, null))
-
-            val result = reimports.applyPreview(prepared)
+            val result = repositories.reimports().reimportFile(first.id)
 
             assertTrue(result.plan.isEmpty)
             assertEquals(ImportStatus.SKIPPED, rows(first.id).single().importStatus)
@@ -301,7 +291,7 @@ class CsvReadOnlyPreviewTest : DbTest() {
             val restored = reimports.runPlan(reimports.planAll(files))
 
             assertEquals(2, restored.filesImported)
-            assertEquals(2, restored.transfersCreated)
+            assertEquals(2, restored.plan.created.size)
             val after = fixtures.map { rows(it.id) }
             val restoredIds: Set<TransactionId> = after.map { assertNotNull(it.first().transferId) }.toSet()
             assertEquals(
@@ -346,7 +336,7 @@ class CsvReadOnlyPreviewTest : DbTest() {
             engine.updateCsvStrategy(strategy)
             val restored = reimports.reimportFile(id)
 
-            assertEquals(1, restored.transfersCreated)
+            assertEquals(1, restored.plan.created.size)
             val afterRestore = rows(id)
             assertEquals(ImportStatus.IMPORTED, afterRestore[0].importStatus)
             assertEquals(
@@ -360,42 +350,31 @@ class CsvReadOnlyPreviewTest : DbTest() {
         }
 
     @Test
-    fun previewIsReadOnlyAndApplyKeepsIdsAndOverrides() =
+    fun reimportKeepsIdsAndOverridesAndAnUnchangedRunWritesNothing() =
         runDbTest {
             val fixture = stage()
             val (id, strategy) = fixture
             val original = transfer(id)
             editDescription(original, "My description")
-            val before = transfer(id)
             repositories.importEngine.updateCsvStrategy(corrected(strategy))
             val staged = rows(id)
-            val hashes = repositories.importRecordRepository.getCsvImportRecords(id)
-            val balances = repositories.transactionRepository.getAccountBalances().first()
-            val version = repositories.importEngine.writeVersion.value
             val reimports = repositories.reimports()
-            val plan = assertNotNull(reimports.preview(reimports.planFile(id), null, null))
 
-            assertEquals(version, repositories.importEngine.writeVersion.value)
-            assertEquals(before, transfer(id))
-            assertEquals(staged, rows(id))
-            assertEquals(hashes, repositories.importRecordRepository.getCsvImportRecords(id))
-            assertEquals(balances, repositories.transactionRepository.getAccountBalances().first())
+            val result = reimports.reimportFile(id)
+
+            val after = transfer(id)
             assertEquals(
                 listOf(PlannedField.AMOUNT),
-                plan.preview.updated
+                result.plan.updated
                     .single()
                     .fields,
             )
             assertEquals(
                 "My description",
-                plan.preview.conflicts
+                result.plan.conflicts
                     .single()
                     .overrideValue,
             )
-
-            val result = reimports.applyPreview(plan)
-            val after = transfer(id)
-            assertEquals(plan.preview, result.plan)
             assertEquals(original.id, after.id)
             assertEquals("My description", after.description)
             assertEquals(Money.fromDisplayValue("12.00", after.amount.asset), after.amount)
@@ -408,35 +387,10 @@ class CsvReadOnlyPreviewTest : DbTest() {
                 }
             assertEquals(-after.amount.amount, afterBalances[fixture.bank])
             assertEquals(after.amount.amount, afterBalances[fixture.shop])
-            assertFailsWith<StaleImportPlanException> { reimports.applyPreview(plan) }
 
-            val noChange = assertNotNull(reimports.preview(reimports.planFile(id), null, null))
-            assertTrue(noChange.preview.isEmpty)
             val appliedVersion = repositories.importEngine.writeVersion.value
-            assertEquals(1, reimports.applyPreview(noChange).filesUnchanged)
+            assertEquals(1, reimports.reimportFile(id).filesUnchanged)
             assertEquals(appliedVersion, repositories.importEngine.writeVersion.value)
-        }
-
-    @Test
-    fun stalePreviewCannotOverwriteANewerEdit() =
-        runDbTest {
-            val (id, strategy) = stage()
-            repositories.importEngine.updateCsvStrategy(corrected(strategy))
-            val reimports = repositories.reimports()
-            val plan = assertNotNull(reimports.preview(reimports.planFile(id), null, null))
-            val original = transfer(id)
-            val version = repositories.importEngine.writeVersion.value
-            val otherEngine = repositories.createImportEngine(EditGate.AlwaysWritable)
-            editDescription(original, "Later edit", otherEngine)
-            assertEquals(version, repositories.importEngine.writeVersion.value)
-            val edited = transfer(id)
-            val hashes = repositories.importRecordRepository.getCsvImportRecords(id)
-
-            assertFailsWith<StaleImportPlanException> { reimports.applyPreview(plan) }
-            assertEquals(original.amount, edited.amount)
-            assertEquals("Later edit", edited.description)
-            assertEquals(edited, transfer(id))
-            assertEquals(hashes, repositories.importRecordRepository.getCsvImportRecords(id))
         }
 
     private suspend fun rows(id: CsvImportId) = repositories.csvImportRepository.getImportRows(id, limit = 10, offset = 0)

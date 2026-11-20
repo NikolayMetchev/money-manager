@@ -1,8 +1,6 @@
 package com.moneymanager.database.repository.write
 
 import app.cash.sqldelight.async.coroutines.awaitAsOne
-import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
-import com.moneymanager.database.csv.CsvTableManager
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.write.recordSource
 import com.moneymanager.domain.model.AccountId
@@ -24,10 +22,8 @@ import com.moneymanager.domain.model.observation.ObservationId
 import com.moneymanager.domain.model.observation.ObservationOwner
 import com.moneymanager.domain.model.observation.ObservedValues
 import com.moneymanager.domain.repository.ObservationReadRepository
-import com.moneymanager.domain.repository.write.CsvObservationCommit
 import com.moneymanager.domain.repository.write.ObservationWriteRepository
 import com.moneymanager.domain.repository.write.RecordObservationInsert
-import com.moneymanager.domain.repository.write.StaleObservationCommitException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
@@ -41,8 +37,6 @@ class ObservationWriteRepositoryImpl(
     ObservationReadRepository by reader {
     private val queries = database.observationWriteQueries
     private val selectQueries = database.observationSelectQueries
-
-    override suspend fun changeToken(): Long = withContext(coroutineContext) { database.dataChangeToken() }
 
     override suspend fun insertRecordObservations(
         contentHash: String,
@@ -63,20 +57,11 @@ class ObservationWriteRepositoryImpl(
         newTransactions: Collection<TransactionId>,
         observations: List<ObservationChange>,
         rows: List<MaterializedWrite>,
-        csv: List<CsvObservationCommit>,
         reclaimed: Collection<ObservationId>,
     ): Map<TransactionId, TransactionId> {
-        if (csv.isEmpty() && newTransactions.isEmpty() && observations.isEmpty() && rows.isEmpty() && reclaimed.isEmpty()) return emptyMap()
+        if (newTransactions.isEmpty() && observations.isEmpty() && rows.isEmpty() && reclaimed.isEmpty()) return emptyMap()
         return withContext(coroutineContext) {
             queries.transactionWithResult {
-                val csvTables = csv.associateWith { verifyCsvCommit(it) }
-                if (csv.isNotEmpty()) verifyCsvChanges(observations, rows)
-                val recordIds = mutableMapOf<ImportRecordId, ImportRecordId>()
-                for (commit in csv) {
-                    for (record in commit.newRecords) {
-                        recordIds[record.id] = database.insertImportRecord(record.key, record.contentHash)
-                    }
-                }
                 val ids = newTransactions.associateWith { allocate(it.kind()) }
                 for (change in observations) {
                     val before = change.before
@@ -86,9 +71,7 @@ class ObservationWriteRepositoryImpl(
                         val target = ids[after.transactionId] ?: after.transactionId
                         val storedId = after.storedId
                         if (storedId == null) {
-                            val owner = change.owner
-                            val recordId = (owner as? ObservationOwner.Record)?.let { recordIds[it.recordId] }
-                            insert(recordId?.let { ObservationOwner.Record(it) } ?: owner, change.slot, target, after.content)
+                            insert(change.owner, change.slot, target, after.content)
                         } else {
                             checkNotNull(before)
                             if (before.content != after.content) update(storedId, after.content)
@@ -118,60 +101,9 @@ class ObservationWriteRepositoryImpl(
                         }
                     }
                 }
-                for ((commit, table) in csvTables) {
-                    val tableManager = CsvTableManager(database)
-                    commit.statuses.forEach { (index, status) ->
-                        tableManager.updateRowStatus(table, index, status.name)
-                    }
-                    commit.hashes.forEach { (recordId, hash) ->
-                        database.importRecordWriteQueries.updateContentHash(hash, recordId.id)
-                    }
-                    database.recordCsvApplication(
-                        commit.importId,
-                        commit.strategyId,
-                        commit.strategyName,
-                        commit.appliedAt,
-                        commit.accountId,
-                        commit.currencyId,
-                    )
-                }
                 ids
             }
         }
-    }
-
-    private suspend fun verifyCsvCommit(csv: CsvObservationCommit): String {
-        val file =
-            database.csvImportSelectQueries.selectImportById(csv.importId.id.toString()).awaitAsOneOrNull()
-                ?: throw StaleObservationCommitException()
-        if (file.file_checksum != csv.fileChecksum || database.dataChangeToken() != csv.changeToken) {
-            throw StaleObservationCommitException()
-        }
-        return file.table_name
-    }
-
-    private suspend fun verifyCsvChanges(
-        changes: List<ObservationChange>,
-        rows: List<MaterializedWrite>,
-    ) {
-        val valid =
-            changes.all { change ->
-                val before = change.before
-                if (before == null) {
-                    getObservationsOf(change.owner).none { it.slot == change.slot }
-                } else {
-                    getObservationsOf(before.owner).singleOrNull { it.slot == before.slot } == before
-                }
-            } &&
-                rows.filterIsInstance<MaterializedWrite.Update>().all { update ->
-                    val id =
-                        when (update.before.values.kind) {
-                            TransactionKind.TRANSFER -> TransferId(update.transactionId)
-                            TransactionKind.TRADE -> TradeId(update.transactionId)
-                        }
-                    getMaterialized(id) == update.before
-                }
-        if (!valid) throw StaleObservationCommitException()
     }
 
     private suspend fun allocate(kind: TransactionKind): TransactionId {

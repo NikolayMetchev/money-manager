@@ -381,7 +381,7 @@ class SourceRerunE2ETest : DbTest() {
 
             // The delete batch, preparing the files and re-importing them each fill the bar from empty, in that order.
             assertEquals(
-                listOf("Removing what the files created", "Preparing files", "Re-importing files"),
+                listOf("Setting aside what the files created", "Preparing files", "Re-importing files"),
                 progress.mapNotNull { it.phase }.map { it.name }.distinct(),
             )
             assertTrue(progress.all { it.phase?.count == 3 }, "every emission names its phase of three: $progress")

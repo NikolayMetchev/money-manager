@@ -27,15 +27,6 @@ interface ImportEngine {
      */
     val writeVersion: StateFlow<Long> get() = NO_WRITES
 
-    /** Captures the revision before reading the inputs for a preview. */
-    suspend fun planVersion(): ImportPlanVersion? = null
-
-    /** Computes a preview for a supported source without writing. Null means this source requires the regular import. */
-    suspend fun plan(requests: List<CsvTransferSync>): PreparedImport? = null
-
-    /** Commits the prepared changes and returns the plan with allocated IDs, or null if it wrote nothing. */
-    suspend fun apply(plan: PreparedImport): ImportPlan? = error("This engine cannot apply prepared imports")
-
     /**
      * Applies [batch] and returns the outcome (counts, per-row outcomes, and the real ids generated for
      * the batch's create intents — see [ImportResult.createdAccountIds]/`createdCategoryIds`/`createdPersonIds`).

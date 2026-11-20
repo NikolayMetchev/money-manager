@@ -591,20 +591,18 @@ of every card whose owner changed (a token can match other cards too, `7721` in 
 re-import dialog's progress indicators. A card an account
 matches only by a pattern is changed in the account editor.
 
-**Re-import keeps transaction ids.** For CSVs with independent transfers or established same-file trade groups, `Reimports` uses the
-same read-only plan for preview and direct re-import. The engine updates changed transfers in place and applies
-skip-rule and newly staged transfer changes in one commit. It checks potential duplicates and runs the
-matcher on the proposed observations before applying the plan. Other staged files
-(CSV, QIF, OFX, Excel or PDF) and API sessions (`executeApiReimport`) use the shared re-run
-(`app/importengineapi`): it reserves the ids of every transfer and trade the source created (`CsvImportMutation.Reserve`,
+**Re-import keeps transaction ids** (#1510). Every staged file (CSV, QIF, OFX, Excel or PDF, `Reimports`) and API session
+(`executeApiReimport`) re-imports through one shared re-run (`app/importengineapi`), with no separate preview: the dialog
+shows what the source created and reports the changes once the run is done. The re-run reserves the ids of every transfer and trade the source created (`CsvImportMutation.Reserve`,
 `ApiSessionMutation.Reserve`), resets its records, runs the normal import again and settles (`ImportBatch.settle`): each
 record takes its transactions' ids back, so hand edits (person overrides), hand-set trade attributes and hand-made
-relationships stay on them and nothing is replayed. Whatever no record claims again is deleted, a hand-edited one among them
+relationships stay on them and nothing is replayed. A reserved transaction keeps its row until the settle, and a record
+taking it back writes only what changed, so re-importing an unchanged source writes nothing. Whatever no record claims again is deleted, a hand-edited one among them
 is reported in the run's `ImportPlan` (`releasedOverrides`, "hand-edited transactions no longer imported"), and accounts
 the source created that are now empty are deleted. No other file is re-run with it (#1432): what other files' records
 matched or reconciled against is matched again by the engine (`MatchSync`), and an observation from another file keeps
 its transaction alive. Never re-run single rows: a file's rows claim the records they match one at a time, so a
-row run alone can claim the record its neighbour explains (two like £800 payments became one). "Re-import all" removes
+row run alone can claim the record its neighbour explains (two like £800 payments became one). "Re-import all" sets aside
 what every file it was given created in one batch (`executeRerun`, over each `RerunFile`), imports each again in import
 order, then deletes empty accounts once; a file it can't run (strategy, account or currency gone) refuses the whole run
 before anything is deleted (`RerunBlockedException`). Stopping it leaves the files not yet started reset, waiting

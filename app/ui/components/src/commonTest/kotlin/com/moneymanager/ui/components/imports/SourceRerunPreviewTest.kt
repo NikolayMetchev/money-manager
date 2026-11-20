@@ -15,7 +15,7 @@ class SourceRerunPreviewTest {
     private val session = Source.Api(ApiSessionId(1))
 
     @Test
-    fun saysWhatItDeletesAndThatHandEditsStay() =
+    fun saysWhatItKeepsAndThatHandEditsStay() =
         runMoneyManagerComposeUiTest {
             val plan =
                 SourceRerunPlan(
@@ -26,8 +26,8 @@ class SourceRerunPreviewTest {
                 )
             setContent { SourceRerunPreview(plan, recordNoun = "item") }
 
-            onNodeWithText("Deletes the 2 transactions and 1 trade it created", substring = true).assertExists()
-            onNodeWithText("imports every item again", substring = true).assertExists()
+            onNodeWithText("The 2 transactions and 1 trade it created keep their ids", substring = true).assertExists()
+            onNodeWithText("Imports every item again", substring = true).assertExists()
             onNodeWithText("takes its transactions' ids back", substring = true).assertExists()
         }
 
@@ -43,6 +43,6 @@ class SourceRerunPreviewTest {
                 )
             setContent { SourceRerunPreview(plan, recordNoun = "row") }
 
-            onNodeWithText("Deletes the 1 transaction it created", substring = true).assertExists()
+            onNodeWithText("The 1 transaction it created keeps its id", substring = true).assertExists()
         }
 }

@@ -338,12 +338,12 @@ class ImportQifE2ETest {
 
             // Re-import both through the bulk dialog; nothing changed, so both are found unchanged and nothing is written.
             onNodeWithText("Re-import all (2)").performClick()
-            waitUntilExactlyOneExists(hasText("Deletes what the 2 files created", substring = true), timeoutMillis = 15000)
+            waitUntilExactlyOneExists(hasText("Imports the 2 files again", substring = true), timeoutMillis = 15000)
             waitUntilAtLeastOneExists(hasText("Re-import 2 files") and hasClickAction() and isEnabled(), timeoutMillis = 15000)
             onNode(hasText("Re-import 2 files") and hasClickAction()).performClick()
             waitUntilAtLeastOneExists(hasText("Re-imported 0 files · 0 imported · 2 unchanged", substring = true), timeoutMillis = 20000)
             onNodeWithText("Done").performClick()
-            waitUntilDoesNotExist(hasText("Deletes what the 2 files created", substring = true), timeoutMillis = 15000)
+            waitUntilDoesNotExist(hasText("Imports the 2 files again", substring = true), timeoutMillis = 15000)
             waitForIdle()
         }
     }

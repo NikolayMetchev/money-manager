@@ -12,10 +12,7 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.calendar.BusinessDayCalendar
 import com.moneymanager.domain.model.csv.ImportStatus
-import com.moneymanager.domain.model.observation.ImportRecord
-import com.moneymanager.domain.model.observation.ImportRecordId
 import com.moneymanager.domain.model.observation.ImportRecordKey
-import com.moneymanager.domain.model.observation.ObservationChange
 import com.moneymanager.domain.model.observation.ObservationOwner
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.ApiImportStrategyReadRepository
@@ -89,19 +86,7 @@ internal class MatchSync(
         return report
     }
 
-    internal suspend fun needsWrites(
-        proposed: List<ObservationChange>,
-        newRecords: List<ImportRecord>,
-        recordHashes: Map<ImportRecordId, String>,
-        csvFamilies: Map<CsvImportId, String>,
-    ): Boolean = plan(proposed, newRecords, recordHashes, csvFamilies).hasChanges
-
-    private suspend fun plan(
-        proposed: List<ObservationChange> = emptyList(),
-        newRecords: List<ImportRecord> = emptyList(),
-        recordHashes: Map<ImportRecordId, String> = emptyMap(),
-        csvFamilies: Map<CsvImportId, String> = emptyMap(),
-    ): MatchPlan {
+    private suspend fun plan(): MatchPlan {
         val typeIds = attributeTypes.getAll().first().associate { it.name to it.id }
         val allAccounts = accounts.getAllAccounts().first()
         // An account name can repeat; a bridge names the first account of that name, as the importer picks it.
@@ -112,7 +97,7 @@ internal class MatchSync(
                     MatchScopeLoader.apiFamily(it.id.toString()) to
                         it.matchFamily(typeIds, accountIdByName)
                 }
-        val loaded = loader.load(allAccounts.map { it.id }, families, proposed, newRecords, recordHashes, csvFamilies)
+        val loaded = loader.load(allAccounts.map { it.id }, families)
         // A record no strategy here describes (a file or session whose strategy is gone) has no rules to match it
         // by, so the matcher would split whatever its import joined it with: its transaction stays as the import left it.
         val frozen =

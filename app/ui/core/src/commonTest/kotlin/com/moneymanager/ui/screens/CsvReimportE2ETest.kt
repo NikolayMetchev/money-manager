@@ -260,8 +260,8 @@ class CsvReimportE2ETest {
                 )
 
             val result = fixture.reimport(changedStrategy)
-            // Each row keeps its transfer, updated where it stands (#1510).
-            assertEquals(0, result.transfersCreated)
+            // Each row is booked again on the transfer it had, updated where it stands (#1510).
+            assertEquals(2, result.transfersCreated)
             assertEquals(
                 rowsBefore.mapNotNull { it.transferId?.id }.toSet(),
                 result.plan.updated
