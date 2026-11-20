@@ -75,6 +75,8 @@ class ApiImportServiceTest : DbTest() {
 
     private var monzoTransactionsJson = MonzoApiFixtures.TRANSACTIONS_JSON
 
+    private var monzoRejectsToken = false
+
     /** Monzo answers from fixtures; any other host (Starling) fails with a server error. */
     private fun mockProviders(): HttpClientEngine =
         MockEngine { request ->
@@ -83,6 +85,10 @@ class ApiImportServiceTest : DbTest() {
             when {
                 "api.monzo.com" !in url -> {
                     respond("down", HttpStatusCode.InternalServerError)
+                }
+
+                "api.monzo.com" in url && monzoRejectsToken -> {
+                    respond("{\"code\":\"unauthorized.bad_access_token\"}", HttpStatusCode.Unauthorized)
                 }
 
                 else -> {
@@ -334,6 +340,27 @@ class ApiImportServiceTest : DbTest() {
                     .any { it.name == "Alice Confirmed" },
                 "the counterparty's account takes the confirmed name",
             )
+        }
+
+    @Test
+    fun `a rejected token comes back as auth failed with the token page and is reported on the run`() =
+        runDbTest {
+            monzoRejectsToken = true
+            val monzo = connection("Monzo")
+            val vault = unlockedCredentialVault(CredentialBundle(apiCredentials = listOf(monzoSecrets)))
+
+            val (outcome, _) = backgroundScope.runTask { service(vault).download(this, monzo, forceFull = false) }
+
+            assertIs<ApiDownloadOutcome.AuthFailed>(outcome)
+            assertEquals("Monzo", outcome.strategyName)
+            assertEquals("https://developers.monzo.com/", outcome.tokenPageUrl)
+            assertTrue(outcome.connectInstructions.isNotEmpty())
+            assertTrue("https://developers.monzo.com/" in outcome.message)
+
+            val (result, tasks) = backgroundScope.runTask { service(vault).downloadAndImportAll(this, listOf(monzo)) }
+            assertIs<ApiDownloadOutcome.AuthFailed>(result.credentials.single().download)
+            assertEquals(0, result.downloadedCount)
+            assertTrue(tasks.single { it.parentId == null }.issues.any { it.startsWith("Monzo: Monzo rejected the saved access token") })
         }
 
     @Test

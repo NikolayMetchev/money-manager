@@ -68,9 +68,12 @@ private const val UNKNOWN_CSV = "Foo,Bar\n1,2"
 class ImportCommandsTest {
     private val json = Json { ignoreUnknownKeys = true }
 
+    private var rejectToken = false
+
     private val monzoApi =
         MockEngine { request ->
             val url = request.url.toString()
+            if (rejectToken) return@MockEngine respond("{}", HttpStatusCode.Unauthorized)
             respond(
                 content =
                     when {
@@ -286,6 +289,19 @@ class ImportCommandsTest {
             val summary = run.summary()
             assertEquals(null, summary.directories)
             assertEquals(listOf("imported"), checkNotNull(summary.apis).sessions.map { it.status })
+        }
+
+    @Test
+    fun importApisReportsARejectedTokenAsNeedingAttention() =
+        withFixture { fixture ->
+            rejectToken = true
+            val run = fixture.mm("--format", "json", "import", "apis", "--strategy", "monzo")
+
+            assertEquals(ExitCodes.NEEDS_ATTENTION, run.exitCode, run.stderr)
+            val summary = run.summary()
+            assertEquals(listOf("Monzo" to "tokenExpired"), checkNotNull(summary.apis).connections.map { it.strategy to it.status })
+            assertEquals(listOf("tokenExpired"), summary.needsAttention.map { it.kind })
+            assertContains(summary.needsAttention.single().reason, "https://developers.monzo.com/")
         }
 
     @Test
