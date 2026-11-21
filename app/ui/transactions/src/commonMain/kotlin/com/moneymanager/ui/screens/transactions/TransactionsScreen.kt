@@ -83,6 +83,7 @@ import com.moneymanager.ui.foundation.rememberPersistedState
 import com.moneymanager.ui.util.ScreenSizeClass
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.builtins.serializer
 
 @Composable
@@ -212,11 +213,16 @@ fun AccountTransactionsScreen(
         }
 
     // Selected currency state - initialized from parameter
-    var selectedCurrencyId by remember { mutableStateOf(initialCurrencyId) }
+    // Remembered per account so it survives opening an audit trail and coming back (the navigation
+    // entry only carries the currency the screen was first opened with).
+    var selectedCurrencyId by rememberPersistedState(
+        "transactions.currency.${accountId.id}",
+        CurrencyId.serializer().nullable,
+    ) { initialCurrencyId }
 
-    // Sync selectedCurrencyId when parent's initialCurrencyId parameter changes
+    // A currency chosen by navigation (e.g. clicking a row's account) wins over the remembered one.
     LaunchedEffect(initialCurrencyId) {
-        selectedCurrencyId = initialCurrencyId
+        if (initialCurrencyId != null) selectedCurrencyId = initialCurrencyId
     }
 
     // Notify parent when selected currency changes
