@@ -217,6 +217,9 @@ class SantanderQifMapperTest {
                 mapper.mapRow(row("FASTER PAYMENTS RECEIPT REF.Sent from Revolut FROM Nikolay Metchev, 250.00", "250.00")),
             )
         assertTrue(r.newAccounts.isEmpty())
+        assertEquals(revolut.id, r.transfer.sourceAccountId)
+        assertEquals(santander.id, r.transfer.targetAccountId)
+        assertNull(r.personalCounterpartyName)
     }
 
     @Test
