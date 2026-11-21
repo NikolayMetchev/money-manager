@@ -81,15 +81,6 @@ stamp_setting(
     visibility = ["//visibility:public"],
 )
 
-# Runs a test APK's instrumentation on a connected device (kmp_test's `:<name>_device`).
-java_library(
-    name = "device_test_runner",
-    testonly = True,
-    srcs = ["src/com/moneymanager/bazel/kmp/android/DeviceTestRunner.java"],
-    target_compatible_with = ANDROID_ONLY,
-    visibility = ["//visibility:public"],
-)
-
 # The lint AGP runs (#1025), on the classpath AGP resolves for it (`com.android.tools.lint:lint-gradle`).
 
 java_library(

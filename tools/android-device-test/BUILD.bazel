@@ -1,0 +1,18 @@
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+
+# gazelle:kmp_generate true
+
+# Runs a test APK's instrumentation on a device, booting the downloaded emulator when none is connected
+# (bazel/kmp/android's `android_device_test`).
+kmp_library(
+    name = "android-device-test",
+    jvm_srcs = glob(["src/main/kotlin/**/*.kt"]),
+    visibility = ["//visibility:public"],
+)
+
+kmp_test(
+    name = "test",
+    associate = ":android-device-test",
+    jvm_deps = ["//bazel/kmp/deps:kotlin_test"],
+    jvm_srcs = glob(["src/test/kotlin/**/*.kt"]),
+)
