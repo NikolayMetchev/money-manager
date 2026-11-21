@@ -71,7 +71,7 @@ private sealed class AppDatabaseState {
     data object ChoosingDatabase : AppDatabaseState()
 }
 
-private data class RemoteUnlockState(
+internal data class RemoteUnlockState(
     val prompt: String,
     val error: String? = null,
     // True when the restore failed because the cloud connection (refresh token) expired/was revoked:
@@ -440,7 +440,7 @@ private fun AppStartupContent(
 }
 
 @Composable
-private fun RemoteDatabaseUnlockDialog(
+internal fun RemoteDatabaseUnlockDialog(
     state: RemoteUnlockState,
     onUnlock: (String) -> Unit,
     onReconnect: () -> Unit,
