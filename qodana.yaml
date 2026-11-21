@@ -71,6 +71,20 @@ exclude:
       - app/reconciliation/src/commonTest/kotlin/com/moneymanager/reconciliation/BalanceCheckTest.kt
       - app/ui/imports/reconciliation/src/commonMain/kotlin/com/moneymanager/ui/screens/reconciliation/BalanceReconciliationScreen.kt
       - app/ui/imports/reconciliation/src/commonTest/kotlin/com/moneymanager/ui/screens/reconciliation/BalanceReconciliationScreenTest.kt
+      # [5] — the Bazel model's source roots for these expect/actual wrappers and test fixtures carry no package prefix.
+      - app/ui/foundation/src/commonMain/kotlin/com/moneymanager/ui/util/ExposedDropdownMenu.kt
+      - app/ui/foundation/src/jvmMain/kotlin/com/moneymanager/ui/util/ExposedDropdownMenu.jvm.kt
+      - app/ui/foundation/src/webMain/kotlin/com/moneymanager/ui/util/ExposedDropdownMenu.web.kt
+      - app/ui/foundation/src/commonTest/kotlin/com/moneymanager/ui/util/ExposedDropdownMenuTest.kt
+      - app/ui/foundation/src/commonTest/kotlin/com/moneymanager/ui/util/PasswordFieldTest.kt
+      - test/app/ui/src/jvmMain/kotlin/com/moneymanager/ui/test/MoneyManagerComposeUiTest.jvm.kt
+
+  # [5] — a test whose body is `= runMoneyManagerComposeUiTest { ... }` returns that call's value, which the linter
+  # reads as a non-void @Test method; the Kotlin test runners accept it (every Compose UI test here is written so).
+  - name: JUnitMalformedDeclaration
+    paths:
+      - app/ui/foundation/src/commonTest/kotlin/com/moneymanager/ui/util/ExposedDropdownMenuTest.kt
+      - app/ui/foundation/src/commonTest/kotlin/com/moneymanager/ui/util/PasswordFieldTest.kt
 
   # Compose @Composable functions are PascalCase by convention; the community linter has no
   # Compose awareness. ktlint (compose ruleset) polices naming in these modules instead.
@@ -245,6 +259,9 @@ exclude:
   # and its KDoc links that generated MoneyManagerDatabase.
   - name: HasPlatformType
     paths:
+      # [5] — the same `= runMoneyManagerComposeUiTest { ... }` bodies: the type is Unit, not a platform type.
+      - app/ui/foundation/src/commonTest/kotlin/com/moneymanager/ui/util/ExposedDropdownMenuTest.kt
+      - app/ui/foundation/src/commonTest/kotlin/com/moneymanager/ui/util/PasswordFieldTest.kt
       - app/db/write/src/commonMain/kotlin/com/moneymanager/database/write/MoneyManagerDatabaseWrapper.kt
       # [5] — native-only sources belong to no module, so the cinterop calls' types don't resolve.
       - utils/parsers/pdf/src/nativeMain
