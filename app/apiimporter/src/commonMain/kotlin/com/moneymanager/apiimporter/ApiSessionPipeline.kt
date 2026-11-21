@@ -6,6 +6,7 @@ import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiTokenExchange
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
+import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.domain.repository.CryptoReadRepository
@@ -170,6 +171,7 @@ class ApiImportReads(
     val currencyRepository: CurrencyReadRepository,
     val cryptoRepository: CryptoReadRepository,
     val importRecordRepository: ImportRecordReadRepository,
+    val accountMappingRepository: AccountMappingReadRepository,
 )
 
 /**
@@ -191,7 +193,14 @@ suspend fun importApiSession(
     val outcome =
         importByShape(reads, sessionId, strategy, importEngine, counterpartyAccountNames, passThroughAccounts, onProgress, engineBatchSize)
     // Recorded only once the whole session imported, so a stopped import never looks unchanged.
-    val inputsHash = apiSessionInputsHash(strategy, counterpartyAccountNames, passThroughAccounts, reads.cryptoRepository.assetAliasMap())
+    val inputsHash =
+        apiSessionInputsHash(
+            strategy,
+            counterpartyAccountNames,
+            passThroughAccounts,
+            reads.cryptoRepository.assetAliasMap(),
+            reads.globalAccountMappings(),
+        )
     importEngine.import(ImportBatch(apiSessionMutations = listOf(ApiSessionMutation.RecordItems(sessionId, inputsHash))))
     return outcome
 }
@@ -239,6 +248,7 @@ private suspend fun importByShape(
                     counterpartyAccountNames = counterpartyAccountNames,
                     passThroughAccounts = passThroughAccounts,
                     assetAliases = reads.cryptoRepository.assetAliasMap(),
+                    merchantMappings = reads.merchantMappings(passThroughAccounts),
                     onProgress = onProgress ?: {},
                 )
             val people =

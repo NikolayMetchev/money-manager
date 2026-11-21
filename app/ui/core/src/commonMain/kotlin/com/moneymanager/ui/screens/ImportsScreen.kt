@@ -203,6 +203,7 @@ fun ImportsScreen(
                     currencyRepository = currencyRepository,
                     cryptoRepository = cryptoRepository,
                     importRecordRepository = importRecordRepository,
+                    accountMappingRepository = accountMappingRepository,
                     maintenance = maintenance,
                     deviceId = deviceId,
                     apiImportService = apiImportService,
