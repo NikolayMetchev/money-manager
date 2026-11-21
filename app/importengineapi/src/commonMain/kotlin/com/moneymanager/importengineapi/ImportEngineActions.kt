@@ -10,6 +10,8 @@ import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Trade
 import com.moneymanager.domain.model.TradeId
+import com.moneymanager.domain.model.TransactionId
+import com.moneymanager.domain.model.TransferId
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -55,6 +57,40 @@ suspend fun ImportEngine.createCrypto(
             ),
         )
     return requireNotNull(result.createdCryptoIds[key]) { "Crypto asset $code was not created" }
+}
+
+/** Deletes one transaction, a transfer or a trade alike, by id. */
+suspend fun ImportEngine.deleteTransaction(
+    id: TransactionId,
+    source: Source = Source.Manual,
+) {
+    val batch =
+        when (id) {
+            is TransferId -> {
+                ImportBatch(
+                    transfers = listOf(ImportTransfer(source = source, operation = ImportOperation.DELETE, existingId = id)),
+                )
+            }
+
+            is TradeId -> {
+                ImportBatch(
+                    trades =
+                        listOf(
+                            ImportTradeIntent(
+                                key = LocalTradeKey("delete-${id.id}"),
+                                source = source,
+                                operation = ImportOperation.DELETE,
+                                existingId = id,
+                            ),
+                        ),
+                )
+            }
+
+            else -> {
+                error("Unknown transaction kind: $id")
+            }
+        }
+    import(batch)
 }
 
 /** Deletes a crypto asset by id. */

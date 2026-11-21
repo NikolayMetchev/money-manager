@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -77,6 +78,7 @@ fun AccountTransactionCard(
     onEditClick: (Transfer) -> Unit = {},
     onEditTradeClick: (TradeId) -> Unit = {},
     onAuditClick: (TransferId) -> Unit = {},
+    onDeleteClick: (AccountRow) -> Unit = {},
     onFeeLinkClick: (TransferId) -> Unit = {},
     onOrderLinkClick: (ExchangeOrderId) -> Unit = {},
 ) {
@@ -370,6 +372,23 @@ fun AccountTransactionCard(
                 ) {
                     Text(
                         text = "\uD83D\uDCDC",
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                }
+            }
+
+            // Delete button - works on transfers and trades alike
+            TooltipBox(
+                positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+                tooltip = { PlainTooltip { Text("Delete transaction") } },
+                state = rememberTooltipState(),
+            ) {
+                IconButton(
+                    onClick = { onDeleteClick(runningBalance) },
+                    modifier = Modifier.size(24.dp).testTag("deleteTransactionButton"),
+                ) {
+                    Text(
+                        text = "\uD83D\uDDD1\uFE0F",
                         style = MaterialTheme.typography.bodyLarge,
                     )
                 }
