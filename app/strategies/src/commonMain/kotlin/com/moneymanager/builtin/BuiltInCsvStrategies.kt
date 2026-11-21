@@ -1231,6 +1231,8 @@ object BuiltInCsvStrategies {
                 excludeWhen("Status", "^Refused$", "refused"),
                 attribute("Transaction ID", "paypal-transaction-id"),
                 attribute("Item Title", "paypal-item-title"),
+                // Per currency, after the row. A hold (imported excluded) lowers it until its reversal.
+                balance("Balance"),
                 // Informational: Amount is already net of it (it is what moved the balance).
                 attribute("Fees", "paypal-fee", extraction = Extraction(pattern = "^.*[1-9].*$")),
                 // The older export lists every withdrawal to a bank twice: the row that moves the balance (status

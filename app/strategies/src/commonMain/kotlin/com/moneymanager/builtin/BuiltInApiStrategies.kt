@@ -321,6 +321,14 @@ object BuiltInApiStrategies {
                                                 ),
                                                 attribute("transaction_info.transaction_event_code", "paypal-event-code"),
                                                 attribute("payer_info.email_address", "paypal-payer-email"),
+                                                // What the currency's balance holds once the item has happened.
+                                                rule(
+                                                    RuleAction.Balance(
+                                                        amount = ValueExpr.of("transaction_info.ending_balance.value"),
+                                                        currency = ValueExpr.of("transaction_info.ending_balance.currency_code"),
+                                                    ),
+                                                    name = "Statement balance",
+                                                ),
                                             ),
                                     ),
                             ),
@@ -895,11 +903,17 @@ object BuiltInApiStrategies {
                 // "amount" is signed (negative = out), so trust that sign instead of the endpoint's fixed
                 // direction, or the reversal double-books as a second real movement in the same direction.
                 rules =
-                    directionFromSign("amount") +
-                        fee(FeeRule(amount = ValueExpr(listOf("fee")))) +
+                    buildList {
+                        addAll(directionFromSign("amount"))
+                        add(fee(FeeRule(amount = ValueExpr(listOf("fee")))))
                         // `type=all` also returns the trades TradesHistory already supplies: those rows are
                         // ledger trade legs, not transfers.
-                        rule(RuleAction.LedgerTradeLeg, conditions = listOf(Condition("type", ConditionOp.IN, value = "trade"))),
+                        add(rule(RuleAction.LedgerTradeLeg, conditions = listOf(Condition("type", ConditionOp.IN, value = "trade"))))
+                        // Every row reports what its asset holds after it, trade rows included. An Earn sub-holding's
+                        // row (`XETH.F`, `.S`, `.M`) reports that sub-holding alone, while its asset books into the one
+                        // Kraken account with spot (see assetCodes), so only spot rows report the account's balance.
+                        add(balance("balance", conditions = listOf(Condition("asset", ConditionOp.MATCHES, value = "^[^.]+$"))))
+                    },
             )
 
         // DepositStatus/WithdrawStatus supply no money movement of their own — they only enrich the

@@ -139,13 +139,19 @@ internal fun incomingWhen(vararg conditions: Condition): StrategyRule =
 internal fun incomingWhenPositive(amountColumn: String): StrategyRule = incomingWhen(Condition(amountColumn, ConditionOp.POSITIVE))
 
 /**
- * The row reports [column] as what its own account holds once the row has happened, from the time in [atColumn] (the
- * row's own time when null).
+ * The record reports [column] as what its own account holds once it has happened, from the time in [atColumn] (the
+ * record's own time when null), when every one of [conditions] holds.
  */
 internal fun balance(
     column: String,
     atColumn: String? = null,
-): StrategyRule = rule(RuleAction.Balance(ValueExpr.of(column), at = atColumn?.let { ValueExpr.of(it) }), name = "Statement balance")
+    conditions: List<Condition> = emptyList(),
+): StrategyRule =
+    rule(
+        RuleAction.Balance(ValueExpr.of(column), at = atColumn?.let { ValueExpr.of(it) }),
+        conditions = conditions,
+        name = "Statement balance",
+    )
 
 /** The row carries [fee] when every one of [conditions] holds. */
 internal fun fee(

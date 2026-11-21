@@ -53,6 +53,7 @@ import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportOrderIntent
+import com.moneymanager.importengineapi.ImportReportedBalance
 import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTradeIntent
 import com.moneymanager.importengineapi.ImportTransfer
@@ -717,6 +718,18 @@ private data class LedgerReconciledTrades(
     val fundingTransfers: List<ParsedExchangeTransfer>,
 )
 
+/**
+ * The balance an item reports the exchange account holding in [currencyCode] once it has happened (the `balance` rule
+ * action: Kraken's Ledgers `balance`), whatever the item itself books: a transfer, a fee or a ledger trade leg.
+ */
+private data class ParsedReportedBalance(
+    val timestamp: Instant,
+    val currencyCode: String,
+    val amount: BigDecimal,
+    val requestId: ApiRequestId,
+    val jsonPath: String,
+)
+
 /** Accumulator for parsed items across all of a session's responses. */
 private class ParsedExchangeData {
     val trades = mutableListOf<ParsedTrade>()
@@ -724,6 +737,7 @@ private class ParsedExchangeData {
     val orders = mutableListOf<ParsedOrder>()
     val enrichments = mutableListOf<ParsedEnrichment>()
     val ledgerTradeLegs = mutableListOf<ParsedLedgerTradeLeg>()
+    val balances = mutableListOf<ParsedReportedBalance>()
 }
 
 /** Parses one response item into [into] according to its endpoint kind. */
@@ -1271,12 +1285,26 @@ suspend fun importApiSessionExchange(
             )
         }
 
+    // A balance is the exchange account's, in the item's own asset as every other code is resolved: a ledger row reports
+    // what the account holds after it, whatever the row itself books. An asset no movement made isn't created for it.
+    val reportedBalances =
+        parsed.balances.mapNotNull { balance ->
+            val balanceAsset = asset(canonicalAsset(balance.currencyCode)) ?: return@mapNotNull null
+            ImportReportedBalance(
+                record = ImportRecordKey.ApiItem(sessionId, balance.requestId, balance.jsonPath),
+                account = exchangeRef,
+                timestamp = balance.timestamp,
+                amount = Money.fromDisplayValue(balance.amount, balanceAsset),
+            )
+        }
+
     val result =
         importEngine.import(
             ImportBatch(
                 transfers = transferIntents,
                 trades = tradeIntents,
                 orders = orderIntents,
+                reportedBalances = reportedBalances,
                 accountsToCreate = counterpartyIntents,
                 dedupePolicy = strategy.dedupePolicy(unidentifiedCounterpartyAttr, bridges),
                 // An export folds an order's partial fills into one row; this feed reports them one by
@@ -1549,6 +1577,31 @@ private fun parseExchangeTransfer(
             rawAmount.compareTo(BigDecimal.ZERO) != 0 &&
             feeCurrency.equals(currency, ignoreCase = true) &&
             rawFeeAmount.abs().compareTo(rawAmount.abs()) == 0
+
+    outcome.balance?.let { balance ->
+        val amount =
+            rules
+                .resolve(balance.amount, item)
+                .trim()
+                .takeIf { it.isNotEmpty() }
+                ?.let { runCatching { BigDecimal(it) }.getOrNull() }
+        if (amount != null) {
+            // When the feed's running balance counts the item, in the item's own timestamp format; else its own time.
+            val countedAt =
+                balance.at?.let { rules.resolve(it, item).trim() }?.takeIf { it.isNotEmpty() }?.let { raw ->
+                    itemTimestamp(raw, tm.timestampFormat, tm.timestampPattern, windowStart)
+                        ?: error("Failed to parse balance time: $raw")
+                }
+            into.balances +=
+                ParsedReportedBalance(
+                    timestamp = countedAt ?: timestamp,
+                    currencyCode = balance.currency?.let { rules.resolve(it, item).trim() }?.takeIf { it.isNotEmpty() } ?: currency,
+                    amount = amount,
+                    requestId = requestId,
+                    jsonPath = jsonPath,
+                )
+        }
+    }
 
     val result = mutableListOf<ParsedExchangeTransfer>()
     if (outcome.ledgerTradeLeg) {
