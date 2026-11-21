@@ -509,6 +509,9 @@ private fun ActionFields(
             pathField.Field("Balance currency (blank: the record's)", action.currency?.primaryPath.orEmpty(), { path ->
                 onActionChanged(action.copy(currency = action.currency.withPrimaryPath(path)))
             }, false)
+            pathField.Field("Balance counts the record at (blank: the record's time)", action.at?.primaryPath.orEmpty(), { path ->
+                onActionChanged(action.copy(at = action.at.withPrimaryPath(path)))
+            }, false)
         }
 
         is RuleAction.ManualEntry -> {

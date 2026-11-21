@@ -382,6 +382,7 @@ object BuiltInCsvStrategies {
     private const val MARCUS_INTEREST_ACCOUNT = "Marcus Interest"
 
     private const val REVOLUT_STARTED_COLUMN = "Started Date"
+    private const val REVOLUT_COMPLETED_COLUMN = "Completed Date"
 
     /** A column the Revolut strategy's rules write: the row's identity, which the export lacks. */
     private const val REVOLUT_ROW_ID_COLUMN = "Row ID"
@@ -2332,7 +2333,9 @@ object BuiltInCsvStrategies {
                     ),
                     name = "Product, start time, type, description, amount and balance identify a row",
                 ),
-                balance("Balance"),
+                // Revolut's running balance is in completion order: a card payment started on the 26th and completed on
+                // the 28th is in the balance of the 28th, not of the 26th.
+                balance("Balance", atColumn = REVOLUT_COMPLETED_COLUMN),
                 attribute(REVOLUT_ROW_ID_COLUMN, "revolut-row-id", unique = true),
                 attribute("Type", "revolut-type"),
                 rule(
@@ -2405,7 +2408,7 @@ object BuiltInCsvStrategies {
                             "Type",
                             "Product",
                             REVOLUT_STARTED_COLUMN,
-                            "Completed Date",
+                            REVOLUT_COMPLETED_COLUMN,
                             "Description",
                             "Amount",
                             "Fee",

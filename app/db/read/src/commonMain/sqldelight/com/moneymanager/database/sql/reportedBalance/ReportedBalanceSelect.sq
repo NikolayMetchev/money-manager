@@ -31,3 +31,14 @@ selectByRecord:
 SELECT id, account_id, asset_id, timestamp, amount, revision_id
 FROM reported_balance
 WHERE record_id = ?;
+
+-- When one account's balances of one asset count each transaction their records observe: the balance's own time, the
+-- latest where several of them observe it. A statement whose running balance counts a record later than the record's
+-- own time (Revolut's, by completion) counts its transactions then too.
+selectTransactionBalanceTimes:
+SELECT o.transaction_id, MAX(rb.timestamp) AS balance_timestamp
+FROM reported_balance rb
+JOIN observation_record orec ON orec.record_id = rb.record_id
+JOIN observation o ON o.id = orec.observation_id
+WHERE rb.account_id = :accountId AND rb.asset_id = :assetId
+GROUP BY o.transaction_id;

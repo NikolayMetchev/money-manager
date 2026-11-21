@@ -70,7 +70,6 @@ class BalanceReconciliationScreenTest {
         accountId = account,
         counterpartyAccountId = AccountId(8),
         amount = money(amount),
-        excludedReason = null,
     )
 
     // The statement says the balance fell by 30 on day 1; Money Manager booked that payment twice.
@@ -86,6 +85,7 @@ class BalanceReconciliationScreenTest {
             mock {
                 every { getSeries() } returns flowOf(listOf(ReportedBalanceSeries(account, "Revolut", coin, 2, t0 + 1.days)))
                 everySuspend { getBalances(any(), any()) } returns reported
+                everySuspend { getTransactionBalanceTimes(any(), any()) } returns emptyMap()
                 everySuspend { getSources(any()) } returns
                     listOf(
                         SourceRecord(

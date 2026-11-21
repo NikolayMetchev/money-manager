@@ -305,8 +305,13 @@ class AuditSourceCoverageTest : DbTest() {
             // This fails automatically when a new *_audit table appears without test coverage.
             // ---------------------------------------------------------------
             val entityAuditTables =
-                discoverAuditTables() - ATTRIBUTE_AUDIT_TABLES - SOURCELESS_AUDIT_TABLES - PENDING_COVERAGE_AUDIT_TABLES -
-                    COVERED_BY_IMPORT_TESTS
+                buildSet {
+                    addAll(discoverAuditTables())
+                    removeAll(ATTRIBUTE_AUDIT_TABLES)
+                    removeAll(SOURCELESS_AUDIT_TABLES)
+                    removeAll(PENDING_COVERAGE_AUDIT_TABLES)
+                    removeAll(COVERED_BY_IMPORT_TESTS)
+                }
             assertEquals(
                 entityAuditTables,
                 coveredTables,

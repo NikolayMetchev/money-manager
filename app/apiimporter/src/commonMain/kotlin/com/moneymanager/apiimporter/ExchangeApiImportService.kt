@@ -1586,9 +1586,15 @@ private fun parseExchangeTransfer(
                 .takeIf { it.isNotEmpty() }
                 ?.let { runCatching { BigDecimal(it) }.getOrNull() }
         if (amount != null) {
+            // When the feed's running balance counts the item, in the item's own timestamp format; else its own time.
+            val countedAt =
+                balance.at?.let { rules.resolve(it, item).trim() }?.takeIf { it.isNotEmpty() }?.let { raw ->
+                    itemTimestamp(raw, tm.timestampFormat, tm.timestampPattern, windowStart)
+                        ?: error("Failed to parse balance time: $raw")
+                }
             into.balances +=
                 ParsedReportedBalance(
-                    timestamp = timestamp,
+                    timestamp = countedAt ?: timestamp,
                     currencyCode = balance.currency?.let { rules.resolve(it, item).trim() }?.takeIf { it.isNotEmpty() } ?: currency,
                     amount = amount,
                     requestId = requestId,

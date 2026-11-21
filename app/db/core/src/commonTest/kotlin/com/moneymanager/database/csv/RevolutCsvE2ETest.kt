@@ -61,7 +61,8 @@ class RevolutCsvE2ETest : DbTest() {
         currency: String,
         balance: String,
         fee: String = "0.00",
-    ): List<String> = listOf(type, "Current", time, time, description, amount, fee, currency, "COMPLETED", balance)
+        completed: String = time,
+    ): List<String> = listOf(type, "Current", time, completed, description, amount, fee, currency, "COMPLETED", balance)
 
     private val eurFile =
         listOf(
@@ -464,5 +465,44 @@ class RevolutCsvE2ETest : DbTest() {
             repositories.accountRepository.unmergeAccount(merge)
             assertEquals(2, balances.getBalances(revolut.id, eur).size)
             assertEquals(emptyList(), balances.getBalances(other, eur))
+        }
+
+    @Test
+    fun `a balance counts its row when the row completed, as Revolut's running balance does`() =
+        runDbTest {
+            // The card payment started first but completed after the top-up, so the statement's balances run in
+            // completion order: 1000 after the top-up, 977.65 after the payment.
+            apply(
+                stage(
+                    "account-statement_eur.csv",
+                    listOf(
+                        row(
+                            "Card Payment",
+                            "2020-05-26 15:23:24",
+                            "Deichmann",
+                            "-22.35",
+                            "EUR",
+                            "977.65",
+                            completed = "2020-05-28 09:00:00",
+                        ),
+                        row("Topup", "2020-05-27 10:00:00", "Top-up by *1234", "1000.00", "EUR", "1000.00"),
+                    ),
+                ),
+            )
+
+            val balances = reportedBalances("EUR")
+            assertEquals(
+                listOf(Instant.parse("2020-05-27T10:00:00Z"), Instant.parse("2020-05-28T09:00:00Z")),
+                balances.map { it.timestamp },
+            )
+            assertEquals(money("1000", "977.65", currency = "EUR"), balances.amounts())
+
+            // The payment's transaction counts at its balance's time, not at the 26th it is dated.
+            val revolut = accounts().single { it.name == "Revolut" }
+            val eur = balances.first().amount.asset
+            val payment = transfers().single { it.amount.toDisplayValue().compareTo(BigDecimal("22.35")) == 0 }
+            val times = repositories.reportedBalanceRepository.getTransactionBalanceTimes(revolut.id, eur)
+            assertEquals(Instant.parse("2020-05-26T15:23:24Z"), payment.timestamp)
+            assertEquals(Instant.parse("2020-05-28T09:00:00Z"), times[payment.id.id])
         }
 }

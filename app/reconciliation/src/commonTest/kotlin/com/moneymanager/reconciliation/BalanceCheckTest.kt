@@ -116,4 +116,21 @@ class BalanceCheckTest {
 
         assertEquals(listOf(money("30"), money("-30")), result.breaks.map { it.change })
     }
+
+    @Test
+    fun `a leg counts when its statement's balance counts it, not when it started`() {
+        // A card payment started on day 0 completes on day 2; the statement's balance takes it in on day 2, after a
+        // top-up that started and completed on day 1.
+        val payment = leg("-30", 0)
+        val topUp = leg("100", 1)
+        val balances = listOf(balance("100", 1), balance("70", 2))
+
+        val byStart = checkBalances(coin, balances, listOf(payment, topUp))
+        assertEquals(1, byStart.breaks.size, "counted at its start, the payment breaks the day-1 balance")
+
+        val result = checkBalances(coin, balances, listOf(payment, topUp), mapOf(payment.transactionId to t0 + 2.days))
+        assertEquals(money("0"), result.openingOffset)
+        assertTrue(result.breaks.isEmpty(), "breaks: ${result.breaks}")
+        assertEquals(money("70"), result.latest?.computed)
+    }
 }

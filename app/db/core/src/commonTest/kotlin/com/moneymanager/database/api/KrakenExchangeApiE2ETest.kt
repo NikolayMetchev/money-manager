@@ -739,7 +739,7 @@ class KrakenExchangeApiE2ETest : DbTest() {
 
             // The trade and its ledger fee add up to what Kraken says: GBP reconciles from the first balance on.
             val legs = repositories.reconciliationLinkRepository.getLegs(setOf(kraken.id))
-            val gbpCheck = checkBalances(gbp, gbpBalances, legs)
+            val gbpCheck = checkBalances(gbp, gbpBalances, legs, repositories.reportedBalanceRepository.getTransactionBalanceTimes(kraken.id, gbp))
             assertEquals(true, gbpCheck.openingOffset?.isZero())
             assertEquals(emptyList(), gbpCheck.breaks)
         }
