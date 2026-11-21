@@ -3,7 +3,7 @@
 Nothing needs installing: the build downloads what it reads from Google's SDK repository, at the versions `pins.bzl`
 names. `@android_platform` is the `compile_sdk` platform: its `android.jar`, neverlink, as `:android_jar`, and the
 platform laid out as an SDK for lint as `:lint_sdk`. `@android_platform_tools//:adb` is what device tests run through.
-Emulators stay outside the build.
+`@android_emulator` is the emulator and system image the device tests boot when no device is connected.
 
 Both are under the Android SDK License, which the person accepts, not the build: Bazel has no way to ask during a
 build, so until `bazel run //tools/repo-scripts:repo-scripts-tool -- accept-android-license` has recorded it, these
@@ -15,14 +15,18 @@ sets (min, target, compile) and AGP's version, and `:debug.keystore` the debug s
 host's aapt2, the build AGP itself downloads (`pins.bzl`).
 """
 
-load("//bazel/kmp/android:pins.bzl", "AAPT2_BUILD", "AAPT2_SHA256", "ANDROID_PLATFORM", "PLATFORM_TOOLS")
+load("//bazel/kmp/android:pins.bzl", "AAPT2_BUILD", "AAPT2_SHA256", "ANDROID_EMULATOR", "ANDROID_PLATFORM", "ANDROID_SYSTEM_IMAGE", "PLATFORM_TOOLS")
 
 _SDK_REPOSITORY = "https://dl.google.com/android/repository/"
 
 _LICENSE = Label("//bazel/kmp/android:sdk_license.txt")
 
-# repo-scripts' accept-android-license and bazel/ci/accept_android_license.sh write this.
+# The Arm system image (Apple Silicon, Windows on Arm) is under a license that adds a clause on running Arm code.
+_ARM_LICENSE = Label("//bazel/kmp/android:sdk_arm_license.txt")
+
+# repo-scripts' accept-android-license and bazel/ci/accept_android_license.sh write these.
 _LICENSE_RECORD = "money-manager-sdk-license.txt"
+_ARM_LICENSE_RECORD = "money-manager-sdk-arm-license.txt"
 
 _NOT_ACCEPTED = ("Android builds need the Android SDK License accepted. Read and accept it with: " +
                  "bazel run //tools/repo-scripts:repo-scripts-tool -- accept-android-license")
@@ -30,12 +34,17 @@ _NOT_ACCEPTED = ("Android builds need the Android SDK License accepted. Read and
 def _android_user_home(rctx):
     return rctx.getenv("ANDROID_USER_HOME") or (rctx.getenv("HOME", rctx.getenv("USERPROFILE", "")) + "/.android")
 
-def _license_accepted(rctx):
-    record = rctx.path(_android_user_home(rctx) + "/" + _LICENSE_RECORD)
+def _license_accepted(rctx, license = _LICENSE, record_name = _LICENSE_RECORD):
+    record = rctx.path(_android_user_home(rctx) + "/" + record_name)
     rctx.watch(record)
-    return record.exists and rctx.read(record) == rctx.read(_LICENSE)
+    return record.exists and rctx.read(record) == rctx.read(license)
 
 _FAILING_CMD = repr("echo '%s' >&2; exit 1" % _NOT_ACCEPTED)
+
+_ARM_NOT_ACCEPTED = ("The Arm Android system image needs its license accepted. Read and accept it with: " +
+                     "bazel run //tools/repo-scripts:repo-scripts-tool -- accept-android-license arm")
+
+_ARM_FAILING_CMD = repr("echo '%s' >&2; exit 1" % _ARM_NOT_ACCEPTED)
 
 _PLATFORM = """\
 load("@rules_java//java:java_import.bzl", "java_import")
@@ -170,6 +179,68 @@ _platform_tools = repository_rule(
     attrs = {"version": attr.string(mandatory = True)},
 )
 
+_EMULATOR = """\
+exports_files(["emulator.properties"])
+"""
+
+_EMULATOR_NOT_ACCEPTED = """\
+genrule(
+    name = "not_accepted",
+    outs = ["emulator.properties"],
+    cmd = {cmd},
+    visibility = ["//visibility:public"],
+)
+"""
+
+def _cpu(rctx):
+    return "aarch64" if rctx.os.arch in ("aarch64", "arm64") else "x64"
+
+def _emulator_impl(rctx):
+    host = _host(rctx)
+    cpu = _cpu(rctx)
+    key = "%s_%s" % (host, cpu)
+    if key not in ANDROID_EMULATOR:
+        fail("Google publishes no Android emulator for %s (pins.bzl has %s): attach a device and set ANDROID_SERIAL instead" % (
+            key,
+            ", ".join(ANDROID_EMULATOR.keys()),
+        ))
+    if ANDROID_SYSTEM_IMAGE["api"] != str(rctx.attr.target_sdk):
+        fail("pins.bzl has the Android system image for API %s, MODULE.bazel's target_sdk is %s: run bazel/renovate/repin.sh" % (
+            ANDROID_SYSTEM_IMAGE["api"],
+            rctx.attr.target_sdk,
+        ))
+
+    # An Arm host runs Arm images natively, every other host the x86_64 ones.
+    abi = "arm64-v8a" if cpu == "aarch64" else "x86_64"
+    arm = abi == "arm64-v8a"
+    if not _license_accepted(rctx):
+        rctx.file("BUILD.bazel", _EMULATOR_NOT_ACCEPTED.format(cmd = _FAILING_CMD))
+        return
+    if arm and not _license_accepted(rctx, _ARM_LICENSE, _ARM_LICENSE_RECORD):
+        rctx.file("BUILD.bazel", _EMULATOR_NOT_ACCEPTED.format(cmd = _ARM_FAILING_CMD))
+        return
+
+    emulator, emulator_sha256 = ANDROID_EMULATOR[key]
+    rctx.download_and_extract(url = _SDK_REPOSITORY + emulator, sha256 = emulator_sha256, output = "sdk")
+    image, image_sha256 = ANDROID_SYSTEM_IMAGE[abi]
+    image_dir = "system-images/android-%s/%s" % (ANDROID_SYSTEM_IMAGE["api"], ANDROID_SYSTEM_IMAGE["tag"])
+    rctx.download_and_extract(url = _SDK_REPOSITORY + image, sha256 = image_sha256, output = "sdk/" + image_dir)
+
+    # What the runner reads (DeviceTestRunner): everything is relative to this file.
+    rctx.file("emulator.properties", "\n".join([
+        "sdk=sdk",
+        "abi=" + abi,
+        "api=" + ANDROID_SYSTEM_IMAGE["api"],
+        "image=%s/%s" % (image_dir, abi),
+        "",
+    ]))
+    rctx.file("BUILD.bazel", _EMULATOR)
+
+_emulator = repository_rule(
+    implementation = _emulator_impl,
+    attrs = {"target_sdk": attr.int(mandatory = True)},
+)
+
 _VERSIONS = """\
 MIN_SDK = {min}
 TARGET_SDK = {target}
@@ -268,6 +339,7 @@ def _android_sdk_impl(module_ctx):
     _platform(name = "android_platform", compile_sdk = levels[0].compile_sdk, version = platforms[0])
     _platform_tools(name = "android_platform_tools", version = tools[0])
     _aapt2(name = "aapt2", agp = agps[0])
+    _emulator(name = "android_emulator", target_sdk = levels[0].target_sdk)
     return module_ctx.extension_metadata(reproducible = False)
 
 android_sdk = module_extension(
