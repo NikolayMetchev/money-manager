@@ -190,6 +190,36 @@ class SantanderQifMapperTest {
     }
 
     @Test
+    fun `an exact-name mapping applies to the counterparty the payee is extracted to`() {
+        // A merge records "^<name>$" of the account it removed, and that is the extracted counterparty, not the
+        // whole payee text the rule read: it must still route the import to the survivor instead of a new account.
+        val revolut = Account(id = AccountId(13), name = "Revolut", openingDate = now)
+        val mapping =
+            AccountMapping(
+                id = 1L,
+                valuePattern = compileRegex("^\\QRevolut FROM Nikolay Metchev\\E$", RegexOption.IGNORE_CASE),
+                accountId = revolut.id,
+                createdAt = now,
+                updatedAt = now,
+            )
+        val mapper =
+            CsvTransferMapper(
+                strategy = strategy,
+                columns = qifColumns,
+                existingAccounts = mapOf(santander.name to santander, revolut.name to revolut),
+                existingCurrencies = mapOf(gbp.id to gbp),
+                existingCurrenciesByCode = mapOf(gbp.code to gbp),
+                accountMappings = listOf(mapping),
+                sourceAccountOverride = santander.id,
+            )
+        val r =
+            assertIs<MappingResult.Success>(
+                mapper.mapRow(row("FASTER PAYMENTS RECEIPT REF.Sent from Revolut FROM Nikolay Metchev, 250.00", "250.00")),
+            )
+        assertTrue(r.newAccounts.isEmpty())
+    }
+
+    @Test
     fun `content auto-detect picks Santander for santander rows and nothing for another bank`() {
         val strategies = BuiltInCsvStrategies.builtInCsvStrategies(now, CurrencyId(1))
         val santanderRows =

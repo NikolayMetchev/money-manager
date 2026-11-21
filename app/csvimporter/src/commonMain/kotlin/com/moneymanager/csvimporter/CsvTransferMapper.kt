@@ -1192,7 +1192,7 @@ class CsvTransferMapper(
             }
 
             is AccountFromRulesMapping -> {
-                (if (applyPersistedMappings) findPersistedMapping(resolution.sourceValue) else null)
+                (if (applyPersistedMappings) findPersistedMapping(resolution) else null)
                     ?: resolution.attributeAccountId
                     ?: resolveExistingAccountId(resolution.accountName)
                     ?: UNRESOLVED_ACCOUNT_ID // Placeholder for new accounts
@@ -1218,7 +1218,17 @@ class CsvTransferMapper(
         mapping is AccountFromRulesMapping &&
             resolution.naming?.unidentified == true &&
             resolution.accountName.isNotBlank() &&
-            !(applyPersistedMappings && findPersistedMapping(resolution.sourceValue) != null)
+            !(applyPersistedMappings && findPersistedMapping(resolution) != null)
+
+    /**
+     * The persisted mapping for what the rules read on this side: tried against the raw [AccountResolution.sourceValue]
+     * first, then against the [AccountResolution.accountName] the rules made of it. A mapping made by merging an account
+     * (or typed by a person) names the account as it is called, "Revolut FROM Alex", while the source value is the whole
+     * payee text it was extracted from, so matching the source value alone never applied it.
+     */
+    private fun findPersistedMapping(resolution: AccountResolution): AccountId? =
+        findPersistedMapping(resolution.sourceValue)
+            ?: resolution.accountName.takeIf { it.isNotBlank() && it != resolution.sourceValue }?.let { findPersistedMapping(it) }
 
     /**
      * Finds a persisted account mapping whose pattern matches the given account source value
@@ -1249,7 +1259,7 @@ class CsvTransferMapper(
     ): Pair<NewAccount, DiscoveredAccountMapping>? {
         val rulesMapping = mapping as? AccountFromRulesMapping ?: return null
         return when {
-            applyPersistedMappings && findPersistedMapping(resolution.sourceValue) != null -> {
+            applyPersistedMappings && findPersistedMapping(resolution) != null -> {
                 null
             }
 
@@ -1353,7 +1363,7 @@ class CsvTransferMapper(
     ): String? {
         if (mapping !is AccountFromRulesMapping) return null
         return resolution.personName
-            ?.takeIf { it.isNotBlank() && !(applyPersistedMappings && findPersistedMapping(resolution.sourceValue) != null) }
+            ?.takeIf { it.isNotBlank() && !(applyPersistedMappings && findPersistedMapping(resolution) != null) }
     }
 
     /**
@@ -1371,7 +1381,7 @@ class CsvTransferMapper(
             mapping is AccountFromRulesMapping &&
                 resolution.attributeAccountId == null &&
                 it.isNotBlank() &&
-                !(applyPersistedMappings && findPersistedMapping(resolution.sourceValue) != null)
+                !(applyPersistedMappings && findPersistedMapping(resolution) != null)
         }
 
     /**
