@@ -7,9 +7,12 @@ import com.moneymanager.apiimport.ApiSessionImport
 import com.moneymanager.apiimport.ApiSessionImportStatus
 import com.moneymanager.csvimporter.BulkFileOutcome
 import com.moneymanager.csvimporter.BulkFileStatus
+import com.moneymanager.csvimporter.BulkReimportResult
 import com.moneymanager.csvimporter.DirectoryRedownloadResult
 import com.moneymanager.domain.model.importFileKind
 import com.moneymanager.importdirectory.ImportAllResult
+import com.moneymanager.importengineapi.ImportPlan
+import com.moneymanager.importengineapi.MaterializationConflict
 import kotlinx.serialization.Serializable
 
 /**
@@ -20,6 +23,7 @@ import kotlinx.serialization.Serializable
 internal data class ImportJson(
     val directories: DirectoriesImportJson? = null,
     val apis: ApisImportJson? = null,
+    val reimport: ReimportJson? = null,
     val plan: PlanJson,
     val needsAttention: List<NeedsAttentionJson>,
     val errors: List<String>,
@@ -27,7 +31,36 @@ internal data class ImportJson(
     /** Whether anything failed or was left for a person, which exits with [ExitCodes.NEEDS_ATTENTION]. */
     val incomplete: Boolean
         get() =
-            needsAttention.isNotEmpty() || errors.isNotEmpty() || directories?.incomplete == true || apis?.incomplete == true
+            needsAttention.isNotEmpty() ||
+                errors.isNotEmpty() ||
+                directories?.incomplete == true ||
+                apis?.incomplete == true ||
+                reimport?.incomplete == true
+}
+
+/**
+ * What `mm import reimport` did. When a file refused the run ([blocked]) nothing was re-imported and every count is 0.
+ * [handEditedNoLongerImported] are the hand-edited transactions (`"#<id>"`) no record makes any more.
+ */
+@Serializable
+internal data class ReimportJson(
+    val filesImported: Int,
+    val filesUnchanged: Int,
+    val filesSkippedNoStrategy: Int,
+    val filesFailed: Int,
+    val filesNotStarted: Int,
+    val transfersCreated: Int,
+    val duplicatesSkipped: Int,
+    val emptyAccountsDeleted: Int,
+    val handEditedNoLongerImported: List<String>,
+    val blocked: List<String>,
+) {
+    val incomplete: Boolean get() = filesFailed > 0 || filesNotStarted > 0 || blocked.isNotEmpty()
+
+    companion object {
+        /** A run that refused to start because [blocked] files can't be imported again: nothing changed. */
+        fun refused(blocked: List<String>) = ReimportJson(0, 0, 0, 0, 0, 0, 0, 0, emptyList(), blocked)
+    }
 }
 
 @Serializable
@@ -151,6 +184,15 @@ internal data class PlanJson(
             ).joinToString(" · ")
 
     companion object {
+        /** What a re-import's [plan] did, as the re-import dialog reports it. */
+        fun of(plan: ImportPlan) =
+            PlanJson(
+                created = plan.created.size,
+                updated = plan.updated.size,
+                removed = plan.removed.size,
+                conflicts = plan.conflicts.map { it.describe() },
+            )
+
         fun of(
             directories: DirectoriesImportJson?,
             apis: ApisImportJson?,
@@ -170,6 +212,29 @@ internal data class NeedsAttentionJson(
     val subject: String,
     val reason: String,
 )
+
+private fun MaterializationConflict.describe(): String {
+    val what =
+        when (val subject = subject) {
+            is MaterializationConflict.Subject.Field -> subject.field.name
+            is MaterializationConflict.Subject.Attribute -> "attribute ${subject.typeId}"
+        }
+    return "#$transactionId $what: kept '${overrideValue ?: "(removed)"}' over '${importAfter ?: "(none)"}'"
+}
+
+internal fun BulkReimportResult.toJson(blocked: List<String> = emptyList()): ReimportJson =
+    ReimportJson(
+        filesImported = filesImported,
+        filesUnchanged = filesUnchanged,
+        filesSkippedNoStrategy = filesSkippedNoStrategy,
+        filesFailed = filesFailed,
+        filesNotStarted = filesNotStarted,
+        transfersCreated = transfersCreated,
+        duplicatesSkipped = duplicatesSkipped,
+        emptyAccountsDeleted = emptyAccountsDeleted,
+        handEditedNoLongerImported = plan.releasedOverrides.map { "#${it.id}" }.sorted(),
+        blocked = blocked,
+    )
 
 internal fun ImportAllResult.toJson(): DirectoriesImportJson =
     DirectoriesImportJson(

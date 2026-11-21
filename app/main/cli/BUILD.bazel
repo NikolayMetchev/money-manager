@@ -75,6 +75,7 @@ kmp_test(
     deps = [
         "//app/db/core",
         "//app/db/di",
+        "//app/importengineapi",
         "//app/importfilesource/core",
         "//app/importfilesource/di",
         "//app/model/core",
