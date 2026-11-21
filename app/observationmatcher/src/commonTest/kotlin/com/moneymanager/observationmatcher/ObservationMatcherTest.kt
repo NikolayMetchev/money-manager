@@ -222,6 +222,39 @@ class ObservationMatcherTest {
     }
 
     @Test
+    fun `a split pair does not use up the matches of the pairs that are allowed`() {
+        // Days: a = 0, 3 and b = 0, 1, 6, with a person's split between a0 and b0. Pairing a0-b0 first would be refused at the
+        // join and strand a3-b1 as the only pair left; leaving it out of the matching keeps a0-b1 and a3-b0.
+        val a = listOf(0, 3).mapIndexed { i, day -> transfer(i + 1L, "bank-a", "a$i", hour = day * 24, stored = i + 1L) }
+        val b = listOf(0, 1, 6).mapIndexed { i, day -> transfer(i + 11L, "bank-b", "b$i", hour = day * 24, stored = i + 11L) }
+        val withinThreeDays =
+            object : PairRule {
+                override val name = "within three days"
+                override val joinsSameContainer = false
+                override val pairsOneToOne = true
+
+                override fun bucket(observation: MatchObservation): Any = 1
+
+                override fun distance(
+                    a: MatchObservation,
+                    b: MatchObservation,
+                ): Long? {
+                    val seconds =
+                        (a.content.values as ObservedValues.Transfer).timestamp - (b.content.values as ObservedValues.Transfer).timestamp
+                    return seconds.absoluteValue.inWholeSeconds.takeIf { it <= 3.days.inWholeSeconds }
+                }
+            }
+
+        val result =
+            ObservationMatcher(listOf(withinThreeDays))
+                .match(a + b, splits = listOf(ObservationSplit.of(ObservationId(1), ObservationId(11))))
+
+        assertSeparate(result, a[0], b[0])
+        assertSameTransaction(result, a[0], b[1])
+        assertSameTransaction(result, a[1], b[0])
+    }
+
+    @Test
     fun `two observations pinned to different transactions never join`() {
         val a = transfer(1, "csv-a", "k-a", stored = 1, current = 100)
         val b = transfer(2, "csv-b", "k-b", stored = 2, current = 200)

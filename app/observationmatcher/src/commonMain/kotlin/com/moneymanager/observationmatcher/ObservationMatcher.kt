@@ -71,7 +71,10 @@ class ObservationMatcher(
             .entries
             .sortedBy { it.key }
             .map { it.value }) {
-            for (candidate in maximumMatchingFirst(rankCandidates, groups)) {
+            for (candidate in maximumMatchingFirst(rankCandidates, groups) { x, y ->
+                canJoin(observations, groups.members(x), groups.members(y), pinned, apart) &&
+                    rules[rankCandidates.first().rank].joinsGroups(listOf(observations[x]), listOf(observations[y]))
+            }) {
                 val x = groups.find(candidate.a)
                 val y = groups.find(candidate.b)
                 if (x != y && canJoin(observations, groups.members(x), groups.members(y), pinned, apart) &&
@@ -221,11 +224,12 @@ class ObservationMatcher(
     private fun maximumMatchingFirst(
         candidates: List<Candidate>,
         groups: Groups,
+        allowed: (Int, Int) -> Boolean,
     ): List<Candidate> {
         if (!rules[candidates.first().rank].pairsOneToOne) return candidates
 
         fun free(i: Int) = groups.members(groups.find(i)).size == 1
-        val usable = candidates.filter { free(it.a) && free(it.b) }
+        val usable = candidates.filter { free(it.a) && free(it.b) && allowed(it.a, it.b) }
         if (usable.size < 2) return candidates
         val neighbours = mutableMapOf<Int, MutableList<Int>>()
         for (c in usable) {

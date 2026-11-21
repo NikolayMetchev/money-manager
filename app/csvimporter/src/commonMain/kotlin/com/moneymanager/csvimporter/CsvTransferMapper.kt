@@ -1359,7 +1359,8 @@ class CsvTransferMapper(
     /**
      * The name a rule gave the counterparty, person or not: a strategy that doesn't mark its counterparties as
      * people (Revolut's "To <name>") still names the holder when the statement says "To <the holder>", so
-     * [isOwnHolder] reads the account name too. A persisted mapping of the value still wins.
+     * [isOwnHolder] reads the account name too. A persisted mapping of the value still wins, and so does an account an
+     * attribute rule resolved (its identity is known, whatever the statement calls it).
      */
     private fun holderCandidate(
         mapping: FieldMapping,
@@ -1368,6 +1369,7 @@ class CsvTransferMapper(
     ): String? =
         resolution.accountName.takeIf {
             mapping is AccountFromRulesMapping &&
+                resolution.attributeAccountId == null &&
                 it.isNotBlank() &&
                 !(applyPersistedMappings && findPersistedMapping(resolution.sourceValue) != null)
         }
