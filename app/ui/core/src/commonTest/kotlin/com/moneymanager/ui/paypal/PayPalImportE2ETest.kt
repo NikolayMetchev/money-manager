@@ -63,11 +63,13 @@ private data class PayPalItem(
     val status: String = "S",
     val payerName: String? = null,
     val subject: String? = null,
+    val balance: String? = null,
 ) {
     fun json(): String {
         val timestamp = at.toString().replace("Z", "+0000")
         val feeJson = fee?.let { """, "fee_amount": { "currency_code": "$currency", "value": "$it" }""" }.orEmpty()
         val subjectJson = subject?.let { """, "transaction_subject": "$it"""" }.orEmpty()
+        val balanceJson = balance?.let { """, "ending_balance": { "currency_code": "$currency", "value": "$it" }""" }.orEmpty()
         val payerJson =
             payerName
                 ?.let { """, "payer_info": { "email_address": "payer@example.com", "payer_name": { "alternate_full_name": "$it" } }""" }
@@ -79,7 +81,7 @@ private data class PayPalItem(
                 "transaction_event_code": "$eventCode",
                 "transaction_initiation_date": "$timestamp",
                 "transaction_amount": { "currency_code": "$currency", "value": "$amount" },
-                "transaction_status": "$status"$feeJson$subjectJson
+                "transaction_status": "$status"$feeJson$subjectJson$balanceJson
               }$payerJson
             }
         """
@@ -95,14 +97,14 @@ class PayPalImportE2ETest : DbTest() {
     private val items =
         listOf(
             // A payment received: gross 50.00 with a 1.59 fee on top.
-            PayPalItem("PAY1", "T0006", recent, "GBP", "50.00", fee = "-1.59", payerName = "Alice Buyer", subject = "Invoice 7"),
+            PayPalItem("PAY1", "T0006", recent, "GBP", "50.00", fee = "-1.59", payerName = "Alice Buyer", subject = "Invoice 7", balance = "48.41"),
             // A payment sent.
-            PayPalItem("PAY2", "T0006", recent + 1.days, "GBP", "-8.00", payerName = "Coffee Roasters"),
+            PayPalItem("PAY2", "T0006", recent + 1.days, "GBP", "-8.00", payerName = "Coffee Roasters", balance = "40.41"),
             // A currency conversion: GBP out, USD in.
-            PayPalItem("CNV1", "T0200", recent + 2.days, "GBP", "-10.00"),
-            PayPalItem("CNV2", "T0200", recent + 2.days, "USD", "12.50"),
+            PayPalItem("CNV1", "T0200", recent + 2.days, "GBP", "-10.00", balance = "30.41"),
+            PayPalItem("CNV2", "T0200", recent + 2.days, "USD", "12.50", balance = "12.50"),
             // Denied: kept for the record, but excluded from balances.
-            PayPalItem("DEN1", "T0006", recent + 3.days, "GBP", "-99.00", status = "D", payerName = "Coffee Roasters"),
+            PayPalItem("DEN1", "T0006", recent + 3.days, "GBP", "-99.00", status = "D", payerName = "Coffee Roasters", balance = "30.41"),
         )
 
     private class Captured {
@@ -249,6 +251,13 @@ class PayPalImportE2ETest : DbTest() {
             val conversionIn = usdTransfers.single { it.amount.hasDisplayValue("12.50") }
             assertEquals(conversion.id, conversionIn.sourceAccountId)
             assertEquals(usd.id, conversionIn.targetAccountId)
+
+            // Each item reports its currency account's balance after it (the denied one leaves it where it was).
+            val gbpBalances = repositories.reportedBalanceRepository.getBalances(gbp.id, received.amount.asset)
+            assertEquals(4, gbpBalances.size)
+            assertTrue(gbpBalances.zip(listOf("48.41", "40.41", "30.41", "30.41")).all { (b, v) -> b.amount.hasDisplayValue(v) }, "$gbpBalances")
+            val usdBalance = repositories.reportedBalanceRepository.getBalances(usd.id, conversionIn.amount.asset).single()
+            assertTrue(usdBalance.amount.hasDisplayValue("12.50"), "$usdBalance")
         }
 
     @Test

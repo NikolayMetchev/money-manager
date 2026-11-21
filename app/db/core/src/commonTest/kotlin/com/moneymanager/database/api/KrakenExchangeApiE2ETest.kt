@@ -3,10 +3,14 @@ package com.moneymanager.database.api
 import com.moneymanager.apiimporter.importApiSessionExchange
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.model.DeviceInfo
+import com.moneymanager.domain.model.Money
+import com.moneymanager.domain.model.Source
+import com.moneymanager.reconciliation.checkBalances
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
@@ -684,5 +688,59 @@ class KrakenExchangeApiE2ETest : DbTest() {
                     if (transfer.targetAccountId == fees.id) acc + value else acc - value
                 }
             assertEquals(BigDecimal.ZERO, netFee, "a fee charge and its refund must net to zero, not double-charge")
+        }
+
+    @Test
+    fun `ledger rows report the Kraken account's spot balances - trade rows included and Earn sub-holdings left out`() =
+        runDbTest {
+            val trades =
+                """
+                {"error":[],"result":{"trades":{
+                  "TB":{"ordertxid":"O1","pair":"XXBTZGBP","time":1700000002.0,"type":"buy",
+                   "price":"50000","cost":"50.0000","vol":"0.0010000000","fee":"0.1000","trade_id":"t1"}
+                },"count":1}}
+                """.trimIndent()
+            val ledger =
+                """
+                {"error":[],"result":{"ledger":{
+                  "LA":{"refid":"RA","time":1700000001.0,"type":"deposit","asset":"ZGBP","amount":"100.0000","fee":"0.0000","balance":"100.0000"},
+                  "LB":{"refid":"TB","time":1700000002.0,"type":"trade","asset":"ZGBP","amount":"-50.0000","fee":"0.1000","balance":"49.9000"},
+                  "LC":{"refid":"TB","time":1700000002.0,"type":"trade","asset":"XXBT","amount":"0.0010000000","fee":"0.0000000000","balance":"0.0010000000"},
+                  "LD":{"refid":"RD","time":1700000003.0,"type":"transfer","asset":"XXBT","amount":"-0.0004000000","fee":"0.0000000000","balance":"0.0006000000"},
+                  "LE":{"refid":"RE","time":1700000003.0,"type":"transfer","asset":"XXBT.F","amount":"0.0004000000","fee":"0.0000000000","balance":"0.0004000000"}
+                },"count":5}}
+                """.trimIndent()
+            stageSessionAndImport(
+                trades = trades,
+                deposits = ledger,
+                withdrawals = """{"error":[],"result":{"ledger":{},"count":0}}""",
+                depositStatus = """{"error":[],"result":[]}""",
+            )
+
+            val kraken =
+                repositories.accountRepository
+                    .getAllAccounts()
+                    .first()
+                    .single { it.name == "Kraken" }
+            val gbp = assertNotNull(repositories.currencyRepository.getCurrencyByCode("GBP").first())
+            val btc = assertNotNull(repositories.cryptoRepository.getCryptoAssetByCode("BTC").first())
+            val gbpBalances = repositories.reportedBalanceRepository.getBalances(kraken.id, gbp)
+            val btcBalances = repositories.reportedBalanceRepository.getBalances(kraken.id, btc)
+
+            assertEquals(listOf("100", "49.9").map { Money.fromDisplayValue(BigDecimal(it), gbp) }, gbpBalances.map { it.amount })
+            // The Earn row (XXBT.F) reports the Earn sub-holding, not the account, so only the spot rows count.
+            assertEquals(listOf("0.001", "0.0006").map { Money.fromDisplayValue(BigDecimal(it), btc) }, btcBalances.map { it.amount })
+            val paths =
+                (gbpBalances + btcBalances).map { balance ->
+                    val source = repositories.reportedBalanceRepository.getSources(balance.id).single().source
+                    assertIs<Source.Api>(source).jsonPath?.value
+                }
+            assertEquals(listOf("$.result.ledger.LA", "$.result.ledger.LB", "$.result.ledger.LC", "$.result.ledger.LD"), paths)
+
+            // The trade and its ledger fee add up to what Kraken says: GBP reconciles from the first balance on.
+            val legs = repositories.reconciliationLinkRepository.getLegs(setOf(kraken.id))
+            val gbpCheck = checkBalances(gbp, gbpBalances, legs)
+            assertEquals(true, gbpCheck.openingOffset?.isZero())
+            assertEquals(emptyList(), gbpCheck.breaks)
         }
 }

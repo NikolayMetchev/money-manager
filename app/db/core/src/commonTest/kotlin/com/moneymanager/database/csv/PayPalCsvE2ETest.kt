@@ -17,6 +17,7 @@ import com.moneymanager.domain.model.csvstrategy.FieldMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.importengineapi.createAccount
+import com.moneymanager.reconciliation.checkBalances
 import com.moneymanager.tasks.Progress
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.planFile
@@ -118,12 +119,13 @@ class PayPalCsvE2ETest : DbTest() {
         id: String,
         zone: String = "GMT",
         status: String = "Completed",
-    ): List<String> = listOf(date, time, zone, name, type, status, currency, amount, "0.00", amount, "", "", "0.00", id, "")
+        balance: String = "0.00",
+    ): List<String> = listOf(date, time, zone, name, type, status, currency, amount, "0.00", amount, "", "", balance, id, "")
 
     private val payPalFile =
         listOf(
             payPalRow("02/11/2025", "11:55:15", "UBER PAYMENTS UK LIMITED", "Pre-approved Payment Bill User Payment", "GBP", "-21.92", "1"),
-            payPalRow("02/11/2025", "11:55:15", "", "General Credit Card Deposit", "GBP", "21.92", "2"),
+            payPalRow("02/11/2025", "11:55:15", "", "General Credit Card Deposit", "GBP", "21.92", "2", balance = "21.92"),
             payPalRow(
                 "20/10/2025",
                 "21:15:01",
@@ -134,13 +136,13 @@ class PayPalCsvE2ETest : DbTest() {
                 "3",
                 "BST",
             ),
-            payPalRow("20/10/2025", "21:15:01", "", "General Credit Card Deposit", "GBP", "3.14", "4", "BST"),
+            payPalRow("20/10/2025", "21:15:01", "", "General Credit Card Deposit", "GBP", "3.14", "4", "BST", balance = "3.14"),
             payPalRow("20/10/2025", "21:15:01", "", "General Currency Conversion", "GBP", "-3.14", "5", "BST"),
-            payPalRow("20/10/2025", "21:15:01", "", "General Currency Conversion", "USD", "4.04", "6", "BST"),
+            payPalRow("20/10/2025", "21:15:01", "", "General Currency Conversion", "USD", "4.04", "6", "BST", balance = "4.04"),
             payPalRow("17/10/2025", "09:57:32", "Pret-a-Portrait Ltd", "Express Checkout Payment", "GBP", "-17.39", "7", "BST"),
-            payPalRow("17/10/2025", "09:57:32", "", "General Credit Card Deposit", "GBP", "17.39", "8", "BST"),
+            payPalRow("17/10/2025", "09:57:32", "", "General Credit Card Deposit", "GBP", "17.39", "8", "BST", balance = "17.39"),
             // Money received and sent on to the bank: no card involved, nothing to reconcile.
-            payPalRow("10/10/2025", "07:34:03", "Frank Frumento", "Mobile Payment", "GBP", "8.00", "9", "BST"),
+            payPalRow("10/10/2025", "07:34:03", "Frank Frumento", "Mobile Payment", "GBP", "8.00", "9", "BST", balance = "8.00"),
             payPalRow("10/10/2025", "08:32:34", "", "General Withdrawal", "GBP", "-8.00", "10", "BST", status = "Processing"),
         )
 
@@ -678,5 +680,24 @@ class PayPalCsvE2ETest : DbTest() {
                     .filter { it.isExcluded() }
             assertEquals(5, excluded.size, "the echo, both authorisations, the refused deposit and the request are excluded")
             assertTrue(excluded.none { it.description == "Jason Tan" })
+        }
+
+    @Test
+    fun `the export's balance column reconciles per currency on the PayPal account`() =
+        runDbTest {
+            importPayPal()
+
+            val payPal = account("PayPal")
+            val legs = repositories.reconciliationLinkRepository.getLegs(setOf(payPal.id))
+            val series = repositories.reportedBalanceRepository.getSeries().first()
+            assertEquals(listOf("PayPal" to "GBP", "PayPal" to "USD"), series.map { it.accountName to it.asset.code })
+            for (currency in series.map { it.asset }) {
+                val reported = repositories.reportedBalanceRepository.getBalances(payPal.id, currency)
+                val check = checkBalances(currency, reported, legs)
+                // Card deposit, conversion and payment in one second end at what PayPal says, whatever their order.
+                assertEquals(true, check.openingOffset?.isZero(), "${currency.code} opening offset")
+                assertEquals(emptyList(), check.breaks, "${currency.code} breaks")
+            }
+            assertEquals(8, repositories.reportedBalanceRepository.getBalances(payPal.id, series.first().asset).size)
         }
 }
