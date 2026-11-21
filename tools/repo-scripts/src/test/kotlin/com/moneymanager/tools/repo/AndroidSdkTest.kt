@@ -37,8 +37,29 @@ class AndroidSdkTest {
         url: String,
         sha1: String,
         host: String? = null,
+        arch: String? = null,
     ) = "<archive><complete><checksum type=\"sha1\">$sha1</checksum><url>$url</url></complete>" +
-        host?.let { "<host-os>$it</host-os>" }.orEmpty() + "</archive>"
+        host?.let { "<host-os>$it</host-os>" }.orEmpty() + arch?.let { "<host-arch>$it</host-arch>" }.orEmpty() + "</archive>"
+
+    private val emulatorBytes = "emulator".toByteArray()
+    private val imageBytes = "image".toByteArray()
+
+    /** What sys-img/aosp_atd's index lists: both ABIs of the target level on the stable channel, a newer one on another. */
+    private fun imageIndex(license: String = "Arm terms") =
+        """
+        <sdk-sys-img>
+          <license id="android-sdk-arm-dbt-license" type="text">$license</license>
+          <remotePackage path="system-images;android-36;aosp_atd;x86_64"><channelRef ref="channel-0"/><archives>
+            ${archive("x86_64-36_r01.zip", sha1(imageBytes))}
+          </archives></remotePackage>
+          <remotePackage path="system-images;android-36;aosp_atd;arm64-v8a"><channelRef ref="channel-0"/><archives>
+            ${archive("arm64-v8a-36_r01.zip", sha1(imageBytes))}
+          </archives></remotePackage>
+          <remotePackage path="system-images;android-36;aosp_atd;x86_64"><channelRef ref="channel-3"/><archives>
+            ${archive("x86_64-36_r09.zip", "0")}
+          </archives></remotePackage>
+        </sdk-sys-img>
+        """.trimIndent()
 
     private fun index(platformSha1: String = sha1(platformZip)) =
         """
@@ -49,6 +70,14 @@ class AndroidSdkTest {
           </archives></remotePackage>
           <remotePackage path="platforms;android-38.0"><channelRef ref="channel-0"/><archives>
             ${archive("platform-38.0_r01.zip", platformSha1)}
+          </archives></remotePackage>
+          <remotePackage path="emulator"><channelRef ref="channel-2"/><archives>
+            ${archive("emulator-linux_x64-2.zip", "0", "linux", "x64")}
+          </archives></remotePackage>
+          <remotePackage path="emulator"><channelRef ref="channel-0"/><archives>
+            ${archive("emulator-linux_x64-1.zip", sha1(emulatorBytes), "linux", "x64")}
+            ${archive("emulator-darwin_aarch64-1.zip", sha1(emulatorBytes), "macosx", "aarch64")}
+            ${archive("emulator-windows_x64-1.zip", sha1(emulatorBytes), "windows", "x64")}
           </archives></remotePackage>
           <remotePackage path="platform-tools"><channelRef ref="channel-3"/><archives>
             ${archive("platform-tools_r38.0.1-linux.zip", "0", "linux")}
@@ -66,7 +95,7 @@ class AndroidSdkTest {
         platform: String = "38.0_r01",
         tools: String = "38.0.0",
     ) = "android_sdk.platform(version = \"$platform\")\n\nandroid_sdk.platform_tools(version = \"$tools\")\n\n" +
-        "android_sdk.levels(\n    compile_sdk = $compileSdk,\n    min_sdk = 30,\n)\n"
+        "android_sdk.levels(\n    compile_sdk = $compileSdk,\n    min_sdk = 30,\n    target_sdk = 36,\n)\n"
 
     private val module = file("MODULE.bazel", moduleText())
     private val license = file("license.txt", "old terms")
@@ -80,8 +109,13 @@ class AndroidSdkTest {
             "    \"file\": \"$platformFile\",\n    \"sha256\": \"${"a".repeat(64)}\",\n}\n\nPLATFORM_TOOLS = {\n" +
             "    \"linux\": [\"$linuxTools\", \"${"b".repeat(64)}\"],\n" +
             "    \"osx\": [\"old-darwin.zip\", \"${"b".repeat(64)}\"],\n" +
-            "    \"windows\": [\"old-win.zip\", \"${"b".repeat(64)}\"],\n}\n",
+            "    \"windows\": [\"old-win.zip\", \"${"b".repeat(64)}\"],\n}\n" + emulatorPins(),
     )
+
+    private fun emulatorPins(linuxEmulator: String = "old.zip") =
+        "\nANDROID_EMULATOR = {\n    \"linux_x64\": [\"$linuxEmulator\", \"${"c".repeat(64)}\"],\n}\n" +
+            "\nANDROID_SYSTEM_IMAGE = {\n    \"api\": \"35\",\n    \"tag\": \"aosp_atd\",\n" +
+            "    \"x86_64\": [\"sys-img/aosp_atd/x86_64-36_r01.zip\", \"${"d".repeat(64)}\"],\n}\n"
 
     private fun fakeDownload(
         asked: MutableList<String>,
@@ -92,6 +126,9 @@ class AndroidSdkTest {
             when {
                 url.endsWith("repository2-3.xml") -> index.toByteArray()
                 url.endsWith("platform-38.0_r01.zip") -> platformZip
+                url.endsWith("sys-img/aosp_atd/sys-img2-3.xml") -> imageIndex().toByteArray()
+                url.contains("emulator-") -> emulatorBytes
+                url.contains("sys-img/aosp_atd/") -> imageBytes
                 else -> toolsBytes
             }
         }
@@ -154,7 +191,19 @@ class AndroidSdkTest {
         val asked = mutableListOf<String>()
         repinAndroidSdk(module, pins, license, fakeDownload(asked))
 
-        assertEquals(listOf("repository2-3.xml", "platform-tools_r38.0.0-darwin.zip", "platform-tools_r38.0.0-win.zip"), asked)
+        assertEquals(
+            listOf(
+                "repository2-3.xml",
+                "platform-tools_r38.0.0-darwin.zip",
+                "platform-tools_r38.0.0-win.zip",
+                "sys-img2-3.xml",
+                "emulator-linux_x64-1.zip",
+                "emulator-darwin_aarch64-1.zip",
+                "emulator-windows_x64-1.zip",
+                "arm64-v8a-36_r01.zip",
+            ),
+            asked,
+        )
         assertTrue(pins.readText().contains("\"sha256\": \"${"a".repeat(64)}\""))
         assertTrue(pins.readText().contains("\"linux\": [\"platform-tools_r38.0.0-linux.zip\", \"${"b".repeat(64)}\"]"))
     }
@@ -167,6 +216,36 @@ class AndroidSdkTest {
             repinAndroidSdk(module, pins, license, fakeDownload(mutableListOf(), index(platformSha1 = "0".repeat(40))))
         }
         assertEquals(before, pins.readText())
+    }
+
+    @Test
+    fun `the stable emulator and the target level's system images are pinned, each host and ABI by its own archive`() {
+        val pins = pins().also { it.writeText(it.readText().replace("x86_64-36_r01.zip", "stale.zip")) }
+        repinAndroidSdk(module, pins, license, fakeDownload(mutableListOf()))
+
+        val text = pins.readText()
+        val emulator = sha256Hex(emulatorBytes)
+        assertTrue(text.contains("\"linux_x64\": [\"emulator-linux_x64-1.zip\", \"$emulator\"]"))
+        assertTrue(text.contains("\"osx_aarch64\": [\"emulator-darwin_aarch64-1.zip\", \"$emulator\"]"))
+        assertTrue(text.contains("\"windows_x64\": [\"emulator-windows_x64-1.zip\", \"$emulator\"]"))
+        assertFalse(text.contains("emulator-linux_x64-2.zip"))
+        val image = sha256Hex(imageBytes)
+        assertTrue(text.contains("\"api\": \"36\""))
+        assertTrue(text.contains("\"arm64-v8a\": [\"sys-img/aosp_atd/arm64-v8a-36_r01.zip\", \"$image\"]"))
+        assertTrue(text.contains("\"x86_64\": [\"sys-img/aosp_atd/x86_64-36_r01.zip\", \"$image\"]"))
+        assertFalse(text.contains("r09"))
+    }
+
+    @Test
+    fun `the Arm image's license is kept beside the SDK's`() {
+        repinAndroidSdk(module, pins(), license, fakeDownload(mutableListOf()))
+        assertEquals("Arm terms", File(dir, "sdk_arm_license.txt").readText())
+    }
+
+    @Test
+    fun `an API level with no stable system image is refused`() {
+        module.writeText(moduleText().replace("target_sdk = 36", "target_sdk = 12"))
+        assertFailsWith<IllegalStateException> { repinAndroidSdk(module, pins(), license, fakeDownload(mutableListOf())) }
     }
 
     @Test
