@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.moneymanager.coroutines.runCatchingCancellable
 import com.moneymanager.credentialvault.CredentialVault
 import com.moneymanager.credentialvault.CredentialVaultLockedException
 import com.moneymanager.credentialvault.VaultState
@@ -220,9 +221,9 @@ private fun pollLocalChanges(
         if (remote == null || !bound) return@LaunchedEffect
         while (true) {
             if (connected) {
-                runCatching { remote.refreshLocalDirty(session.database) }
+                runCatchingCancellable { remote.refreshLocalDirty(session.database) }
             } else {
-                unconnectedChanges = runCatching { remote.hasUnsyncedChanges(session.database) }.getOrDefault(false)
+                unconnectedChanges = runCatchingCancellable { remote.hasUnsyncedChanges(session.database) }.getOrDefault(false)
             }
             delay(LOCAL_CHANGES_INTERVAL)
         }

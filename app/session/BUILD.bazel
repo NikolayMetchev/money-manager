@@ -54,6 +54,7 @@ kmp_library(
     deps = [
         "//app/csvimporter",
         "//app/query",
+        "//utils/coroutines",
         "@maven_kmp//:kermit",
     ],
 )

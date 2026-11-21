@@ -2,6 +2,7 @@ package com.moneymanager.apiimporter
 
 import co.touchlab.kermit.Logger
 import com.moneymanager.bigdecimal.BigDecimal
+import com.moneymanager.coroutines.runCatchingCancellable
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
@@ -189,7 +190,7 @@ suspend fun downloadApiSessionExchange(
             if (sync == null) {
                 0L
             } else {
-                runCatching {
+                runCatchingCancellable {
                     val url = buildExchangeEndpointUrl(strategy.config.baseUrl, sync.path)
                     val body = apiClient.send(method = "GET", url = url, storeResponse = false).body
                     val serverMillis =

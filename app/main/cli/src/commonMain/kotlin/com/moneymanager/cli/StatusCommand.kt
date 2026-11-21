@@ -3,6 +3,7 @@ package com.moneymanager.cli
 import com.github.ajalt.clikt.command.SuspendingCliktCommand
 import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.requireObject
+import com.moneymanager.coroutines.runCatchingCancellable
 import com.moneymanager.credentialvault.VaultState
 import com.moneymanager.session.bindingFor
 import kotlinx.serialization.Serializable
@@ -54,7 +55,12 @@ internal class StatusCommand : SuspendingCliktCommand(name = "status") {
                                 status =
                                     controller.syncState.value.status.name
                                         .lowercase(),
-                                localChanges = runCatching { controller.hasUnsyncedChanges(session.database) }.getOrDefault(true),
+                                localChanges =
+                                    runCatchingCancellable {
+                                        controller.hasUnsyncedChanges(
+                                            session.database,
+                                        )
+                                    }.getOrDefault(true),
                             )
                         },
                     vault =

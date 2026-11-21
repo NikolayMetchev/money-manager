@@ -1,5 +1,7 @@
 package com.moneymanager.ui.components.imports
 
+import kotlinx.coroutines.CancellationException
+
 /** What to report after staging a batch of picked files; see [importPickedFiles]. */
 data class BulkFileImportOutcome(
     val message: String,
@@ -22,6 +24,8 @@ suspend fun <T> importPickedFiles(
     for (file in files) {
         try {
             if (stageFile(file)) imported++ else skipped++
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (expected: Exception) {
             failures.add("${fileName(file)}: ${expected.message}")
         }

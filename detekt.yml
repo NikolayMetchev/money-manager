@@ -44,6 +44,11 @@ potential-bugs:
     active: false
 
 style:
+  # A screen's save, delete and load handlers each rethrow a cancellation before reporting their own failure.
+  ThrowsCount:
+    active: true
+    ignoreAnnotated:
+      - 'Composable'
   MagicNumber:
     active: false
   MaxLineLength:

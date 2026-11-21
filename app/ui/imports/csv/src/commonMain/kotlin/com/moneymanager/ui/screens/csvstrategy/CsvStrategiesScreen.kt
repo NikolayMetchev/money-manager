@@ -56,6 +56,7 @@ import com.moneymanager.domain.strategy.CsvStrategyImportExport
 import com.moneymanager.domain.strategy.StrategyLibrary
 import com.moneymanager.humanreadable.HumanReadable
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 @Composable
@@ -117,6 +118,8 @@ fun CsvStrategiesScreen(
                             importParseResult = parseResult
                             importError = null
                             exportError = null
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
                         } catch (expected: Exception) {
                             importError = "Failed to parse file: ${expected.message}"
                             importParseResult = null
@@ -142,6 +145,8 @@ fun CsvStrategiesScreen(
                 exportJson = json
                 val fileName = "${strategy.name.replace(Regex("[^a-zA-Z0-9-_]"), "_")}.json"
                 fileSaver.launch(fileName, json)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (expected: Exception) {
                 strategyToExport = null
                 exportJson = null

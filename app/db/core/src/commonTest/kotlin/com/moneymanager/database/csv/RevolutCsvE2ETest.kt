@@ -442,7 +442,7 @@ class RevolutCsvE2ETest : DbTest() {
         }
 
     @Test
-    fun `merging the Revolut account moves its balances, and undoing the merge moves them back`() =
+    fun `merging the Revolut account moves its balances and undoing the merge moves them back`() =
         runDbTest {
             apply(stage("account-statement_eur.csv", eurFile))
             val revolut = accounts().single { it.name == "Revolut" }
@@ -468,7 +468,7 @@ class RevolutCsvE2ETest : DbTest() {
         }
 
     @Test
-    fun `a balance counts its row when the row completed, as Revolut's running balance does`() =
+    fun `a balance counts its row when the row completed as Revolut running balance does`() =
         runDbTest {
             // The card payment started first but completed after the top-up, so the statement's balances run in
             // completion order: 1000 after the top-up, 977.65 after the payment.

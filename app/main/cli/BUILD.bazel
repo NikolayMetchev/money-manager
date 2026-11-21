@@ -45,6 +45,7 @@ kmp_library(
         "//app/tui",
         "//utils/archive",
         "//utils/browser",
+        "//utils/coroutines",
         "//utils/credentialvault",
         "//utils/files",
         "//utils/localsettings",

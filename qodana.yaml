@@ -3,8 +3,8 @@
 ####################################################################################################################
 
 # Every exclusion below works around a verified linter defect (each entry says which); anything the
-# linter reported correctly has been fixed in code instead. The two style inspections this project
-# rejects on purpose (DestructuringDeclaration, KotlinPrintToLogpoint) are disabled in
+# linter reported correctly has been fixed in code instead. The style inspections this project
+# rejects on purpose (DestructuringDeclaration, KotlinPrintToLogpoint, CollectionConcatenationToBuildCollection) are disabled in
 # .qodana/profile.xml, not excluded here.
 #
 # The recurring defects, referenced by number below:
@@ -59,18 +59,34 @@ bootstrap: >-
 profile:
   path: .qodana/profile.xml
 exclude:
-  # The Bazel IDE model uses commonTest/kotlin/com/moneymanager as these modules' test
-  # source root with an empty package prefix. The file's package matches its Kotlin source path.
+  # [5] — the Bazel IDE model gives most modules' source roots an empty package prefix (and a Kotlin Multiplatform
+  # module's commonMain, jvmMain and test roots as one JVM module), so every package reads as mismatched with its
+  # directory: 1349 reports, each matching the file's real Kotlin source path. The compiler and ktlint check it.
   - name: PackageDirectoryMismatch
+
+  # [5] — a test whose body is `= runMoneyManagerComposeUiTest { ... }` returns that call's value; the helper lives in
+  # test/app/ui, which the linter doesn't resolve per module, so the body reads as a platform type and the @Test
+  # method as non-void. The Kotlin test runners accept it (every Compose UI test here is written so).
+  - name: JUnitMalformedDeclaration
     paths:
-      - app/csvimporter/src/commonTest/kotlin/com/moneymanager/csvimporter/BarclaycardCsvMapperTest.kt
-      - app/csvimporter/src/commonTest/kotlin/com/moneymanager/database/csv/RevolutOwnHolderTest.kt
-      - app/db/core/src/commonTest/kotlin/com/moneymanager/database/csv/CsvReimportInPlaceTest.kt
-      # [5] — the same empty package prefix on these modules' commonMain/commonTest roots.
-      - app/reconciliation/src/commonMain/kotlin/com/moneymanager/reconciliation/BalanceCheck.kt
-      - app/reconciliation/src/commonTest/kotlin/com/moneymanager/reconciliation/BalanceCheckTest.kt
-      - app/ui/imports/reconciliation/src/commonMain/kotlin/com/moneymanager/ui/screens/reconciliation/BalanceReconciliationScreen.kt
-      - app/ui/imports/reconciliation/src/commonTest/kotlin/com/moneymanager/ui/screens/reconciliation/BalanceReconciliationScreenTest.kt
+      - app/ui/components/src/commonTest/kotlin/com/moneymanager/ui/components/imports/SourceRerunPreviewTest.kt
+      - app/ui/components/src/commonTest/kotlin/com/moneymanager/ui/components/rules/SettlementWindowEditorTest.kt
+      - app/ui/components/src/commonTest/kotlin/com/moneymanager/ui/components/rules/StrategyRulesEditorTest.kt
+      - app/ui/core/src/commonTest/kotlin/com/moneymanager/ui/screens/ApiSessionsArchiveButtonsUiTest.kt
+      - app/ui/core/src/commonTest/kotlin/com/moneymanager/ui/screens/ApiSessionsBulkButtonsUiTest.kt
+      - app/ui/core/src/commonTest/kotlin/com/moneymanager/ui/screens/HolidayCalendarsE2ETest.kt
+      - app/ui/core/src/commonTest/kotlin/com/moneymanager/ui/screens/ReimportDialogsTest.kt
+      - app/ui/foundation/src/commonTest/kotlin/com/moneymanager/ui/foundation/NamedDatabaseDialogTest.kt
+      - app/ui/foundation/src/commonTest/kotlin/com/moneymanager/ui/util/ExposedDropdownMenuTest.kt
+      - app/ui/foundation/src/commonTest/kotlin/com/moneymanager/ui/util/PasswordFieldTest.kt
+      - app/ui/imports/api/src/commonTest/kotlin/com/moneymanager/ui/screens/apistrategy/ApiDownloadNoticeBannerTest.kt
+      - app/ui/imports/api/src/commonTest/kotlin/com/moneymanager/ui/screens/apistrategy/ApiReimportProgressTest.kt
+      - app/ui/imports/api/src/commonTest/kotlin/com/moneymanager/ui/screens/apistrategy/editor/ApiStrategyEditorStateTest.kt
+      - app/ui/imports/api/src/commonTest/kotlin/com/moneymanager/ui/screens/apistrategy/editor/RulesTabTest.kt
+      - app/ui/imports/csv/src/commonTest/kotlin/com/moneymanager/ui/screens/csvstrategy/editor/AccountsTabTest.kt
+      - app/ui/imports/csv/src/commonTest/kotlin/com/moneymanager/ui/screens/csvstrategy/editor/LegGroupsEditorTest.kt
+      - app/ui/transactions/src/commonTest/kotlin/com/moneymanager/ui/screens/transactions/ManualEntriesScreenTest.kt
+      - app/ui/transactions/src/commonTest/kotlin/com/moneymanager/ui/screens/transactions/ManualEntriesTradesTest.kt
 
   # Compose @Composable functions are PascalCase by convention; the community linter has no
   # Compose awareness. ktlint (compose ruleset) polices naming in these modules instead.
@@ -148,6 +164,20 @@ exclude:
   # linter fails to resolve this experimental serialization API and calls the import unused.
   - name: KotlinUnusedImport
     paths:
+      # [2] — `kotlinx.coroutines.flow.update` and the domain types each import-engine phase takes from another module.
+      - app/importer/src/commonMain/kotlin/com/moneymanager/importer/BatchValidation.kt
+      - app/importer/src/commonMain/kotlin/com/moneymanager/importer/ConfigMutationWriter.kt
+      - app/importer/src/commonMain/kotlin/com/moneymanager/importer/ExistingTransferLoader.kt
+      - app/importer/src/commonMain/kotlin/com/moneymanager/importer/HandEdits.kt
+      - app/importer/src/commonMain/kotlin/com/moneymanager/importer/ImportEngineImpl.kt
+      - app/importer/src/commonMain/kotlin/com/moneymanager/importer/ReconciliationCopier.kt
+      - app/importer/src/commonMain/kotlin/com/moneymanager/importer/ReferenceDataWriter.kt
+      - app/importer/src/commonMain/kotlin/com/moneymanager/importer/RerunSettlement.kt
+      - app/importer/src/commonMain/kotlin/com/moneymanager/importer/ReversalLinker.kt
+      - app/importer/src/commonMain/kotlin/com/moneymanager/importer/SourceObservations.kt
+      - app/importer/src/commonMain/kotlin/com/moneymanager/importer/TradeImporter.kt
+      - app/importer/src/commonMain/kotlin/com/moneymanager/importer/TransferImporter.kt
+      - app/importer/src/commonMain/kotlin/com/moneymanager/importer/TransferWriter.kt
       # [5] — native code is analysed against the JVM (each module's `:<name>_ide_native`), where kotlinx.cinterop,
       # platform.* and the native-only libraries don't resolve: `kotlinx.coroutines.IO` (native's Dispatchers.IO
       # extension) and cinterop's `get` operator look unused.
@@ -245,6 +275,25 @@ exclude:
   # and its KDoc links that generated MoneyManagerDatabase.
   - name: HasPlatformType
     paths:
+      # [5] — the same `= runMoneyManagerComposeUiTest { ... }` bodies: the type is Unit, not a platform type.
+      - app/ui/components/src/commonTest/kotlin/com/moneymanager/ui/components/imports/SourceRerunPreviewTest.kt
+      - app/ui/components/src/commonTest/kotlin/com/moneymanager/ui/components/rules/SettlementWindowEditorTest.kt
+      - app/ui/components/src/commonTest/kotlin/com/moneymanager/ui/components/rules/StrategyRulesEditorTest.kt
+      - app/ui/core/src/commonTest/kotlin/com/moneymanager/ui/screens/ApiSessionsArchiveButtonsUiTest.kt
+      - app/ui/core/src/commonTest/kotlin/com/moneymanager/ui/screens/ApiSessionsBulkButtonsUiTest.kt
+      - app/ui/core/src/commonTest/kotlin/com/moneymanager/ui/screens/HolidayCalendarsE2ETest.kt
+      - app/ui/core/src/commonTest/kotlin/com/moneymanager/ui/screens/ReimportDialogsTest.kt
+      - app/ui/foundation/src/commonTest/kotlin/com/moneymanager/ui/foundation/NamedDatabaseDialogTest.kt
+      - app/ui/foundation/src/commonTest/kotlin/com/moneymanager/ui/util/ExposedDropdownMenuTest.kt
+      - app/ui/foundation/src/commonTest/kotlin/com/moneymanager/ui/util/PasswordFieldTest.kt
+      - app/ui/imports/api/src/commonTest/kotlin/com/moneymanager/ui/screens/apistrategy/ApiDownloadNoticeBannerTest.kt
+      - app/ui/imports/api/src/commonTest/kotlin/com/moneymanager/ui/screens/apistrategy/ApiReimportProgressTest.kt
+      - app/ui/imports/api/src/commonTest/kotlin/com/moneymanager/ui/screens/apistrategy/editor/ApiStrategyEditorStateTest.kt
+      - app/ui/imports/api/src/commonTest/kotlin/com/moneymanager/ui/screens/apistrategy/editor/RulesTabTest.kt
+      - app/ui/imports/csv/src/commonTest/kotlin/com/moneymanager/ui/screens/csvstrategy/editor/AccountsTabTest.kt
+      - app/ui/imports/csv/src/commonTest/kotlin/com/moneymanager/ui/screens/csvstrategy/editor/LegGroupsEditorTest.kt
+      - app/ui/transactions/src/commonTest/kotlin/com/moneymanager/ui/screens/transactions/ManualEntriesScreenTest.kt
+      - app/ui/transactions/src/commonTest/kotlin/com/moneymanager/ui/screens/transactions/ManualEntriesTradesTest.kt
       - app/db/write/src/commonMain/kotlin/com/moneymanager/database/write/MoneyManagerDatabaseWrapper.kt
       # [5] — native-only sources belong to no module, so the cinterop calls' types don't resolve.
       - utils/parsers/pdf/src/nativeMain

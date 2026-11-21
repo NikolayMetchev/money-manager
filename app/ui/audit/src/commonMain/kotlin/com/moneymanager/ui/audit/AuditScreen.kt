@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import co.touchlab.kermit.Logger
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
+import kotlinx.coroutines.CancellationException
 
 private val logger = Logger.withTag("AuditScreen")
 
@@ -57,6 +58,8 @@ fun <D : Any> AuditScreen(
         errorMessage = null
         try {
             screenData = loadData()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (expected: Exception) {
             logger.e(expected) { "Failed to load audit history: ${expected.message}" }
             errorMessage = "Failed to load audit history: ${expected.message}"

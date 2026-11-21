@@ -107,12 +107,16 @@ internal class LoopbackRedirectReceiver private constructor(
         }
 
         /** Binds a fresh loopback port for one sign-in attempt. */
+        @Suppress("TooGenericExceptionCaught") // Whatever the bind throws, the selector is closed and the failure is rethrown.
         suspend fun bind(): LoopbackRedirectReceiver {
             val selector = SelectorManager(ioDispatcher)
             val serverSocket =
-                runCatching { aSocket(selector).tcp().bind(LOOPBACK_HOST, 0) }
-                    .onFailure { selector.close() }
-                    .getOrThrow()
+                try {
+                    aSocket(selector).tcp().bind(LOOPBACK_HOST, 0)
+                } catch (failure: Exception) {
+                    selector.close()
+                    throw failure
+                }
             return LoopbackRedirectReceiver(selector, serverSocket)
         }
     }

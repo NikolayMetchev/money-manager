@@ -28,6 +28,7 @@ import com.moneymanager.importengineapi.createCurrency
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.util.onEnterKeyDown
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 private val logger = Logger.withTag("CreateCurrencyDialog")
@@ -87,6 +88,8 @@ fun CreateCurrencyDialog(
                     try {
                         val currencyId = importEngine.createCurrency(code.trim(), name.trim(), decimalPlaces.toIntOrNull())
                         onCurrencyCreated(currencyId)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
                     } catch (expected: Exception) {
                         logger.e(expected) { "Failed to create currency: ${expected.message}" }
                         saveState.errorMessage = "Failed to create currency: ${expected.message}"

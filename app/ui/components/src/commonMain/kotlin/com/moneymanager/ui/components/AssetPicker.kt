@@ -26,6 +26,7 @@ import com.moneymanager.domain.model.CryptoId
 import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
+import com.moneymanager.ui.util.ExposedDropdownMenu
 import com.moneymanager.ui.util.onEnterKeyDown
 
 // The menu composes every row it holds, and an installed crypto list has thousands. Currencies come first, so they stay in.

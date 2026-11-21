@@ -60,7 +60,7 @@ class BalanceCheckTest {
     }
 
     @Test
-    fun `history before the first leg is the opening offset, not a break`() {
+    fun `history before the first leg is the opening offset and not a break`() {
         val legs = listOf(leg("-30", 1), leg("5", 2))
         val result = checkBalances(coin, listOf(balance("470", 1), balance("475", 2)), legs)
 
@@ -118,7 +118,7 @@ class BalanceCheckTest {
     }
 
     @Test
-    fun `a leg counts when its statement's balance counts it, not when it started`() {
+    fun `a leg counts when the statement balance counts it and not when it started`() {
         // A card payment started on day 0 completes on day 2; the statement's balance takes it in on day 2, after a
         // top-up that started and completed on day 1.
         val payment = leg("-30", 0)

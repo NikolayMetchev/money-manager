@@ -219,7 +219,7 @@ jobs:
         if: github.event_name != 'pull_request'
         id: jdk
         shell: bash
-        run: echo "version=$(sed -n 's/^JDK = "\([^"]*\)".*/\1/p' MODULE.bazel)" >> "$GITHUB_OUTPUT"
+        run: echo "version=$(sed -n 's/^JDK = "\([0-9]*\)\..*/\1/p' MODULE.bazel)" >> "$GITHUB_OUTPUT"
       - name: Set up Java
         if: github.event_name != 'pull_request'
         uses: actions/setup-java@v6
@@ -342,11 +342,11 @@ jobs:
           name: ${{ matrix.target }}-test-binaries
           path: ${{ runner.temp }}/native-tests
 
-      # For the launcher, whose bytecode can be as new as MODULE.bazel's JDK: run it on that JDK.
+      # For the launcher, whose bytecode can be as new as MODULE.bazel's JDK: run it on that JDK (its major version: setup-java can't match the four-part build number, 27.0.1.1).
       - name: Read the JDK version
         id: jdk
         shell: bash
-        run: echo "version=$(sed -n 's/^JDK = "\([^"]*\)".*/\1/p' MODULE.bazel)" >> "$GITHUB_OUTPUT"
+        run: echo "version=$(sed -n 's/^JDK = "\([0-9]*\)\..*/\1/p' MODULE.bazel)" >> "$GITHUB_OUTPUT"
       - name: Set up Java
         uses: actions/setup-java@v6
         with:
@@ -635,7 +635,7 @@ jobs:
         if: github.event_name != 'pull_request'
         id: jdk
         shell: bash
-        run: echo "version=$(sed -n 's/^JDK = "\([^"]*\)".*/\1/p' MODULE.bazel)" >> "$GITHUB_OUTPUT"
+        run: echo "version=$(sed -n 's/^JDK = "\([0-9]*\)\..*/\1/p' MODULE.bazel)" >> "$GITHUB_OUTPUT"
       - name: Set up Java
         if: github.event_name != 'pull_request'
         uses: actions/setup-java@v6

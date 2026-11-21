@@ -37,6 +37,7 @@ import com.moneymanager.ui.components.DestructiveConfirmDialog
 import com.moneymanager.ui.components.LocationPicker
 import com.moneymanager.ui.components.SettingsSectionCard
 import com.moneymanager.ui.foundation.LocalImportEngine
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
@@ -285,6 +286,8 @@ private fun HolidayCalendarEditorDialog(
                                     workingDays = workingDays.sorted(),
                                 ),
                             )
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
                         } catch (expected: Exception) {
                             logger.e(expected) { "Failed to save holiday calendar $code" }
                             errorMessage = "Failed to save: ${expected.message}"

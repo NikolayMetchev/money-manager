@@ -2,6 +2,7 @@ package com.moneymanager.cli
 
 import co.touchlab.kermit.Logger
 import com.moneymanager.archive.ArchiveDecryptionException
+import com.moneymanager.coroutines.runCatchingCancellable
 import com.moneymanager.credentialvault.CredentialVault
 import com.moneymanager.credentialvault.UnlockRequest
 import com.moneymanager.credentialvault.VaultState
@@ -82,7 +83,7 @@ internal class VaultUnlocker(
         if (!prompter.confirm("Create one", default = true)) return false
         val path = prompter.text("Vault file", defaultPath) ?: return false
         val password = console.suppliedVaultPassword() ?: newPassword() ?: return false
-        return runCatching { vault.create(path, password) }
+        return runCatchingCancellable { vault.create(path, password) }
             .onFailure { prompter.error("Couldn't create the credential vault: ${it.message}") }
             .isSuccess
     }

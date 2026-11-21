@@ -1,5 +1,6 @@
 package com.moneymanager.remotestorage.googledrive
 
+import com.moneymanager.coroutines.runCatchingCancellable
 import com.moneymanager.remotestorage.RemoteStorageException
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
@@ -65,7 +66,7 @@ internal suspend fun <T> fetchAllDrivePages(
 }
 
 private suspend fun HttpResponse.driveError(): DriveError? =
-    if (status.isSuccess()) null else runCatching { json.decodeFromString<DriveErrorResponse>(bodyAsText()).error }.getOrNull()
+    if (status.isSuccess()) null else runCatchingCancellable { json.decodeFromString<DriveErrorResponse>(bodyAsText()).error }.getOrNull()
 
 // Drive's status alone can't tell a permission refusal from a rate limit (both 403), so carry its reason. A body
 // that isn't Drive's error shape (a proxy's page, say) is kept as raw text instead.
@@ -75,7 +76,7 @@ private suspend fun HttpResponse.driveErrorSuffix(): String {
         if (error != null) {
             listOfNotNull(error.errors.firstOrNull()?.reason, error.message).joinToString(": ")
         } else {
-            runCatching { bodyAsText() }.getOrDefault("").trim().take(MAX_RAW_ERROR_CHARS)
+            runCatchingCancellable { bodyAsText() }.getOrDefault("").trim().take(MAX_RAW_ERROR_CHARS)
         }
     return if (detail.isEmpty()) "" else ", $detail"
 }

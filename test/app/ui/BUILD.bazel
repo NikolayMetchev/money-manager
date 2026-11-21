@@ -16,15 +16,15 @@ kmp_library(
     ],
     android_srcs = glob(["src/androidMain/kotlin/**/*.kt"]),
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
-    jvm_deps = ["@maven_kmp//:compose_ui_test_desktop"],
+    jvm_deps = [
+        "@maven_kmp//:compose_ui_test_desktop",
+        "@maven_kmp//:kotlinx_coroutines_core",
+    ],
     jvm_srcs = glob(["src/jvmMain/kotlin/**/*.kt"]),
     keep_deps = [
         "@maven_kmp//:kotlinx_coroutines_android",
         "@maven_kmp//:kotlinx_coroutines_test",
     ],
     visibility = ["//visibility:public"],
-    deps = [
-        "//app/model/core",
-        "@maven_kmp//:kotlinx_coroutines_core",
-    ],
+    deps = ["//app/model/core"],
 )

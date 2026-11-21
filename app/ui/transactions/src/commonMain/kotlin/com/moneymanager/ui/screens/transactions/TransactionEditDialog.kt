@@ -59,6 +59,7 @@ import com.moneymanager.ui.components.transactions.EditableAttribute
 import com.moneymanager.ui.components.transactions.EditableAttributesSection
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.util.onEnterKeyDown
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDateTime
@@ -414,6 +415,8 @@ fun TransactionEditDialog(
 
                         onSaved()
                         onDismiss()
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
                     } catch (expected: Exception) {
                         logger.e(expected) {
                             "Failed to ${if (isEditMode) "update" else "create"} transaction: ${expected.message}"

@@ -57,6 +57,7 @@ kmp_library(
         "//app/ui/foundation",
         "//utils/compose/filePicker",
         "//utils/compose/scrollbar",
+        "//utils/coroutines",
         "//utils/credentialvault",
         "//utils/humanreadable",
         "@maven_kmp//:androidx_compose_runtime",

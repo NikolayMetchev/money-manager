@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
+import com.moneymanager.coroutines.runCatchingCancellable
 import com.moneymanager.database.write.DbObjectSize
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.write.getDbSizeBreakdown
@@ -127,7 +128,7 @@ fun DatabaseSizeBreakdownScreen(
         isLoading = true
         errorMessage = null
         breakdown =
-            runCatching {
+            runCatchingCancellable {
                 withContext(Dispatchers.Default) {
                     database.getDbSizeBreakdown()
                 }

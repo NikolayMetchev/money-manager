@@ -54,6 +54,8 @@ import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.regex.compileRegex
 import com.moneymanager.ui.components.CreateAccountDialog
 import com.moneymanager.ui.foundation.LocalImportEngine
+import com.moneymanager.ui.util.ExposedDropdownMenu
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 /** Shown under the pattern field when there is no CSV sample to preview against. */
@@ -269,6 +271,8 @@ internal fun AccountMappingEditorDialog(
                             } catch (expected: IllegalArgumentException) {
                                 errorMessage = "Invalid pattern: ${expected.message}"
                                 isSaving = false
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
                             } catch (expected: Exception) {
                                 // Any engine/DB failure must also reset isSaving, else the dialog (whose
                                 // dismiss + onDismissRequest are gated on !isSaving) becomes unclosable.

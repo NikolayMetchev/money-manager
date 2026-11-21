@@ -55,6 +55,7 @@ import com.moneymanager.domain.model.apistrategy.HttpMethodType
 import com.moneymanager.domain.model.apistrategy.WindowBoundFormat
 import com.moneymanager.ui.components.rules.ConditionPathField
 import com.moneymanager.ui.screens.apistrategy.JsonPathEntry
+import com.moneymanager.ui.util.ExposedDropdownMenu
 
 /** Requests the JSON-path picker dialog over `paths`, routing the chosen path to `setter`. */
 internal typealias PathPicker = (paths: List<JsonPathEntry>, setter: (String) -> Unit) -> Unit

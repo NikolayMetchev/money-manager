@@ -22,6 +22,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
+import com.moneymanager.coroutines.runCatchingCancellable
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.defaultRemoteArchiveName
@@ -78,8 +79,8 @@ fun CloudStorageCard(
     var localSize by remember { mutableStateOf<Long?>(null) }
     var remoteSize by remember { mutableStateOf<Long?>(null) }
     LaunchedEffect(binding, sessionActive, refreshTick, currentDatabaseLocation) {
-        localSize = runCatching { controller.localDatabaseSize(currentDatabaseLocation) }.getOrNull()
-        remoteSize = if (binding != null) runCatching { controller.remoteArchiveSize() }.getOrNull() else null
+        localSize = runCatchingCancellable { controller.localDatabaseSize(currentDatabaseLocation) }.getOrNull()
+        remoteSize = if (binding != null) runCatchingCancellable { controller.remoteArchiveSize() }.getOrNull() else null
     }
 
     // The controller owns the multi-device sync state; the card just reflects it.
@@ -91,8 +92,8 @@ fun CloudStorageCard(
     LaunchedEffect(sessionActive, binding, refreshTick, database) {
         while (true) {
             if (sessionActive) {
-                runCatching { controller.refreshLocalDirty(database) }
-                tokenStatus = runCatching { controller.accessTokenExpiresAtEpochMs() }.getOrNull()?.let(::formatTokenStatus)
+                runCatchingCancellable { controller.refreshLocalDirty(database) }
+                tokenStatus = runCatchingCancellable { controller.accessTokenExpiresAtEpochMs() }.getOrNull()?.let(::formatTokenStatus)
             } else {
                 tokenStatus = null
             }
@@ -103,7 +104,7 @@ fun CloudStorageCard(
     // Check the remote once whenever a session arms (e.g. after open/resume). Detection is otherwise
     // on demand via the "Check remote for changes" button — never polled.
     LaunchedEffect(sessionActive, binding) {
-        if (sessionActive) runCatching { controller.checkRemote(database) }
+        if (sessionActive) runCatchingCancellable { controller.checkRemote(database) }
     }
 
     SettingsSectionCard(title = "Cloud storage") {
@@ -146,7 +147,7 @@ fun CloudStorageCard(
             fun upload(force: Boolean) {
                 busy = true
                 scope.launch {
-                    runCatching { controller.syncNow(database, force = force) { syncProgress = it } }
+                    runCatchingCancellable { controller.syncNow(database, force = force) { syncProgress = it } }
                         .onSuccess { result ->
                             message =
                                 when (result) {
@@ -182,7 +183,7 @@ fun CloudStorageCard(
                 onCheckRemote = {
                     busy = true
                     scope.launch {
-                        runCatching { controller.checkRemote(database) }
+                        runCatchingCancellable { controller.checkRemote(database) }
                             .onSuccess { message = null }
                             .onFailure { message = "Check failed: ${it.message}" }
                         busy = false
@@ -258,7 +259,7 @@ fun CloudStorageCard(
         createType = null
         busy = true
         scope.launch {
-            runCatching {
+            runCatchingCancellable {
                 controller.createRemote(type.id, config, name, currentDatabaseLocation, database, password, overwriteFileId) {
                     syncProgress = it
                 }
@@ -288,7 +289,7 @@ fun CloudStorageCard(
         }
         busy = true
         scope.launch {
-            runCatching {
+            runCatchingCancellable {
                 controller.openRemote(type.id, config, file, target, password) {
                     syncProgress = it
                 }
@@ -339,7 +340,7 @@ fun CloudStorageCard(
                 showResume = false
                 busy = true
                 scope.launch {
-                    val ok = runCatching { controller.resume(password) }.getOrDefault(false)
+                    val ok = runCatchingCancellable { controller.resume(password) }.getOrDefault(false)
                     sessionActive = ok
                     message = if (ok) "Sync resumed" else "Wrong password"
                     busy = false

@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import co.touchlab.kermit.Logger
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 private val logger = Logger.withTag("DestructiveConfirmDialog")
@@ -84,6 +85,8 @@ fun DestructiveConfirmDialog(
                     scope.launch {
                         try {
                             onConfirm()
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
                         } catch (expected: Exception) {
                             logger.e(expected) { "$failureMessage: ${expected.message}" }
                             errorMessage = "$failureMessage: ${expected.message}"

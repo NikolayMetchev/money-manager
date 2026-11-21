@@ -57,6 +57,7 @@ import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.screens.accountmapping.AccountMappingEditorDialog
 import com.moneymanager.ui.screens.csvstrategy.ColumnDetector
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -271,6 +272,8 @@ fun CsvStrategyEditorScreen(
                     importEngine.createCsvStrategy(strategy)
                 }
                 onBack()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (expected: Exception) {
                 val action = if (isEditMode) "save" else "create"
                 state.errorMessage = "Failed to $action strategy: ${expected.message}"
@@ -360,6 +363,8 @@ fun CsvStrategyEditorScreen(
                             scope.launch {
                                 try {
                                     importEngine.deleteAccountMapping(mapping.id)
+                                } catch (cancelled: CancellationException) {
+                                    throw cancelled
                                 } catch (expected: Exception) {
                                     state.errorMessage = "Failed to delete account mapping: ${expected.message}"
                                 }

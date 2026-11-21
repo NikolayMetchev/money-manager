@@ -34,6 +34,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.filepicker.manualFolderEntrySupported
 import com.moneymanager.compose.filepicker.rememberFolderPicker
+import com.moneymanager.coroutines.runCatchingCancellable
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
@@ -115,7 +116,7 @@ fun StrategyCatalogScreen(
     ) {
         scope.launch {
             controller.beginBusy()
-            runCatching { controller.install(library, appVersion, keys, resolutions) }
+            runCatchingCancellable { controller.install(library, appVersion, keys, resolutions) }
         }
     }
 
@@ -124,7 +125,7 @@ fun StrategyCatalogScreen(
     fun beginInstall(keys: Set<StrategyKey>) {
         scope.launch {
             controller.beginBusy()
-            runCatching {
+            runCatchingCancellable {
                 val unresolved =
                     controller
                         .previewInstall(library, keys)

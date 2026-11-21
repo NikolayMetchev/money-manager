@@ -17,6 +17,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.Asset
+import com.moneymanager.ui.util.ExposedDropdownMenu
 
 /** Narrows the list to one of the [assets] the account holds, or back to all of them (null). */
 @Composable
