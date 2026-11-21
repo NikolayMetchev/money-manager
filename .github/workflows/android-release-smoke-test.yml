@@ -45,47 +45,6 @@ jobs:
           buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
           cache-name: android-smoke-test
 
-      # Same key as build.yml's android-test job, so the snapshot it saves on main is reused here.
-      # Saved only from main (below), since a dispatch on a PR branch saves a branch-scoped entry.
-      - name: Restore AVD cache
-        uses: actions/cache/restore@v6
-        id: avd-cache
-        with:
-          path: |
-            ~/.android/avd/*
-            ~/.android/adb*
-          # Android emulator API level sync: update with build.yml's emulator job,
-          # .idea/runConfigurations/Android_Tests.xml, and CLAUDE.md.
-          key: avd-pixel6-api36-aosp-atd-${{ runner.os }}
-
-      - name: Create AVD and generate snapshot for caching
-        if: steps.avd-cache.outputs.cache-hit != 'true'
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          # Android emulator API level sync: update with build.yml's emulator job,
-          # .idea/runConfigurations/Android_Tests.xml, and CLAUDE.md.
-          api-level: 36
-          arch: x86_64
-          profile: pixel_6
-          target: aosp_atd
-          # The API-36 ATD images are only published on the dev sdkmanager channel.
-          channel: dev
-          force-avd-creation: false
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
-          disable-animations: true
-          script: echo "Generated AVD snapshot for caching."
-
-      - name: Save AVD cache
-        if: github.ref == 'refs/heads/main' && steps.avd-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v6
-        with:
-          path: |
-            ~/.android/avd/*
-            ~/.android/adb*
-          # Android emulator API level sync: update with build.yml's emulator job,
-          # .idea/runConfigurations/Android_Tests.xml, and CLAUDE.md.
-          key: ${{ steps.avd-cache.outputs.cache-primary-key }}
-
       # Build before booting the emulator, so the R8 build's minutes aren't spent with it idling.
       - name: Build release APK and smoke test APK
         env:
@@ -95,23 +54,11 @@ jobs:
 
       - name: Run release smoke test
         timeout-minutes: 20
-        uses: reactivecircus/android-emulator-runner@v2
         env:
           GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
           GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
-        with:
-          # Android emulator API level sync: update with build.yml's emulator job,
-          # .idea/runConfigurations/Android_Tests.xml, and CLAUDE.md.
-          api-level: 36
-          arch: x86_64
-          profile: pixel_6
-          target: aosp_atd
-          # The API-36 ATD images are only published on the dev sdkmanager channel.
-          channel: dev
-          force-avd-creation: false
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
-          disable-animations: true
-          script: bazel test --config=android //app/main/android-smoketest:smoketest_test --test_output=errors
+        # The test boots the emulator Bazel downloaded (@android_emulator) when no device is connected.
+        run: bazel test --config=android //app/main/android-smoketest:smoketest_test --test_output=errors
 
       - name: Upload test results
         if: always()
