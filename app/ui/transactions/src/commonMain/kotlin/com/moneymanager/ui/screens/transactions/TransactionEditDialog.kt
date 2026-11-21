@@ -93,7 +93,7 @@ fun TransactionEditDialog(
     var sourceAccountId by remember { mutableStateOf(transaction?.sourceAccountId ?: preSelectedSourceAccountId) }
     var targetAccountId by remember { mutableStateOf(transaction?.targetAccountId) }
     // Held as the asset itself, not an id: a crypto transfer (e.g. a reconciliation copy) must keep its asset.
-    var selectedAsset by remember { mutableStateOf<Asset?>(transaction?.amount?.asset) }
+    var selectedAsset by remember { mutableStateOf(transaction?.amount?.asset) }
     var preSelectedAssetId by remember { mutableStateOf<AssetId?>(preSelectedCurrencyId) }
     val currencyId: AssetId? = selectedAsset?.id ?: preSelectedAssetId
     var amount by remember {
