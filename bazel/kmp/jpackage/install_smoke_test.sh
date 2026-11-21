@@ -103,15 +103,22 @@ echo "mm-jvm pdf-lines: $out"
 grep -q '"text": "Statement Date 19/01/13"' <<<"$out"
 grep -Eq '"text": "Jan 2 +PAYMENT RECEIVED - THANK YOU {2,}[^"]*2,609.36"' <<<"$out"
 
-# A fresh runner, so this is the app's first run: the database setup screen.
-if [ "$(uname -s)" = Linux ]; then
-  Xvfb :99 -screen 0 1600x1000x24 &
-  export DISPLAY=:99
-  # The app connects as soon as it starts, so wait for Xvfb's socket instead of racing it.
+# Starts Xvfb :99 and waits for its socket. The app connects as soon as it starts, so this
+# must finish before the app does. Xvfb's own log is kept, so a server that dies is explained.
+start_xvfb() {
+  rm -f /tmp/.X11-unix/X99 /tmp/.X99-lock
+  Xvfb :99 -screen 0 1600x1000x24 >"$work/xvfb.log" 2>&1 &
+  xvfb=$!
   for _ in $(seq 50); do
     [ -S /tmp/.X11-unix/X99 ] && break
     sleep 0.2
   done
+}
+
+# A fresh runner, so this is the app's first run: the database setup screen.
+if [ "$(uname -s)" = Linux ]; then
+  start_xvfb
+  export DISPLAY=:99
 fi
 "$app" >"$work/app.log" 2>&1 &
 pid=$!
@@ -139,6 +146,14 @@ echo "The desktop app started and stayed up."
 
 if [ -n "${STARTUP_BENCH_DBS:-}" ]; then
   unset JAVA_TOOL_OPTIONS
+  # The startup timings run for minutes after the first launch. The display server has died
+  # under them before (the timing tool then fails with "Can't connect to X11 window server"),
+  # so bring it back up and show why it stopped.
+  if [ "$(uname -s)" = Linux ] && ! kill -0 "$xvfb" 2>/dev/null; then
+    echo "Xvfb stopped during the startup run; restarting it. Its log:" >&2
+    cat "$work/xvfb.log" >&2 || true
+    start_xvfb
+  fi
   # The runner's JDK (the workflow sets up MODULE.bazel's) runs the timing tool: the installed runtime has no java,
   # as jlink strips the native commands.
   java=$(command -v java)
