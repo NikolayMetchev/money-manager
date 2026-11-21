@@ -347,6 +347,10 @@ it is relative, so it runs under any prefix.
   during a build: until `bazel run //tools/repo-scripts:repo-scripts-tool -- accept-android-license` has recorded
   `sdk_license.txt` in `~/.android` (`ANDROID_USER_HOME`), they hold an action that fails naming that command. When repin
   brings in a changed license it is asked again; CI accepts with `bazel/ci/accept_android_license.sh`.
+  `@android_emulator` is the emulator and the `target_sdk` level's headless `aosp_atd` system image (2.5 GB, fetched only
+  when a device test needs it), for the host's own CPU: `x86_64` images on x64 hosts, `arm64-v8a` on Arm ones. A repin moves both to
+  the newest stable release (no version in `MODULE.bazel`). The Arm image is under a license with one more clause, accepted
+  apart: `bazel run //tools/repo-scripts:repo-scripts-tool -- accept-android-license arm`.
   `@android_platform//:lint_sdk` is that platform laid out as an SDK for lint (its zip has no sdkmanager `package.xml`,
   which lint doesn't need). AGP's own tools come from the
   `@android_tools` install; aapt2 is downloaded as AGP does, for the release `android_sdk.agp(version = …)` names (`pins.bzl`, from AGP's `aapt2_version.properties`).
