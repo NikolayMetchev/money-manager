@@ -237,13 +237,10 @@ fun AccountTransactionsScreen(
         onCurrencyIdChange(selectedCurrencyId)
     }
 
+    // Only judge the selection once the balances have loaded: an empty list just means "not yet", and
+    // clearing then would throw away the remembered asset on every return from an audit trail.
     LaunchedEffect(accountAssets) {
-        if (accountAssets.isNotEmpty()) {
-            if (selectedCurrencyId != null && accountAssets.none { it.id == selectedCurrencyId }) {
-                selectedCurrencyId = null
-            }
-        } else if (initialCurrencyId == null) {
-            // Only clear if we didn't receive an initial currency from navigation
+        if (accountAssets.isNotEmpty() && selectedCurrencyId != null && accountAssets.none { it.id == selectedCurrencyId }) {
             selectedCurrencyId = null
         }
     }
