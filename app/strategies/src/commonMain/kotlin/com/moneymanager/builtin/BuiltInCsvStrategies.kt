@@ -2242,6 +2242,7 @@ object BuiltInCsvStrategies {
                             ),
                             attribute(MARCUS_ROW_ID_COLUMN, "marcus-row-id", unique = true),
                             incomingWhenPositive(MARCUS_VALUE_COLUMN),
+                            balance(MARCUS_BALANCE_COLUMN),
                             accounts(
                                 AccountSide.SOURCE,
                                 naming(
@@ -2329,6 +2330,7 @@ object BuiltInCsvStrategies {
                     ),
                     name = "Product, start time, type, description, amount and balance identify a row",
                 ),
+                balance("Balance"),
                 attribute(REVOLUT_ROW_ID_COLUMN, "revolut-row-id", unique = true),
                 attribute("Type", "revolut-type"),
                 rule(

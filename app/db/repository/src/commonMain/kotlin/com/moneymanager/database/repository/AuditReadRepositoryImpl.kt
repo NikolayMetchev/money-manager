@@ -13,6 +13,7 @@ import com.moneymanager.database.mapper.OwnershipAuditHistoryForAccountMapper
 import com.moneymanager.database.mapper.PersonAccountOwnershipAuditEntryMapper
 import com.moneymanager.database.mapper.PersonAttributeAuditEntryMapper
 import com.moneymanager.database.mapper.PersonAuditEntryMapper
+import com.moneymanager.database.mapper.ReportedBalanceAuditEntryMapper
 import com.moneymanager.database.mapper.TradeAuditEntryMapper
 import com.moneymanager.database.mapper.TransferAuditEntryMapper
 import com.moneymanager.database.sql.read.MoneyManagerDatabase
@@ -48,6 +49,8 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyAuditEntry
 import com.moneymanager.domain.model.csv.CsvImportHistoryEvent
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyAuditEntry
+import com.moneymanager.domain.model.reconciliation.ReportedBalanceAuditEntry
+import com.moneymanager.domain.model.reconciliation.ReportedBalanceId
 import com.moneymanager.domain.repository.AuditReadRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -152,6 +155,14 @@ class AuditReadRepositoryImpl(
             { auditSelectQueries.selectAuditHistoryForExchangeOrder(orderId.id).awaitAsList() },
             ExchangeOrderAuditEntryMapper::map,
             { EntityRevision(it.orderId.id, it.revisionId) },
+        ) { entry, source -> entry.copy(source = source) }
+
+    override suspend fun getAuditHistoryForReportedBalance(balanceId: ReportedBalanceId): List<ReportedBalanceAuditEntry> =
+        auditHistory(
+            EntityType.REPORTED_BALANCE,
+            { auditSelectQueries.selectAuditHistoryForReportedBalance(balanceId.id).awaitAsList() },
+            ReportedBalanceAuditEntryMapper::map,
+            { EntityRevision(it.balanceId.id, it.revisionId) },
         ) { entry, source -> entry.copy(source = source) }
 
     override suspend fun getAuditHistoryForCategory(categoryId: Long): List<CategoryAuditEntry> =

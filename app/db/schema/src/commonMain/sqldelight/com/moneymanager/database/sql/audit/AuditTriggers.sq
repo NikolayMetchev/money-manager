@@ -678,3 +678,30 @@ BEGIN
     INSERT INTO csv_import_application_audit (audit_timestamp, audit_type_id, csv_import_application_id, csv_import_id, strategy_id, strategy_name, applied_at, account_id, currency_id)
     VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, old.id, old.csv_import_id, old.strategy_id, old.strategy_name, old.applied_at, old.account_id, old.currency_id);
 END;
+
+-- trigger_reported_balance_insert_audit
+CREATE TRIGGER trigger_reported_balance_insert_audit
+AFTER INSERT ON reported_balance
+FOR EACH ROW
+BEGIN
+    INSERT INTO reported_balance_audit (audit_timestamp, audit_type_id, reported_balance_id, revision_id, record_id, account_id, asset_id, timestamp, amount)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, new.id, new.revision_id, new.record_id, new.account_id, new.asset_id, new.timestamp, new.amount);
+END;
+
+-- trigger_reported_balance_update_audit
+CREATE TRIGGER trigger_reported_balance_update_audit
+AFTER UPDATE ON reported_balance
+FOR EACH ROW
+BEGIN
+    INSERT INTO reported_balance_audit (audit_timestamp, audit_type_id, reported_balance_id, revision_id, record_id, account_id, asset_id, timestamp, amount)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, old.id, new.revision_id, old.record_id, old.account_id, old.asset_id, old.timestamp, old.amount);
+END;
+
+-- trigger_reported_balance_delete_audit
+CREATE TRIGGER trigger_reported_balance_delete_audit
+AFTER DELETE ON reported_balance
+FOR EACH ROW
+BEGIN
+    INSERT INTO reported_balance_audit (audit_timestamp, audit_type_id, reported_balance_id, revision_id, record_id, account_id, asset_id, timestamp, amount)
+    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, old.id, old.revision_id, old.record_id, old.account_id, old.asset_id, old.timestamp, old.amount);
+END;

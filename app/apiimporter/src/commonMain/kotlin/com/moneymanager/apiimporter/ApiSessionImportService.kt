@@ -30,6 +30,7 @@ import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.model.apistrategy.TimestampFormat
 import com.moneymanager.domain.model.codesByName
 import com.moneymanager.domain.model.csv.ImportStatus
+import com.moneymanager.domain.model.observation.ImportRecordKey
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.model.resolveAssetCode
 import com.moneymanager.domain.model.rules.AccountNaming
@@ -63,6 +64,7 @@ import com.moneymanager.importengineapi.ImportFee
 import com.moneymanager.importengineapi.ImportOwnershipIntent
 import com.moneymanager.importengineapi.ImportPassThrough
 import com.moneymanager.importengineapi.ImportPersonIntent
+import com.moneymanager.importengineapi.ImportReportedBalance
 import com.moneymanager.importengineapi.ImportResult
 import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTransfer
@@ -1516,6 +1518,9 @@ private data class ApiTransactionPageItem(
     val feeAmountDecimalMajor: BigDecimal? = null,
     val feeCurrencyCode: String? = null,
     val feeDescription: String? = null,
+    // What the own account holds after the item, as the feed reports it (signed).
+    val balance: ParsedAmount? = null,
+    val balanceCurrencyCode: String? = null,
 ) {
     val isZeroAmount: Boolean get() = amountSign == 0
     val isIncoming: Boolean get() = amountSign > 0
@@ -1556,6 +1561,8 @@ private data class PreparedApiTransaction(
     val fee: ImportFee? = null,
     val passThrough: ImportPassThrough? = null,
     val conversion: ImportConversion? = null,
+    /** What [ownAccount] holds after the item, as the feed reports it. */
+    val reportedBalance: Money? = null,
 )
 
 /** Every [LocalAccountKey] this prepared transaction moves money through (main legs, fee, pass-through). */
@@ -1710,6 +1717,17 @@ private suspend fun runImportEngine(
     val batch =
         ImportBatch(
             transfers = importTransfers,
+            reportedBalances =
+                orderedPrepared.mapNotNull { p ->
+                    p.reportedBalance?.let {
+                        ImportReportedBalance(
+                            record = ImportRecordKey.ApiItem(setup.sessionId, p.requestId, p.item.jsonPath.value),
+                            account = p.ownAccount,
+                            timestamp = p.timestamp,
+                            amount = it,
+                        )
+                    }
+                },
             dedupePolicy =
                 setup.strategy.dedupePolicy(
                     setup.attributeTypeCache.getOrCreate(WellKnownIds.UNIDENTIFIED_COUNTERPARTY_ATTR_TYPE_NAME),
@@ -1958,6 +1976,31 @@ private suspend fun prepareValidTransactionItem(
                 }
         }
     val conversion = foreignMoney?.let { ImportConversion(settled = amount, incoming = data.isIncoming) }
+    val reportedBalance =
+        item.balance?.let { parsed ->
+            val balanceCurrency =
+                item.balanceCurrencyCode?.let { code ->
+                    setup.currencyCache.getCurrency(code) ?: error("Balance currency not found: $code")
+                }
+                    ?: currency
+            when {
+                parsed.minorUnits != null -> {
+                    minorUnitsToMoney(
+                        parsed.minorUnits,
+                        balanceCurrency,
+                        setup.strategy.config.minorUnitDecimalPlaces,
+                    )
+                }
+
+                parsed.decimalMajor != null -> {
+                    Money.fromDisplayValue(parsed.decimalMajor, balanceCurrency)
+                }
+
+                else -> {
+                    null
+                }
+            }
+        }
     val movedAmount = foreignMoney ?: amount
 
     val passThrough =
@@ -2016,6 +2059,7 @@ private suspend fun prepareValidTransactionItem(
         fee = fee,
         passThrough = passThrough?.passThrough,
         conversion = conversion,
+        reportedBalance = reportedBalance,
     )
 }
 
@@ -2157,6 +2201,12 @@ private fun parseTransactionsWithPath(
                     fee.isMagnitudeOf(amount)
             val chargedFee = fee?.takeUnless { toFeeAccount }
             val feeDescription = feeRule?.description?.let { obj.resolve(it) }
+            val balance = outcome.balance?.let { parseSigned(obj, it.amount, mappings.amountFormat) }
+            val balanceCurrency =
+                outcome.balance
+                    ?.currency
+                    ?.let { obj.resolve(it) }
+                    ?.takeIf { it.isNotBlank() }
             if (created != null && amount != null && currency != null) {
                 ApiTransactionPageItem(
                     amountMinorUnits = amount.minorUnits,
@@ -2184,6 +2234,8 @@ private fun parseTransactionsWithPath(
                     feeAmountDecimalMajor = chargedFee?.decimalMajor,
                     feeCurrencyCode = feeCurrency?.uppercase(),
                     feeDescription = feeDescription,
+                    balance = balance,
+                    balanceCurrencyCode = balanceCurrency?.uppercase(),
                 )
             } else {
                 logger.e {
@@ -2259,6 +2311,26 @@ private fun parseMagnitude(
             val decimal = runCatching { BigDecimal(raw) }.getOrNull() ?: return null
             if (decimal.compareTo(BigDecimal.ZERO) == 0) return null
             ParsedAmount(minorUnits = null, decimalMajor = decimal.abs(), sign = 0)
+        }
+    }
+}
+
+/** Parses the amount at [amount] per the strategy's [ApiAmountFormat], keeping its sign (a balance can be overdrawn). */
+private fun parseSigned(
+    obj: JsonObject,
+    amount: ValueExpr,
+    amountFormat: ApiAmountFormat,
+): ParsedAmount? {
+    val raw = obj.resolve(amount).ifBlank { return null }
+    return when (amountFormat) {
+        ApiAmountFormat.MINOR_UNITS_INTEGER -> {
+            val value = raw.toLongOrNull() ?: return null
+            ParsedAmount(minorUnits = value, decimalMajor = null, sign = value.compareTo(0L))
+        }
+
+        ApiAmountFormat.DECIMAL_MAJOR_UNITS -> {
+            val decimal = runCatching { BigDecimal(raw) }.getOrNull() ?: return null
+            ParsedAmount(minorUnits = null, decimalMajor = decimal, sign = decimal.compareTo(BigDecimal.ZERO))
         }
     }
 }

@@ -85,6 +85,7 @@ class CategoriesScreenTest {
                 },
             personOverrideRepository = mock(MockMode.autoUnit),
             importRecordRepository = mock(MockMode.autoUnit),
+            reportedBalanceRepository = mock(MockMode.autoUnit),
             editGate = EditGate.AlwaysWritable,
         )
 

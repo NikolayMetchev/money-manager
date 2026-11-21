@@ -4,18 +4,26 @@ import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.csvimporter.bulkApplyCsv
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Money
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Trade
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csv.CsvImport
+import com.moneymanager.domain.model.reconciliation.ReportedBalance
+import com.moneymanager.domain.model.rules.RuleAction
+import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.importengineapi.ManualTradeInput
 import com.moneymanager.importengineapi.createManualTradeEntries
 import com.moneymanager.test.database.DbTest
+import com.moneymanager.test.database.reimportFile
+import com.moneymanager.test.database.reimports
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Instant
@@ -307,5 +315,154 @@ class RevolutCsvE2ETest : DbTest() {
 
             val fee = transfers().single { it.amount.toDisplayValue().compareTo(BigDecimal("1.5")) == 0 }
             assertEquals("EUR", fee.amount.asset.code)
+        }
+
+    private suspend fun reportedBalances(currency: String): List<ReportedBalance> {
+        val revolut = accounts().single { it.name == "Revolut" }
+        val asset =
+            repositories.currencyRepository
+                .getAllCurrencies()
+                .first()
+                .single { it.code == currency }
+        return repositories.reportedBalanceRepository.getBalances(revolut.id, asset)
+    }
+
+    private fun List<ReportedBalance>.amounts(): List<Money> = map { it.amount }
+
+    private suspend fun money(
+        vararg amounts: String,
+        currency: String,
+    ): List<Money> {
+        val asset =
+            repositories.currencyRepository
+                .getAllCurrencies()
+                .first()
+                .single { it.code == currency }
+        return amounts.map { Money.fromDisplayValue(BigDecimal(it), asset) }
+    }
+
+    @Test
+    fun `every row's balance is kept against the Revolut account with its row as the source`() =
+        runDbTest {
+            val eur = stage("account-statement_eur.csv", eurFile)
+            val usd = stage("account-statement_usd.csv", usdFile)
+            apply(eur, usd)
+
+            // The exchange legs became one trade, but their balances are each statement's own.
+            assertEquals(money("977.65", "777.65", currency = "EUR"), reportedBalances("EUR").amounts())
+            assertEquals(money("230", "180", currency = "USD"), reportedBalances("USD").amounts())
+            val sources =
+                reportedBalances("EUR").map {
+                    repositories.reportedBalanceRepository
+                        .getSources(it.id)
+                        .single()
+                        .source
+                }
+            assertEquals(listOf(1L, 2L), sources.map { (it as Source.Csv).rowIndex })
+            assertEquals(setOf(eur.id), sources.map { (it as Source.Csv).importId }.toSet())
+            assertEquals(
+                listOf("Revolut"),
+                repositories.reportedBalanceRepository
+                    .getSeries()
+                    .first()
+                    .map { it.accountName }
+                    .distinct(),
+            )
+        }
+
+    @Test
+    fun `a re-import keeps unchanged balances and revises changed ones`() =
+        runDbTest {
+            val eur = stage("account-statement_eur.csv", eurFile)
+            apply(eur, stage("account-statement_usd.csv", usdFile))
+            val before = reportedBalances("EUR")
+            val reimports = repositories.reimports(maintenance)
+
+            reimports.reimportFile(eur.id)
+            assertEquals(before, reportedBalances("EUR"))
+
+            // A strategy whose balance reads another column changes every balance the file reports.
+            val appliedId =
+                repositories.csvImportRepository
+                    .getImport(eur.id)
+                    .first()!!
+                    .lastAppliedStrategyId
+            val revolut =
+                repositories.csvImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .single { it.id == appliedId }
+            val readsAmount =
+                revolut.copy(
+                    config =
+                        revolut.config.copy(
+                            rules =
+                                revolut.config.rules.map { rule ->
+                                    rule.copy(
+                                        actions =
+                                            rule.actions.map {
+                                                if (it is RuleAction.Balance) {
+                                                    RuleAction.Balance(
+                                                        ValueExpr.of("Amount"),
+                                                    )
+                                                } else {
+                                                    it
+                                                }
+                                            },
+                                    )
+                                },
+                        ),
+                )
+            reimports.reimportFile(eur.id, strategy = readsAmount)
+            val after = reportedBalances("EUR")
+            assertEquals(money("-22.35", "-200", currency = "EUR"), after.amounts())
+            assertEquals(before.map { it.id }, after.map { it.id })
+            assertTrue(after.zip(before).all { (now, then) -> now.revisionId > then.revisionId })
+            // Each revision keeps its old value in the audit history, and every one names the row that reported it.
+            val history = repositories.auditRepository.getAuditHistoryForReportedBalance(after.first().id)
+            assertEquals(after.first().revisionId, history.maxOf { it.revisionId })
+            assertTrue(history.size >= 2)
+            assertTrue(history.all { it.source?.source is Source.Csv }, "every revision has its row as the source: $history")
+
+            // Without a balance rule the file reports none.
+            val withoutBalance =
+                revolut.copy(
+                    config =
+                        revolut.config.copy(
+                            rules =
+                                revolut.config.rules.filter { rule ->
+                                    rule.actions.none { it is RuleAction.Balance }
+                                },
+                        ),
+                )
+            reimports.reimportFile(eur.id, strategy = withoutBalance)
+            assertEquals(emptyList(), reportedBalances("EUR"))
+            assertEquals(2, reportedBalances("USD").size)
+        }
+
+    @Test
+    fun `merging the Revolut account moves its balances, and undoing the merge moves them back`() =
+        runDbTest {
+            apply(stage("account-statement_eur.csv", eurFile))
+            val revolut = accounts().single { it.name == "Revolut" }
+            val eur =
+                repositories.currencyRepository
+                    .getAllCurrencies()
+                    .first()
+                    .single { it.code == "EUR" }
+            val other =
+                repositories.accountRepository.createAccount(
+                    Account(id = AccountId(0), name = "My Revolut", openingDate = now),
+                    Source.Manual,
+                )
+            val balances = repositories.reportedBalanceRepository
+
+            val merge = repositories.accountRepository.mergeAccounts(deletedAccount = revolut.id, survivingAccount = other)
+            assertEquals(2, balances.getBalances(other, eur).size)
+            assertEquals(emptyList(), balances.getBalances(revolut.id, eur))
+
+            repositories.accountRepository.unmergeAccount(merge)
+            assertEquals(2, balances.getBalances(revolut.id, eur).size)
+            assertEquals(emptyList(), balances.getBalances(other, eur))
         }
 }

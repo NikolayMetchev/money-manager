@@ -1,0 +1,39 @@
+-- The balance a statement says an account held once one of its records had happened (#1531): a `Balance` rule action's
+-- value (Revolut's `Balance` column). It is kept apart from the record's transactions, so the Statement Balances
+-- reconciliation can compare it with the running balance Money Manager computes from them, whatever the record became
+-- (a transfer, a trade's leg, a deduped twin, an excluded row).
+--
+-- One per import record: the record's lifecycle owns it (deleting or unimporting a file deletes its records, and
+-- with them their balances). Its provenance is an `entity_source` row like any entity's (entity_type 14), pointing
+-- at its CSV row or API item; a balance a re-import changes takes a new revision.
+CREATE TABLE reported_balance (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    record_id INTEGER NOT NULL UNIQUE,
+    account_id INTEGER NOT NULL,
+    asset_id INTEGER NOT NULL,
+    timestamp INTEGER NOT NULL,
+    -- Signed arbitrary-precision minor-unit amount, stored as a decimal string (BigInteger.toString()).
+    amount TEXT NOT NULL,
+    revision_id INTEGER NOT NULL DEFAULT 1,
+    FOREIGN KEY (record_id) REFERENCES import_record(id) ON DELETE CASCADE,
+    FOREIGN KEY (account_id) REFERENCES account(id) ON DELETE CASCADE,
+    FOREIGN KEY (asset_id) REFERENCES asset(id)
+);
+
+CREATE INDEX idx_reported_balance_account ON reported_balance(account_id, asset_id, timestamp);
+
+-- A balance a staged file's or an API session's re-run has yet to report again (like observation_reserved): the re-run
+-- unreserves every balance it reports again, and settling the source deletes the rest.
+CREATE TABLE reported_balance_reserved (
+    reported_balance_id INTEGER PRIMARY KEY NOT NULL,
+    FOREIGN KEY (reported_balance_id) REFERENCES reported_balance(id) ON DELETE CASCADE
+);
+
+-- The balances an account merge moved from the deleted account to the survivor, so unmerge moves exactly those back.
+CREATE TABLE account_merge_reported_balance (
+    merge_id INTEGER NOT NULL,
+    reported_balance_id INTEGER NOT NULL,
+    PRIMARY KEY (merge_id, reported_balance_id),
+    FOREIGN KEY (merge_id) REFERENCES account_merge(id) ON DELETE CASCADE,
+    FOREIGN KEY (reported_balance_id) REFERENCES reported_balance(id) ON DELETE CASCADE
+);

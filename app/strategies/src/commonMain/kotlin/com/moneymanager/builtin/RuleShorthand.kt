@@ -138,6 +138,9 @@ internal fun incomingWhen(vararg conditions: Condition): StrategyRule =
 /** The row's money comes into the statement account when [amountColumn] is positive. */
 internal fun incomingWhenPositive(amountColumn: String): StrategyRule = incomingWhen(Condition(amountColumn, ConditionOp.POSITIVE))
 
+/** The row reports [column] as what its own account holds once the row has happened. */
+internal fun balance(column: String): StrategyRule = rule(RuleAction.Balance(ValueExpr.of(column)), name = "Statement balance")
+
 /** The row carries [fee] when every one of [conditions] holds. */
 internal fun fee(
     fee: FeeRule,

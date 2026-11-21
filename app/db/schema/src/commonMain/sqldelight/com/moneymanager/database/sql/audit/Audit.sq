@@ -375,3 +375,20 @@ CREATE TABLE csv_import_application_audit (
 );
 
 CREATE INDEX IF NOT EXISTS idx_csv_import_application_audit_import_timestamp ON csv_import_application_audit(csv_import_id, audit_timestamp DESC);
+
+-- reported_balance_audit: Audit trail for reported_balance table (a balance a re-import revises keeps its earlier value)
+CREATE TABLE reported_balance_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    audit_timestamp INTEGER NOT NULL,
+    audit_type_id INTEGER NOT NULL,
+    reported_balance_id INTEGER NOT NULL,
+    revision_id INTEGER NOT NULL,
+    record_id INTEGER NOT NULL,
+    account_id INTEGER NOT NULL,
+    asset_id INTEGER NOT NULL,
+    timestamp INTEGER NOT NULL,
+    amount TEXT NOT NULL,
+    FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_reported_balance_audit_balance_id_timestamp ON reported_balance_audit(reported_balance_id, audit_timestamp DESC);

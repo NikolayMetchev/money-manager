@@ -330,6 +330,16 @@ internal class SourceObservations(
         return ObservationOwner.Record(id) to true
     }
 
+    /**
+     * [key]'s import record, written now if this is the first the database hears of it. Asked after the batch's
+     * observations, which can write records this cache never saw (a materialized observation mutation), so a miss reads
+     * the container's records again before writing one.
+     */
+    suspend fun recordId(key: ImportRecordKey): ImportRecordId {
+        if (knownRecord(key) == null) containerRecords.remove(key.containerKey())
+        return (record(key).first as ObservationOwner.Record).recordId
+    }
+
     private suspend fun knownRecord(key: ImportRecordKey): ImportRecordId? = recordsOf(key)[key]
 
     private suspend fun recordsOf(key: ImportRecordKey): MutableMap<ImportRecordKey, ImportRecordId> =

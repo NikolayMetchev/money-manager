@@ -20,7 +20,7 @@ enum class ImportTab { FILES, API, MISC, TIMELINE, RECONCILIATION }
 
 /** The sub-tabs of the Reconciliation import tab; part of the destination so Back returns to the one that was showing. */
 @Serializable
-enum class ReconciliationSubTab { EXTERNAL, MANUAL, CARDS }
+enum class ReconciliationSubTab { EXTERNAL, MANUAL, CARDS, BALANCES }
 
 /**
  * Navigation destinations. Serializable [NavKey]s so the back stack survives process death via

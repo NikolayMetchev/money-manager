@@ -277,6 +277,7 @@ class CsvImportWriteRepositoryImpl(
                     ?: return@withContext
             database.transaction {
                 database.observationWriteQueries.reserveCsvImport(id.id.toString())
+                database.reportedBalanceWriteQueries.reserveCsvImport(id.id.toString())
                 csvImportWriteQueries.unhashImportRecords(unhashed, id.id.toString())
                 tableManager.resetAllRowStatuses(import.table_name)
             }

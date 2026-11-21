@@ -293,6 +293,20 @@ sealed interface RuleAction {
         val foreignAmount: ForeignAmount,
     ) : RuleAction
 
+    /**
+     * The balance the record's own account holds once the record has happened, as its statement reports it
+     * (Revolut's `Balance` column). [amount] keeps its sign; [currency] names its asset, the record's own when
+     * absent. It is stored apart from the record's transactions, so the Statement Balances reconciliation can
+     * compare it with the running balance Money Manager computes.
+     */
+    @Serializable
+    @SerialName("balance")
+    data class Balance(
+        val amount: ValueExpr,
+        @EncodeDefault(EncodeDefault.Mode.NEVER)
+        val currency: ValueExpr? = null,
+    ) : RuleAction
+
     /** The record runs through the conduit [accountName] as a pass-through chain. */
     @Serializable
     @SerialName("throughConduit")

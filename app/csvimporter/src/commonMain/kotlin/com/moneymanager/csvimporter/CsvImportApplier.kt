@@ -52,6 +52,7 @@ import com.moneymanager.importengineapi.ImportFee
 import com.moneymanager.importengineapi.ImportOwnershipIntent
 import com.moneymanager.importengineapi.ImportPassThrough
 import com.moneymanager.importengineapi.ImportPersonIntent
+import com.moneymanager.importengineapi.ImportReportedBalance
 import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTradeIntent
 import com.moneymanager.importengineapi.ImportTransfer
@@ -116,7 +117,10 @@ internal fun collapsePassThroughChain(
     return if (keptNodes.size < 2) null else keptNodes to keptDescriptions
 }
 
-/** A fee comes out of the row's own account, so a fee on money coming in isn't charged to whoever sent it. */
+/**
+ * The row's own account: a fee comes out of it, so a fee on money coming in isn't charged to whoever sent it, and a
+ * balance the row reports is that account's.
+ */
 private fun CsvTransferWithAttributes.feePayerId(): AccountId =
     statementAccountId?.takeIf { it != UNRESOLVED_ACCOUNT_ID } ?: transfer.sourceAccountId
 
@@ -1505,6 +1509,17 @@ suspend fun runCsvImport(
             peopleToCreate = peopleToCreate,
             ownerships = personOwnerships,
             trades = importTrades,
+            reportedBalances =
+                finalPrep.validTransfers.mapNotNull { row ->
+                    row.reportedBalance?.let {
+                        ImportReportedBalance(
+                            record = ImportRecordKey.CsvRow(csvImport.id, row.rowIndex),
+                            account = AccountRef.Existing(row.feePayerId()),
+                            timestamp = row.transfer.timestamp,
+                            amount = it,
+                        )
+                    }
+                },
             tradeDedupePolicy = strategy.tradeDedupePolicy(),
             dedupePolicy = strategy.dedupePolicy(unidentifiedCounterpartyTypeId),
             strategyId = strategy.id.toString(),

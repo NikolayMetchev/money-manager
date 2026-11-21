@@ -275,6 +275,8 @@ class AccountWriteRepositoryImpl(
             targetAccount = survivingAccount.id,
             accountToDelete = deletedAccount.id,
         )
+        database.reportedBalanceWriteQueries.insertMergeMoves(mergeId = mergeId, deletedAccountId = deletedAccount.id)
+        database.reportedBalanceWriteQueries.moveToSurvivor(survivingAccountId = survivingAccount.id, deletedAccountId = deletedAccount.id)
         mergeWriteQueries.insertMergeStatementSources(mergeId = mergeId, deletedAccount = deletedAccount.id)
         database.entitySourceWriteQueries.reassignStatementAccount(
             survivingAccountId = survivingAccount.id,
@@ -494,6 +496,8 @@ class AccountWriteRepositoryImpl(
             survivingAccount = merge.surviving_account_id,
         )
         mergeWriteQueries.restoreStatementSources(deletedAccount = merge.deleted_account_id, mergeId = mergeId.id)
+        database.reportedBalanceWriteQueries.restoreMergeMoves(restoredAccountId = merge.deleted_account_id, mergeId = mergeId.id)
+        database.reportedBalanceWriteQueries.deleteMergeMoves(mergeId.id)
         // The restored account takes its imports back.
         mergeSelectQueries.selectMappingIdsForMerge(mergeId.id).awaitAsList().forEach { mappingId ->
             database.accountMappingWriteQueries.deleteById(mappingId)

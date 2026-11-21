@@ -420,3 +420,20 @@ SELECT audit_type_id, audit_timestamp, strategy_name, applied_at
 FROM csv_import_application_audit
 WHERE csv_import_id = ?
 ORDER BY id DESC;
+
+selectAuditHistoryForReportedBalance:
+SELECT
+    reported_balance_audit.id,
+    reported_balance_audit.audit_timestamp,
+    audit_type.name AS audit_type,
+    reported_balance_audit.reported_balance_id,
+    reported_balance_audit.revision_id,
+    reported_balance_audit.record_id,
+    reported_balance_audit.account_id,
+    reported_balance_audit.asset_id,
+    reported_balance_audit.timestamp,
+    reported_balance_audit.amount
+FROM reported_balance_audit
+JOIN audit_type ON reported_balance_audit.audit_type_id = audit_type.id
+WHERE reported_balance_audit.reported_balance_id = ?
+ORDER BY reported_balance_audit.audit_timestamp DESC, reported_balance_audit.id DESC;

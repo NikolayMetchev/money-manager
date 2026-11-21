@@ -29,6 +29,7 @@ import com.moneymanager.domain.repository.write.ReconciliationLinkWriteRepositor
 import com.moneymanager.domain.repository.write.RelationshipTypeWriteRepository
 import com.moneymanager.domain.repository.write.RelationshipWrite
 import com.moneymanager.domain.repository.write.RelationshipWriteRepository
+import com.moneymanager.domain.repository.write.ReportedBalanceWriteRepository
 import com.moneymanager.domain.repository.write.SettingsWriteRepository
 import com.moneymanager.domain.repository.write.TradeWriteRepository
 import com.moneymanager.domain.repository.write.TransactionWriteRepository
@@ -91,12 +92,15 @@ class ImportEngineImpl(
     private val personOverrideRepository: PersonOverrideWriteRepository,
     /** Staged files' import records. */
     private val importRecordRepository: ImportRecordWriteRepository,
+    /** The running balances statements report beside their records. */
+    private val reportedBalanceRepository: ReportedBalanceWriteRepository,
     private val editGate: EditGate,
 ) : ImportEngine {
     private val commitLock = Mutex()
     private val writes = MutableStateFlow(0L)
     override val writeVersion: StateFlow<Long> = writes.asStateFlow()
 
+    private val balanceWriter = ReportedBalanceWriter(reportedBalanceRepository)
     private val copier =
         ReconciliationCopier(observationRepository, reconciliationLinkRepository, accountAttributeRepository, ::materialize)
     private val rerun =
@@ -267,9 +271,11 @@ class ImportEngineImpl(
         val matchSync = batch.takeIf { it.syncMatches }?.let { matchSync().run(onProgress) } ?: MaterializationReport()
         // A transaction a re-run took back was written with what its own record says: bring it to the merge of every
         // observation and link it has, as a fresh booking would be, writing only what differs (#1510).
+        balanceWriter.write(batch, observer, accountResolution.keyToId)
+
         val retaken = transfers.retaken + observer.claimed
         if (retaken.isNotEmpty()) materialize(emptyList(), MaterializationRequest(Source.Reconciler, retaken))
-        val settled = batch.settle?.let { rerun.settle(it, onProgress) }
+        val settled = batch.settle?.let { rerun.settle(it, onProgress).also { balanceWriter.settle() } }
         val copied = if (batch.reconciliationCopies.isEmpty()) emptyList() else copier.copyToRealAccounts(batch.reconciliationCopies)
 
         return ImportResult(

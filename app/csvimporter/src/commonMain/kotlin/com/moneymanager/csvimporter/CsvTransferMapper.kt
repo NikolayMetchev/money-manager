@@ -116,6 +116,8 @@ sealed interface MappingResult {
          * when it isn't known. [UNRESOLVED_ACCOUNT_ID] until the account exists.
          */
         val statementAccountId: AccountId? = null,
+        /** What the statement says its account holds once the row has happened (see `RuleAction.Balance`); null when it doesn't say. */
+        val reportedBalance: Money? = null,
     ) : MappingResult {
         /** Convenience for flows where only the target side can discover a new account. */
         val newAccountName: String? get() = newAccounts.firstOrNull()?.name
@@ -253,6 +255,8 @@ data class CsvTransferWithAttributes(
     val conversion: ImportConversion? = null,
     /** The account whose statement the row is (see [MappingResult.Success.statementAccountId]). */
     val statementAccountId: AccountId? = null,
+    /** The statement's balance after the row (see [MappingResult.Success.reportedBalance]). */
+    val reportedBalance: Money? = null,
 )
 
 /**
@@ -430,6 +434,7 @@ class CsvTransferMapper(
                             unidentifiedCounterpartyAccountId = result.unidentifiedCounterpartyAccountId,
                             statementAccountId = result.statementAccountId,
                             conversion = result.conversion,
+                            reportedBalance = result.reportedBalance,
                         ),
                     )
                     // Count by status
@@ -896,6 +901,7 @@ class CsvTransferMapper(
                 // The own account is the source of a payment and the target of a refund (flipped row).
                 conversion = foreign?.let { ImportConversion(settled = settled, incoming = flipAccounts) },
                 statementAccountId = ownAccountId,
+                reportedBalance = parseBalance(outcome.balance, values, currency),
             )
         } catch (expected: Exception) {
             MappingResult.Error(row.rowIndex, expected.message ?: "Unknown error")
@@ -964,6 +970,27 @@ class CsvTransferMapper(
         val magnitude = parseBigDecimal(rawAmount).abs()
         if (asset.id == settledCurrency.id || magnitude.compareTo(BigDecimal.ZERO) == 0) return ForeignParse.None
         return ForeignParse.Foreign(Money.fromDisplayValue(magnitude, asset))
+    }
+
+    /**
+     * The balance the row reports (see [RuleAction.Balance]), with its sign: null when no rule declares one or the cell is
+     * blank. Its currency is the row's unless the rule names another.
+     */
+    private fun parseBalance(
+        balance: RuleAction.Balance?,
+        values: List<String>,
+        rowCurrency: Asset,
+    ): Money? {
+        if (balance == null) return null
+        val lookup: (String) -> String? = { getColumnValueOrNull(it, values)?.trim() }
+        val raw = rules.resolve(balance.amount, lookup).trim()
+        if (raw.isEmpty()) return null
+        val asset =
+            balance.currency?.let { expr ->
+                val code = rules.resolve(expr, lookup).trim()
+                if (code.isEmpty()) rowCurrency else lookupAsset(code) ?: error("Balance currency not found: $code")
+            } ?: rowCurrency
+        return Money.fromDisplayValue(parseBigDecimal(raw), asset)
     }
 
     /** A detected leg, plus the intermediate account a through-account leg routes via. */
