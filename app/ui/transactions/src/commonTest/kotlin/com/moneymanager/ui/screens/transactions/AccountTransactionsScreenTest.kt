@@ -194,6 +194,43 @@ class AccountTransactionsScreenTest {
     }
 
     @Test
+    fun deleteButton_reportsTheRowItWasClickedOn() {
+        runMoneyManagerComposeUiTest {
+            val now = Clock.System.now()
+            val usd = Currency(id = CurrencyId(1L), code = "USD", name = "US Dollar", scaleFactor = 100)
+            val own = Account(id = AccountId(1L), name = "Exchange", openingDate = now)
+            val other = Account(id = AccountId(2L), name = "Other", openingDate = now)
+            val row =
+                AccountRow(
+                    transactionId = TradeId(42L),
+                    timestamp = now,
+                    description = "Buy crypto",
+                    accountId = own.id,
+                    transactionAmount = Money(-500, usd),
+                    runningBalance = Money(-500, usd),
+                    sourceAccountId = own.id,
+                    targetAccountId = other.id,
+                    kind = TransactionKind.TRADE,
+                )
+            var deleted: AccountRow? = null
+            setContent {
+                ProvideSchemaAwareScope {
+                    AccountTransactionCard(
+                        runningBalance = row,
+                        accounts = listOf(own, other),
+                        screenSizeClass = ScreenSizeClass.Expanded,
+                        onDeleteClick = { deleted = it },
+                    )
+                }
+            }
+            waitForIdle()
+            onNodeWithTag("deleteTransactionButton").performClick()
+            waitForIdle()
+            assertEquals(row, deleted)
+        }
+    }
+
+    @Test
     fun tradeEditor_savesEditedDescriptionThroughImportEngine() {
         runMoneyManagerComposeUiTest {
             val now = Clock.System.now()
