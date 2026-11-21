@@ -219,8 +219,11 @@ class ObservationMatcher(
         }
 
     /**
-     * Whether the groups [x] and [y] may become one. Pinned observations stay where a person put them without vetoing
-     * what else joins them, but still count for splits and pins.
+     * Whether the groups [x] and [y] may become one. Pinned observations stay where a person put them, but one that
+     * joins them must still pair with each of them:
+     * a pin keeps its own observations together, it does not let an unrelated record of another movement chain on
+     * (a pinned Revolut row and a Coinbase deposit pulling in a Marcus withdrawal of the same amount). Pins still count
+     * for splits and for each other.
      */
     private fun canJoin(
         observations: List<MatchObservation>,
@@ -235,7 +238,7 @@ class ObservationMatcher(
         return !pinsConflict &&
             x.all { i ->
                 y.all { j ->
-                    setOf(i, j) !in apart && (i in pinned || j in pinned || paired(observations[i], observations[j]))
+                    setOf(i, j) !in apart && ((i in pinned && j in pinned) || paired(observations[i], observations[j]))
                 }
             }
     }

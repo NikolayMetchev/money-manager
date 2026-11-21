@@ -699,6 +699,7 @@ suspend fun applyStagedCsv(
             assetAliases = cryptoRepository?.assetAliasMap().orEmpty(),
             attributeAccountMatchers = attributeAccountMatchers,
             passThroughAccounts = passThroughAccounts,
+            accountOwnerNames = accountRepository.getAccountOwnerNames(),
         )
     importEngine.applyCsvImportMutations(listOf(recordRowsMutation(stagedImport, allRows, inputsHash)))
     // An account the file's rules named that nothing ended up on (a conversion counterparty whose legs paired into a

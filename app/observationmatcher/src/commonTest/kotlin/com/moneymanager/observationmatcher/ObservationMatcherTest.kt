@@ -176,6 +176,19 @@ class ObservationMatcherTest {
     }
 
     @Test
+    fun `a record pairing with one pinned observation does not chain onto the others pinned with it`() {
+        val a = transfer(1, "csv-a", "k-a", stored = 1, current = 100)
+        val b = transfer(2, "csv-b", "k-b", stored = 2, current = 100, description = "Something else entirely")
+        val c = transfer(3, "csv-c", "k-c")
+        val pins = listOf(ObservationPin(ObservationId(1), TransferId(100)), ObservationPin(ObservationId(2), TransferId(100)))
+
+        val result = matcher(FUZZY).match(listOf(a, b, c), pins = pins)
+
+        assertSameTransaction(result, a, b)
+        assertSeparate(result, a, c)
+    }
+
+    @Test
     fun `two observations pinned to different transactions never join`() {
         val a = transfer(1, "csv-a", "k-a", stored = 1, current = 100)
         val b = transfer(2, "csv-b", "k-b", stored = 2, current = 200)

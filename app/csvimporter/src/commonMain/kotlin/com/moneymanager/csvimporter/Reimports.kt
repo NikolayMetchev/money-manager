@@ -426,6 +426,7 @@ class Reimports(
                     assetAliases = cryptoRepository.assetAliasMap(),
                     attributeAccountMatchers = AttributeAccountMatcher.registry(accountAttributeRepository.getAll().first()),
                     passThroughAccounts = passThroughAccountRepository.getAll().first(),
+                    accountOwnerNames = reads.accountRepository.getAccountOwnerNames(),
                 )
             }
         val unchanged = mutableSetOf<CsvImport>()
@@ -462,6 +463,7 @@ class Reimports(
         val assetAliases: Map<String, String>,
         val attributeAccountMatchers: Map<String, AttributeAccountMatcher>,
         val passThroughAccounts: List<PassThroughAccount>,
+        val accountOwnerNames: Map<AccountId, List<String>>,
     )
 
     /**
@@ -489,6 +491,7 @@ class Reimports(
                 assetAliases = inputs.assetAliases,
                 attributeAccountMatchers = inputs.attributeAccountMatchers,
                 passThroughAccounts = inputs.passThroughAccounts,
+                accountOwnerNames = inputs.accountOwnerNames,
             )
         val rows = reads.csvImportRepository.getImportRows(file.id, limit = file.rowCount.coerceAtLeast(1), offset = 0)
         return isUnchanged(file, rows, records.getCsvImportRecords(file.id), inputsHash)

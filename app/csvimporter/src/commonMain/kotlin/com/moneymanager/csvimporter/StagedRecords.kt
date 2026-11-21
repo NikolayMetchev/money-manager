@@ -32,6 +32,7 @@ suspend fun stagedInputsHash(
     assetAliases: Map<String, String>,
     attributeAccountMatchers: Map<String, AttributeAccountMatcher>,
     passThroughAccounts: List<PassThroughAccount>,
+    accountOwnerNames: Map<AccountId, List<String>> = emptyMap(),
 ): String {
     val canonical =
         buildString {
@@ -51,6 +52,10 @@ suspend fun stagedInputsHash(
                 .sorted()
                 .forEach { type -> appendLine("attribute=$type|${attributeAccountMatchers[type]?.fingerprint.orEmpty()}") }
             appendLine(CANONICAL_JSON.encodeToString(PASS_THROUGHS_SERIALIZER, passThroughAccounts.sortedBy { it.id.value }))
+            accountOwnerNames.entries
+                .flatMap { (account, names) -> names.map { "owner=${account.id}|$it" } }
+                .sorted()
+                .forEach(::appendLine)
         }
     return strategyConfigHash(canonical)
 }

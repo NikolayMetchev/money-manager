@@ -781,7 +781,11 @@ class CsvTransferMapper(
                     else -> {
                         counterpartyAccountId.takeIf {
                             isUnidentifiedCounterparty(targetMapping, targetResolution, targetUsedPersistedMappings) ||
-                                isOwnHolder(personalCounterpartyName, ownAccountId)
+                                isOwnHolder(
+                                    personalCounterpartyName
+                                        ?: holderCandidate(targetMapping, targetResolution, targetUsedPersistedMappings),
+                                    ownAccountId,
+                                )
                         }
                     }
                 }
@@ -1351,6 +1355,22 @@ class CsvTransferMapper(
         return resolution.personName
             ?.takeIf { it.isNotBlank() && !(applyPersistedMappings && findPersistedMapping(resolution.sourceValue) != null) }
     }
+
+    /**
+     * The name a rule gave the counterparty, person or not: a strategy that doesn't mark its counterparties as
+     * people (Revolut's "To <name>") still names the holder when the statement says "To <the holder>", so
+     * [isOwnHolder] reads the account name too. A persisted mapping of the value still wins.
+     */
+    private fun holderCandidate(
+        mapping: FieldMapping,
+        resolution: AccountResolution,
+        applyPersistedMappings: Boolean,
+    ): String? =
+        resolution.accountName.takeIf {
+            mapping is AccountFromRulesMapping &&
+                it.isNotBlank() &&
+                !(applyPersistedMappings && findPersistedMapping(resolution.sourceValue) != null)
+        }
 
     /**
      * True when [personalCounterpartyName] names an owner of [ownAccountId]: a statement saying only "FROM ALEX
