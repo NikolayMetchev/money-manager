@@ -1,5 +1,6 @@
 package com.moneymanager.strategycatalog
 
+import com.moneymanager.coroutines.runCatchingCancellable
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.strategy.CsvResolution
 import com.moneymanager.domain.strategy.CsvUnresolvedReference
@@ -98,7 +99,7 @@ class StrategyCatalogController(
         library: StrategyLibrary,
         appVersion: AppVersion,
     ) {
-        runCatching {
+        runCatchingCancellable {
             val manifest = source.fetchManifest()
             val localHashes = library.listLocal(appVersion).associate { it.key to it.contentHash }
             manifest.entries

@@ -86,6 +86,7 @@ import com.moneymanager.apiimporter.displaySummary
 import com.moneymanager.compose.filepicker.rememberFilePicker
 import com.moneymanager.compose.filepicker.rememberFileSaver
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
+import com.moneymanager.coroutines.runCatchingCancellable
 import com.moneymanager.credentialvault.CredentialVaultLockedException
 import com.moneymanager.credentialvault.StoredApiCredential
 import com.moneymanager.credentialvault.VaultState
@@ -405,7 +406,7 @@ fun ApiSessionsScreen(
                     // Built at click time: a snapshot taken when the session list changed would miss the
                     // requests a download records after its session appears.
                     scope.launch {
-                        runCatching { ApiSessionsArchive.export(apiSessionRepository, apiImportStrategyRepository) }
+                        runCatchingCancellable { ApiSessionsArchive.export(apiSessionRepository, apiImportStrategyRepository) }
                             .onSuccess { exportSaver.launch("api-sessions.json", it) }
                             .onFailure { archiveMessage = "Failed to export API sessions: ${it.message}" }
                     }

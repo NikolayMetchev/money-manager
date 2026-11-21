@@ -47,6 +47,7 @@ kmp_library(
         "@maven_kmp//:ktor_client_core",
     ],
     deps = [
+        "//utils/coroutines",
         "//utils/httpclient",
         "@maven_kmp//:cryptography_core",
         "@maven_kmp//:cryptography_random",

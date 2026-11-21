@@ -40,6 +40,7 @@ import com.moneymanager.importengineapi.deleteCsvStrategy
 import com.moneymanager.presenter.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalImportEngine
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 /**
@@ -86,6 +87,8 @@ fun DeleteCsvStrategyDialog(
                         try {
                             importEngine.deleteCsvStrategy(strategy.id)
                             onDismiss()
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
                         } catch (expected: Exception) {
                             errorMessage = "Failed to delete: ${expected.message}"
                             isDeleting = false

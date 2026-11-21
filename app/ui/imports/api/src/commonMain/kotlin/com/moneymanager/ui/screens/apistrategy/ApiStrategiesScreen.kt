@@ -42,6 +42,7 @@ import com.moneymanager.importengineapi.deleteApiStrategy
 import com.moneymanager.importengineapi.updateApiStrategy
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.foundation.LocalImportEngine
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
@@ -91,6 +92,8 @@ fun ApiStrategiesScreen(
                                 strategyPendingOverwrite = strategy.copy(id = existing.id, createdAt = existing.createdAt)
                             }
                             importError = null
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
                         } catch (expected: Exception) {
                             importError = "Failed to import strategy: ${expected.message}"
                         }
@@ -189,6 +192,8 @@ fun ApiStrategiesScreen(
                             try {
                                 importEngine.updateApiStrategy(updated)
                                 importError = null
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
                             } catch (expected: Exception) {
                                 importError = "Failed to import strategy: ${expected.message}"
                             }

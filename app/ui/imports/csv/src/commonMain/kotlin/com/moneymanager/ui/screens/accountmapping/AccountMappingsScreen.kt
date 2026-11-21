@@ -58,6 +58,7 @@ import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandli
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.util.ExposedDropdownMenu
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 /**
@@ -112,6 +113,8 @@ fun AccountMappingsScreen(
                             } else {
                                 parseResult = parsed
                             }
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
                         } catch (expected: Exception) {
                             errorMessage = "Failed to import: ${expected.message}"
                         }
@@ -148,6 +151,8 @@ fun AccountMappingsScreen(
                                     val export = accountMappingExportService.toExport(mappings, appVersion)
                                     val json = AccountMappingExportCodec.encode(export)
                                     fileSaver.launch("account-mappings.json", json)
+                                } catch (cancelled: CancellationException) {
+                                    throw cancelled
                                 } catch (expected: Exception) {
                                     errorMessage = "Failed to export: ${expected.message}"
                                 }
@@ -197,6 +202,8 @@ fun AccountMappingsScreen(
                                         @Suppress("TooGenericExceptionCaught")
                                         try {
                                             importEngine.deleteAccountMapping(mapping.id)
+                                        } catch (cancelled: CancellationException) {
+                                            throw cancelled
                                         } catch (expected: Exception) {
                                             errorMessage = "Failed to delete mapping: ${expected.message}"
                                         }
@@ -247,6 +254,8 @@ fun AccountMappingsScreen(
                     try {
                         accountMappingExportService.importMappings(parsed.export, resolutions)
                         parseResult = null
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
                     } catch (expected: Exception) {
                         errorMessage = "Failed to import: ${expected.message}"
                         parseResult = null

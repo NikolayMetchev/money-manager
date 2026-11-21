@@ -167,7 +167,7 @@ sealed interface DedupePolicy {
 
     /** No deduplication — every transfer is imported. */
     data object None : DedupePolicy {
-        override val reconciledExclusionAttributeTypeId: AttributeTypeId? get() = null
+        override val reconciledExclusionAttributeTypeId: AttributeTypeId? = null
 
         override fun windows(): List<SettlementWindow> = emptyList()
     }

@@ -86,6 +86,7 @@ kmp_library(
         "//app/model/observation",
         "//app/model/rules",
         "//app/observationmatcher",
+        "//utils/coroutines",
         "@maven_kmp//:kotlinx_coroutines_core",
     ],
 )

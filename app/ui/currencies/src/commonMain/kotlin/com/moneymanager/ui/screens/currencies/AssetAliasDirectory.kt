@@ -21,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.coroutines.runCatchingCancellable
 import com.moneymanager.domain.model.AssetAlias
 import com.moneymanager.domain.model.CryptoRegistry
 import com.moneymanager.importengineapi.removeAssetAlias
@@ -66,7 +67,7 @@ internal fun AssetAliasRow(
                 AssistChip(
                     onClick = {
                         scope.launch {
-                            runCatching { importEngine.removeAssetAlias(alias) }
+                            runCatchingCancellable { importEngine.removeAssetAlias(alias) }
                                 .onFailure { error = "Failed to remove $alias: ${it.message}" }
                         }
                     },
@@ -122,7 +123,7 @@ private fun AddAssetAliasDialog(
                 enabled = alias.isNotBlank(),
                 onClick = {
                     scope.launch {
-                        runCatching { importEngine.setAssetAlias(alias, code) }
+                        runCatchingCancellable { importEngine.setAssetAlias(alias, code) }
                             .onSuccess { onDismiss() }
                             .onFailure { error = it.message }
                     }

@@ -1,6 +1,7 @@
 package com.moneymanager.csvimporter
 
 import co.touchlab.kermit.Logger
+import com.moneymanager.coroutines.runCatchingCancellable
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
@@ -77,6 +78,7 @@ import com.moneymanager.importengineapi.tradeDedupePolicy
 import com.moneymanager.tasks.Progress
 import com.moneymanager.tasks.WeightedProgress
 import com.moneymanager.xlsx.createXlsxParser
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -552,6 +554,8 @@ suspend fun bulkApplyCsv(
                 results[outcomes.size] = result
                 outcome(BulkFileStatus.IMPORTED, result)
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (expected: Exception) {
             logger.e(expected) { "Bulk CSV import failed for ${csvImport.originalFileName}: ${expected.message}" }
             outcome(BulkFileStatus.FAILED, error = expected.message ?: expected::class.simpleName)
@@ -809,7 +813,7 @@ private suspend fun recordCsvApplication(
     strategy: CsvImportStrategy,
     sourceAccountOverride: AccountId?,
 ) {
-    runCatching {
+    runCatchingCancellable {
         importEngine.applyCsvImportMutations(
             listOf(
                 CsvImportMutation.RecordApplication(
@@ -890,6 +894,8 @@ private suspend fun persistMappingsWithFallback(
     try {
         importEngine.createAccountMappings(mappings)
         logger.i { "Saved ${mappings.size} account mappings" }
+    } catch (cancelled: CancellationException) {
+        throw cancelled
     } catch (expected: Exception) {
         // Batch is atomic, nothing was committed — retry per mapping so one bad mapping doesn't block the rest
         logger.w(expected) { "Bulk mapping save failed, falling back to per-mapping save" }
@@ -900,6 +906,8 @@ private suspend fun persistMappingsWithFallback(
                     accountId = mapping.accountId,
                     strategyId = mapping.strategyId,
                 )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (expectedMappingError: Exception) {
                 // Don't log the pattern itself — it's derived from bank-file payee/account values (PII).
                 logger.w(expectedMappingError) { "Failed to save account mapping for account id ${mapping.accountId.id}" }
@@ -940,6 +948,8 @@ private suspend fun createNewAccounts(
         importEngine.createAccounts(newAccounts, shadowSource = shadowSource, sourceFor = sourceFor)
         newAccounts.forEach { account -> createdAccountNames.add(account.name) }
         logger.i { "Created ${accountsToCreate.size} new accounts" }
+    } catch (cancelled: CancellationException) {
+        throw cancelled
     } catch (expected: Exception) {
         // Bulk create failed — fall back to per-account creation to skip only failing accounts
         logger.w(expected) { "Bulk account creation failed, falling back to per-account creation" }
@@ -948,6 +958,8 @@ private suspend fun createNewAccounts(
                 importEngine.createAccount(account, sourceFor(account), shadowSource)
                 createdAccountNames.add(account.name)
                 logger.i { "Created new account: ${account.name}" }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (expectedAccountError: Exception) {
                 logger.w(expectedAccountError) { "Skipping account '${account.name}': ${expectedAccountError.message}" }
             }

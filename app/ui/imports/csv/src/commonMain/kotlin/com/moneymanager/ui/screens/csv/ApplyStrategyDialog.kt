@@ -63,6 +63,7 @@ import com.moneymanager.ui.components.LoadingTextButton
 import com.moneymanager.ui.components.imports.ImportPreviewSection
 import com.moneymanager.ui.components.imports.NewAccountResolutionSection
 import com.moneymanager.ui.components.imports.StrategySelector
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -427,6 +428,8 @@ fun ApplyStrategyDialog(
                                     attributeAccountMatchers = AttributeAccountMatcher.registry(accountAttributes),
                                 )
                             onImportComplete(result)
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
                         } catch (expected: Exception) {
                             logger.e(expected) { "Import failed: ${expected.message}" }
                             errorMessage = "Import failed: ${expected.message}"

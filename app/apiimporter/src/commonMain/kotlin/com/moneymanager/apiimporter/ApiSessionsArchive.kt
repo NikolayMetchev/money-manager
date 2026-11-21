@@ -13,6 +13,7 @@ import com.moneymanager.importengineapi.insertApiRequest
 import com.moneymanager.importengineapi.insertApiResponse
 import com.moneymanager.importengineapi.recordApiDownloadCoverage
 import com.moneymanager.tasks.Progress
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -140,6 +141,8 @@ object ApiSessionsArchive {
         @Suppress("TooGenericExceptionCaught")
         try {
             import(content, deviceId, sessions, strategies, engine, onProgress).summary()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (expected: Exception) {
             "Failed to import API sessions: ${expected.message}"
         }

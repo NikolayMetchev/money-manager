@@ -42,6 +42,7 @@ import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.screens.apistrategy.JsonPathEntry
 import com.moneymanager.ui.screens.apistrategy.extractFirstArrayItem
 import com.moneymanager.ui.screens.apistrategy.extractJsonPaths
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -175,6 +176,8 @@ fun ApiStrategyEditorScreen(
                     importEngine.createApiStrategy(strategy)
                 }
                 onBack()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (expected: Exception) {
                 val action = if (isEditMode) "save" else "create"
                 state.errorMessage = "Failed to $action strategy: ${expected.message}"

@@ -40,6 +40,7 @@ import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.util.ExposedDropdownMenu
 import com.moneymanager.ui.util.onEnterKeyDown
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
 
@@ -125,6 +126,8 @@ fun CreateAccountDialog(
                         )
                     onAccountCreated?.invoke(result.createdAccountIds.getValue(key))
                     onDismiss()
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
                 } catch (expected: Exception) {
                     logger.e(expected) { "Failed to create account: ${expected.message}" }
                     accountState.errorMessage =

@@ -84,6 +84,7 @@ import com.moneymanager.ui.util.buildCategoryForest
 import com.moneymanager.ui.util.flattenCategoryForest
 import com.moneymanager.ui.util.formatAmount
 import com.moneymanager.ui.util.getDescendantIds
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -329,6 +330,8 @@ fun CategoriesScreen(
                                                                 ),
                                                         ),
                                                     )
+                                                } catch (cancelled: CancellationException) {
+                                                    throw cancelled
                                                 } catch (expected: Exception) {
                                                     logger.e(expected) {
                                                         "Failed to update category hierarchy: ${expected.message}"
@@ -771,6 +774,8 @@ private fun saveCategoryWithValidation(
         try {
             saveAction(name.trim())
             onSuccess()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (expected: Exception) {
             logger.e(expected) { "Failed to update category: ${expected.message}" }
             setError("Failed to update category: ${expected.message}")
