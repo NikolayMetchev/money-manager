@@ -17,6 +17,9 @@ CREATE TABLE transfer (
 
 CREATE INDEX IF NOT EXISTS idx_transfer_src_target_amount ON transfer(source_account_id, target_account_id, amount);
 CREATE INDEX IF NOT EXISTS idx_transfer_target_timestamp ON transfer(target_account_id, timestamp);
+-- The source side of "on this account, in this window" (the importer's dedupe loads it per batch): without it the
+-- source half of the OR read every transfer of the account.
+CREATE INDEX IF NOT EXISTS idx_transfer_source_timestamp ON transfer(source_account_id, timestamp);
 CREATE INDEX IF NOT EXISTS idx_transfer_asset ON transfer(asset_id);
 
 -- Materialized table for account balances (manually refreshed)

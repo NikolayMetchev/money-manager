@@ -68,8 +68,11 @@ interface ObservationReadRepository {
 
     suspend fun getVacantReservedGroups(): List<VacantObservation>
 
-    /** The transactions every observation of which a re-run reserved (#1510): what its own dedupe and matching don't see. */
-    suspend fun getVacantTransactionIds(): Set<TransactionId>
+    /**
+     * Those of [among] every observation of which a re-run reserved (#1510): what its own dedupe and matching don't see.
+     * Scoped to the caller's ids, as a re-run can leave tens of thousands vacant and every batch asks.
+     */
+    suspend fun getVacantTransactionIds(among: Collection<TransactionId>): Set<TransactionId>
 
     /** Every observation still reserved, vacant or not: what settling a re-run resolves. */
     suspend fun getReserved(): List<Observation>

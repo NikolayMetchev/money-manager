@@ -76,7 +76,7 @@ class CategoriesScreenTest {
             observationRepository =
                 mock(MockMode.autoUnit) {
                     everySuspend { getRecordTransactions(any(), any()) } returns emptySet()
-                    everySuspend { getVacantTransactionIds() } returns emptySet()
+                    everySuspend { getVacantTransactionIds(any()) } returns emptySet()
                     everySuspend { getAccountsWithObservations(any()) } returns emptySet()
                     everySuspend { getObservationsOfTransactions(any()) } returns emptyList()
                     everySuspend { getTransactionsObservedByOtherRecords(any(), any(), any()) } returns emptySet()

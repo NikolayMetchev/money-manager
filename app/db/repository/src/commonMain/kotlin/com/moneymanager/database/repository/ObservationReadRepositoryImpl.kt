@@ -223,11 +223,10 @@ class ObservationReadRepositoryImpl(
     override suspend fun getVacantReservedGroups(): List<VacantObservation> =
         queries.selectVacantReservedGroups(::vacantObservation).awaitAsList()
 
-    override suspend fun getVacantTransactionIds(): Set<TransactionId> =
-        queries
-            .selectVacantTransactionIds { id, kind -> storedTransactionId(id, kind) }
-            .awaitAsList()
-            .toSet()
+    override suspend fun getVacantTransactionIds(among: Collection<TransactionId>): Set<TransactionId> =
+        queryInChunks(among.map { it.id }, MAX_IDS_PER_QUERY) { chunk ->
+            queries.selectVacantTransactionIds(chunk) { id, kind -> storedTransactionId(id, kind) }.awaitAsList()
+        }.toSet()
 
     override suspend fun getReserved(): List<Observation> = load(queries.selectReserved(::Header).awaitAsList())
 

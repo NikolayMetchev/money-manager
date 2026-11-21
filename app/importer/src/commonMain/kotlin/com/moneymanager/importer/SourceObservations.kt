@@ -116,10 +116,10 @@ internal class SourceObservations(
         val recordId = recordsOf(recordKey)[recordKey] ?: return null
         val shared =
             sharedRecords ?: run {
-                val vacant = observations.getVacantTransactionIds()
-                observations
-                    .getReserved()
-                    .filter { it.owner is ObservationOwner.Record && it.transactionId !in vacant }
+                val records = observations.getReserved().filter { it.owner is ObservationOwner.Record }
+                val vacant = observations.getVacantTransactionIds(records.map { it.transactionId })
+                records
+                    .filter { it.transactionId !in vacant }
                     .associate { (it.owner to it.slot) to it.transactionId }
                     .also { sharedRecords = it }
             }

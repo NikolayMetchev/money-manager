@@ -96,10 +96,18 @@ internal class TransferImporter(
         onProgress?.invoke(Progress("Detecting duplicates"))
         val calendars = existingTransfers.settlementCalendars(batch.dedupePolicy)
         // A re-run's vacated rows stand for what it is re-booking, so it books them afresh rather than matching them (#1510).
-        val vacant = observationRepository.getVacantTransactionIds()
-        val existing = existingTransfers.loadExisting(resolvedTransfers, batch, calendars).filterNot { it.transferId in vacant }
+        val loaded = existingTransfers.loadExisting(resolvedTransfers, batch, calendars)
+        val loadedRelationships = existingTransfers.existingRelationships(loaded)
+        val vacant =
+            observationRepository.getVacantTransactionIds(
+                loaded.map { it.transferId } +
+                    loadedRelationships.flatMap { relationship ->
+                        relationship.members.map { it.transactionId }
+                    },
+            )
+        val existing = loaded.filterNot { it.transferId in vacant }
         val existingRelationships =
-            existingTransfers.existingRelationships(existing).filterNot { relationship ->
+            loadedRelationships.filterNot { relationship ->
                 relationship.members.any {
                     it.transactionId in
                         vacant

@@ -312,5 +312,6 @@ ORDER BY observation.id;
 isReserved:
 SELECT COUNT(*) FROM observation_reserved WHERE observation_id = ?;
 
+-- Scoped to the ids a caller holds: a re-run can leave tens of thousands vacant, and every batch asks.
 selectVacantTransactionIds:
-SELECT transaction_id, kind FROM vacant_transaction;
+SELECT transaction_id, kind FROM vacant_transaction WHERE transaction_id IN ?;

@@ -17,15 +17,20 @@ deleteMembersOfTransaction:
 DELETE FROM relationship_member WHERE transaction_id = ?;
 
 -- Reserves the relationships a CSV or API import (source types 2 and 5) made on the transactions a re-run vacates (#1510).
+-- The source check is a correlated EXISTS, not a join: as a join SQLite drove the query from every relationship's
+-- entity_source row (entity_type_id 13 is all of them) once per chunk of ids, seconds per chunk on a real database.
 reserveImportMadeOf:
 INSERT OR IGNORE INTO relationship_reserved (relationship_id)
 SELECT DISTINCT relationship_member.relationship_id
 FROM relationship_member
-JOIN entity_source ON entity_source.entity_type_id = 13
-                  AND entity_source.entity_id = relationship_member.relationship_id
-                  AND entity_source.revision_id = 1
 WHERE relationship_member.transaction_id IN ?
-  AND entity_source.source_type_id IN (2, 5);
+  AND EXISTS (
+    SELECT 1 FROM entity_source
+    WHERE entity_source.entity_type_id = 13
+      AND entity_source.entity_id = relationship_member.relationship_id
+      AND entity_source.revision_id = 1
+      AND entity_source.source_type_id IN (2, 5)
+  );
 
 unreserve:
 DELETE FROM relationship_reserved WHERE relationship_id = ?;
