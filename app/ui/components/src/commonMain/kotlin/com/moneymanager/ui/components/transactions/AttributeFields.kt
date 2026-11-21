@@ -28,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.AttributeType
+import com.moneymanager.ui.util.ExposedDropdownMenu
 import kotlin.uuid.Uuid
 
 /**

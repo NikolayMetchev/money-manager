@@ -30,7 +30,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.moneymanager.apiimport.ApiImportService
 import com.moneymanager.apiimport.storeNewSigningKey
@@ -47,6 +46,7 @@ import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandli
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalCredentialVault
 import com.moneymanager.ui.foundation.LocalImportEngine
+import com.moneymanager.ui.util.PasswordField
 import com.moneymanager.ui.util.setPlainText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -356,51 +356,39 @@ private fun ApiCredentialForm(
             OutlinedButton(onClick = { onOpenTokenPage(url) }) { Text("Open ${strategy.name} token page") }
         }
 
-        OutlinedTextField(
+        PasswordField(
             value = tokenInput,
             onValueChange = {
                 tokenInput = it
                 errorMessage = null
             },
-            label = {
-                Text(
-                    when {
-                        usesTokenExchange -> "Client ID"
-                        needsSecret -> "API key"
-                        else -> "Access token"
-                    },
-                )
-            },
-            placeholder = {
-                Text(if (credential == null) "Paste it here" else "Paste the replacement here")
-            },
+            label =
+                when {
+                    usesTokenExchange -> "Client ID"
+                    needsSecret -> "API key"
+                    else -> "Access token"
+                },
+            placeholder = if (credential == null) "Paste it here" else "Paste the replacement here",
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            visualTransformation = PasswordVisualTransformation(),
             isError = errorMessage != null,
         )
 
         if (needsSecret) {
-            OutlinedTextField(
+            PasswordField(
                 value = secretInput,
                 onValueChange = {
                     secretInput = it
                     loadedKeyFile = null
                     errorMessage = null
                 },
-                label = {
-                    Text(
-                        when {
-                            usesTokenExchange -> "Client secret"
-                            secretIsPrivateKey -> "Private key"
-                            else -> "API secret"
-                        },
-                    )
-                },
-                supportingText = loadedKeyFile?.let { name -> { Text("Loaded from $name") } },
+                label =
+                    when {
+                        usesTokenExchange -> "Client secret"
+                        secretIsPrivateKey -> "Private key"
+                        else -> "API secret"
+                    },
+                supportingText = loadedKeyFile?.let { name -> "Loaded from $name" },
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
                 isError = errorMessage != null,
             )
             if (secretIsPrivateKey) {

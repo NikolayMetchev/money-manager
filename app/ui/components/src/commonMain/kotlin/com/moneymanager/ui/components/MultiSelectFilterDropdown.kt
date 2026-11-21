@@ -21,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.ui.util.ExposedDropdownMenu
 
 /**
  * A searchable multi-select filter dropdown: a checkbox row per item plus an "All …" row that clears

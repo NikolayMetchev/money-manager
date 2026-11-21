@@ -29,6 +29,7 @@ import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
+import com.moneymanager.ui.util.ExposedDropdownMenu
 import com.moneymanager.ui.util.onEnterKeyDown
 
 /**

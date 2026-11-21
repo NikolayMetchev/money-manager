@@ -54,6 +54,7 @@ import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.regex.compileRegex
 import com.moneymanager.ui.components.CreateAccountDialog
 import com.moneymanager.ui.foundation.LocalImportEngine
+import com.moneymanager.ui.util.ExposedDropdownMenu
 import kotlinx.coroutines.launch
 
 /** Shown under the pattern field when there is no CSV sample to preview against. */
