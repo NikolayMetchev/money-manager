@@ -703,11 +703,16 @@ class KrakenExchangeApiE2ETest : DbTest() {
             val ledger =
                 """
                 {"error":[],"result":{"ledger":{
-                  "LA":{"refid":"RA","time":1700000001.0,"type":"deposit","asset":"ZGBP","amount":"100.0000","fee":"0.0000","balance":"100.0000"},
-                  "LB":{"refid":"TB","time":1700000002.0,"type":"trade","asset":"ZGBP","amount":"-50.0000","fee":"0.1000","balance":"49.9000"},
-                  "LC":{"refid":"TB","time":1700000002.0,"type":"trade","asset":"XXBT","amount":"0.0010000000","fee":"0.0000000000","balance":"0.0010000000"},
-                  "LD":{"refid":"RD","time":1700000003.0,"type":"transfer","asset":"XXBT","amount":"-0.0004000000","fee":"0.0000000000","balance":"0.0006000000"},
-                  "LE":{"refid":"RE","time":1700000003.0,"type":"transfer","asset":"XXBT.F","amount":"0.0004000000","fee":"0.0000000000","balance":"0.0004000000"}
+                  "LA":{"refid":"RA","time":1700000001.0,"type":"deposit",
+                   "asset":"ZGBP","amount":"100.0000","fee":"0.0000","balance":"100.0000"},
+                  "LB":{"refid":"TB","time":1700000002.0,"type":"trade",
+                   "asset":"ZGBP","amount":"-50.0000","fee":"0.1000","balance":"49.9000"},
+                  "LC":{"refid":"TB","time":1700000002.0,"type":"trade",
+                   "asset":"XXBT","amount":"0.0010000000","fee":"0.0000000000","balance":"0.0010000000"},
+                  "LD":{"refid":"RD","time":1700000003.0,"type":"transfer",
+                   "asset":"XXBT","amount":"-0.0004000000","fee":"0.0000000000","balance":"0.0006000000"},
+                  "LE":{"refid":"RE","time":1700000003.0,"type":"transfer",
+                   "asset":"XXBT.F","amount":"0.0004000000","fee":"0.0000000000","balance":"0.0004000000"}
                 },"count":5}}
                 """.trimIndent()
             stageSessionAndImport(
@@ -732,14 +737,19 @@ class KrakenExchangeApiE2ETest : DbTest() {
             assertEquals(listOf("0.001", "0.0006").map { Money.fromDisplayValue(BigDecimal(it), btc) }, btcBalances.map { it.amount })
             val paths =
                 (gbpBalances + btcBalances).map { balance ->
-                    val source = repositories.reportedBalanceRepository.getSources(balance.id).single().source
+                    val source =
+                        repositories.reportedBalanceRepository
+                            .getSources(balance.id)
+                            .single()
+                            .source
                     assertIs<Source.Api>(source).jsonPath?.value
                 }
             assertEquals(listOf("$.result.ledger.LA", "$.result.ledger.LB", "$.result.ledger.LC", "$.result.ledger.LD"), paths)
 
             // The trade and its ledger fee add up to what Kraken says: GBP reconciles from the first balance on.
             val legs = repositories.reconciliationLinkRepository.getLegs(setOf(kraken.id))
-            val gbpCheck = checkBalances(gbp, gbpBalances, legs, repositories.reportedBalanceRepository.getTransactionBalanceTimes(kraken.id, gbp))
+            val balanceTimes = repositories.reportedBalanceRepository.getTransactionBalanceTimes(kraken.id, gbp)
+            val gbpCheck = checkBalances(gbp, gbpBalances, legs, balanceTimes)
             assertEquals(true, gbpCheck.openingOffset?.isZero())
             assertEquals(emptyList(), gbpCheck.breaks)
         }

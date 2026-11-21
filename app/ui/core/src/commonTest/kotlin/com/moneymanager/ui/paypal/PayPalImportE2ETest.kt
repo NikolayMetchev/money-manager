@@ -97,7 +97,17 @@ class PayPalImportE2ETest : DbTest() {
     private val items =
         listOf(
             // A payment received: gross 50.00 with a 1.59 fee on top.
-            PayPalItem("PAY1", "T0006", recent, "GBP", "50.00", fee = "-1.59", payerName = "Alice Buyer", subject = "Invoice 7", balance = "48.41"),
+            PayPalItem(
+                "PAY1",
+                "T0006",
+                recent,
+                "GBP",
+                "50.00",
+                fee = "-1.59",
+                payerName = "Alice Buyer",
+                subject = "Invoice 7",
+                balance = "48.41",
+            ),
             // A payment sent.
             PayPalItem("PAY2", "T0006", recent + 1.days, "GBP", "-8.00", payerName = "Coffee Roasters", balance = "40.41"),
             // A currency conversion: GBP out, USD in.
@@ -255,7 +265,8 @@ class PayPalImportE2ETest : DbTest() {
             // Each item reports its currency account's balance after it (the denied one leaves it where it was).
             val gbpBalances = repositories.reportedBalanceRepository.getBalances(gbp.id, received.amount.asset)
             assertEquals(4, gbpBalances.size)
-            assertTrue(gbpBalances.zip(listOf("48.41", "40.41", "30.41", "30.41")).all { (b, v) -> b.amount.hasDisplayValue(v) }, "$gbpBalances")
+            val expected = listOf("48.41", "40.41", "30.41", "30.41")
+            assertTrue(gbpBalances.zip(expected).all { (b, v) -> b.amount.hasDisplayValue(v) }, "$gbpBalances")
             val usdBalance = repositories.reportedBalanceRepository.getBalances(usd.id, conversionIn.amount.asset).single()
             assertTrue(usdBalance.amount.hasDisplayValue("12.50"), "$usdBalance")
         }

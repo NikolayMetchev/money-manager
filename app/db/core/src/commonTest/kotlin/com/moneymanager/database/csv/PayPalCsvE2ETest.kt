@@ -693,7 +693,8 @@ class PayPalCsvE2ETest : DbTest() {
             assertEquals(listOf("PayPal" to "GBP", "PayPal" to "USD"), series.map { it.accountName to it.asset.code })
             for (currency in series.map { it.asset }) {
                 val reported = repositories.reportedBalanceRepository.getBalances(payPal.id, currency)
-                val check = checkBalances(currency, reported, legs, repositories.reportedBalanceRepository.getTransactionBalanceTimes(payPal.id, currency))
+                val balanceTimes = repositories.reportedBalanceRepository.getTransactionBalanceTimes(payPal.id, currency)
+                val check = checkBalances(currency, reported, legs, balanceTimes)
                 // Card deposit, conversion and payment in one second end at what PayPal says, whatever their order.
                 assertEquals(true, check.openingOffset?.isZero(), "${currency.code} opening offset")
                 assertEquals(emptyList(), check.breaks, "${currency.code} breaks")
