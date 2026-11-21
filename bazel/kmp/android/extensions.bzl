@@ -190,6 +190,12 @@ def _emulator_impl(rctx):
     cpu = _cpu(rctx)
     key = "%s_%s" % (host, cpu)
 
+    # Someone who names their device has no use for 2.5 GB of emulator, and an offline build can't fetch it.
+    if rctx.getenv("ANDROID_SERIAL"):
+        rctx.file("emulator.properties", "blocked=ANDROID_SERIAL is set: device tests use that device, not the emulator\n")
+        rctx.file("BUILD.bazel", _EMULATOR)
+        return
+
     # A host that can't boot the emulator still builds device tests, and runs them on a connected device: the runner
     # reports `blocked` only when it has no device and needs the emulator.
     if key not in ANDROID_EMULATOR:

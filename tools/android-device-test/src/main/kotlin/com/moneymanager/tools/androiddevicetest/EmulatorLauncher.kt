@@ -123,25 +123,27 @@ internal class EmulatorLauncher private constructor(
         try {
             if (process.isAlive) {
                 // The emulator saves nothing (-no-snapshot), so killing it through adb is quick; wait, then insist.
-                adb.withSerial(serial).capture("emu", "kill")
+                runCatching { adb.withSerial(serial).capture("emu", "kill") }
                 if (!process.waitFor(30, TimeUnit.SECONDS)) {
                     process.destroyForcibly()
                     process.waitFor(30, TimeUnit.SECONDS)
                 }
             }
         } finally {
+            // Whatever adb did (it may not even start), nothing is left running.
+            process.destroyForcibly()
             runCatching { Runtime.getRuntime().removeShutdownHook(shutdownHook) } // already running, if the JVM is exiting
             root.toFile().deleteRecursively()
         }
     }
 
     companion object {
-        /** Whether adb already has a device the tests can use: the `ANDROID_SERIAL` one, or any online one. */
-        fun deviceConnected(adb: Adb): Boolean {
-            val online = onlineDevices(adb.capture("devices"))
-            val wanted = System.getenv("ANDROID_SERIAL")
-            return if (wanted.isNullOrEmpty()) online.isNotEmpty() else wanted in online
-        }
+        /**
+         * Whether the tests use a device that isn't ours to boot: the one `ANDROID_SERIAL` names (adb waits for it to come
+         * online, rather than the tests quietly running on an emulator instead), else any online one.
+         */
+        fun deviceConnected(adb: Adb): Boolean =
+            !System.getenv("ANDROID_SERIAL").isNullOrEmpty() || onlineDevices(adb.capture("devices")).isNotEmpty()
 
         /** Starts the emulator [properties] describes and waits for it to finish booting. */
         fun start(
