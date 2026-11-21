@@ -801,7 +801,7 @@ set of writes.
 - Android tests require manifest with `ComponentActivity` declaration
 - Share commonTest sources with a device test via `# gazelle:kmp_device_test_srcs`
 - **Android Device Tests**: `bazel test --config=device //app/ui/core:test_device` (or every one:
-  `bazel test --config=device //...`; a naked `bazel test //...` leaves them out, and so does naming one without the config) on a connected device, or with none on the API 36 emulator `tools/android-device-test` boots from `@android_emulator`.
+  `bazel test --config=device //...`; a naked `bazel test //...` leaves them out, and so does naming one without the config; each target cold-boots its own emulator, so for many wrap them: `bazel run --config=device //tools/android-device-test:with-emulator -- bazel test --config=device //...`) on a connected device, or with none on the API 36 emulator `tools/android-device-test` boots from `@android_emulator`.
   **Android emulator API level**: it is `MODULE.bazel`'s `android_sdk.levels` `target_sdk`; the system image follows it, so after
   changing it run `bazel/renovate/repin.sh` (CI no longer names a level).
 - **Test Stability**: Always call `waitForIdle()` after `waitUntilDoesNotExist()` to ensure recompositions complete before test ends

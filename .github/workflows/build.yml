@@ -503,11 +503,11 @@ jobs:
       - name: Build the test APKs
         run: bazel build --config=device --build_tests_only //...
 
-      # The device test runner boots the emulator Bazel downloaded (@android_emulator: an API 36 aosp_atd image) when
-      # no device is connected, so there is no AVD to create or cache here.
+      # The device tests boot the emulator Bazel downloaded (@android_emulator: an API 36 aosp_atd image) when no device
+      # is connected, which is a cold boot per target; with-emulator boots one for all of them.
       - name: Run the device tests
         timeout-minutes: 30
-        run: bazel test --config=device //... --test_output=errors
+        run: bazel run --config=device //tools/android-device-test:with-emulator -- bazel test --config=device //... --test_output=errors
 
       # Codecov's `files` takes paths, not globs, so list the reports.
       - name: List test reports
