@@ -1,5 +1,6 @@
 load("@rules_java//java:java_binary.bzl", "java_binary")
 load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
+load("//bazel/kmp:optional.bzl", "ANDROID_ONLY")
 
 # gazelle:kmp_generate true
 
@@ -25,6 +26,8 @@ java_binary(
         "@android_platform_tools//:adb_files",
     ],
     main_class = "com.moneymanager.tools.androiddevicetest.WithEmulatorKt",
+    # Its data fetches the 2.5 GB emulator: only an Android invocation builds it.
+    target_compatible_with = ANDROID_ONLY,
     visibility = ["//visibility:public"],
     runtime_deps = [":android-device-test_jvm"],
 )
