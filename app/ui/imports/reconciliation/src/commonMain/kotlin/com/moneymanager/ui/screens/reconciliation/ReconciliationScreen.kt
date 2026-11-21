@@ -126,6 +126,7 @@ fun ReconciliationScreen(
     transactionRepository: TransactionReadRepository,
     onOpenLeg: (ReconciliationLeg) -> Unit,
     onOpenSource: (ReconciliationLeg) -> Unit = {},
+    refreshViews: suspend () -> Unit = {},
     pickerState: MatchPickerState = remember { MatchPickerState() },
     cache: ReconciliationCache = remember { ReconciliationCache() },
     focus: ReconciliationFocusState = remember { ReconciliationFocusState() },
@@ -173,6 +174,7 @@ fun ReconciliationScreen(
             transactionRepository = transactionRepository,
             onOpenLeg = onOpenLeg,
             onOpenSource = onOpenSource,
+            refreshViews = refreshViews,
             pickerState = pickerState,
             cache = cache,
             focus = focus,
@@ -190,6 +192,7 @@ private fun SourceReconciliation(
     transactionRepository: TransactionReadRepository,
     onOpenLeg: (ReconciliationLeg) -> Unit,
     onOpenSource: (ReconciliationLeg) -> Unit,
+    refreshViews: suspend () -> Unit,
     pickerState: MatchPickerState,
     cache: ReconciliationCache,
     focus: ReconciliationFocusState,
@@ -685,6 +688,7 @@ private fun SourceReconciliation(
                 write("Adding the fee") {
                     val feeId = importEngine.createManualFee(fee.account, fee.fee, fee.timestamp)
                     importEngine.acceptMatches(listOf((movement + selected).map { it.transactionRef } + feeId))
+                    refreshViews()
                 }
             },
             onOpenLeg = onOpenLeg,
@@ -692,7 +696,10 @@ private fun SourceReconciliation(
             copyPlan = remember(movement, shadowAccounts, links, accountNames) { planCopy(movement, shadowAccounts, links, accountNames) },
             onCopy = { plan ->
                 pickerState.close()
-                write("Copying to Money Manager") { importEngine.copyToMoneyManager(movement, plan) }
+                write("Copying to Money Manager") {
+                    importEngine.copyToMoneyManager(movement, plan)
+                    refreshViews()
+                }
             },
         )
     }

@@ -252,6 +252,7 @@ fun ImportsScreen(
                             transactionRepository = transactionRepository,
                             onOpenLeg = onReconciliationLegClick,
                             onOpenSource = onReconciliationSourceClick,
+                            refreshViews = { maintenance.refreshMaterializedViews() },
                             pickerState = matchPickerState,
                             cache = reconciliationCache,
                             focus = reconciliationFocus,
