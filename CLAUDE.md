@@ -63,7 +63,7 @@ timeout; use at least 20 minutes.
 | `bazel run --config=web //app/main/web:serve -- 8080` | Serve the browser app (`//app/main/web:dist`) on http://127.0.0.1:8080 |
 | `bazel build --config=android //app/main/android:debug` | Debug APK (`bazel-bin/app/main/android/debug.apk`; `adb install` it) |
 | `bazel build --config=native //app/main/cli:mm` / `bazel build //app/main/cli:mm-jvm` | The host's native `mm` / the JVM `mm-jvm` (`bazel-bin/app/main/cli/mm-jvm/bin/mm-jvm`) |
-| `bazel test --config=android $(bazel query 'attr(tags, android_device, tests(//...))')` | Android device tests, on the device adb picks, else on the API 36 emulator Bazel downloads and boots |
+| `bazel test --config=device //...` | Android device tests, on the device adb picks, else on the API 36 emulator Bazel downloads and boots |
 | `bazel run //:format` | Regenerate the BUILD files (Gazelle), then ktlint -F |
 | `bazel run //:gazelle` | Regenerate the BUILD files only |
 | `bazel/renovate/repin.sh` | Re-pin every lockfile (after changing `MODULE.bazel`) |
@@ -114,8 +114,7 @@ on the orphan `perf-data` branch, which `webpage/performance.html` graphs. Pull 
 Releases: `//app/main/android:release` (R8, unsigned), `//app/main/jvm:installer`, and `//app/main/cli:mm-linux-x64`,
 `:mm-linux-arm64`, `:mm-windows-x64`, `:mm-macos-arm64` (the Apple one only on macOS). The release smoke test,
 `bazel test //app/main/android-smoketest:smoketest_test`, installs the debug-signed minified APK
-(`//app/main/android:release_debug_signed`) on a device and drives first run; CI runs it only via the manual "Android
-Release Smoke Test" workflow (dispatch it on main or a PR branch). Cut a release by pushing a `v*` tag.
+(`//app/main/android:release_debug_signed`) on a device and drives first run; CI runs it with the other device tests in Android Instrumented Tests, whenever the android flag is on. Cut a release by pushing a `v*` tag.
 
 **CI**: every workflow sets Bazel up through `.github/actions/bazel-setup` (on RBE without the disk cache, which
 BuildBuddy's cache already holds). `build.yml`'s Build and Test, on Linux (RBE), is `bazel/ci/build_and_test.sh`:
@@ -801,11 +800,10 @@ set of writes.
 - Use `runComposeUiTest` for UI tests
 - Android tests require manifest with `ComponentActivity` declaration
 - Share commonTest sources with a device test via `# gazelle:kmp_device_test_srcs`
-- **Android Device Tests**: `bazel test //app/ui/core:test_device` (or every one:
-  `bazel test $(bazel query 'attr(tags, android_device, tests(//...))')`) on a connected device, or with none on the API 36 emulator `tools/android-device-test` boots from `@android_emulator`.
-  **Android emulator API level sync**: change the level here and you must change it in `MODULE.bazel`
-  (`android_sdk.levels`' `target_sdk`), the CI emulator (`.github/workflows/build.yml` and
-  `.github/workflows/android-release-smoke-test.yml`) too.
+- **Android Device Tests**: `bazel test --config=device //app/ui/core:test_device` (or every one:
+  `bazel test --config=device //...`; a naked `bazel test //...` leaves them out, and so does naming one without the config; each target cold-boots its own emulator, so for many wrap them: `bazel run --config=device //tools/android-device-test:with-emulator -- bazel test --config=device //...`) on a connected device, or with none on the API 36 emulator `tools/android-device-test` boots from `@android_emulator`.
+  **Android emulator API level**: it is `MODULE.bazel`'s `android_sdk.levels` `target_sdk`; the system image follows it, so after
+  changing it run `bazel/renovate/repin.sh` (CI no longer names a level).
 - **Test Stability**: Always call `waitForIdle()` after `waitUntilDoesNotExist()` to ensure recompositions complete before test ends
 
 ### Platform Support

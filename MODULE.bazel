@@ -788,7 +788,7 @@ android_sdk.platform(version = "37.0_r02")
 
 android_sdk.platform_tools(version = "37.0.3")
 
-# Keep target_sdk and the CI emulators (build.yml, android-release-smoke-test.yml) on one level. compile_sdk runs
+# The device tests boot the aosp_atd image of target_sdk (repin.sh moves the pin with it). compile_sdk runs
 # ahead: androidx Compose 1.12 compiles against API 37, a compile-time floor that needs no emulator move.
 android_sdk.levels(
     compile_sdk = 37,

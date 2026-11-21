@@ -461,8 +461,8 @@ jobs:
           fail_ci_if_error: false
 
   # The device tests (#1024): kmp_test's `:<name>_device` targets and the release smoke test, run through adb on
-  # an emulator. They're `manual`, so `bazel test //...` leaves them out; this job runs everything tagged
-  # android_device. The APKs build on BuildBuddy, the tests run here (`local`), one at a time (`exclusive`).
+  # an emulator. .bazelrc leaves them out of `bazel test //...`; this job runs them with `--config=device`. The APKs
+  # build on BuildBuddy, the tests run here (`local`), one at a time (`exclusive`).
   android-test:
     name: Android Instrumented Tests
     runs-on: ubuntu-latest
@@ -501,63 +501,13 @@ jobs:
 
       # Building first keeps the emulator's time limit for the tests.
       - name: Build the test APKs
-        run: bazel build --config=android $(bazel query 'attr(tags, android_device, tests(//...))')
+        run: bazel build --config=device --build_tests_only //...
 
-      # Restore on every ref, save only from main (below): a ~2 GB snapshot saved from a PR's merge
-      # ref can't be restored by main or any other PR, and only pushes the shared entries out.
-      - name: Restore AVD cache
-        uses: actions/cache/restore@v6
-        id: avd-cache
-        with:
-          path: |
-            ~/.android/avd/*
-            ~/.android/adb*
-          # Android emulator API level sync: update with android-release-smoke-test.yml,
-          # .idea/runConfigurations/Android_Tests.xml, and CLAUDE.md.
-          key: avd-pixel6-api36-aosp-atd-${{ runner.os }}
-
-      - name: Create AVD and generate snapshot for caching
-        if: steps.avd-cache.outputs.cache-hit != 'true'
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          # Android emulator API level sync: update with android-release-smoke-test.yml,
-          # .idea/runConfigurations/Android_Tests.xml, and CLAUDE.md.
-          # aosp_atd is the headless test-optimized image.
-          api-level: 36
-          arch: x86_64
-          profile: pixel_6
-          target: aosp_atd
-          # The API-36 ATD images are only published on the dev sdkmanager channel.
-          channel: dev
-          force-avd-creation: false
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
-          disable-animations: true
-          script: echo "Generated AVD snapshot for caching."
-
-      - name: Save AVD cache
-        if: github.ref == 'refs/heads/main' && steps.avd-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v6
-        with:
-          path: |
-            ~/.android/avd/*
-            ~/.android/adb*
-          key: ${{ steps.avd-cache.outputs.cache-primary-key }}
-
+      # The device tests boot the emulator Bazel downloaded (@android_emulator: an API 36 aosp_atd image) when no device
+      # is connected, which is a cold boot per target; with-emulator boots one for all of them.
       - name: Run the device tests
         timeout-minutes: 30
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          # Android emulator API level sync: update with android-release-smoke-test.yml,
-          # .idea/runConfigurations/Android_Tests.xml, and CLAUDE.md.
-          api-level: 36
-          arch: x86_64
-          profile: pixel_6
-          target: aosp_atd
-          channel: dev
-          force-avd-creation: false
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
-          disable-animations: true
-          script: bazel test --config=android $(bazel query 'attr(tags, android_device, tests(//...))') --test_output=errors
+        run: bazel run --config=device //tools/android-device-test:with-emulator -- bazel test --config=device //... --test_output=errors
 
       # Codecov's `files` takes paths, not globs, so list the reports.
       - name: List test reports

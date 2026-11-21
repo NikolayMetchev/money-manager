@@ -375,13 +375,15 @@ it is relative, so it runs under any prefix.
   (`kmp_device_test_resources`); the test runner is `kmp_keep_dep … androidDeviceTest`. `android_apk(test_runner = …)`
   builds the self-instrumenting test APK (`com.moneymanager.<module path>.test`, targetSdk = compileSdk), and
   `android_device_test` runs it with `adb install` and `am instrument -w -r` (`tools/android-device-test`, which writes
-  `test.xml`) on the device adb picks (`ANDROID_SERIAL` among several). They're `manual`, `local` and `exclusive`,
-  tagged `android_device`, so `bazel test //...` leaves them out; run them with
-  `bazel test $(bazel query 'attr(tags, android_device, tests(//...))')` against a connected device or, with none, an
+  `test.xml`) on the device adb picks (`ANDROID_SERIAL` among several). They're `local` and `exclusive`,
+  tagged `android_device`, which .bazelrc filters out of every `bazel test` (`--test_tag_filters=-android_device`, so a naked
+  `//...` leaves them out); `bazel test --config=device //...` runs them, and only them (it turns Android on), against a connected device or, with none, an
   emulator the runner boots from `@android_emulator` (API 36: Espresso 3.5.0 fails on API 37). It checks `emulator-check accel`
   first, so a host without a hypervisor (KVM, Hypervisor.framework, the Windows Hypervisor Platform) is told how to fix it, and
   gives the AVD a temporary directory and a free port, so it can't touch an emulator already running. Linux x64 is the tested host;
-  macOS and Windows follow the same path untested. rules_android's emulator rules aren't used: they can't take APKs built outside them. The release
+  macOS and Windows follow the same path untested. Each target boots its own emulator, so to run many boot one for
+  all of them: `bazel run --config=device //tools/android-device-test:with-emulator -- bazel test --config=device //...` (CI
+  does; the second target on runs in seconds). rules_android's emulator rules aren't used: they can't take APKs built outside them. The release
   smoke test is `//app/main/android-smoketest:smoketest_test` (its own test APK, the release variant not
   debuggable), which installs `//app/main/android:release_debug_signed` first.
 - **Lint** (`lint.bzl`): `//app/main/android:lint` runs the lint AGP does (`@android_lint`'s lint-gradle,
