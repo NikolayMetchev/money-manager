@@ -10,8 +10,9 @@ def android_device_test(name, apk, package, runner = INSTRUMENTATION_RUNNER, ins
     With no device connected the test boots the emulator `@android_emulator` downloads, and stops it afterwards.
 
     The APK is installed, its runner run with `am instrument -w -r` and the output turned into test.xml, then
-    it's uninstalled. A device is one shared screen outside any sandbox or executor, so the test is `manual`
-    (only the emulator job runs it), `local` and `exclusive`, and tagged `android_device` for that job's query.
+    it's uninstalled. A device is one shared screen outside any sandbox or executor, so the test is `local` and
+    `exclusive`, and tagged `android_device`: .bazelrc leaves that tag out of every `bazel test` unless `--config=device`
+    asks for it.
 
     Args:
         name: the test.
@@ -37,7 +38,7 @@ def android_device_test(name, apk, package, runner = INSTRUMENTATION_RUNNER, ins
             runner,
         ] + extra,
         data = [Label("@android_platform_tools//:adb"), Label("@android_platform_tools//:adb_files"), Label("@android_emulator//:emulator.properties"), apk] + install.values(),
-        tags = ["manual", "local", "exclusive", "external", "android_device"],
+        tags = ["local", "exclusive", "external", "android_device"],
         runtime_deps = [Label("//tools/android-device-test:android-device-test_jvm")],
         **kwargs
     )

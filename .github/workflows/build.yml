@@ -461,8 +461,8 @@ jobs:
           fail_ci_if_error: false
 
   # The device tests (#1024): kmp_test's `:<name>_device` targets and the release smoke test, run through adb on
-  # an emulator. They're `manual`, so `bazel test //...` leaves them out; this job runs everything tagged
-  # android_device. The APKs build on BuildBuddy, the tests run here (`local`), one at a time (`exclusive`).
+  # an emulator. .bazelrc leaves them out of `bazel test //...`; this job runs them with `--config=device`. The APKs
+  # build on BuildBuddy, the tests run here (`local`), one at a time (`exclusive`).
   android-test:
     name: Android Instrumented Tests
     runs-on: ubuntu-latest
@@ -501,13 +501,13 @@ jobs:
 
       # Building first keeps the emulator's time limit for the tests.
       - name: Build the test APKs
-        run: bazel build --config=android $(bazel query 'attr(tags, android_device, tests(//...))')
+        run: bazel build --config=device --build_tests_only //...
 
       # The device test runner boots the emulator Bazel downloaded (@android_emulator: an API 36 aosp_atd image) when
       # no device is connected, so there is no AVD to create or cache here.
       - name: Run the device tests
         timeout-minutes: 30
-        run: bazel test --config=android $(bazel query 'attr(tags, android_device, tests(//...))') --test_output=errors
+        run: bazel test --config=device //... --test_output=errors
 
       # Codecov's `files` takes paths, not globs, so list the reports.
       - name: List test reports
