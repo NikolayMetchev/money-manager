@@ -176,6 +176,85 @@ class ObservationMatcherTest {
     }
 
     @Test
+    fun `a record pairing with one pinned observation does not chain onto the others pinned with it`() {
+        val a = transfer(1, "csv-a", "k-a", stored = 1, current = 100)
+        val b = transfer(2, "csv-b", "k-b", stored = 2, current = 100, description = "Something else entirely")
+        val c = transfer(3, "csv-c", "k-c")
+        val pins = listOf(ObservationPin(ObservationId(1), TransferId(100)), ObservationPin(ObservationId(2), TransferId(100)))
+
+        val result = matcher(FUZZY).match(listOf(a, b, c), pins = pins)
+
+        assertSameTransaction(result, a, b)
+        assertSeparate(result, a, c)
+    }
+
+    @Test
+    fun `a run of like payments pairs one to one rather than crossing the nearest pairs`() {
+        // Days: a = 0, 8, 11, 14 and b = 3, 11, 13, 17. Nearest-first pairs a11 with b11 and a14 with b13, stranding a8 and b17;
+        // pairing a0-b3, a8-b11, a11-b13 and a14-b17 leaves nobody out.
+        val a = listOf(0, 8, 11, 14).mapIndexed { i, day -> transfer(i + 1L, "bank-a", "a$i", hour = day * 24) }
+        val b = listOf(3, 11, 13, 17).mapIndexed { i, day -> transfer(i + 11L, "bank-b", "b$i", hour = day * 24) }
+        val withinThreeDays =
+            object : PairRule {
+                override val name = "within three days"
+                override val joinsSameContainer = false
+                override val pairsOneToOne = true
+
+                override fun bucket(observation: MatchObservation): Any = 1
+
+                override fun distance(
+                    a: MatchObservation,
+                    b: MatchObservation,
+                ): Long? {
+                    val seconds =
+                        (a.content.values as ObservedValues.Transfer).timestamp - (b.content.values as ObservedValues.Transfer).timestamp
+                    return seconds.absoluteValue.inWholeSeconds.takeIf { it <= 3.days.inWholeSeconds }
+                }
+            }
+
+        val result = ObservationMatcher(listOf(withinThreeDays)).match(a + b)
+
+        (a + b).forEach { o -> assertEquals(2, (a + b).count { result.assignments[it.ref] == result.assignments[o.ref] }) }
+        assertSameTransaction(result, a[0], b[0])
+        assertSameTransaction(result, a[1], b[1])
+        assertSameTransaction(result, a[2], b[2])
+        assertSameTransaction(result, a[3], b[3])
+    }
+
+    @Test
+    fun `a split pair does not use up the matches of the pairs that are allowed`() {
+        // Days: a = 0, 3 and b = 0, 1, 6, with a person's split between a0 and b0. Pairing a0-b0 first would be refused at the
+        // join and strand a3-b1 as the only pair left; leaving it out of the matching keeps a0-b1 and a3-b0.
+        val a = listOf(0, 3).mapIndexed { i, day -> transfer(i + 1L, "bank-a", "a$i", hour = day * 24, stored = i + 1L) }
+        val b = listOf(0, 1, 6).mapIndexed { i, day -> transfer(i + 11L, "bank-b", "b$i", hour = day * 24, stored = i + 11L) }
+        val withinThreeDays =
+            object : PairRule {
+                override val name = "within three days"
+                override val joinsSameContainer = false
+                override val pairsOneToOne = true
+
+                override fun bucket(observation: MatchObservation): Any = 1
+
+                override fun distance(
+                    a: MatchObservation,
+                    b: MatchObservation,
+                ): Long? {
+                    val seconds =
+                        (a.content.values as ObservedValues.Transfer).timestamp - (b.content.values as ObservedValues.Transfer).timestamp
+                    return seconds.absoluteValue.inWholeSeconds.takeIf { it <= 3.days.inWholeSeconds }
+                }
+            }
+
+        val result =
+            ObservationMatcher(listOf(withinThreeDays))
+                .match(a + b, splits = listOf(ObservationSplit.of(ObservationId(1), ObservationId(11))))
+
+        assertSeparate(result, a[0], b[0])
+        assertSameTransaction(result, a[0], b[1])
+        assertSameTransaction(result, a[1], b[0])
+    }
+
+    @Test
     fun `two observations pinned to different transactions never join`() {
         val a = transfer(1, "csv-a", "k-a", stored = 1, current = 100)
         val b = transfer(2, "csv-b", "k-b", stored = 2, current = 200)

@@ -21,6 +21,13 @@ interface PairRule {
     val joinsSameContainer: Boolean
 
     /**
+     * Whether a match of this rule is one record to one record (two sources' records of one movement), so the matcher
+     * may arrange its pairs for the most matches rather than only taking the nearest first. A rule that builds groups
+     * of three or more (a repeated id) leaves it false.
+     */
+    val pairsOneToOne: Boolean get() = false
+
+    /**
      * The bucket [observation] falls in, or null when the rule never applies to it. Only observations of one bucket
      * are compared, so a bucket should be as narrow as the rule allows (an id, an amount).
      */

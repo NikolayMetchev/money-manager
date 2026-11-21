@@ -66,14 +66,26 @@ class ObservationMatcher(
                 }
             }
 
-        for (candidate in candidatePairs(observations)) {
-            val x = groups.find(candidate.a)
-            val y = groups.find(candidate.b)
-            if (x != y && canJoin(observations, groups.members(x), groups.members(y), pinned, apart) &&
-                rules[candidate.rank].joinsGroups(groups.members(x).map { observations[it] }, groups.members(y).map { observations[it] })
-            ) {
-                groups.union(x, y)
-                joins += Join(observations[candidate.a].ref, observations[candidate.b].ref, rules[candidate.rank].name)
+        for (rankCandidates in candidatePairs(observations)
+            .groupBy(Candidate::rank)
+            .entries
+            .sortedBy { it.key }
+            .map { it.value }) {
+            for (candidate in maximumMatchingFirst(rankCandidates, groups) { x, y ->
+                canJoin(observations, groups.members(x), groups.members(y), pinned, apart) &&
+                    rules[rankCandidates.first().rank].joinsGroups(listOf(observations[x]), listOf(observations[y]))
+            }) {
+                val x = groups.find(candidate.a)
+                val y = groups.find(candidate.b)
+                if (x != y && canJoin(observations, groups.members(x), groups.members(y), pinned, apart) &&
+                    rules[candidate.rank].joinsGroups(
+                        groups.members(x).map { observations[it] },
+                        groups.members(y).map { observations[it] },
+                    )
+                ) {
+                    groups.union(x, y)
+                    joins += Join(observations[candidate.a].ref, observations[candidate.b].ref, rules[candidate.rank].name)
+                }
             }
         }
 
@@ -202,6 +214,61 @@ class ObservationMatcher(
             }
         }.sortedWith(compareBy(Candidate::rank, Candidate::distance, Candidate::a, Candidate::b))
 
+    /**
+     * One rank's [candidates] (nearest first) reordered so the pairs of a largest one-to-one set of them come first.
+     * Taking the nearest pair first can cross two records of a run (three like payments a day apart, each nearer to
+     * its neighbour's partner), leaving one record with nobody and its partner stranded; a pair is only worth
+     * leaving out when no other arrangement of the unjoined records pairs more of them. Only records not yet in a
+     * group are matched this way: a record already in one still has to pair with all of it ([canJoin]).
+     */
+    private fun maximumMatchingFirst(
+        candidates: List<Candidate>,
+        groups: Groups,
+        allowed: (Int, Int) -> Boolean,
+    ): List<Candidate> {
+        if (!rules[candidates.first().rank].pairsOneToOne) return candidates
+
+        fun free(i: Int) = groups.members(groups.find(i)).size == 1
+        val usable = candidates.filter { free(it.a) && free(it.b) && allowed(it.a, it.b) }
+        if (usable.size < 2) return candidates
+        val neighbours = mutableMapOf<Int, MutableList<Int>>()
+        for (c in usable) {
+            neighbours.getOrPut(c.a) { mutableListOf() } += c.b
+            neighbours.getOrPut(c.b) { mutableListOf() } += c.a
+        }
+        val mate = mutableMapOf<Int, Int>()
+        for (c in usable) {
+            if (c.a !in mate && c.b !in mate) {
+                mate[c.a] = c.b
+                mate[c.b] = c.a
+            }
+        }
+        var budget = MATCHING_WORK_LIMIT
+
+        fun augment(
+            from: Int,
+            seen: MutableSet<Int>,
+            depth: Int,
+        ): Boolean {
+            for (next in neighbours.getValue(from)) {
+                if (--budget < 0 || depth > MATCHING_DEPTH_LIMIT) return false
+                if (!seen.add(next)) continue
+                val partner = mate[next]
+                if (partner == null || augment(partner, seen, depth + 1)) {
+                    mate[from] = next
+                    mate[next] = from
+                    return true
+                }
+            }
+            return false
+        }
+        for (start in neighbours.keys.sorted()) {
+            if (start !in mate) augment(start, mutableSetOf(start), 0)
+        }
+        val (matched, rest) = candidates.partition { mate[it.a] == it.b }
+        return matched + rest
+    }
+
     private fun admits(
         rule: PairRule,
         a: MatchObservation,
@@ -219,8 +286,11 @@ class ObservationMatcher(
         }
 
     /**
-     * Whether the groups [x] and [y] may become one. Pinned observations stay where a person put them without vetoing
-     * what else joins them, but still count for splits and pins.
+     * Whether the groups [x] and [y] may become one. Pinned observations stay where a person put them, but one that
+     * joins them must still pair with each of them:
+     * a pin keeps its own observations together, it does not let an unrelated record of another movement chain on
+     * (a pinned Revolut row and a Coinbase deposit pulling in a Marcus withdrawal of the same amount). Pins still count
+     * for splits and for each other.
      */
     private fun canJoin(
         observations: List<MatchObservation>,
@@ -235,7 +305,7 @@ class ObservationMatcher(
         return !pinsConflict &&
             x.all { i ->
                 y.all { j ->
-                    setOf(i, j) !in apart && (i in pinned || j in pinned || paired(observations[i], observations[j]))
+                    setOf(i, j) !in apart && ((i in pinned && j in pinned) || paired(observations[i], observations[j]))
                 }
             }
     }
@@ -329,6 +399,10 @@ class ObservationMatcher(
     }
 
     companion object {
+        /** Bounds on the search for a larger set of pairs, so a huge bucket of like records costs a fixed amount. */
+        private const val MATCHING_WORK_LIMIT = 2_000_000
+        private const val MATCHING_DEPTH_LIMIT = 200
+
         /**
          * The matcher's order of observations: by record key, then slot. Only observations of records with the same
          * key (identical rows) fall through to their owner, and those are interchangeable: whichever comes first, the

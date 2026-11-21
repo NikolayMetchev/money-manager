@@ -224,6 +224,7 @@ internal abstract class CrossSourceRule(
     protected val context: Context,
 ) : PairRule {
     override val joinsSameContainer = false
+    override val pairsOneToOne = true
 
     override fun bucket(observation: MatchObservation): Any? {
         val values = context.eligible(observation) ?: return null
@@ -423,6 +424,7 @@ internal class PlaceholderTwinRule(
 ) : PairRule {
     override val name = "placeholder twin"
     override val joinsSameContainer = false
+    override val pairsOneToOne = true
 
     override fun bucket(observation: MatchObservation): Any? {
         val values = context.eligible(observation) ?: return null
