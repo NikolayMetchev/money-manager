@@ -21,8 +21,8 @@ test --test_output=errors
 # them out, whatever else is on: `--config=device` runs them, and only them (it turns Android on). A tag filter applies to a
 # target named on the command line too, so `bazel test //app/ui/core:test_device` needs `--config=device` as well.
 test --test_tag_filters=-android_device
-test:device --config=android
-test:device --test_tag_filters=android_device
+build:device --config=android
+build:device --test_tag_filters=android_device
 
 # Android, Kotlin/Native and the browser are optional (bazel/kmp/optional.bzl): a target only one of them builds is
 # incompatible unless that platform's flag is on, so a plain `bazel build //...` or `bazel test //...` skips it and does
