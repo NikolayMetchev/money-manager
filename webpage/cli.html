@@ -367,13 +367,14 @@ EOF</code></pre>
         edit a new import value met), as the app's re-import dialogs do. The TUI's Imports tab shows the same line.
       </p>
       <h3><code>import reimport</code></h3>
-      <p class="synopsis"><code>mm import reimport [--dir NAME]…</code></p>
+      <p class="synopsis"><code>mm import reimport [--dir NAME]… [--force]</code></p>
       <p>
         Runs the desktop app's <em>Re-import all</em> over the imported CSV, QIF, OFX, Excel and PDF files of the import
         folders (or only the <code>--dir</code> folders and their subfolders): each file is imported again with the current
         strategies and mappings, every transaction keeps its id where it is still created, and only what changed is written.
         Ignored and never-imported files are left out. A file whose inputs (rows, strategy, mappings, aliases, accounts) hash
-        to what its last import recorded is skipped and counted as <code>filesUnchanged</code>; there is no option to force it.
+        to what its last import recorded is skipped and counted as <code>filesUnchanged</code>. <code>--force</code> re-imports
+        every file anyway; use it after a change to the importer or matcher, which that check can't see.
       </p>
       <p>
         A file whose strategy is gone is left alone and counted in <code>filesSkippedNoStrategy</code>. If any file can't be

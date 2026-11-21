@@ -167,6 +167,23 @@ class CsvReimportInPlaceTest : DbTest() {
         }
 
     @Test
+    fun forcedReimportRunsAFileNothingItReadsChanged() =
+        runDbTest {
+            val (id, _) = stage(includeUnchangedRow = true)
+            val reimports = repositories.reimports()
+            // Nothing changed: a normal run leaves the file alone, a forced one runs it.
+            val skipped = reimports.reimportFile(id)
+            assertEquals(1, skipped.filesUnchanged)
+            assertEquals(0, skipped.filesImported)
+
+            val forced = reimports.reimportFile(id, force = true)
+
+            assertEquals(0, forced.filesUnchanged)
+            assertEquals(1, forced.filesImported)
+            assertEquals(1, reimports.reimportFile(id).filesUnchanged, "the forced run left the file as a normal run finds it")
+        }
+
+    @Test
     fun standardReimportUpdatesOnlyTheChangedTransfer() =
         runDbTest {
             val (id, strategy) = stage(includeUnchangedRow = true)

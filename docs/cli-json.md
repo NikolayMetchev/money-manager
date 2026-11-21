@@ -223,12 +223,13 @@ and the materialized views are refreshed once at the end.
 The exit code is `3` when anything needs attention or any folder, file, connection or session failed. The summary
 is printed either way.
 
-### `import reimport [--dir NAME]…`
+### `import reimport [--dir NAME]… [--force]`
 
 "Re-import all" over the imported (not ignored) CSV, QIF, OFX, Excel and PDF files of the import directories, or only
 the `--dir` folders and their subfolders. Each file is imported again with the current strategies and mappings; a
 transaction keeps its id where it is still created. A file whose inputs hash to what its last import recorded is
-skipped (`filesUnchanged`); there is no way to force it. A file whose strategy is gone is left alone
+skipped (`filesUnchanged`) unless `--force` is given, which re-imports every file (`filesUnchanged` is then `0`); use it
+after a change to the importer or matcher, which the check can't see. A file whose strategy is gone is left alone
 (`filesSkippedNoStrategy`). If any file can't be imported again because nothing says which account or currency it
 imports in, nothing is re-imported (see `blocked`) and the exit code is `3`. `data` has the same shape as the other import commands, with a `reimport`
 section instead of `directories` and `apis`, and `plan` is the re-import's own plan.

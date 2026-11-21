@@ -25,6 +25,7 @@ internal data class DirectoriesRequest(
 /** Re-import the imported files of these folders and their subfolders ([names] empty: every folder), as a run of its own. */
 internal data class ReimportRequest(
     val names: List<String>,
+    val force: Boolean = false,
 )
 
 /**
@@ -106,7 +107,7 @@ internal class ImportRun(
             ImportRequest(
                 directories = directories?.let { DirectoryImport(folders, it.apply, it.redownload) },
                 apis = apis?.let { ApiImport(strategyIds, it.forceFull, it.apply, it.optional) },
-                reimport = reimport?.let { DirectoryReimport(reimportFolders) },
+                reimport = reimport?.let { DirectoryReimport(reimportFolders, it.force) },
             )
         val outcome =
             coroutineScope {

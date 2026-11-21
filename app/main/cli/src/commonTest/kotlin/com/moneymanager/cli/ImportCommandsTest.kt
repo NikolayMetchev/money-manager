@@ -280,6 +280,25 @@ class ImportCommandsTest {
         }
 
     @Test
+    fun importReimportForceRunsFilesNothingTheyReadChanged() =
+        withFixture { fixture ->
+            fixture.mm("import", "dirs")
+            fixture.mm("import", "reimport")
+            val before = fixture.balances()
+
+            val plain = checkNotNull(fixture.mm("--format", "json", "import", "reimport").summary().reimport)
+            val forced = fixture.mm("--format", "json", "import", "reimport", "--force")
+
+            assertEquals(1, plain.filesUnchanged, "$plain")
+            assertEquals(0, plain.filesImported)
+            assertEquals(ExitCodes.OK, forced.exitCode, forced.stderr)
+            val reimport = checkNotNull(forced.summary().reimport)
+            assertEquals(0, reimport.filesUnchanged)
+            assertEquals(1, reimport.filesImported)
+            assertEquals(before, fixture.balances())
+        }
+
+    @Test
     fun importReimportWithNothingImportedDoesNothing() =
         withFixture { fixture ->
             val run = fixture.mm("--format", "json", "import", "reimport", "--dir", "monzo")

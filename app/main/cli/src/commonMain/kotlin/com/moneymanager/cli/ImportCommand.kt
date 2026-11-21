@@ -47,18 +47,23 @@ internal class ImportReimportCommand : SuspendingCliktCommand(name = "reimport")
     private val runtime by requireObject<CliRuntime>()
     private val dirs by option("--dir", metavar = "NAME", help = "Only this folder and its subfolders (repeatable)").multiple()
 
+    private val force by option(
+        "--force",
+        help = "Re-import files even if nothing they read changed (e.g. after changing importer or matcher code)",
+    ).flag()
+
     override fun help(context: Context): String =
         """
         Re-import every imported CSV/QIF/OFX/Excel/PDF file of the import directories, as the app's "Re-import all" does
 
         Each file is imported again with the current strategies and mappings; every transaction keeps its id where
         it is still created, so hand edits stay. A file whose inputs haven't changed since its last import is left
-        alone (filesUnchanged). If any file can't be imported again (nothing says its account or currency)
+        alone (filesUnchanged) unless --force is given. If any file can't be imported again (nothing says its account or currency)
         nothing is re-imported: they are listed under needsAttention and the exit code is 3.
         """.trimIndent()
 
     override suspend fun run() {
-        ImportRun(runtime).run(directories = null, apis = null, reimport = ReimportRequest(dirs))
+        ImportRun(runtime).run(directories = null, apis = null, reimport = ReimportRequest(dirs, force))
     }
 }
 

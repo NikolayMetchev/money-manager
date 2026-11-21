@@ -85,7 +85,7 @@ mm transactions --account Current --from 2024-03-01  # newest first, with runnin
 mm sql "SELECT COUNT(*) FROM transfer"               # one read-only SQL query, for debugging
 mm pdf-lines statement.pdf                           # a PDF's text lines, as PDF line rules read them
 mm --push import all                                 # download + import every folder and API (with a plan summary), then upload
-mm import reimport --dir Monzo                       # "Re-import all" for the imported files of one import folder (all folders without --dir)
+mm import reimport --dir Monzo                       # "Re-import all" for the imported files of one import folder (all folders without --dir; --force also re-runs unchanged files)
 mm tui                                               # full-screen terminal UI: status & cloud sync, accounts, transactions, imports (? for keys, q to quit)
 ```
 

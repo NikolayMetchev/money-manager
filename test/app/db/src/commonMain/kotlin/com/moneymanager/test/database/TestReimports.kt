@@ -59,7 +59,8 @@ suspend fun Reimports.reimportFile(
     id: CsvImportId,
     accountId: AccountId? = null,
     strategy: CsvImportStrategy? = null,
-): BulkReimportResult = reimportAll(planFile(id, strategy), accountId, currencyId = null, onProgress = {})
+    force: Boolean = false,
+): BulkReimportResult = reimportAll(planFile(id, strategy), accountId, currencyId = null, onProgress = {}, force = force)
 
 /** Runs [plan] as the re-import dialog does. */
 suspend fun Reimports.runPlan(

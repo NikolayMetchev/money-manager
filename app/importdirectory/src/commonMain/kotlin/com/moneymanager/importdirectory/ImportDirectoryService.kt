@@ -378,19 +378,20 @@ class ImportDirectoryService(
      * when null): what the desktop's Imported tab runs for the same files ([Reimports.prepareAll]). Ignored and
      * never-imported files are left out. A file that can't be imported again refuses the whole run before anything
      * is deleted ([com.moneymanager.importengineapi.RerunBlockedException]). A file whose inputs hash to what its import
-     * records hold is left alone and counted in [com.moneymanager.csvimporter.BulkReimportResult.filesUnchanged].
+     * records hold is left alone and counted in [com.moneymanager.csvimporter.BulkReimportResult.filesUnchanged], unless [force].
      * [refreshViews] false leaves the materialized views to a caller that batches several runs.
      */
     suspend fun reimportAll(
         task: TaskScope,
         directories: List<ImportDirectory>? = null,
         refreshViews: Boolean = true,
+        force: Boolean = false,
     ): BulkReimportResult {
         val folders = scope(directories, importDirectoryRepository.getAllDirectories().first())
         val ids = filesIn(folders)
         val files = csvImportRepository.getAllImports().first().filter { it.id in ids && !it.ignored && it.lastAppliedAt != null }
         try {
-            val run = reimports.prepareAll(files, onProgress = { task.report(it) })
+            val run = reimports.prepareAll(files, onProgress = { task.report(it) }, force = force)
             return run()
         } finally {
             if (refreshViews) withContext(NonCancellable) { maintenance.refreshMaterializedViews() }

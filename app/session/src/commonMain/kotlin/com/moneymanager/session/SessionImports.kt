@@ -61,6 +61,8 @@ data class ApiImport(
  */
 data class DirectoryReimport(
     val folders: List<ImportDirectory>? = null,
+    /** Run every file, even those nothing they read changed (a change to the importer isn't in that check). */
+    val force: Boolean = false,
 )
 
 /**
@@ -224,7 +226,7 @@ class SessionImports(
     ): ImportRunOutcome =
         manager.await(REIMPORT_ALL_TASK_KEY, "Re-import files", ImportRunOutcome::summary) {
             try {
-                ImportRunOutcome(reimport = directories.reimportAll(this, request.folders, refreshViews = false))
+                ImportRunOutcome(reimport = directories.reimportAll(this, request.folders, refreshViews = false, force = request.force))
             } catch (blocked: RerunBlockedException) {
                 ImportRunOutcome(reimportBlocked = blocked.files)
             }
