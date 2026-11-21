@@ -69,6 +69,8 @@ exclude:
   # method as non-void. The Kotlin test runners accept it (every Compose UI test here is written so).
   - name: JUnitMalformedDeclaration
     paths:
+      - app/ui/core/src/commonTest/kotlin/com/moneymanager/ui/PasswordDialogsTest.kt
+      - app/ui/currencies/src/jvmTest/kotlin/com/moneymanager/ui/screens/currencies/AssetsScreenExportTest.kt
       - app/ui/components/src/commonTest/kotlin/com/moneymanager/ui/components/imports/SourceRerunPreviewTest.kt
       - app/ui/components/src/commonTest/kotlin/com/moneymanager/ui/components/rules/SettlementWindowEditorTest.kt
       - app/ui/components/src/commonTest/kotlin/com/moneymanager/ui/components/rules/StrategyRulesEditorTest.kt
@@ -281,6 +283,8 @@ exclude:
   # and its KDoc links that generated MoneyManagerDatabase.
   - name: HasPlatformType
     paths:
+      - app/ui/core/src/commonTest/kotlin/com/moneymanager/ui/PasswordDialogsTest.kt
+      - app/ui/currencies/src/jvmTest/kotlin/com/moneymanager/ui/screens/currencies/AssetsScreenExportTest.kt
       # [5] — the same `= runMoneyManagerComposeUiTest { ... }` bodies: the type is Unit, not a platform type.
       - app/ui/components/src/commonTest/kotlin/com/moneymanager/ui/components/imports/SourceRerunPreviewTest.kt
       - app/ui/components/src/commonTest/kotlin/com/moneymanager/ui/components/rules/SettlementWindowEditorTest.kt
