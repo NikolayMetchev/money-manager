@@ -77,8 +77,7 @@ class ReportedBalanceReadRepositoryImpl(
             queries
                 .selectTransactionBalanceTimes(accountId.id, asset.id.id)
                 .awaitAsList()
-                .mapNotNull { row -> row.balance_timestamp?.let { row.transaction_id to Instant.fromEpochMilliseconds(it) } }
-                .toMap()
+                .associate { row -> row.transaction_id to Instant.fromEpochMilliseconds(row.balance_timestamp) }
         }
 
     override suspend fun getSources(id: ReportedBalanceId): List<SourceRecord> =
