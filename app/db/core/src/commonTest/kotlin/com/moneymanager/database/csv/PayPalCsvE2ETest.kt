@@ -134,7 +134,7 @@ class PayPalCsvE2ETest : DbTest() {
                 "1",
                 balance = "-21.92",
             ),
-            payPalRow("02/11/2025", "11:55:15", "", "General Credit Card Deposit", "GBP", "21.92", "2", balance = "0.00"),
+            payPalRow("02/11/2025", "11:55:15", "", "General Credit Card Deposit", "GBP", "21.92", "2"),
             payPalRow(
                 "20/10/2025",
                 "21:15:01",
@@ -148,7 +148,7 @@ class PayPalCsvE2ETest : DbTest() {
             ),
             payPalRow("20/10/2025", "21:15:01", "", "General Credit Card Deposit", "GBP", "3.14", "4", "BST", balance = "3.14"),
             payPalRow("20/10/2025", "21:15:01", "", "General Currency Conversion", "GBP", "-3.14", "5", "BST"),
-            payPalRow("20/10/2025", "21:15:01", "", "General Currency Conversion", "USD", "4.04", "6", "BST", balance = "0.00"),
+            payPalRow("20/10/2025", "21:15:01", "", "General Currency Conversion", "USD", "4.04", "6", "BST"),
             payPalRow(
                 "17/10/2025",
                 "09:57:32",
@@ -160,7 +160,7 @@ class PayPalCsvE2ETest : DbTest() {
                 "BST",
                 balance = "-17.39",
             ),
-            payPalRow("17/10/2025", "09:57:32", "", "General Credit Card Deposit", "GBP", "17.39", "8", "BST", balance = "0.00"),
+            payPalRow("17/10/2025", "09:57:32", "", "General Credit Card Deposit", "GBP", "17.39", "8", "BST"),
             // Money received and sent on to the bank: no card involved, nothing to reconcile.
             payPalRow("10/10/2025", "07:34:03", "Frank Frumento", "Mobile Payment", "GBP", "8.00", "9", "BST", balance = "8.00"),
             payPalRow("10/10/2025", "08:32:34", "", "General Withdrawal", "GBP", "-8.00", "10", "BST", status = "Processing"),
