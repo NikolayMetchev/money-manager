@@ -64,6 +64,7 @@ exclude:
   - name: PackageDirectoryMismatch
     paths:
       - app/csvimporter/src/commonTest/kotlin/com/moneymanager/csvimporter/BarclaycardCsvMapperTest.kt
+      - app/csvimporter/src/commonTest/kotlin/com/moneymanager/database/csv/RevolutOwnHolderTest.kt
       - app/db/core/src/commonTest/kotlin/com/moneymanager/database/csv/CsvReimportInPlaceTest.kt
 
   # Compose @Composable functions are PascalCase by convention; the community linter has no
