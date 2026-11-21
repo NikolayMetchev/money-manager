@@ -50,7 +50,7 @@ nothing) and features that only built-ins could configure. Don't recreate that d
 Bazel runs through bazelisk, at the version in `.bazelversion`; nothing else needs installing (it downloads the JDK,
 Kotlin, Kotlin/Native and the Android SDK's `compile_sdk` platform and adb). Android targets need the Android SDK License accepted once:
 `bazel run //tools/repo-scripts:repo-scripts-tool -- accept-android-license` (a build that needs it fails naming that command). Device
-tests' emulator is installed separately, and a Mac needs the Xcode Command Line Tools (`xcode-select --install`; not Xcode itself). How the build itself works (the KMP rules, Gazelle, the resolver, bumping Kotlin) is in
+tests boot an emulator Bazel downloads (`@android_emulator`, 2.5 GB, fetched on first use) when no device is connected, so it needs a usable hypervisor: `/dev/kvm` on Linux, Hypervisor.framework on a Mac, the Windows Hypervisor Platform on Windows (an Arm Mac or PC also accepts the Arm image's license once: `accept-android-license arm`). Only Linux x64 is exercised by CI; macOS and Windows are untested. A connected device or `ANDROID_SERIAL` always wins. A Mac needs the Xcode Command Line Tools (`xcode-select --install`; not Xcode itself). How the build itself works (the KMP rules, Gazelle, the resolver, bumping Kotlin) is in
 [`bazel/README.md`](bazel/README.md). A cold `bazel build //...` takes well over 2 minutes, so never run it with a short
 timeout; use at least 20 minutes.
 
@@ -63,7 +63,7 @@ timeout; use at least 20 minutes.
 | `bazel run --config=web //app/main/web:serve -- 8080` | Serve the browser app (`//app/main/web:dist`) on http://127.0.0.1:8080 |
 | `bazel build --config=android //app/main/android:debug` | Debug APK (`bazel-bin/app/main/android/debug.apk`; `adb install` it) |
 | `bazel build --config=native //app/main/cli:mm` / `bazel build //app/main/cli:mm-jvm` | The host's native `mm` / the JVM `mm-jvm` (`bazel-bin/app/main/cli/mm-jvm/bin/mm-jvm`) |
-| `bazel test --config=android $(bazel query 'attr(tags, android_device, tests(//...))')` | Android device tests, on the device adb picks (an API 36 emulator) |
+| `bazel test --config=android $(bazel query 'attr(tags, android_device, tests(//...))')` | Android device tests, on the device adb picks, else on the API 36 emulator Bazel downloads and boots |
 | `bazel run //:format` | Regenerate the BUILD files (Gazelle), then ktlint -F |
 | `bazel run //:gazelle` | Regenerate the BUILD files only |
 | `bazel/renovate/repin.sh` | Re-pin every lockfile (after changing `MODULE.bazel`) |
@@ -802,7 +802,7 @@ set of writes.
 - Android tests require manifest with `ComponentActivity` declaration
 - Share commonTest sources with a device test via `# gazelle:kmp_device_test_srcs`
 - **Android Device Tests**: `bazel test //app/ui/core:test_device` (or every one:
-  `bazel test $(bazel query 'attr(tags, android_device, tests(//...))')`) on a running API 36 emulator.
+  `bazel test $(bazel query 'attr(tags, android_device, tests(//...))')`) on a connected device, or with none on the API 36 emulator `tools/android-device-test` boots from `@android_emulator`.
   **Android emulator API level sync**: change the level here and you must change it in `MODULE.bazel`
   (`android_sdk.levels`' `target_sdk`), the CI emulator (`.github/workflows/build.yml` and
   `.github/workflows/android-release-smoke-test.yml`) too.
