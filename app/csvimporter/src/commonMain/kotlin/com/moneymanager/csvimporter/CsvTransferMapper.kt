@@ -910,7 +910,7 @@ class CsvTransferMapper(
                 reportedBalance = parseBalance(outcome.balance, values, currency),
                 reportedBalanceAt =
                     outcome.balance?.at?.let { at ->
-                        parseBalanceAt(at, timestampMapping as DateTimeParsingMapping, values, timezone)
+                        parseBalanceAt(at, timestampMapping, values, timezone)
                     },
             )
         } catch (expected: Exception) {
