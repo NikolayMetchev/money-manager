@@ -31,9 +31,9 @@ import kotlin.time.Instant
 private const val PROFILE_ID = "111"
 private const val BALANCE_ID = "222"
 
-private val PROFILES_JSON = """[{ "id": $PROFILE_ID, "type": "personal", "details": { "firstName": "Ada", "lastName": "Lovelace" } }]"""
+private const val PROFILES_JSON = """[{ "id": $PROFILE_ID, "type": "personal", "details": { "firstName": "Ada", "lastName": "Lovelace" } }]"""
 
-private val BALANCES_JSON = """[{ "id": $BALANCE_ID, "currency": "GBP", "name": null, "type": "STANDARD" }]"""
+private const val BALANCES_JSON = """[{ "id": $BALANCE_ID, "currency": "GBP", "name": null, "type": "STANDARD" }]"""
 
 private val STATEMENT_JSON =
     """
