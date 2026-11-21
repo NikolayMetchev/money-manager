@@ -102,6 +102,9 @@ enum class RuleActionKind(
     FOREIGN("Foreign amount", setOf(RuleContext.CSV_ROW, RuleContext.API_TRANSACTION), {
         RuleAction.Foreign(ForeignAmount(ValueExpr(listOf("")), ValueExpr(listOf(""))))
     }),
+    BALANCE("Statement balance", setOf(RuleContext.CSV_ROW, RuleContext.API_TRANSACTION), {
+        RuleAction.Balance(ValueExpr(listOf("")))
+    }),
     CONDUIT("Run through a conduit", setOf(RuleContext.CSV_ROW), { RuleAction.ThroughConduit("") }),
     TRADE_SIDE("Set the trade side", setOf(RuleContext.API_TRADE), { RuleAction.TradeSide(buy = true) }),
     LEG("Leg of a group", setOf(RuleContext.CSV_ROW), { RuleAction.Leg("", LegRole.Debit) }),
@@ -126,6 +129,7 @@ enum class RuleActionKind(
                 is RuleAction.Fee -> FEE
                 is RuleAction.ManualEntry -> MANUAL_ENTRY
                 is RuleAction.Foreign -> FOREIGN
+                is RuleAction.Balance -> BALANCE
                 is RuleAction.ThroughConduit -> CONDUIT
                 is RuleAction.TradeSide -> TRADE_SIDE
                 is RuleAction.Leg -> LEG
@@ -175,6 +179,8 @@ private fun RuleAction.isComplete(): Boolean =
         is RuleAction.Fee -> fee.amount.primaryPath.isNotBlank()
 
         is RuleAction.Foreign -> foreignAmount.amount.primaryPath.isNotBlank() && foreignAmount.currency.primaryPath.isNotBlank()
+
+        is RuleAction.Balance -> amount.primaryPath.isNotBlank()
 
         is RuleAction.ManualEntry -> name.isNotBlank() && description.isNotBlank() && relationshipType.isNotBlank()
 
@@ -494,6 +500,18 @@ private fun ActionFields(
                 onForeignAmountChanged = { foreign -> foreign?.let { onActionChanged(action.copy(foreignAmount = it)) } },
                 pathField = pathField,
             )
+        }
+
+        is RuleAction.Balance -> {
+            pathField.Field("Balance after the record", action.amount.primaryPath, { path ->
+                onActionChanged(action.copy(amount = action.amount.withPrimaryPath(path) ?: ValueExpr(listOf(""))))
+            }, action.amount.primaryPath.isBlank())
+            pathField.Field("Balance currency (blank: the record's)", action.currency?.primaryPath.orEmpty(), { path ->
+                onActionChanged(action.copy(currency = action.currency.withPrimaryPath(path)))
+            }, false)
+            pathField.Field("Balance counts the record at (blank: the record's time)", action.at?.primaryPath.orEmpty(), { path ->
+                onActionChanged(action.copy(at = action.at.withPrimaryPath(path)))
+            }, false)
         }
 
         is RuleAction.ManualEntry -> {

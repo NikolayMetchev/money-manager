@@ -12,6 +12,7 @@
 -- 7 = TRANSFER
 -- 8 = CSV_IMPORT_STRATEGY
 -- 13 = RELATIONSHIP
+-- 14 = REPORTED_BALANCE
 
 CREATE TABLE entity_type (
     id INTEGER PRIMARY KEY NOT NULL,
@@ -30,6 +31,7 @@ INSERT OR IGNORE INTO entity_type (id, name) VALUES (10, 'CRYPTO');
 INSERT OR IGNORE INTO entity_type (id, name) VALUES (11, 'TRADE');
 INSERT OR IGNORE INTO entity_type (id, name) VALUES (12, 'EXCHANGE_ORDER');
 INSERT OR IGNORE INTO entity_type (id, name) VALUES (13, 'RELATIONSHIP');
+INSERT OR IGNORE INTO entity_type (id, name) VALUES (14, 'REPORTED_BALANCE');
 
 -- One row per revision: the source that wrote it (enforced by idx_entity_source_writer).
 CREATE TABLE entity_source (

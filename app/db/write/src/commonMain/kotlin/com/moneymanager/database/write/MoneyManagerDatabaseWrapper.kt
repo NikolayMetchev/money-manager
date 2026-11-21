@@ -52,6 +52,7 @@ class MoneyManagerDatabaseWrapper(
     val holidayCalendarWriteQueries get() = writeDb.holidayCalendarWriteQueries
     val reconciliationLinkWriteQueries get() = writeDb.reconciliationLinkWriteQueries
     val relationshipTypeWriteQueries get() = writeDb.relationshipTypeWriteQueries
+    val reportedBalanceWriteQueries get() = writeDb.reportedBalanceWriteQueries
     val settingsWriteQueries get() = writeDb.settingsWriteQueries
     val tradeWriteQueries get() = writeDb.tradeWriteQueries
     val transactionIdWriteQueries get() = writeDb.transactionIdWriteQueries

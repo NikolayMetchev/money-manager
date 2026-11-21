@@ -83,6 +83,10 @@ class AuditSourceCoverageTest : DbTest() {
         // Empty: crypto_audit and trade_audit are now fully covered below (issue #263).
         private val PENDING_COVERAGE_AUDIT_TABLES = emptySet<String>()
 
+        // Entity types only an import can create, whose source coverage is checked by that import's test.
+        // reported_balance: a statement balance hangs off an import record (RevolutCsvE2ETest's re-import test).
+        private val COVERED_BY_IMPORT_TESTS = setOf("reported_balance_audit")
+
         // Fixed UUID of the built-in Monzo strategy (installed from the fixture in this test).
         private val MONZO_STRATEGY_ID =
             ApiImportStrategyId(BuiltInApiStrategies.monzoStrategyId)
@@ -301,7 +305,13 @@ class AuditSourceCoverageTest : DbTest() {
             // This fails automatically when a new *_audit table appears without test coverage.
             // ---------------------------------------------------------------
             val entityAuditTables =
-                discoverAuditTables() - ATTRIBUTE_AUDIT_TABLES - SOURCELESS_AUDIT_TABLES - PENDING_COVERAGE_AUDIT_TABLES
+                buildSet {
+                    addAll(discoverAuditTables())
+                    removeAll(ATTRIBUTE_AUDIT_TABLES)
+                    removeAll(SOURCELESS_AUDIT_TABLES)
+                    removeAll(PENDING_COVERAGE_AUDIT_TABLES)
+                    removeAll(COVERED_BY_IMPORT_TESTS)
+                }
             assertEquals(
                 entityAuditTables,
                 coveredTables,

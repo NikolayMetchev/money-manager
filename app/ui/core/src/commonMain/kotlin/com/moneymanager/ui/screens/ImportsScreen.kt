@@ -21,6 +21,7 @@ import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.DeviceId
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.reconciliation.ReconciliationFocus
 import com.moneymanager.domain.model.reconciliation.ReconciliationLeg
@@ -42,6 +43,7 @@ import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.ReconciliationReadRepository
+import com.moneymanager.domain.repository.ReportedBalanceReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.importdirectory.ImportDirectoryService
@@ -58,6 +60,8 @@ import com.moneymanager.ui.screens.accountmapping.AccountMappingsScreen
 import com.moneymanager.ui.screens.apistrategy.ApiSessionsScreen
 import com.moneymanager.ui.screens.csv.ImportFilesScreen
 import com.moneymanager.ui.screens.importdirectory.ImportDirectoriesSection
+import com.moneymanager.ui.screens.reconciliation.BalanceCheckCache
+import com.moneymanager.ui.screens.reconciliation.BalanceReconciliationScreen
 import com.moneymanager.ui.screens.reconciliation.CardLast4Screen
 import com.moneymanager.ui.screens.reconciliation.MatchPickerState
 import com.moneymanager.ui.screens.reconciliation.ReconciliationCache
@@ -78,6 +82,7 @@ fun ImportsScreen(
     importDirectoryRepository: ImportDirectoryReadRepository,
     importTimelineRepository: ImportTimelineReadRepository,
     reconciliationRepository: ReconciliationReadRepository,
+    reportedBalanceRepository: ReportedBalanceReadRepository,
     importDirectoryService: ImportDirectoryService,
     apiImportService: ApiImportService,
     driveFolderBrowser: DriveFolderBrowser?,
@@ -115,9 +120,11 @@ fun ImportsScreen(
     onBrowsePassThroughCatalog: () -> Unit = {},
     onReconciliationLegClick: (ReconciliationLeg) -> Unit = {},
     onReconciliationSourceClick: (ReconciliationLeg) -> Unit = {},
+    onSourceClick: (Source) -> Unit = {},
     matchPickerState: MatchPickerState = remember { MatchPickerState() },
     reconciliationCache: ReconciliationCache = remember { ReconciliationCache() },
     manualEntrySuggestionCache: ManualEntrySuggestionCache = remember { ManualEntrySuggestionCache() },
+    balanceCheckCache: BalanceCheckCache = remember { BalanceCheckCache() },
     reconciliationFocus: ReconciliationFocusState,
     showImportDirectories: Boolean = true,
 ) {
@@ -291,6 +298,15 @@ fun ImportsScreen(
                             },
                         )
                     },
+                    balances = {
+                        BalanceReconciliationScreen(
+                            reportedBalanceRepository = reportedBalanceRepository,
+                            reconciliationRepository = reconciliationRepository,
+                            onOpenLeg = onReconciliationLegClick,
+                            onOpenSource = onSourceClick,
+                            cache = balanceCheckCache,
+                        )
+                    },
                 )
             }
         }
@@ -302,12 +318,13 @@ private fun ReconciliationSubTab.label(): String =
         ReconciliationSubTab.EXTERNAL -> "External Account Reconciliation"
         ReconciliationSubTab.MANUAL -> "Manual Entries"
         ReconciliationSubTab.CARDS -> "Card Last-4"
+        ReconciliationSubTab.BALANCES -> "Statement Balances"
     }
 
 /**
  * Sub-tabs under the "Reconciliation" import tab — everything an import leaves for a person to resolve:
  * comparing against an external source's shadow accounts, companion transactions to enter by hand, and
- * card references no account owns yet.
+ * card references no account owns yet, and statement balances that disagree with the computed ones.
  */
 @Composable
 private fun ReconciliationImportsTab(
@@ -316,6 +333,7 @@ private fun ReconciliationImportsTab(
     reconciliation: @Composable () -> Unit,
     manualEntries: @Composable () -> Unit,
     cards: @Composable () -> Unit,
+    balances: @Composable () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         SecondaryTabRow(selectedTabIndex = subTab.ordinal) {
@@ -327,6 +345,7 @@ private fun ReconciliationImportsTab(
             ReconciliationSubTab.EXTERNAL -> reconciliation()
             ReconciliationSubTab.MANUAL -> manualEntries()
             ReconciliationSubTab.CARDS -> cards()
+            ReconciliationSubTab.BALANCES -> balances()
         }
     }
 }

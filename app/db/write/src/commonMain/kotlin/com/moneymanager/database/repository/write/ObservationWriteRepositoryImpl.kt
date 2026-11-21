@@ -253,7 +253,12 @@ class ObservationWriteRepositoryImpl(
     }
 
     override suspend fun reserveApiSession(sessionId: ApiSessionId) {
-        withContext(coroutineContext) { queries.reserveApiSession(sessionId.id) }
+        withContext(coroutineContext) {
+            queries.transaction {
+                queries.reserveApiSession(sessionId.id)
+                database.reportedBalanceWriteQueries.reserveApiSession(sessionId.id)
+            }
+        }
     }
 
     override suspend fun unreserve(id: ObservationId) {

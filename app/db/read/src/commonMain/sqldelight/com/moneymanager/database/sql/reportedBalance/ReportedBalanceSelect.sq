@@ -1,0 +1,44 @@
+-- Every account and asset some statement reports balances for, with how many there are and the latest one's instant.
+selectAccountAssets:
+SELECT
+    rb.account_id,
+    account.name AS account_name,
+    ad.id AS asset_id,
+    ad.code AS asset_code,
+    ad.name AS asset_name,
+    ad.scale_factor AS asset_scale_factor,
+    ad.fraction_digits AS asset_fraction_digits,
+    ad.kind AS asset_kind,
+    COUNT(*) AS balance_count,
+    MAX(rb.timestamp) AS latest_timestamp
+FROM reported_balance rb
+JOIN account ON account.id = rb.account_id
+JOIN asset_details ad ON ad.id = rb.asset_id
+GROUP BY rb.account_id, rb.asset_id
+ORDER BY account.name, ad.code;
+
+-- One account's reported balances of one asset, oldest first. Rows reported at one instant come in their statement's
+-- order (a CSV row's index, else the order they were recorded in), so the last of them is the balance after all of them.
+selectBalances:
+SELECT rb.id, rb.timestamp, rb.amount, rb.revision_id
+FROM reported_balance rb
+LEFT JOIN csv_import_record cir ON cir.record_id = rb.record_id
+WHERE rb.account_id = :accountId AND rb.asset_id = :assetId
+ORDER BY rb.timestamp, cir.row_index, rb.record_id;
+
+-- The balance a record reports, if it reports one: the engine revises it in place.
+selectByRecord:
+SELECT id, account_id, asset_id, timestamp, amount, revision_id
+FROM reported_balance
+WHERE record_id = ?;
+
+-- When one account's balances of one asset count each transaction their records observe: the balance's own time, the
+-- latest where several of them observe it. A statement whose running balance counts a record later than the record's
+-- own time (Revolut's, by completion) counts its transactions then too.
+selectTransactionBalanceTimes:
+SELECT o.transaction_id, MAX(rb.timestamp) AS balance_timestamp
+FROM reported_balance rb
+JOIN observation_record orec ON orec.record_id = rb.record_id
+JOIN observation o ON o.id = orec.observation_id
+WHERE rb.account_id = :accountId AND rb.asset_id = :assetId
+GROUP BY o.transaction_id;

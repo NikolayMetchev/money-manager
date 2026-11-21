@@ -26,6 +26,8 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyAuditEntry
 import com.moneymanager.domain.model.csv.CsvImportHistoryEvent
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyAuditEntry
+import com.moneymanager.domain.model.reconciliation.ReportedBalanceAuditEntry
+import com.moneymanager.domain.model.reconciliation.ReportedBalanceId
 
 interface AuditReadRepository {
     /**
@@ -111,6 +113,9 @@ interface AuditReadRepository {
     suspend fun getAuditHistoryForTrade(tradeId: TradeId): List<TradeAuditEntry>
 
     suspend fun getAuditHistoryForExchangeOrder(orderId: ExchangeOrderId): List<ExchangeOrderAuditEntry>
+
+    /** Audit history for a balance a statement reported: each revision a re-import made, with its source. */
+    suspend fun getAuditHistoryForReportedBalance(balanceId: ReportedBalanceId): List<ReportedBalanceAuditEntry>
 
     /**
      * Gets the audit history for a specific category.
