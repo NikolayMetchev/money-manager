@@ -90,6 +90,7 @@ kmp_test(
         "-Djava.awt.headless=true",
         "-Dskiko.test.harness=true",
     ],
+    jvm_srcs = glob(["src/jvmTest/kotlin/**/*.kt"]),
     keep_deps = ["//bazel/kmp/deps:compose_desktop_current_os"],
     plugins = [
         "compose",

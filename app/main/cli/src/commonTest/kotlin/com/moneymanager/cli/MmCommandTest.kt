@@ -1,14 +1,23 @@
 package com.moneymanager.cli
 
+import com.moneymanager.credentialvault.testing.InMemoryLocalSettings
 import com.moneymanager.localsettings.KEY_LAST_DATABASE
 import com.moneymanager.query.Envelope
+import com.moneymanager.remotestorage.sync.RemoteDatabaseController
+import com.moneymanager.remotestorage.sync.RemoteDatabaseSyncService
+import com.moneymanager.remotestorage.testing.InMemoryStorageProvider
+import com.moneymanager.remotestorage.testing.SingleProviderFactory
+import com.moneymanager.session.DatabaseSessions
+import com.moneymanager.session.performClose
 import com.moneymanager.test.database.createTestDatabaseLocation
+import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class MmCommandTest {
@@ -81,6 +90,30 @@ class MmCommandTest {
                 val again = cli.run("status")
                 assertEquals(ExitCodes.OK, again.exitCode, again.stderr)
                 assertEquals(location.path, Json.decodeFromString<Envelope<StatusJson>>(again.stdout).data.database)
+            } finally {
+                deleteTestDatabase(location)
+            }
+        }
+
+    @Test
+    fun statusReportsACloudBackedDatabasesCopy() =
+        runTest {
+            val manager = createTestDatabaseManager()
+            val settings = InMemoryLocalSettings()
+            val provider = InMemoryStorageProvider()
+            val controller = RemoteDatabaseController(RemoteDatabaseSyncService(manager, settings), SingleProviderFactory(provider))
+            val cli = TestCli(manager, settings, remoteController = controller)
+            val location = createTestDatabaseLocation()
+            try {
+                val session = DatabaseSessions(manager, settings, cli.vault, controller).open(location)
+                controller.createRemote(provider.id, null, "db.mmdb", location, session.database, "pw")
+                controller.performClose(session.database, upload = false, keepLocal = true, password = null, localChanged = false)
+
+                val run = cli.run("--db", location.path, "status")
+
+                assertEquals(ExitCodes.OK, run.exitCode, run.stderr)
+                val cloud = assertNotNull(Json.decodeFromString<Envelope<StatusJson>>(run.stdout).data.cloud)
+                assertEquals("db.mmdb", cloud.remoteName)
             } finally {
                 deleteTestDatabase(location)
             }
