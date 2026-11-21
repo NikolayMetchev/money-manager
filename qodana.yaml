@@ -410,8 +410,6 @@ exclude:
       - utils/files/src/commonMain/kotlin/com/moneymanager/files/Files.kt
       - utils/localsettings/di/src/androidMain
       - utils/localsettings/di/src/jvmMain
-      # SourceObservations.recordId is called by ReportedBalanceWriter (same module), which the linter misses.
-      - app/importer/src/commonMain/kotlin/com/moneymanager/importer/SourceObservations.kt
       - utils/localsettings/src/androidMain/kotlin/com/moneymanager/localsettings/AndroidLocalSettings.kt
       - utils/parsers/xlsx/src/jvmTest/kotlin/com/moneymanager/xlsx/XlsxParserTest.kt
       # [2] — the Google-account helpers are used by app/remotestorage/googledrive, the path-resolver
@@ -658,6 +656,8 @@ exclude:
       - utils/credentialvault/src/commonMain/kotlin/com/moneymanager/credentialvault/CredentialBundle.kt
       - utils/credentialvault/di/src/androidMain
       - test/utils/credentialvault/src
+      # [5] — SourceObservations.recordId is called by ReportedBalanceWriter, in the same module.
+      - app/importer/src/commonMain/kotlin/com/moneymanager/importer/SourceObservations.kt
 
   # Bazel's output trees (generated SQLDelight sources, kotlin_constants output) are not hand-written code, and
   # user.bazelrc carries the CI's BuildBuddy key. Only literal paths are honoured by the linter (wildcard globs
