@@ -70,7 +70,6 @@ class BalanceReconciliationScreenTest {
         accountId = account,
         counterpartyAccountId = AccountId(8),
         amount = money(amount),
-        excludedReason = null,
     )
 
     // The statement says the balance fell by 30 on day 1; Money Manager booked that payment twice.

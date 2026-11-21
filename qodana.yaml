@@ -65,6 +65,11 @@ exclude:
     paths:
       - app/csvimporter/src/commonTest/kotlin/com/moneymanager/csvimporter/BarclaycardCsvMapperTest.kt
       - app/db/core/src/commonTest/kotlin/com/moneymanager/database/csv/CsvReimportInPlaceTest.kt
+      # [5] — the same empty package prefix on these modules' commonMain/commonTest roots.
+      - app/reconciliation/src/commonMain/kotlin/com/moneymanager/reconciliation/BalanceCheck.kt
+      - app/reconciliation/src/commonTest/kotlin/com/moneymanager/reconciliation/BalanceCheckTest.kt
+      - app/ui/imports/reconciliation/src/commonMain/kotlin/com/moneymanager/ui/screens/reconciliation/BalanceReconciliationScreen.kt
+      - app/ui/imports/reconciliation/src/commonTest/kotlin/com/moneymanager/ui/screens/reconciliation/BalanceReconciliationScreenTest.kt
 
   # Compose @Composable functions are PascalCase by convention; the community linter has no
   # Compose awareness. ktlint (compose ruleset) polices naming in these modules instead.
@@ -98,6 +103,9 @@ exclude:
       # The version check after `json.decodeFromString` (in a try whose catch throws) runs — the vault's
       # "newer version is refused" test exercises it; the linter resolves the reified call to Nothing.
       - utils/credentialvault/src/commonMain/kotlin/com/moneymanager/credentialvault/CredentialVaultImpl.kt
+      # [5] — `series ?: return` after rememberFlowAsStateWithSchemaErrorHandling(initial = null): the flow's type
+      # doesn't resolve, so the state reads as always null. BalanceReconciliationScreenTest renders what follows.
+      - app/ui/imports/reconciliation/src/commonMain/kotlin/com/moneymanager/ui/screens/reconciliation/BalanceReconciliationScreen.kt
 
   # Compile-verified: these opt-ins are still required (ExperimentalMaterial3Api on
   # ExposedDropdownMenuBox/menuAnchor, ExperimentalTestApi on runComposeUiTest) — removing them
@@ -172,6 +180,7 @@ exclude:
       - app/ui/imports/csv/src/commonMain/kotlin/com/moneymanager/ui/screens/csvstrategy/StrategyDialogs.kt
       - app/ui/imports/importDirectory/src/commonMain/kotlin/com/moneymanager/ui/screens/importdirectory/DriveFolderPickerDialog.kt
       - app/ui/imports/reconciliation/src/commonMain/kotlin/com/moneymanager/ui/screens/reconciliation/CardLast4Screen.kt
+      - app/ui/imports/reconciliation/src/commonMain/kotlin/com/moneymanager/ui/screens/reconciliation/BalanceReconciliationScreen.kt
       - app/ui/imports/reconciliation/src/commonMain/kotlin/com/moneymanager/ui/screens/reconciliation/ReconciliationScreen.kt
       - app/ui/people/src/commonMain/kotlin/com/moneymanager/ui/screens/people/PeopleScreen.kt
       - app/ui/settings/src/commonMain/kotlin/com/moneymanager/ui/screens/settings/StrategyCatalogScreen.kt
@@ -213,6 +222,9 @@ exclude:
       - app/db/write/src/commonMain/kotlin/com/moneymanager/database/write/CsvImportStrategyInsert.kt
       # [5] — legGroups calls LazyListScope.item; showConnections and show call ComposeUiTest.setContent.
       - app/ui/imports/reconciliation/src/commonMain/kotlin/com/moneymanager/ui/screens/reconciliation/ReconciliationScreen.kt
+      # [2] — ReportedBalanceSeries.key reads accountId and asset; RevolutCsvE2ETest's List<ReportedBalance>.amounts() maps it.
+      - app/ui/imports/reconciliation/src/commonMain/kotlin/com/moneymanager/ui/screens/reconciliation/BalanceReconciliationScreen.kt
+      - app/db/core/src/commonTest/kotlin/com/moneymanager/database/csv/RevolutCsvE2ETest.kt
       - app/ui/core/src/commonTest/kotlin/com/moneymanager/ui/credentials/ApiConnectionsVaultE2ETest.kt
       - app/ui/foundation/src/commonTest/kotlin/com/moneymanager/ui/foundation/NamedDatabaseDialogTest.kt
 
@@ -398,6 +410,8 @@ exclude:
       - utils/files/src/commonMain/kotlin/com/moneymanager/files/Files.kt
       - utils/localsettings/di/src/androidMain
       - utils/localsettings/di/src/jvmMain
+      # SourceObservations.recordId is called by ReportedBalanceWriter (same module), which the linter misses.
+      - app/importer/src/commonMain/kotlin/com/moneymanager/importer/SourceObservations.kt
       - utils/localsettings/src/androidMain/kotlin/com/moneymanager/localsettings/AndroidLocalSettings.kt
       - utils/parsers/xlsx/src/jvmTest/kotlin/com/moneymanager/xlsx/XlsxParserTest.kt
       # [2] — the Google-account helpers are used by app/remotestorage/googledrive, the path-resolver

@@ -68,7 +68,7 @@ class ImportEngineImpl(
     private val ownershipRepository: PersonAccountOwnershipWriteRepository,
     private val categoryRepository: CategoryWriteRepository,
     private val currencyRepository: CurrencyWriteRepository,
-    private val cryptoRepository: CryptoWriteRepository,
+    cryptoRepository: CryptoWriteRepository,
     private val tradeRepository: TradeWriteRepository,
     private val exchangeOrderRepository: ExchangeOrderWriteRepository,
     private val attributeTypeRepository: AttributeTypeWriteRepository,
@@ -269,10 +269,9 @@ class ImportEngineImpl(
             materialize(emptyList(), MaterializationRequest(Source.Reconciler, transfers.observedDuplicates))
         }
         val matchSync = batch.takeIf { it.syncMatches }?.let { matchSync().run(onProgress) } ?: MaterializationReport()
+        balanceWriter.write(batch, observer, accountResolution.keyToId)
         // A transaction a re-run took back was written with what its own record says: bring it to the merge of every
         // observation and link it has, as a fresh booking would be, writing only what differs (#1510).
-        balanceWriter.write(batch, observer, accountResolution.keyToId)
-
         val retaken = transfers.retaken + observer.claimed
         if (retaken.isNotEmpty()) materialize(emptyList(), MaterializationRequest(Source.Reconciler, retaken))
         val settled = batch.settle?.let { rerun.settle(it, onProgress).also { balanceWriter.settle() } }
