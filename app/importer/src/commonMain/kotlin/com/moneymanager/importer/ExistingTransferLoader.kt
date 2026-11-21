@@ -146,7 +146,10 @@ internal class ExistingTransferLoader(
                 .getByType(AttributeTypeId(WellKnownIds.ACCOUNT_LOCATION_ATTR_TYPE_ID))
                 .first()
                 .associate { it.accountId to it.value }
-        return SettlementCalendars(locations, settingsRepository.getDefaultLocation().first(), holidayCalendarRepository.getAll().first())
+        val defaultLocation = settingsRepository.getDefaultLocation().first()
+        // Only the calendars a location names: a database holds every installed one, most of which nothing uses.
+        val calendars = holidayCalendarRepository.getByCodes(locations.values + listOfNotNull(defaultLocation))
+        return SettlementCalendars(locations, defaultLocation, calendars)
     }
 
     suspend fun loadExisting(

@@ -8,6 +8,7 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.PdfImportSource
+import com.moneymanager.domain.model.csv.PdfTextLine
 import com.moneymanager.domain.model.csv.XlsxImportBlob
 import kotlinx.coroutines.flow.Flow
 
@@ -82,6 +83,12 @@ interface CsvImportReadRepository {
 
     /** The file and its text lines for a PDF-backed import, or null for any other. */
     suspend fun getPdfSource(id: CsvImportId): PdfImportSource?
+
+    /**
+     * The text lines of a PDF-backed import, or null for any other: what [getPdfSource] returns without the file's
+     * bytes, which are far larger and which matching a strategy or showing the lines never reads.
+     */
+    suspend fun getPdfLines(id: CsvImportId): List<PdfTextLine>?
 
     /** The imports staged from a PDF, which only a PDF strategy reads. */
     suspend fun getPdfImportIds(): Set<CsvImportId>

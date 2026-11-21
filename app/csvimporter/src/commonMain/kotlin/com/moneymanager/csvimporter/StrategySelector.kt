@@ -132,9 +132,9 @@ suspend fun List<CsvImportStrategy>.selectForImport(
     csvImport: CsvImport,
     csvImportRepository: CsvImportReadRepository,
 ): CsvImportStrategy? {
-    val pdf = csvImportRepository.getPdfSource(csvImport.id)
-    if (pdf != null) {
-        val staged = PdfRowAssembler.rawLines(pdf.lines)
+    val pdfLines = csvImportRepository.getPdfLines(csvImport.id)
+    if (pdfLines != null) {
+        val staged = PdfRowAssembler.rawLines(pdfLines)
         val columns = staged.headers.mapIndexed { index, name -> CsvColumn(CsvColumnId(Uuid.random()), index, name) }
         val rows = staged.rows.mapIndexed { index, values -> CsvRow(index + 1L, values) }
         return selectForCsv(csvImport.originalFileName, columns, rows, wholeDocument = true)

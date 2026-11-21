@@ -10,3 +10,16 @@ SELECT * FROM holiday_calendar_weekend_day ORDER BY calendar_code, iso_day_of_we
 
 selectAllDays:
 SELECT * FROM holiday_calendar_day ORDER BY calendar_code, epoch_day;
+
+-- The calendars of the given codes only, for an import, which reads just the locations its accounts name.
+selectByCodes:
+SELECT * FROM holiday_calendar WHERE code IN ? ORDER BY name, code;
+
+selectCountriesByCodes:
+SELECT * FROM holiday_calendar_country WHERE calendar_code IN ? ORDER BY calendar_code, country_code;
+
+selectWeekendDaysByCodes:
+SELECT * FROM holiday_calendar_weekend_day WHERE calendar_code IN ? ORDER BY calendar_code, iso_day_of_week;
+
+selectDaysByCodes:
+SELECT * FROM holiday_calendar_day WHERE calendar_code IN ? ORDER BY calendar_code, epoch_day;

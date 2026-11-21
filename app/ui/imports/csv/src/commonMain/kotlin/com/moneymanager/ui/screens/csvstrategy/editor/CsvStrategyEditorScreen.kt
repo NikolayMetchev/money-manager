@@ -135,7 +135,7 @@ fun CsvStrategyEditorScreen(
     LaunchedEffect(csvImportId, columnsOverride) {
         pdfLines =
             if (columnsOverride == null && csvImportId != null) {
-                csvImportRepository.getPdfSource(csvImportId)?.lines.orEmpty()
+                csvImportRepository.getPdfLines(csvImportId).orEmpty()
             } else {
                 emptyList()
             }

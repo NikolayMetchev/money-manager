@@ -1,6 +1,7 @@
 package com.moneymanager.database.repository.write
 
 import app.cash.sqldelight.async.coroutines.awaitAsList
+import app.cash.sqldelight.async.coroutines.awaitAsOne
 import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
@@ -198,6 +199,18 @@ class CsvImportReadRepositoryImpl(
                             .awaitAsList(),
                     stagedRulesHash = blob.staged_rules_hash,
                 )
+            }
+        }
+
+    override suspend fun getPdfLines(id: CsvImportId): List<PdfTextLine>? =
+        withContext(coroutineContext) {
+            val importId = id.id.toString()
+            if (csvImportSelectQueries.selectIsPdfImport(importId).awaitAsOne() > 0) {
+                csvImportSelectQueries
+                    .selectPdfLines(importId) { page, line, text -> PdfTextLine(page.toInt(), line.toInt(), text) }
+                    .awaitAsList()
+            } else {
+                null
             }
         }
 
