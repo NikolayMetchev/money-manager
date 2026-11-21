@@ -291,6 +291,8 @@ exclude:
       - app/importfilesource/di/src/androidMain/kotlin/com/moneymanager/importfilesource/di/CreateImportFileSourceFactory.android.kt
       - app/importfilesource/di/src/jvmMain/kotlin/com/moneymanager/importfilesource/di/CreateImportFileSourceFactory.jvm.kt
       - app/remotestorage/core/src/commonMain/kotlin/com/moneymanager/remotestorage/RemoteStorageProvider.kt
+      # PairRule.pairsOneToOne is an interface default of false that the cross-source rules override with true.
+      - app/observationmatcher/src/commonMain/kotlin/com/moneymanager/observationmatcher/PairRule.kt
       - app/ui/imports/timeline/src/commonTest/kotlin/com/moneymanager/ui/screens/timeline/ImportTimelineScreenTest.kt
       - test/app/db/src/androidMain/kotlin/com/moneymanager/test/database/TestDatabaseHelper.kt
       # The JVM can't switch console modes, so its VT-enable actual is always true (Windows' actual isn't).
