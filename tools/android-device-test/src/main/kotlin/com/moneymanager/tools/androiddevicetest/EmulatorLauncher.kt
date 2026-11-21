@@ -64,6 +64,87 @@ internal fun hypervisorHint(osName: String): String =
         }
     }
 
+/** What `@android_emulator`'s `emulator.properties` says, resolved against its own location. */
+internal class EmulatorConfig(
+    val sdk: Path,
+    val abi: String,
+    val api: String,
+    val image: String,
+) {
+    companion object {
+        fun read(properties: Path): EmulatorConfig {
+            val config = Properties().apply { Files.newInputStream(properties).use { load(it) } }
+            config.getProperty("blocked")?.let {
+                error("No device is connected and the emulator can't be used: ${it.trim()}")
+            }
+            // The repository can be a symlink farm in a sandbox; the emulator finds its libraries beside its own binary.
+            return EmulatorConfig(
+                properties.toRealPath().parent.resolve(config.getProperty("sdk")),
+                config.getProperty("abi"),
+                config.getProperty("api"),
+                config.getProperty("image"),
+            )
+        }
+    }
+}
+
+/** Writes the AVD under [root] and returns the directory `ANDROID_AVD_HOME` points at. */
+internal fun writeAvd(
+    root: Path,
+    config: EmulatorConfig,
+): Path {
+    val avdHome = Files.createDirectories(root.resolve("avd"))
+    val avd = Files.createDirectories(avdHome.resolve("$AVD_NAME.avd"))
+    Files.writeString(avd.resolve("config.ini"), avdConfig(config.abi, config.image))
+    Files.writeString(
+        avdHome.resolve("$AVD_NAME.ini"),
+        "avd.ini.encoding=UTF-8\npath=${avd.toString().replace('\\', '/')}\ntarget=android-${config.api}\n",
+    )
+    return avdHome
+}
+
+internal fun emulatorCommand(
+    sdk: Path,
+    windows: Boolean,
+    port: Int,
+): List<String> =
+    listOf(
+        sdk.resolve("emulator").resolve(if (windows) "emulator.exe" else "emulator").toString(),
+        "-avd",
+        AVD_NAME,
+        "-port",
+        port.toString(),
+        "-no-window",
+        "-no-audio",
+        "-no-snapshot",
+        "-no-boot-anim",
+        "-no-metrics",
+        "-gpu",
+        "swiftshader_indirect",
+    )
+
+internal fun emulatorEnvironment(
+    sdk: Path,
+    avdHome: Path,
+    home: Path,
+): Map<String, String> =
+    mapOf(
+        "ANDROID_SDK_ROOT" to sdk.toString(),
+        "ANDROID_HOME" to sdk.toString(),
+        "ANDROID_AVD_HOME" to avdHome.toString(),
+        "ANDROID_EMULATOR_HOME" to home.toString(),
+    )
+
+internal fun launchProcess(
+    command: List<String>,
+    environment: Map<String, String>,
+    log: Path,
+): Process {
+    val builder = ProcessBuilder(command).redirectErrorStream(true).redirectOutput(log.toFile())
+    builder.environment().putAll(environment)
+    return builder.start()
+}
+
 /**
  * Boots the emulator Bazel downloaded (`@android_emulator`) when a device test finds no device, and stops it again.
  * Nothing is installed on the machine: the SDK root is the repository's, the AVD lives in a temporary directory and the
@@ -117,7 +198,7 @@ internal class EmulatorLauncher private constructor(
         }
     }
 
-    private fun tail(): String = Files.readAllLines(log).takeLast(40).joinToString("\n")
+    private fun tail(): String = if (Files.exists(log)) Files.readAllLines(log).takeLast(40).joinToString("\n") else ""
 
     override fun close() {
         try {
@@ -149,53 +230,23 @@ internal class EmulatorLauncher private constructor(
         fun start(
             adb: Adb,
             properties: Path,
+            launch: (List<String>, Map<String, String>, Path) -> Process = ::launchProcess,
+            requireAcceleration: (Path, Boolean) -> Unit = ::requireAcceleration,
         ): EmulatorLauncher {
-            val config = Properties().apply { Files.newInputStream(properties).use { load(it) } }
-            config.getProperty("blocked")?.let {
-                error("No device is connected and the emulator can't be used: ${it.trim()}")
-            }
-            // The repository can be a symlink farm in a sandbox; the emulator finds its libraries beside its own binary.
-            val sdk = properties.toRealPath().parent.resolve(config.getProperty("sdk"))
-            val abi = config.getProperty("abi")
+            val config = EmulatorConfig.read(properties)
             val windows = System.getProperty("os.name").startsWith("windows", ignoreCase = true)
-            val emulator = sdk.resolve("emulator").resolve(if (windows) "emulator.exe" else "emulator")
-            requireAcceleration(sdk, windows)
+            requireAcceleration(config.sdk, windows)
 
             val root = Files.createTempDirectory(tempParent(), "emulator")
             var launched = false
             try {
-                val avdHome = Files.createDirectories(root.resolve("avd"))
-                val avd = Files.createDirectories(avdHome.resolve("$AVD_NAME.avd"))
-                Files.writeString(avd.resolve("config.ini"), avdConfig(abi, config.getProperty("image")))
-                Files.writeString(
-                    avdHome.resolve("$AVD_NAME.ini"),
-                    "avd.ini.encoding=UTF-8\npath=${avd.toString().replace('\\', '/')}\ntarget=android-${config.getProperty("api")}\n",
-                )
+                val avdHome = writeAvd(root, config)
                 val port = freePort()
                 val log = root.resolve("emulator.log")
-                val builder =
-                    ProcessBuilder(
-                        emulator.toString(),
-                        "-avd",
-                        AVD_NAME,
-                        "-port",
-                        port.toString(),
-                        "-no-window",
-                        "-no-audio",
-                        "-no-snapshot",
-                        "-no-boot-anim",
-                        "-no-metrics",
-                        "-gpu",
-                        "swiftshader_indirect",
-                    ).redirectErrorStream(true).redirectOutput(log.toFile())
-                builder.environment().apply {
-                    put("ANDROID_SDK_ROOT", sdk.toString())
-                    put("ANDROID_HOME", sdk.toString())
-                    put("ANDROID_AVD_HOME", avdHome.toString())
-                    put("ANDROID_EMULATOR_HOME", Files.createDirectories(root.resolve("home")).toString())
-                }
-                println("Booting the Android emulator emulator-$port ($abi, API ${config.getProperty("api")})")
-                val launcher = EmulatorLauncher(adb, root, builder.start(), log, "emulator-$port")
+                val environment = emulatorEnvironment(config.sdk, avdHome, Files.createDirectories(root.resolve("home")))
+                println("Booting the Android emulator emulator-$port (${config.abi}, API ${config.api})")
+                val process = launch(emulatorCommand(config.sdk, windows, port), environment, log)
+                val launcher = EmulatorLauncher(adb, root, process, log, "emulator-$port")
                 var booted = false
                 try {
                     launcher.awaitBoot()
@@ -216,7 +267,7 @@ internal class EmulatorLauncher private constructor(
          * Hypervisor.framework, the Windows Hypervisor Platform) is usable. Without it the emulator either refuses to
          * start or crawls, and this says why.
          */
-        private fun requireAcceleration(
+        fun requireAcceleration(
             sdk: Path,
             windows: Boolean,
         ) {
@@ -234,13 +285,13 @@ internal class EmulatorLauncher private constructor(
         }
 
         /** The even port of a free pair in the range adb scans for emulators (5554..5584). */
-        private fun freePort(): Int =
+        fun freePort(): Int =
             (5554..5584 step 2).firstOrNull { free(it) && free(it + 1) }
                 ?: error("No free emulator port in 5554..5585: stop another emulator")
 
-        private fun free(port: Int): Boolean = runCatching { ServerSocket(port, 1, InetAddress.getLoopbackAddress()).use { } }.isSuccess
+        internal fun free(port: Int): Boolean = runCatching { ServerSocket(port, 1, InetAddress.getLoopbackAddress()).use { } }.isSuccess
 
-        private fun tempParent(): Path =
+        internal fun tempParent(): Path =
             System.getenv("TEST_TMPDIR")?.let { Files.createDirectories(Path.of(it)) } ?: Path.of(System.getProperty("java.io.tmpdir"))
     }
 }
