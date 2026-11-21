@@ -340,7 +340,17 @@ private val TOOLS_TAG = Regex("""android_sdk\.platform_tools\(version = "([^"]+)
 private val PLATFORM_PIN = Regex("""^ANDROID_PLATFORM = \{\n(.*?)^}""", setOf(RegexOption.MULTILINE, RegexOption.DOT_MATCHES_ALL))
 private val TOOLS_PIN = Regex("""^PLATFORM_TOOLS = \{\n(.*?)^}""", setOf(RegexOption.MULTILINE, RegexOption.DOT_MATCHES_ALL))
 private val PIN_FIELD = Regex(""""(\w+)": (?:"([^"]*)"|(\d+))""")
-private val TOOLS_ENTRY = Regex(""""(\w+)": \["([^"]+)", "([0-9a-f]{64})"]""")
+private val TOOLS_ENTRY = Regex(""""([\w-]+)": \["([^"]+)", "([0-9a-f]{64})"]""")
+private val EMULATOR_PIN = Regex("""^ANDROID_EMULATOR = \{\n(.*?)^}""", setOf(RegexOption.MULTILINE, RegexOption.DOT_MATCHES_ALL))
+private val SYSTEM_IMAGE_PIN = Regex("""^ANDROID_SYSTEM_IMAGE = \{\n(.*?)^}""", setOf(RegexOption.MULTILINE, RegexOption.DOT_MATCHES_ALL))
+private val TARGET_SDK = Regex("""^ *target_sdk = (\d+),$""", MULTILINE)
+
+/** The system image the device tests boot: the headless, test-optimised build, for each CPU an emulator host runs. */
+private const val SYSTEM_IMAGE_TAG = "aosp_atd"
+private val SYSTEM_IMAGE_ABIS = listOf("arm64-v8a", "x86_64")
+
+/** The licence an ABI's image is under. The Arm image's adds a clause (4.7) on running Arm code, so it is accepted apart. */
+private val SYSTEM_IMAGE_LICENSES = mapOf("arm64-v8a" to "android-sdk-arm-dbt-license", "x86_64" to "android-sdk-license")
 
 private class SdkArchive(
     val file: String,
@@ -429,6 +439,9 @@ fun repinAndroidSdk(
         }
     if (writeIfChanged(pinsFile, pins, updated)) println("Re-pinned the Android SDK: ${platform.file}, ${tools.values.first().file}")
 
+    val targetSdk = TARGET_SDK.find(module)?.groupValues?.get(1) ?: fail("no target_sdk in $moduleFile")
+    repinEmulator(index, targetSdk, pinsFile, licenseFile, download, fetch)
+
     val release = platform.file.removePrefix("platform-").removeSuffix(".zip")
     writeIfChanged(moduleFile, module, PLATFORM_TAG.replace(module) { "${it.groupValues[1]}$release${it.groupValues[3]}" })
 
@@ -470,3 +483,93 @@ private fun Element.archives(): Map<String, SdkArchive> =
         (SDK_HOSTS[host] ?: "any") to
             SdkArchive(complete.elements("url").single().textContent, complete.elements("checksum").single().textContent)
     }
+
+/** The emulator's archives by "<os>_<arch>" (`linux_x64`, `osx_aarch64`): unlike the SDK's tools, it is built per CPU. */
+private fun Element.hostArchives(): Map<String, SdkArchive> =
+    elements("archive").associate { archive ->
+        val os = SDK_HOSTS.getValue(archive.elements("host-os").single().textContent)
+        val arch = archive.elements("host-arch").single().textContent
+        val complete = archive.elements("complete").single()
+        "${os}_$arch" to
+            SdkArchive(complete.elements("url").single().textContent, complete.elements("checksum").single().textContent)
+    }
+
+private fun pinnedEntries(
+    pins: String,
+    block: Regex,
+    name: String,
+): Map<String, Pair<String, String>> =
+    TOOLS_ENTRY
+        .findAll(block.find(pins)?.groupValues?.get(1) ?: fail("no $name in pins.bzl"))
+        .associate { it.groupValues[1] to (it.groupValues[2] to it.groupValues[3]) }
+
+/** One `"key": ["file", "sha256"]` line per archive, in key order; an archive already pinned isn't downloaded again. */
+private fun archiveEntries(
+    archives: Map<String, SdkArchive>,
+    pinned: Map<String, Pair<String, String>>,
+    fetch: (SdkArchive) -> ByteArray,
+): String =
+    archives.keys.sorted().joinToString("") { key ->
+        val archive = archives.getValue(key)
+        val sha256 = pinned[key]?.takeIf { it.first == archive.file }?.second ?: sha256Hex(fetch(archive))
+        "    \"$key\": [\"${archive.file}\", \"$sha256\"],\n"
+    }
+
+/**
+ * The emulator and the system image the device tests boot (`bazel/kmp/android`'s `@android_emulator`): the newest stable
+ * emulator for every host, and the `target_sdk` API level's [SYSTEM_IMAGE_TAG] image for each ABI. Neither has a version
+ * in MODULE.bazel: a repin moves them to the newest stable release, as it does the platform when compile_sdk moves.
+ */
+private fun repinEmulator(
+    index: Element,
+    level: String,
+    pinsFile: File,
+    licenseFile: File,
+    download: (String) -> ByteArray,
+    fetch: (SdkArchive) -> ByteArray,
+) {
+    val pins = pinsFile.readText()
+    val emulators =
+        index.elements("remotePackage").singleOrNull { it.getAttribute("path") == "emulator" && it.isStable() }?.hostArchives()
+            ?: error("the SDK index has no single stable emulator")
+    val images =
+        DocumentBuilderFactory
+            .newInstance()
+            .apply { setFeature("http://apache.org/xml/features/disallow-doctype-decl", true) }
+            .newDocumentBuilder()
+            .parse(ByteArrayInputStream(download("$SDK_REPOSITORY/sys-img/$SYSTEM_IMAGE_TAG/sys-img2-3.xml")))
+            .documentElement
+    val imageArchives =
+        SYSTEM_IMAGE_ABIS.associateWith { abi ->
+            val path = "system-images;android-$level;$SYSTEM_IMAGE_TAG;$abi"
+            val archive =
+                images
+                    .stablePackage(path)
+                    ?.archives()
+                    ?.values
+                    ?.single()
+                    ?: error("no stable $path in the SDK index: the device tests need API $level's $SYSTEM_IMAGE_TAG image")
+            // The index names the file beside it; pins.bzl keeps the path from the repository's root.
+            SdkArchive("sys-img/$SYSTEM_IMAGE_TAG/${archive.file}", archive.sha1)
+        }
+
+    val updated =
+        SYSTEM_IMAGE_PIN.replace(
+            EMULATOR_PIN.replace(pins) {
+                "ANDROID_EMULATOR = {\n" +
+                    archiveEntries(emulators, pinnedEntries(pins, EMULATOR_PIN, "ANDROID_EMULATOR"), fetch) +
+                    "}"
+            },
+        ) {
+            "ANDROID_SYSTEM_IMAGE = {\n    \"api\": \"$level\",\n    \"tag\": \"$SYSTEM_IMAGE_TAG\",\n" +
+                archiveEntries(imageArchives, pinnedEntries(pins, SYSTEM_IMAGE_PIN, "ANDROID_SYSTEM_IMAGE"), fetch) + "}"
+        }
+    if (writeIfChanged(pinsFile, pins, updated)) println("Re-pinned the Android emulator and its $SYSTEM_IMAGE_TAG images")
+
+    val armLicense =
+        images.elements("license").firstOrNull { it.getAttribute("id") == SYSTEM_IMAGE_LICENSES.getValue("arm64-v8a") }?.textContent
+            ?: error("no ${SYSTEM_IMAGE_LICENSES.getValue("arm64-v8a")} in the SDK index")
+    val armFile = File(licenseFile.parentFile, "sdk_arm_license.txt")
+    val current = if (armFile.exists()) armFile.readText() else ""
+    if (writeIfChanged(armFile, current, armLicense)) println("The Arm system image's license changed: everyone accepts it again")
+}

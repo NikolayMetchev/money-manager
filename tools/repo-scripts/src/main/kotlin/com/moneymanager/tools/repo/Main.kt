@@ -11,7 +11,7 @@ fun main(args: Array<String>) {
         "repin" -> repin(rest)
         "dependency-snapshot" -> dependencySnapshot(rest)
         "startup-bench" -> startupBench(rest)
-        "accept-android-license" -> acceptAndroidLicense()
+        "accept-android-license" -> acceptAndroidLicense(rest)
         else -> fail("usage: repo-scripts repin|dependency-snapshot|startup-bench|accept-android-license <args>")
     }
 }
