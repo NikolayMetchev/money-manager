@@ -24,6 +24,7 @@ private val EXCLUDED_FROM_AUDIT =
         "crypto_audit",
         "trade_audit",
         "exchange_order_audit",
+        "reported_balance_audit",
         "exchange_order_trade",
         "asset",
         "category_audit",
@@ -136,6 +137,9 @@ private val EXCLUDED_FROM_AUDIT =
         "observation_split",
         "account_merge_observation",
         "account_merge_transfer_override",
+        // A re-run's not-yet-reported balances, and the balances a merge moved: undo data, like their observation twins.
+        "reported_balance_reserved",
+        "account_merge_reported_balance",
     )
 
 /** Whether a table is outside the audit trail. */

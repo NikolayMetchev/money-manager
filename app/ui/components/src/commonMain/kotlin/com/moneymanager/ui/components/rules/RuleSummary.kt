@@ -130,6 +130,10 @@ fun RuleAction.summary(): String =
             "foreign amount ${foreignAmount.amount.summary()} ${foreignAmount.currency.summary()}"
         }
 
+        is RuleAction.Balance -> {
+            "balance ${amount.summary()}" + (currency?.let { " ${it.summary()}" } ?: "") + (at?.let { " at ${it.summary()}" } ?: "")
+        }
+
         is RuleAction.ThroughConduit -> {
             "through “${accountName.orMissing()}”"
         }

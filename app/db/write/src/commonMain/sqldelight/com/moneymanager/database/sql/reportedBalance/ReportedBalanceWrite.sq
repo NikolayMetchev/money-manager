@@ -1,0 +1,50 @@
+insertBalance:
+INSERT INTO reported_balance (record_id, account_id, asset_id, timestamp, amount, revision_id)
+VALUES (?, ?, ?, ?, ?, 1);
+
+lastInsertedId:
+SELECT last_insert_rowid();
+
+updateBalance:
+UPDATE reported_balance
+SET account_id = :accountId, asset_id = :assetId, timestamp = :timestamp, amount = :amount, revision_id = :revisionId
+WHERE id = :id;
+
+unreserve:
+DELETE FROM reported_balance_reserved WHERE reported_balance_id = ?;
+
+-- Reserves every balance :csvImportId's rows reported, for its re-run.
+reserveCsvImport:
+INSERT OR IGNORE INTO reported_balance_reserved (reported_balance_id)
+SELECT reported_balance.id
+FROM reported_balance
+JOIN csv_import_record ON csv_import_record.record_id = reported_balance.record_id
+WHERE csv_import_record.csv_import_id = ?;
+
+-- Reserves every balance :apiSessionId's items reported, for its re-run.
+reserveApiSession:
+INSERT OR IGNORE INTO reported_balance_reserved (reported_balance_id)
+SELECT reported_balance.id
+FROM reported_balance
+JOIN api_import_record ON api_import_record.record_id = reported_balance.record_id
+WHERE api_import_record.api_session_id = ?;
+
+-- The balances a settled re-run didn't report again.
+deleteReserved:
+DELETE FROM reported_balance WHERE id IN (SELECT reported_balance_id FROM reported_balance_reserved);
+
+-- Remembers the deleted account's balances before an account merge moves them to the survivor.
+insertMergeMoves:
+INSERT INTO account_merge_reported_balance (merge_id, reported_balance_id)
+SELECT :mergeId, id FROM reported_balance WHERE account_id = :deletedAccountId;
+
+moveToSurvivor:
+UPDATE reported_balance SET account_id = :survivingAccountId WHERE account_id = :deletedAccountId;
+
+-- Gives the restored account back the balances the merge moved to the survivor.
+restoreMergeMoves:
+UPDATE reported_balance SET account_id = :restoredAccountId
+WHERE id IN (SELECT reported_balance_id FROM account_merge_reported_balance WHERE merge_id = :mergeId);
+
+deleteMergeMoves:
+DELETE FROM account_merge_reported_balance WHERE merge_id = ?;

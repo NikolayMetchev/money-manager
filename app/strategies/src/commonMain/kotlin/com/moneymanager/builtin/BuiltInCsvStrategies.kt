@@ -382,6 +382,7 @@ object BuiltInCsvStrategies {
     private const val MARCUS_INTEREST_ACCOUNT = "Marcus Interest"
 
     private const val REVOLUT_STARTED_COLUMN = "Started Date"
+    private const val REVOLUT_COMPLETED_COLUMN = "Completed Date"
 
     /** A column the Revolut strategy's rules write: the row's identity, which the export lacks. */
     private const val REVOLUT_ROW_ID_COLUMN = "Row ID"
@@ -1230,6 +1231,8 @@ object BuiltInCsvStrategies {
                 excludeWhen("Status", "^Refused$", "refused"),
                 attribute("Transaction ID", "paypal-transaction-id"),
                 attribute("Item Title", "paypal-item-title"),
+                // Per currency, after the row. A hold (imported excluded) lowers it until its reversal.
+                balance("Balance"),
                 // Informational: Amount is already net of it (it is what moved the balance).
                 attribute("Fees", "paypal-fee", extraction = Extraction(pattern = "^.*[1-9].*$")),
                 // The older export lists every withdrawal to a bank twice: the row that moves the balance (status
@@ -2242,6 +2245,7 @@ object BuiltInCsvStrategies {
                             ),
                             attribute(MARCUS_ROW_ID_COLUMN, "marcus-row-id", unique = true),
                             incomingWhenPositive(MARCUS_VALUE_COLUMN),
+                            balance(MARCUS_BALANCE_COLUMN),
                             accounts(
                                 AccountSide.SOURCE,
                                 naming(
@@ -2329,6 +2333,9 @@ object BuiltInCsvStrategies {
                     ),
                     name = "Product, start time, type, description, amount and balance identify a row",
                 ),
+                // Revolut's running balance is in completion order: a card payment started on the 26th and completed on
+                // the 28th is in the balance of the 28th, not of the 26th.
+                balance("Balance", atColumn = REVOLUT_COMPLETED_COLUMN),
                 attribute(REVOLUT_ROW_ID_COLUMN, "revolut-row-id", unique = true),
                 attribute("Type", "revolut-type"),
                 rule(
@@ -2401,7 +2408,7 @@ object BuiltInCsvStrategies {
                             "Type",
                             "Product",
                             REVOLUT_STARTED_COLUMN,
-                            "Completed Date",
+                            REVOLUT_COMPLETED_COLUMN,
                             "Description",
                             "Amount",
                             "Fee",

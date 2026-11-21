@@ -35,6 +35,8 @@ SELECT SUM(n) FROM (
     UNION ALL
     SELECT COUNT(*) AS n FROM person_audit
     UNION ALL
+    SELECT COUNT(*) AS n FROM reported_balance_audit
+    UNION ALL
     SELECT COUNT(*) AS n FROM trade_attribute_audit
     UNION ALL
     SELECT COUNT(*) AS n FROM trade_audit

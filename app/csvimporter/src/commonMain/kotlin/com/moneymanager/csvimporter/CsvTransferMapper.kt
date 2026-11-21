@@ -44,6 +44,7 @@ import com.moneymanager.domain.model.rules.LegRole
 import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.RuleEngine
 import com.moneymanager.domain.model.rules.RuleOutcome
+import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.domain.model.rules.excludedAttributeValue
 import com.moneymanager.importengineapi.DESCRIPTION_SIMILARITY_THRESHOLD
 import com.moneymanager.importengineapi.ImportConversion
@@ -116,6 +117,10 @@ sealed interface MappingResult {
          * when it isn't known. [UNRESOLVED_ACCOUNT_ID] until the account exists.
          */
         val statementAccountId: AccountId? = null,
+        /** What the statement says its account holds once the row has happened (see `RuleAction.Balance`); null when it doesn't say. */
+        val reportedBalance: Money? = null,
+        /** When the statement's running balance counts the row (`RuleAction.Balance.at`); null: the row's own time. */
+        val reportedBalanceAt: Instant? = null,
     ) : MappingResult {
         /** Convenience for flows where only the target side can discover a new account. */
         val newAccountName: String? get() = newAccounts.firstOrNull()?.name
@@ -253,6 +258,10 @@ data class CsvTransferWithAttributes(
     val conversion: ImportConversion? = null,
     /** The account whose statement the row is (see [MappingResult.Success.statementAccountId]). */
     val statementAccountId: AccountId? = null,
+    /** The statement's balance after the row (see [MappingResult.Success.reportedBalance]). */
+    val reportedBalance: Money? = null,
+    /** When the statement's balance counts the row (see [MappingResult.Success.reportedBalanceAt]). */
+    val reportedBalanceAt: Instant? = null,
 )
 
 /**
@@ -430,6 +439,8 @@ class CsvTransferMapper(
                             unidentifiedCounterpartyAccountId = result.unidentifiedCounterpartyAccountId,
                             statementAccountId = result.statementAccountId,
                             conversion = result.conversion,
+                            reportedBalance = result.reportedBalance,
+                            reportedBalanceAt = result.reportedBalanceAt,
                         ),
                     )
                     // Count by status
@@ -900,6 +911,11 @@ class CsvTransferMapper(
                 // The own account is the source of a payment and the target of a refund (flipped row).
                 conversion = foreign?.let { ImportConversion(settled = settled, incoming = flipAccounts) },
                 statementAccountId = ownAccountId,
+                reportedBalance = parseBalance(outcome.balance, values, currency),
+                reportedBalanceAt =
+                    outcome.balance?.at?.let { at ->
+                        parseBalanceAt(at, timestampMapping, values, timezone)
+                    },
             )
         } catch (expected: Exception) {
             MappingResult.Error(row.rowIndex, expected.message ?: "Unknown error")
@@ -968,6 +984,27 @@ class CsvTransferMapper(
         val magnitude = parseBigDecimal(rawAmount).abs()
         if (asset.id == settledCurrency.id || magnitude.compareTo(BigDecimal.ZERO) == 0) return ForeignParse.None
         return ForeignParse.Foreign(Money.fromDisplayValue(magnitude, asset))
+    }
+
+    /**
+     * The balance the row reports (see [RuleAction.Balance]), with its sign: null when no rule declares one or the cell is
+     * blank. Its currency is the row's unless the rule names another.
+     */
+    private fun parseBalance(
+        balance: RuleAction.Balance?,
+        values: List<String>,
+        rowCurrency: Asset,
+    ): Money? {
+        if (balance == null) return null
+        val lookup: (String) -> String? = { getColumnValueOrNull(it, values)?.trim() }
+        val raw = rules.resolve(balance.amount, lookup).trim()
+        if (raw.isEmpty()) return null
+        val asset =
+            balance.currency?.let { expr ->
+                val code = rules.resolve(expr, lookup).trim()
+                if (code.isEmpty()) rowCurrency else lookupAsset(code) ?: error("Balance currency not found: $code")
+            } ?: rowCurrency
+        return Money.fromDisplayValue(parseBigDecimal(raw), asset)
     }
 
     /** A detected leg, plus the intermediate account a through-account leg routes via. */
@@ -1282,12 +1319,27 @@ class CsvTransferMapper(
         }
     }
 
-    private fun parseTimestamp(
+    /**
+     * When the row's statement balance counts it ([RuleAction.Balance.at]), read as [mapping] reads the row's own date:
+     * null when the cell is blank (a pending row), so the balance is the row's own time's.
+     */
+    private fun parseBalanceAt(
+        at: ValueExpr,
         mapping: DateTimeParsingMapping,
         values: List<String>,
         timezone: TimeZone,
     ): Instant? {
-        val dateValue = getColumnValue(mapping.dateColumnName, values)
+        val raw = rules.resolve(at) { getColumnValueOrNull(it, values)?.trim() }.trim()
+        if (raw.isEmpty()) return null
+        return parseTimestamp(mapping, values, timezone, raw) ?: error("Failed to parse balance time: $raw")
+    }
+
+    private fun parseTimestamp(
+        mapping: DateTimeParsingMapping,
+        values: List<String>,
+        timezone: TimeZone,
+        dateValue: String = getColumnValue(mapping.dateColumnName, values),
+    ): Instant? {
         val timeValue =
             mapping.timeColumnName?.let { getColumnValue(it, values) }
                 ?: mapping.defaultTime

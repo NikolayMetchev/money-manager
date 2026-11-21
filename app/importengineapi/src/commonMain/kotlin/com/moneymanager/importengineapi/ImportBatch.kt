@@ -23,6 +23,7 @@ import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.observation.ImportGroupKey
+import com.moneymanager.domain.model.observation.ImportRecordKey
 import kotlin.jvm.JvmInline
 import kotlin.time.Instant
 
@@ -679,6 +680,12 @@ data class ImportBatch(
      * in order, as [ImportResult.copiedTransactionIds].
      */
     val reconciliationCopies: List<TransactionId> = emptyList(),
+    /**
+     * The balances the batch's records report their own account holding after them (the `balance` rule action). Each
+     * is the record's, whatever it books, and stored with it: a re-import updates the ones that changed and, once
+     * [settle]d, deletes the ones its records no longer report.
+     */
+    val reportedBalances: List<ImportReportedBalance> = emptyList(),
 ) {
     companion object {
         /**
@@ -711,3 +718,14 @@ data class ImportBatch(
             )
     }
 }
+
+/**
+ * A statement's running balance: [account] held [amount] right after [record], at [timestamp]. A record reports at most
+ * one, from its `balance` rule action, and the engine records it with the record's provenance.
+ */
+data class ImportReportedBalance(
+    val record: ImportRecordKey,
+    val account: AccountRef,
+    val timestamp: Instant,
+    val amount: Money,
+)

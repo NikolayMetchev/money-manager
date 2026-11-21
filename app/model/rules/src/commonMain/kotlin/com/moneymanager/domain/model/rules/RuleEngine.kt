@@ -27,6 +27,7 @@ data class RuleLeg(
  * @property accounts Every account candidate per side, in rule order; the importer takes the first that
  *   applies (see [AccountNaming]).
  * @property rewrites Every value the rules set or rewrote, by path, in the order first written.
+ * @property balance The claimed [RuleAction.Balance]: the statement balance after the record.
  * @property capture The claimed [RuleAction.Capture] target.
  */
 data class RuleOutcome(
@@ -43,6 +44,7 @@ data class RuleOutcome(
     val attributes: List<RuleAttribute> = emptyList(),
     val fees: List<FeeRule> = emptyList(),
     val foreignAmount: ForeignAmount? = null,
+    val balance: RuleAction.Balance? = null,
     val conduitAccountName: String? = null,
     val tradeBuy: Boolean? = null,
     val legs: List<RuleLeg> = emptyList(),
@@ -177,6 +179,10 @@ class RuleEngine(
                 state.foreignAmount = state.foreignAmount ?: action.foreignAmount
             }
 
+            is RuleAction.Balance -> {
+                state.balance = state.balance ?: action
+            }
+
             is RuleAction.ThroughConduit -> {
                 state.conduitAccountName = state.conduitAccountName ?: action.accountName
             }
@@ -233,6 +239,7 @@ class RuleEngine(
         val attributes = mutableListOf<RuleAttribute>()
         val fees = mutableListOf<FeeRule>()
         var foreignAmount: ForeignAmount? = null
+        var balance: RuleAction.Balance? = null
         var conduitAccountName: String? = null
         var tradeBuy: Boolean? = null
         val legs = mutableListOf<RuleLeg>()
@@ -262,6 +269,7 @@ class RuleEngine(
                 attributes = attributes.toList(),
                 fees = fees.toList(),
                 foreignAmount = foreignAmount,
+                balance = balance,
                 conduitAccountName = conduitAccountName,
                 tradeBuy = tradeBuy,
                 legs = legs.toList(),

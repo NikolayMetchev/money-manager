@@ -103,6 +103,7 @@ import com.moneymanager.ui.screens.orders.OrderDetailScreen
 import com.moneymanager.ui.screens.orders.OrdersScreen
 import com.moneymanager.ui.screens.people.PeopleScreen
 import com.moneymanager.ui.screens.people.PersonAuditScreen
+import com.moneymanager.ui.screens.reconciliation.BalanceCheckCache
 import com.moneymanager.ui.screens.reconciliation.MatchPickerState
 import com.moneymanager.ui.screens.reconciliation.ReconciliationCache
 import com.moneymanager.ui.screens.settings.DatabaseReplacement
@@ -160,6 +161,7 @@ fun MoneyManagerApp(
         val matchPicker = remember { MatchPickerState() }
         val reconciliationCache = remember { ReconciliationCache() }
         val manualEntrySuggestionCache = remember { ManualEntrySuggestionCache() }
+        val balanceCheckCache = remember { BalanceCheckCache() }
         val reconciliationFocus = remember { ReconciliationFocusState() }
         val taskManager = rememberTaskManager(scope)
         // One per database: its two services share a write lock, since directory and API runs (which outlive any
@@ -442,6 +444,30 @@ fun MoneyManagerApp(
                             }
                             val onCsvSourceClick: (CsvImportId, Long) -> Unit = { importId, rowIndex ->
                                 navigationHistory.navigateTo(Screen.CsvImportDetail(importId, rowIndex))
+                            }
+                            // Opens what a source names: its file row, its API item, or the file or session as a whole.
+                            val onSourceClick: (Source) -> Unit = { source ->
+                                when (source) {
+                                    is Source.Csv -> {
+                                        val rowIndex = source.rowIndex
+                                        if (rowIndex != null) {
+                                            onCsvSourceClick(source.importId, rowIndex)
+                                        } else {
+                                            navigationHistory.navigateTo(Screen.CsvImportDetail(source.importId))
+                                        }
+                                    }
+
+                                    is Source.Api -> {
+                                        val requestId = source.requestId
+                                        if (requestId != null) {
+                                            onApiSourceClick(source.sessionId, requestId, source.jsonPath?.value.orEmpty())
+                                        } else {
+                                            navigationHistory.navigateTo(Screen.ApiSessionTraffic(source.sessionId))
+                                        }
+                                    }
+
+                                    else -> {}
+                                }
                             }
                             NavDisplay(
                                 backStack = navigationHistory.backStack,
@@ -745,33 +771,15 @@ fun MoneyManagerApp(
                                                                     emptyList()
                                                                 }
                                                             }.sortedBy { it.revisionId }.map { it.source }
-                                                        val csv = sources.filterIsInstance<Source.Csv>().firstOrNull()
-                                                        val api = sources.filterIsInstance<Source.Api>().firstOrNull()
-                                                        val apiRequestId = api?.requestId
-                                                        when {
-                                                            csv != null -> {
-                                                                val rowIndex = csv.rowIndex
-                                                                if (rowIndex != null) {
-                                                                    onCsvSourceClick(csv.importId, rowIndex)
-                                                                } else {
-                                                                    navigationHistory.navigateTo(Screen.CsvImportDetail(csv.importId))
-                                                                }
-                                                            }
-
-                                                            api != null && apiRequestId != null -> {
-                                                                onApiSourceClick(
-                                                                    api.sessionId,
-                                                                    apiRequestId,
-                                                                    api.jsonPath?.value.orEmpty(),
-                                                                )
-                                                            }
-
-                                                            api != null -> {
-                                                                navigationHistory.navigateTo(Screen.ApiSessionTraffic(api.sessionId))
-                                                            }
-                                                        }
+                                                        (
+                                                            sources.firstOrNull { it is Source.Csv }
+                                                                ?: sources.firstOrNull { it is Source.Api }
+                                                        )?.let(onSourceClick)
                                                     }
                                                 },
+                                                onSourceClick = onSourceClick,
+                                                balanceCheckCache = balanceCheckCache,
+                                                reportedBalanceRepository = services.imports.reportedBalanceRepository,
                                                 // Folders need an import file source, which the browser doesn't have yet.
                                                 showImportDirectories = importFileSourceFactory != null,
                                                 onTimelineFileClick = { file ->

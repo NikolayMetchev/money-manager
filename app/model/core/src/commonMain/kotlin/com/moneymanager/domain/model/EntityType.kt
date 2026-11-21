@@ -54,4 +54,10 @@ enum class EntityType(
      * never revised).
      */
     RELATIONSHIP(13),
+
+    /**
+     * A balance a statement reports for an account (`reported_balance`). Shares the unified `entity_source` store, like
+     * [TRANSFER]: provenance is an `entity_source` row with `entity_type_id = 14`, at the balance's revision.
+     */
+    REPORTED_BALANCE(14),
 }

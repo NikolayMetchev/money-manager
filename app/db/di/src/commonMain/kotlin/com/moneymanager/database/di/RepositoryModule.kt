@@ -28,6 +28,7 @@ import com.moneymanager.database.repository.PersonReadRepositoryImpl
 import com.moneymanager.database.repository.ReconciliationReadRepositoryImpl
 import com.moneymanager.database.repository.RelationshipReadRepositoryImpl
 import com.moneymanager.database.repository.RelationshipTypeReadRepositoryImpl
+import com.moneymanager.database.repository.ReportedBalanceReadRepositoryImpl
 import com.moneymanager.database.repository.SettingsReadRepositoryImpl
 import com.moneymanager.database.repository.TradeReadRepositoryImpl
 import com.moneymanager.database.repository.TransactionReadRepositoryImpl
@@ -59,6 +60,7 @@ import com.moneymanager.database.repository.write.PersonWriteRepositoryImpl
 import com.moneymanager.database.repository.write.ReconciliationLinkWriteRepositoryImpl
 import com.moneymanager.database.repository.write.RelationshipTypeWriteRepositoryImpl
 import com.moneymanager.database.repository.write.RelationshipWriteRepositoryImpl
+import com.moneymanager.database.repository.write.ReportedBalanceWriteRepositoryImpl
 import com.moneymanager.database.repository.write.SettingsWriteRepositoryImpl
 import com.moneymanager.database.repository.write.TradeWriteRepositoryImpl
 import com.moneymanager.database.repository.write.TransactionWriteRepositoryImpl
@@ -99,6 +101,7 @@ import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.ReconciliationReadRepository
 import com.moneymanager.domain.repository.RelationshipReadRepository
 import com.moneymanager.domain.repository.RelationshipTypeReadRepository
+import com.moneymanager.domain.repository.ReportedBalanceReadRepository
 import com.moneymanager.domain.repository.SettingsReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
@@ -129,6 +132,7 @@ import com.moneymanager.domain.repository.write.PersonWriteRepository
 import com.moneymanager.domain.repository.write.ReconciliationLinkWriteRepository
 import com.moneymanager.domain.repository.write.RelationshipTypeWriteRepository
 import com.moneymanager.domain.repository.write.RelationshipWriteRepository
+import com.moneymanager.domain.repository.write.ReportedBalanceWriteRepository
 import com.moneymanager.domain.repository.write.SettingsWriteRepository
 import com.moneymanager.domain.repository.write.TradeWriteRepository
 import com.moneymanager.domain.repository.write.TransactionWriteRepository
@@ -409,6 +413,19 @@ object RepositoryModule {
 
     @Provides
     @SingleIn(DatabaseScope::class)
+    fun provideReportedBalanceReadRepository(database: MoneyManagerDatabaseWrapper): ReportedBalanceReadRepository =
+        ReportedBalanceReadRepositoryImpl(database)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideReportedBalanceWriteRepository(
+        database: MoneyManagerDatabaseWrapper,
+        deviceId: DeviceId,
+        reader: ReportedBalanceReadRepository,
+    ): ReportedBalanceWriteRepository = ReportedBalanceWriteRepositoryImpl(database, deviceId, reader)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
     fun provideDeviceReadRepository(database: MoneyManagerDatabaseWrapper): DeviceReadRepository = DeviceReadRepositoryImpl(database)
 
     @Provides
@@ -621,6 +638,7 @@ object RepositoryModule {
         observationRepository: ObservationWriteRepository,
         personOverrideRepository: PersonOverrideWriteRepository,
         importRecordRepository: ImportRecordWriteRepository,
+        reportedBalanceRepository: ReportedBalanceWriteRepository,
         editGate: EditGate,
     ): ImportEngine =
         ImportEngineImpl(
@@ -651,6 +669,7 @@ object RepositoryModule {
             observationRepository = observationRepository,
             personOverrideRepository = personOverrideRepository,
             importRecordRepository = importRecordRepository,
+            reportedBalanceRepository = reportedBalanceRepository,
             editGate = editGate,
         )
 }
