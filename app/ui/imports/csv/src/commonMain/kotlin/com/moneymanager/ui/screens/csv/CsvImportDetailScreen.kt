@@ -132,7 +132,7 @@ fun CsvImportDetailScreen(
 
     // Restaging (after the strategy's line rules change) re-emits the import too.
     LaunchedEffect(import) {
-        pdfLines = if (import == null) null else csvImportRepository.getPdfSource(importId)?.lines
+        pdfLines = if (import == null) null else csvImportRepository.getPdfLines(importId)
     }
 
     // Determine amount column index by looking for common amount column names

@@ -18,7 +18,9 @@ import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.withContext
 
 internal const val FROM_EACH_ROW = "From each row"
 
@@ -89,11 +91,20 @@ fun <K : Any, F : StagedImport<K>> rememberStagedImportsData(
     val importDirectories = remember(directoryIds, directories) { resolveImportDirectories(directoryIds, directories) }
 
     // Unimported files carry no stored strategy, so match one per file exactly as "Import all" will, to
-    // group the Unimported tab by strategy and flag files with no match. Re-run when the strategies change.
+    // group the Unimported tab by strategy and flag files with no match. Matching reads each file's rows (a
+    // PDF's lines) and runs every strategy's rules over them, so a file's match is kept until the strategies
+    // change: the imports flow re-emits after every file an import applies, and re-matching every file still
+    // unimported each time made "Import all" quadratic in files. A restaged file is a new value, so it matches again.
     val unimported = remember(imports) { imports.filter { !it.ignored && it.lastAppliedAt == null } }
+    val matchCache = remember(strategies) { mutableMapOf<F, CsvImportStrategy?>() }
     var matchedStrategies by remember { mutableStateOf<Map<K, CsvImportStrategy?>?>(null) }
     LaunchedEffect(unimported, strategies) {
-        matchedStrategies = matchStrategies(unimported)
+        val unmatched = unimported.filter { it !in matchCache }
+        if (unmatched.isNotEmpty()) {
+            val matched = withContext(Dispatchers.Default) { matchStrategies(unmatched) }
+            unmatched.forEach { matchCache[it] = matched[it.id] }
+        }
+        matchedStrategies = unimported.associate { it.id to matchCache[it] }
     }
     return StagedImportsData(directories, importDirectories, matchedStrategies, strategies, accounts, directoryAccounts)
 }
