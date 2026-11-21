@@ -88,6 +88,12 @@ exclude:
       - app/ui/transactions/src/commonTest/kotlin/com/moneymanager/ui/screens/transactions/ManualEntriesScreenTest.kt
       - app/ui/transactions/src/commonTest/kotlin/com/moneymanager/ui/screens/transactions/ManualEntriesTradesTest.kt
 
+  # Ktor's SelectorManager.close() only cancels the selector's coroutines and returns; the linter lists every
+  # Closeable.close() as blocking, so closing the selector after a failed bind reads as blocking in a suspend function.
+  - name: BlockingMethodInNonBlockingContext
+    paths:
+      - app/remotestorage/googledrive/loopback/src/commonMain/kotlin/com/moneymanager/remotestorage/googledrive/loopback/LoopbackRedirectReceiver.kt
+
   # Compose @Composable functions are PascalCase by convention; the community linter has no
   # Compose awareness. ktlint (compose ruleset) polices naming in these modules instead.
   - name: FunctionName
