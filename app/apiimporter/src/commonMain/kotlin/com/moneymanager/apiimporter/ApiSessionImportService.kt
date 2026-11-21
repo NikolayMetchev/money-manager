@@ -1521,6 +1521,8 @@ private data class ApiTransactionPageItem(
     // What the own account holds after the item, as the feed reports it (signed).
     val balance: ParsedAmount? = null,
     val balanceCurrencyCode: String? = null,
+    // When the feed's running balance counts the item (`RuleAction.Balance.at`); null: the item's own time.
+    val balanceAt: Instant? = null,
 ) {
     val isZeroAmount: Boolean get() = amountSign == 0
     val isIncoming: Boolean get() = amountSign > 0
@@ -1723,7 +1725,7 @@ private suspend fun runImportEngine(
                         ImportReportedBalance(
                             record = ImportRecordKey.ApiItem(setup.sessionId, p.requestId, p.item.jsonPath.value),
                             account = p.ownAccount,
-                            timestamp = p.timestamp,
+                            timestamp = p.item.balanceAt ?: p.timestamp,
                             amount = it,
                         )
                     }
@@ -2207,6 +2209,10 @@ private fun parseTransactionsWithPath(
                     ?.currency
                     ?.let { obj.resolve(it) }
                     ?.takeIf { it.isNotBlank() }
+            val balanceAt =
+                outcome.balance?.at?.let { obj.resolve(it) }?.takeIf { it.isNotBlank() }?.let { raw ->
+                    parseApiTimestamp(raw, mappings.timestampFormat) ?: error("Failed to parse balance time: $raw")
+                }
             if (created != null && amount != null && currency != null) {
                 ApiTransactionPageItem(
                     amountMinorUnits = amount.minorUnits,
@@ -2236,6 +2242,7 @@ private fun parseTransactionsWithPath(
                     feeDescription = feeDescription,
                     balance = balance,
                     balanceCurrencyCode = balanceCurrency?.uppercase(),
+                    balanceAt = balanceAt,
                 )
             } else {
                 logger.e {

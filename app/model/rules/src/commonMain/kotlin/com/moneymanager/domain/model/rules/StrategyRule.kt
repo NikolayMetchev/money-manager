@@ -296,8 +296,10 @@ sealed interface RuleAction {
     /**
      * The balance the record's own account holds once the record has happened, as its statement reports it
      * (Revolut's `Balance` column). [amount] keeps its sign; [currency] names its asset, the record's own when
-     * absent. It is stored apart from the record's transactions, so the Statement Balances reconciliation can
-     * compare it with the running balance Money Manager computes.
+     * absent. [at] is when the statement's running balance counts the record, read in the record's own timestamp format,
+     * the record's own time when absent or blank: Revolut's balance runs in `Completed Date` order while its records
+     * are dated when they started. It is stored apart from the record's transactions, so the Statement Balances
+     * reconciliation can compare it with the running balance Money Manager computes.
      */
     @Serializable
     @SerialName("balance")
@@ -305,6 +307,8 @@ sealed interface RuleAction {
         val amount: ValueExpr,
         @EncodeDefault(EncodeDefault.Mode.NEVER)
         val currency: ValueExpr? = null,
+        @EncodeDefault(EncodeDefault.Mode.NEVER)
+        val at: ValueExpr? = null,
     ) : RuleAction
 
     /** The record runs through the conduit [accountName] as a pass-through chain. */

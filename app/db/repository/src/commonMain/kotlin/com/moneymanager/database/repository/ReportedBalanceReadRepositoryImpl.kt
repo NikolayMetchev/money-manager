@@ -69,6 +69,18 @@ class ReportedBalanceReadRepositoryImpl(
             }
         }
 
+    override suspend fun getTransactionBalanceTimes(
+        accountId: AccountId,
+        asset: Asset,
+    ): Map<Long, Instant> =
+        withContext(coroutineContext) {
+            queries
+                .selectTransactionBalanceTimes(accountId.id, asset.id.id)
+                .awaitAsList()
+                .mapNotNull { row -> row.balance_timestamp?.let { row.transaction_id to Instant.fromEpochMilliseconds(it) } }
+                .toMap()
+        }
+
     override suspend fun getSources(id: ReportedBalanceId): List<SourceRecord> =
         withContext(coroutineContext) { sources.sourcesFor(EntityType.REPORTED_BALANCE, id.id) }
 }

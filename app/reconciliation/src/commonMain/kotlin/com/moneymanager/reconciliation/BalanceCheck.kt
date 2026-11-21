@@ -54,13 +54,19 @@ data class BalanceCheckResult(
  * as a transfer of its own, never shows as a break. At an instant reported several times (two records, or two
  * sources of one account) the balance compared is the one that keeps the previous difference, if any does, else the
  * last in statement order: the balance after every record of that instant.
+ *
+ * A leg counts from its transaction's [balanceTimes] entry when it has one, else from its own time: a statement whose
+ * running balance counts a record when it completed (Revolut) counts a card payment started two days before then, so
+ * comparing at its start would break twice, once each way.
  */
 fun checkBalances(
     asset: Asset,
     reported: List<ReportedBalance>,
     legs: List<ReconciliationLeg>,
+    balanceTimes: Map<Long, Instant> = emptyMap(),
 ): BalanceCheckResult {
-    val counted = legs.filter { it.amount.asset.id == asset.id && !it.isExcluded }.sortedBy { it.timestamp }
+    val countsAt: (ReconciliationLeg) -> Instant = { balanceTimes[it.transactionId] ?: it.timestamp }
+    val counted = legs.filter { it.amount.asset.id == asset.id && !it.isExcluded }.sortedBy(countsAt)
     val byInstant =
         reported
             .filter { it.amount.asset.id == asset.id }
@@ -74,7 +80,7 @@ fun checkBalances(
     var previous: BalanceCheckpoint? = null
     for ((timestamp, balances) in byInstant) {
         val windowStart = legIndex
-        while (legIndex < counted.size && counted[legIndex].timestamp <= timestamp) running += counted[legIndex++].amount
+        while (legIndex < counted.size && countsAt(counted[legIndex]) <= timestamp) running += counted[legIndex++].amount
         val keepsDifference = previous?.difference?.let { offset -> balances.lastOrNull { it.amount - running == offset } }
         val checkpoint =
             BalanceCheckpoint(

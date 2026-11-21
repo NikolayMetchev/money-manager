@@ -131,7 +131,7 @@ fun RuleAction.summary(): String =
         }
 
         is RuleAction.Balance -> {
-            "balance ${amount.summary()}" + (currency?.let { " ${it.summary()}" } ?: "")
+            "balance ${amount.summary()}" + (currency?.let { " ${it.summary()}" } ?: "") + (at?.let { " at ${it.summary()}" } ?: "")
         }
 
         is RuleAction.ThroughConduit -> {

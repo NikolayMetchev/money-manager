@@ -116,7 +116,8 @@ fun BalanceReconciliationScreen(
         result = null
         val reported = reportedBalanceRepository.getBalances(selected.accountId, selected.asset)
         val legs = reconciliationRepository.getLegs(setOf(selected.accountId))
-        val computed = withContext(Dispatchers.Default) { checkBalances(selected.asset, reported, legs) }
+        val balanceTimes = reportedBalanceRepository.getTransactionBalanceTimes(selected.accountId, selected.asset)
+        val computed = withContext(Dispatchers.Default) { checkBalances(selected.asset, reported, legs, balanceTimes) }
         cache.put(selected.key, writeVersion, computed)
         result = computed
     }

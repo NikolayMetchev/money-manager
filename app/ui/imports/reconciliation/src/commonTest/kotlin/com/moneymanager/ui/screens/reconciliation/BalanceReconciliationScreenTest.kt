@@ -85,6 +85,7 @@ class BalanceReconciliationScreenTest {
             mock {
                 every { getSeries() } returns flowOf(listOf(ReportedBalanceSeries(account, "Revolut", coin, 2, t0 + 1.days)))
                 everySuspend { getBalances(any(), any()) } returns reported
+                everySuspend { getTransactionBalanceTimes(any(), any()) } returns emptyMap()
                 everySuspend { getSources(any()) } returns
                     listOf(
                         SourceRecord(

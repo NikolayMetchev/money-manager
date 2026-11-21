@@ -1515,7 +1515,7 @@ suspend fun runCsvImport(
                         ImportReportedBalance(
                             record = ImportRecordKey.CsvRow(csvImport.id, row.rowIndex),
                             account = AccountRef.Existing(row.feePayerId()),
-                            timestamp = row.transfer.timestamp,
+                            timestamp = row.reportedBalanceAt ?: row.transfer.timestamp,
                             amount = it,
                         )
                     }
