@@ -121,7 +121,7 @@ internal class RerunSettlement(
         val remaining = reserved.ids - recopied.ids
         // What no record took back still stands as it was before the re-run (#1510): it goes now, and what it was
         // reconciled with is rebuilt, as a fresh import of the others has it.
-        val vacant = remaining.intersect(observations.getVacantTransactionIds())
+        val vacant = observations.getVacantTransactionIds(remaining)
         onProgress?.invoke(stepProgress("Deleting ${vacant.size} transactions no record took back", 1, SETTLE_STEPS))
         val partners = reconciledPartnersOf(vacant.toList(), emptySet())
         relationshipRepository.deleteReserved(reserved.ids)

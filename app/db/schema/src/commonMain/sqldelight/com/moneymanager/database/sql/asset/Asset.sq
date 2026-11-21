@@ -10,7 +10,20 @@ CREATE TABLE asset (
 -- asset_details: unifying read view over every asset subtype, exposing the common columns plus a
 -- `kind` discriminator (and a currency's ISO minor unit, `fraction_digits`, NULL for crypto) so a reader (e.g. a transfer/trade mapper) can resolve any asset_id to the
 -- right domain type without knowing which subtype table it lives in.
+-- Joins off `asset` rather than a UNION ALL of the subtypes: SQLite can't push a join's `asset_details.id = ?` into a
+-- union, so every transfer or trade read by id scanned every crypto row (thousands, per record a re-import books). As
+-- joins the view flattens into its reader and each lookup is a primary-key search. The trailing literals only keep the
+-- columns NOT NULL for SQLDelight: the WHERE guarantees one subtype row.
 CREATE VIEW asset_details AS
-SELECT id, revision_id, code, name, scale_factor, fraction_digits, 'FIAT' AS kind FROM currency
-UNION ALL
-SELECT id, revision_id, code, name, scale_factor, NULL AS fraction_digits, 'CRYPTO' AS kind FROM crypto;
+SELECT
+    asset.id,
+    COALESCE(currency.revision_id, crypto.revision_id, 0) AS revision_id,
+    COALESCE(currency.code, crypto.code, '') AS code,
+    COALESCE(currency.name, crypto.name, '') AS name,
+    COALESCE(currency.scale_factor, crypto.scale_factor, 0) AS scale_factor,
+    currency.fraction_digits AS fraction_digits,
+    CASE WHEN currency.id IS NOT NULL THEN 'FIAT' ELSE 'CRYPTO' END AS kind
+FROM asset
+LEFT JOIN currency ON currency.id = asset.id
+LEFT JOIN crypto ON crypto.id = asset.id
+WHERE currency.id IS NOT NULL OR crypto.id IS NOT NULL;

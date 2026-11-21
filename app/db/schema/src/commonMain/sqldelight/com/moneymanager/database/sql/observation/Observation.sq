@@ -194,9 +194,15 @@ CREATE TABLE observation_reserved (
 -- The transactions a re-run left vacant (#1510): every observation on them is reserved. Their rows stay as they were until
 -- the re-run's records take them back or settling deletes them, and meanwhile the re-run's own dedupe and matching treat
 -- them as gone.
+-- One row per transaction comes from its first observation rather than a DISTINCT, so the view flattens into its reader:
+-- `NOT EXISTS (SELECT 1 FROM vacant_transaction WHERE transaction_id = x.id)` is then a few index searches per row,
+-- where a DISTINCT view (or `NOT IN` it) computes every vacant transaction per statement (tenths of a second each, per
+-- record a re-import books). Ask per row with NOT EXISTS, never `NOT IN`.
 CREATE VIEW vacant_transaction AS
-SELECT DISTINCT observation.transaction_id, observation.kind
-FROM observation_reserved
-JOIN observation ON observation.id = observation_reserved.observation_id
-WHERE NOT EXISTS (SELECT 1 FROM observation other WHERE other.transaction_id = observation.transaction_id
-                  AND other.id NOT IN (SELECT observation_id FROM observation_reserved));
+SELECT observation.transaction_id, observation.kind
+FROM observation
+WHERE NOT EXISTS (SELECT 1 FROM observation earlier
+                  WHERE earlier.transaction_id = observation.transaction_id AND earlier.id < observation.id)
+  AND NOT EXISTS (SELECT 1 FROM observation other
+                  WHERE other.transaction_id = observation.transaction_id
+                    AND NOT EXISTS (SELECT 1 FROM observation_reserved WHERE observation_reserved.observation_id = other.id));

@@ -4,7 +4,6 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Trade
 import com.moneymanager.domain.model.TradeId
-import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.TransactionKind
 import com.moneymanager.domain.repository.write.ExchangeOrderWriteRepository
 import com.moneymanager.domain.repository.write.NewTrade
@@ -57,14 +56,13 @@ internal class TradeImporter(
         // exact tuple the writer matches on, so load the window they could disagree within and match in
         // memory. A hit suppresses the write and reports the existing trade, which is the only way a
         // trade can be linked to its duplicate (see TradeDedupePolicy).
-        val vacant = observationRepository.getVacantTransactionIds()
-        val tradeReconciler = buildTradeReconciler(batch, vacant)
+        val tradeReconciler = buildTradeReconciler(batch)
         // The same movement again, but recorded by the other source as *transfers*: a conversion whose
         // credits it could not attribute to its debits. There is no trade id to report for such a
         // match, so the order links resolved below would have nothing to point at - hence trades an
         // order claims are held back from it. A conversion is never part of an order.
         val orderLinkedTradeKeys = batch.orders.flatMapTo(mutableSetOf()) { it.tradeKeys }
-        val conversionReconciler = buildConversionTradeReconciler(batch, orderLinkedTradeKeys, vacant)
+        val conversionReconciler = buildConversionTradeReconciler(batch, orderLinkedTradeKeys)
         val tradesToWrite = mutableListOf<Pair<ImportTradeIntent, NewTrade>>()
         for (intent in batch.trades.creates()) {
             // Either kind of cross-source match suppresses the write; they differ only in what can be
@@ -221,10 +219,7 @@ internal class TradeImporter(
      * by the policy's tolerance, mirroring [ExistingTransferLoader.loadExisting]'s slack: an existing trade stamped just
      * outside the batch's own span is exactly the one a second-vs-millisecond disagreement produces.
      */
-    private suspend fun buildTradeReconciler(
-        batch: ImportBatch,
-        vacant: Set<TransactionId>,
-    ): TradeReconciler? {
+    private suspend fun buildTradeReconciler(batch: ImportBatch): TradeReconciler? {
         val policy = batch.tradeDedupePolicy as? TradeDedupePolicy.Fuzzy ?: return null
         val creates = batch.trades.creates().filter { it.timestamp != null }
         if (creates.isEmpty()) return null
@@ -232,7 +227,9 @@ internal class TradeImporter(
         if (accountIds.isEmpty()) return null
         val minTs = creates.minOf { requireNotNull(it.timestamp) } - policy.window
         val maxTs = creates.maxOf { requireNotNull(it.timestamp) } + policy.window
-        val existing = tradeRepository.getTradesByAccountsAndDateRange(accountIds, minTs, maxTs).filterNot { it.id in vacant }
+        val loaded = tradeRepository.getTradesByAccountsAndDateRange(accountIds, minTs, maxTs)
+        val vacant = observationRepository.getVacantTransactionIds(loaded.map { it.id })
+        val existing = loaded.filterNot { it.id in vacant }
         return if (existing.isEmpty()) null else TradeReconciler(policy, existing)
     }
 
@@ -250,7 +247,6 @@ internal class TradeImporter(
     private suspend fun buildConversionTradeReconciler(
         batch: ImportBatch,
         orderLinkedTradeKeys: Set<LocalTradeKey>,
-        vacant: Set<TransactionId>,
     ): ConversionTradeReconciler? {
         val policy = batch.tradeDedupePolicy as? TradeDedupePolicy.Fuzzy ?: return null
         val typeName = policy.conversionRelationshipTypeName ?: return null
@@ -265,14 +261,15 @@ internal class TradeImporter(
         val maxTs = creates.maxOf { requireNotNull(it.timestamp) } + policy.window
         val typeId = relationshipTypeRepository.getByName(typeName).first()?.id ?: return null
 
-        val candidates =
+        val debits =
             accountIds
                 .flatMap { transactionRepository.getTransactionsByAccountAndDateRange(it, minTs, maxTs).first() }
                 .distinctBy { it.id }
                 // A conversion's debit leg is the one the asset LEFT the owner account on; the credit
                 // leg runs the other way and is matched through the relationship, never directly.
                 .filter { it.sourceAccountId in accountIds }
-                .filterNot { it.id in vacant }
+        val vacantDebits = observationRepository.getVacantTransactionIds(debits.map { it.id })
+        val candidates = debits.filterNot { it.id in vacantDebits }
         if (candidates.isEmpty()) return null
 
         val creditIdByDebitId =
@@ -283,6 +280,7 @@ internal class TradeImporter(
                 .toMap()
         if (creditIdByDebitId.isEmpty()) return null
         val creditLegs = transactionRepository.getTransactionsByIds(creditIdByDebitId.values.toSet())
+        val vacant = observationRepository.getVacantTransactionIds(creditLegs.values.map { it.id })
 
         val legs =
             candidates.mapNotNull { debit ->
