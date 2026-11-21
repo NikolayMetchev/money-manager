@@ -286,7 +286,7 @@
   "moduleExtensions": {
     "//bazel/kmp/android:extensions.bzl%android_sdk": {
       "general": {
-        "bzlTransitiveDigest": "kMYjuxo+IGb03sSyhZhqpoXATheUEd0RMQ/Q9+sQt9s=",
+        "bzlTransitiveDigest": "1r7ZBpThSvuJaE1Dzo0oppRKzDnUnMLgHjFlUNGz4Yg=",
         "usagesDigest": "+cGS8Rur9JF3wXP63ac1Rp+/yxUrOZFSP5V/bPf1XJs=",
         "recordedInputs": [],
         "generatedRepoSpecs": {

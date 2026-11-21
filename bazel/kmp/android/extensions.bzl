@@ -44,7 +44,6 @@ _FAILING_CMD = repr("echo '%s' >&2; exit 1" % _NOT_ACCEPTED)
 _ARM_NOT_ACCEPTED = ("The Arm Android system image needs its license accepted. Read and accept it with: " +
                      "bazel run //tools/repo-scripts:repo-scripts-tool -- accept-android-license arm")
 
-_ARM_FAILING_CMD = repr("echo '%s' >&2; exit 1" % _ARM_NOT_ACCEPTED)
 
 _PLATFORM = """\
 load("@rules_java//java:java_import.bzl", "java_import")
@@ -183,15 +182,6 @@ _EMULATOR = """\
 exports_files(["emulator.properties"])
 """
 
-_EMULATOR_NOT_ACCEPTED = """\
-genrule(
-    name = "not_accepted",
-    outs = ["emulator.properties"],
-    cmd = {cmd},
-    visibility = ["//visibility:public"],
-)
-"""
-
 def _cpu(rctx):
     return "aarch64" if rctx.os.arch in ("aarch64", "arm64") else "x64"
 
@@ -199,11 +189,22 @@ def _emulator_impl(rctx):
     host = _host(rctx)
     cpu = _cpu(rctx)
     key = "%s_%s" % (host, cpu)
+
+    # Someone who names their device has no use for 2.5 GB of emulator, and an offline build can't fetch it.
+    if rctx.getenv("ANDROID_SERIAL"):
+        rctx.file("emulator.properties", "blocked=ANDROID_SERIAL is set: device tests use that device, not the emulator\n")
+        rctx.file("BUILD.bazel", _EMULATOR)
+        return
+
+    # A host that can't boot the emulator still builds device tests, and runs them on a connected device: the runner
+    # reports `blocked` only when it has no device and needs the emulator.
     if key not in ANDROID_EMULATOR:
-        fail("Google publishes no Android emulator for %s (pins.bzl has %s): attach a device and set ANDROID_SERIAL instead" % (
+        rctx.file("emulator.properties", "blocked=Google publishes no Android emulator for %s (only %s): connect a device or set ANDROID_SERIAL\n" % (
             key,
             ", ".join(ANDROID_EMULATOR.keys()),
         ))
+        rctx.file("BUILD.bazel", _EMULATOR)
+        return
     if ANDROID_SYSTEM_IMAGE["api"] != str(rctx.attr.target_sdk):
         fail("pins.bzl has the Android system image for API %s, MODULE.bazel's target_sdk is %s: run bazel/renovate/repin.sh" % (
             ANDROID_SYSTEM_IMAGE["api"],
@@ -213,15 +214,18 @@ def _emulator_impl(rctx):
     # An Arm host runs Arm images natively, every other host the x86_64 ones.
     abi = "arm64-v8a" if cpu == "aarch64" else "x86_64"
     arm = abi == "arm64-v8a"
-    if not _license_accepted(rctx):
-        rctx.file("BUILD.bazel", _EMULATOR_NOT_ACCEPTED.format(cmd = _FAILING_CMD))
-        return
-    if arm and not _license_accepted(rctx, _ARM_LICENSE, _ARM_LICENSE_RECORD):
-        rctx.file("BUILD.bazel", _EMULATOR_NOT_ACCEPTED.format(cmd = _ARM_FAILING_CMD))
-        return
+    for needed, license, record in [(True, _LICENSE, _LICENSE_RECORD), (arm, _ARM_LICENSE, _ARM_LICENSE_RECORD)]:
+        if needed and not _license_accepted(rctx, license, record):
+            rctx.file("emulator.properties", "blocked=%s\n" % (_ARM_NOT_ACCEPTED if license == _ARM_LICENSE else _NOT_ACCEPTED))
+            rctx.file("BUILD.bazel", _EMULATOR)
+            return
 
     emulator, emulator_sha256 = ANDROID_EMULATOR[key]
     rctx.download_and_extract(url = _SDK_REPOSITORY + emulator, sha256 = emulator_sha256, output = "sdk")
+
+    # The emulator takes a directory for an SDK root only with platform-tools in it (it never runs that adb).
+    tools, tools_sha256 = PLATFORM_TOOLS[host]
+    rctx.download_and_extract(url = _SDK_REPOSITORY + tools, sha256 = tools_sha256, output = "sdk")
     image, image_sha256 = ANDROID_SYSTEM_IMAGE[abi]
     image_dir = "system-images/android-%s/%s" % (ANDROID_SYSTEM_IMAGE["api"], ANDROID_SYSTEM_IMAGE["tag"])
     rctx.download_and_extract(url = _SDK_REPOSITORY + image, sha256 = image_sha256, output = "sdk/" + image_dir)
