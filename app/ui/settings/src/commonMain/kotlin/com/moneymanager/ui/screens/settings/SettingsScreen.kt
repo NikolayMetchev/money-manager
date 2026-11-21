@@ -59,6 +59,7 @@ import com.moneymanager.ui.foundation.rememberDatabaseLocationPicker
 import com.moneymanager.ui.util.GenerationProgress
 import com.moneymanager.ui.util.SampleDataSize
 import com.moneymanager.ui.util.generateSampleData
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlin.time.Duration
@@ -303,6 +304,8 @@ fun SettingsScreen(
                                             runningOperation = null,
                                             lastResults = maintenanceState.lastResults + (operation to duration),
                                         )
+                                } catch (cancelled: CancellationException) {
+                                    throw cancelled
                                 } catch (expected: Exception) {
                                     maintenanceState =
                                         maintenanceState.copy(
@@ -350,6 +353,8 @@ fun SettingsScreen(
                                 scope.launch {
                                     try {
                                         incrementalRefreshDuration = maintenance.refreshMaterializedViews()
+                                    } catch (cancelled: CancellationException) {
+                                        throw cancelled
                                     } catch (expected: Exception) {
                                         refreshViewsError = "Incremental refresh failed: ${expected.message}"
                                     } finally {
@@ -387,6 +392,8 @@ fun SettingsScreen(
                                 scope.launch {
                                     try {
                                         fullRefreshDuration = maintenance.fullRefreshMaterializedViews()
+                                    } catch (cancelled: CancellationException) {
+                                        throw cancelled
                                     } catch (expected: Exception) {
                                         refreshViewsError = "Full refresh failed: ${expected.message}"
                                     } finally {
@@ -454,6 +461,8 @@ fun SettingsScreen(
                             try {
                                 val count = cryptoCatalogRefresher.refresh()
                                 cryptoMessage = "Updated crypto list ($count entries)."
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
                             } catch (expected: Exception) {
                                 cryptoError = "Failed to update crypto list: ${expected.message}"
                             } finally {
@@ -596,6 +605,8 @@ fun SettingsScreen(
                                     "${finalProgress.tradesCreated} trades and " +
                                     "${finalProgress.ordersCreated} orders."
                                 showProgressDialog = false
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
                             } catch (expected: Exception) {
                                 errorMessage = "Failed to generate sample data: ${expected.message}"
                                 showProgressDialog = false

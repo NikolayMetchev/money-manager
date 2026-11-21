@@ -42,6 +42,7 @@ import com.moneymanager.ui.components.transactions.EditableAttribute
 import com.moneymanager.ui.components.transactions.EditableAttributesSection
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.util.onEnterKeyDown
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -200,6 +201,8 @@ fun EditPersonDialog(
                         onPersonCreated?.invoke(newPersonId)
                     }
                     onDismiss()
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
                 } catch (expected: Exception) {
                     val action = if (personToEdit != null) "update" else "create"
                     logger.e(expected) { "Failed to $action person: ${expected.message}" }

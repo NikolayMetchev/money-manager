@@ -1,6 +1,7 @@
 package com.moneymanager.cli
 
 import com.github.ajalt.clikt.core.UsageError
+import com.moneymanager.coroutines.runCatchingCancellable
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.files.expandTilde
 import com.moneymanager.remotestorage.sync.RemoteDatabaseBinding
@@ -157,7 +158,7 @@ internal class CliSession(
         }
         // Offline, the local copy still opens; the edit gate just can't know about other devices' changes.
         if (controller.hasActiveSession()) {
-            runCatching { controller.checkRemote(session.database) }
+            runCatchingCancellable { controller.checkRemote(session.database) }
                 .onFailure { prompter.warn("Couldn't check ${binding.remoteName} for changes from other devices: ${it.message}") }
         }
         if (controller.syncState.value.editingLocked) {

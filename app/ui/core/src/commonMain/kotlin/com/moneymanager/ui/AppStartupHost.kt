@@ -2,10 +2,7 @@ package com.moneymanager.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -20,8 +17,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.moneymanager.credentialvault.CredentialVault
 import com.moneymanager.database.DatabaseManager
@@ -51,7 +46,7 @@ import com.moneymanager.ui.foundation.LocalUiStateStore
 import com.moneymanager.ui.screens.FirstRunDatabaseSetupScreen
 import com.moneymanager.ui.screens.settings.CredentialBackupSyncHost
 import com.moneymanager.ui.screens.settings.LocalCredentialSyncController
-import com.moneymanager.ui.util.onEnterKeyDown
+import com.moneymanager.ui.util.PasswordField
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
@@ -76,7 +71,7 @@ private sealed class AppDatabaseState {
     data object ChoosingDatabase : AppDatabaseState()
 }
 
-private data class RemoteUnlockState(
+internal data class RemoteUnlockState(
     val prompt: String,
     val error: String? = null,
     // True when the restore failed because the cloud connection (refresh token) expired/was revoked:
@@ -445,7 +440,7 @@ private fun AppStartupContent(
 }
 
 @Composable
-private fun RemoteDatabaseUnlockDialog(
+internal fun RemoteDatabaseUnlockDialog(
     state: RemoteUnlockState,
     onUnlock: (String) -> Unit,
     onReconnect: () -> Unit,
@@ -467,15 +462,12 @@ private fun RemoteDatabaseUnlockDialog(
                     Text("Reconnect to your Google account to finish restoring this database.")
                 } else {
                     val submit = { if (password.isNotEmpty()) onUnlock(password) }
-                    OutlinedTextField(
+                    PasswordField(
                         value = password,
                         onValueChange = { password = it },
-                        label = { Text("Password") },
-                        singleLine = true,
-                        visualTransformation = PasswordVisualTransformation(),
-                        modifier = Modifier.focusRequester(passwordFocusRequester).onEnterKeyDown(submit),
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                        keyboardActions = KeyboardActions(onDone = { submit() }),
+                        label = "Password",
+                        modifier = Modifier.focusRequester(passwordFocusRequester),
+                        onSubmit = submit,
                     )
                 }
                 state.error?.let { Text(it) }

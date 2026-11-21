@@ -1,5 +1,6 @@
 package com.moneymanager.importer
 
+import com.moneymanager.coroutines.runCatchingCancellable
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Person
@@ -50,7 +51,7 @@ internal class PersonResolver(
                         byAttr[match.typeId to match.value]
                             ?: match.nameKeyFallback?.let { byNameKey[it] }?.also { matchedId ->
                                 if (byAttr[match.typeId to match.value] == null) {
-                                    runCatching {
+                                    runCatchingCancellable {
                                         personAttributeRepository.insertInCreationMode(matchedId, match.typeId, match.value)
                                     }
                                     byAttr[match.typeId to match.value] = matchedId

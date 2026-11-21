@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.moneymanager.coroutines.runCatchingCancellable
 import com.moneymanager.database.DatabaseManager
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.DEFAULT_DATABASE_NAME
@@ -105,7 +106,7 @@ fun FirstRunDatabaseSetupScreen(
             } catch (expected: Exception) {
                 onErrorLog("Failed to create remote database", expected)
                 // No binding is persisted until the upload succeeds, so clean up the orphan working copy.
-                runCatching {
+                runCatchingCancellable {
                     database?.close()
                     databaseManager.deleteDatabase(cache)
                 }

@@ -57,6 +57,7 @@ import com.moneymanager.domain.model.rules.RuleValue
 import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import com.moneymanager.domain.model.rules.isComplete
+import com.moneymanager.ui.util.ExposedDropdownMenu
 
 /** What a rule list runs over, which decides the actions its editor offers. */
 enum class RuleContext {

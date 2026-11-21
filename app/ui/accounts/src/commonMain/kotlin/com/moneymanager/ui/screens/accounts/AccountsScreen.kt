@@ -55,7 +55,9 @@ import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.foundation.LocalStartupProbe
 import com.moneymanager.ui.foundation.StartupMilestone
 import com.moneymanager.ui.foundation.rememberPersistedState
+import com.moneymanager.ui.util.ExposedDropdownMenu
 import com.moneymanager.ui.util.formatAmount
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 private val logger = Logger.withTag("AccountsScreen")
@@ -640,6 +642,8 @@ fun UnmergeAccountDialog(
                             importEngine.import(ImportBatch.manualEdits(accountUnmerges = listOf(merge.id)))
                             maintenance.fullRefreshMaterializedViews()
                             onDismiss()
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
                         } catch (expected: Exception) {
                             logger.e(expected) { "Failed to undo merge: ${expected.message}" }
                             errorMessage = "Failed to undo merge: ${expected.message}"

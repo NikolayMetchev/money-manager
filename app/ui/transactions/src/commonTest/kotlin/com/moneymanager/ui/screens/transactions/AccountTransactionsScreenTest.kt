@@ -608,10 +608,11 @@ class AccountTransactionsScreenTest {
 
             // When: the user scrolls to the top of the loaded window, which triggers a backward
             // load of newer transactions that get prepended to the list. Keep nudging to the top
-            // until the prepended page (Tx 150..159) lands and becomes the new list head.
+            // until the prepended page (Tx 150..159) lands and becomes the new list head, on screen: lazy lists may
+            // compose a row off-screen before the viewport reaches it.
             val list = onNodeWithTag("accountTransactionsList")
             var attempts = 0
-            while (onAllNodesWithText("Tx 150").fetchSemanticsNodes().isEmpty() && attempts < 40) {
+            while (runCatching { onNodeWithText("Tx 150").assertIsDisplayed() }.isFailure && attempts < 40) {
                 list.performScrollToIndex(0)
                 mainClock.advanceTimeBy(100)
                 waitForIdle()

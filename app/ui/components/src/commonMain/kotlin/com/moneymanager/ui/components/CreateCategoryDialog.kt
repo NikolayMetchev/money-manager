@@ -40,7 +40,9 @@ import com.moneymanager.importengineapi.LocalCategoryKey
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalImportEngine
+import com.moneymanager.ui.util.ExposedDropdownMenu
 import com.moneymanager.ui.util.onEnterKeyDown
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 private val logger = Logger.withTag("CreateCategoryDialog")
@@ -98,6 +100,8 @@ fun CreateCategoryDialog(
                             ),
                         )
                     onCategoryCreated(result.createdCategoryIds.getValue(key), name.trim())
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
                 } catch (expected: Exception) {
                     logger.e(expected) { "Failed to create category: ${expected.message}" }
                     errorMessage = "Failed to create category: ${expected.message}"

@@ -52,6 +52,7 @@ kmp_library(
         "//app/ui/foundation",
         "//utils/compose/filePicker",
         "//utils/compose/scrollbar",
+        "//utils/coroutines",
         "@maven_kmp//:androidx_compose_runtime",
         "@maven_kmp//:compose_foundation",
         "@maven_kmp//:compose_ui",
@@ -89,6 +90,7 @@ kmp_test(
         "-Djava.awt.headless=true",
         "-Dskiko.test.harness=true",
     ],
+    jvm_srcs = glob(["src/jvmTest/kotlin/**/*.kt"]),
     keep_deps = ["//bazel/kmp/deps:compose_desktop_current_os"],
     plugins = [
         "compose",

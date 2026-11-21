@@ -50,6 +50,7 @@ kmp_library(
         "//app/model/observation",
         "//app/model/rules",
         "//utils/bigdecimal",
+        "//utils/coroutines",
         "@maven_kmp//:kermit",
         "@maven_kmp//:kotlinx_coroutines_core",
         "@maven_kmp//:kotlinx_serialization_core",

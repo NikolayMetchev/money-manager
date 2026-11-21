@@ -1,6 +1,7 @@
 package com.moneymanager.session
 
 import co.touchlab.kermit.Logger
+import com.moneymanager.coroutines.runCatchingCancellable
 import com.moneymanager.database.write.MoneyManagerDatabaseWrapper
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.remotestorage.sync.SyncResult
@@ -29,7 +30,7 @@ data class CloseOutcome(
 suspend fun RemoteDatabaseController.closeDecision(database: MoneyManagerDatabaseWrapper): CloseDecision? {
     val binding = activeBinding() ?: return null
     val baselineKnown = hasSyncBaseline()
-    val changed = runCatching { hasUnsyncedChanges(database) }.getOrDefault(true)
+    val changed = runCatchingCancellable { hasUnsyncedChanges(database) }.getOrDefault(true)
     return CloseDecision(
         remoteName = binding.remoteName,
         // Assume changed when we have no baseline, so the upload is offered by default.
@@ -59,12 +60,12 @@ suspend fun RemoteDatabaseController.performClose(
         onProgress(Progress.counted("Checking for changes…", 0, 100))
         val ready =
             hasActiveSession() ||
-                (password != null && runCatching { resume(password) }.getOrDefault(false))
+                (password != null && runCatchingCancellable { resume(password) }.getOrDefault(false))
         if (ready) {
             // Guarded push: if another device pushed since our last sync the upload is refused
             // (BLOCKED) rather than clobbering it — then we keep the local copy.
             syncResult =
-                runCatching { syncNow(database, rebuildViews = false, onProgress = onProgress) }
+                runCatchingCancellable { syncNow(database, rebuildViews = false, onProgress = onProgress) }
                     .onFailure { logger.e(it) { "Failed to sync database on close" } }
                     .getOrNull()
             remoteCurrent = syncResult == SyncResult.UPLOADED
@@ -77,7 +78,7 @@ suspend fun RemoteDatabaseController.performClose(
         // deleted externally since our last sync — without this check we'd close with no recoverable copy.
         onProgress(Progress.counted("Checking cloud copy…", 0, 100))
         remoteCurrent =
-            runCatching { remoteArchiveSize() != null }
+            runCatchingCancellable { remoteArchiveSize() != null }
                 .onFailure { logger.e(it) { "Failed to verify remote copy on close; keeping local copy" } }
                 .getOrDefault(false)
     }
@@ -88,7 +89,7 @@ suspend fun RemoteDatabaseController.performClose(
         keepLocal -> {}
 
         remoteCurrent -> {
-            runCatching { deleteLocalCache() }
+            runCatchingCancellable { deleteLocalCache() }
                 .onSuccess {
                     keptLocal = false
                     logger.i { "Deleted local working copy; cloud copy is up to date" }

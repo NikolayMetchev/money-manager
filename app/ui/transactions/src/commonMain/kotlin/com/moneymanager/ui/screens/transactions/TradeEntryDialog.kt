@@ -42,6 +42,7 @@ import com.moneymanager.ui.components.AssetPicker
 import com.moneymanager.ui.components.DateTimePickerField
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.util.formatAmount
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
@@ -187,6 +188,8 @@ fun TradeEntryDialog(
                         maintenance.refreshMaterializedViews()
                         onSaved()
                         onDismiss()
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
                     } catch (expected: Exception) {
                         tradeEntryLogger.e(expected) {
                             "Failed to ${if (trade == null) "create" else "update"} trade: ${expected.message}"

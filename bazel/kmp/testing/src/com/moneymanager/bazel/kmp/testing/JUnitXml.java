@@ -77,7 +77,7 @@ final class JUnitXml {
     }
     out.write("</testsuites>\n");
     try (Writer writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8)) {
-      writer.write(out.toString());
+      writer.append(out.getBuffer());
     }
   }
 

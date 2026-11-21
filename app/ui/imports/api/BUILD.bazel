@@ -60,6 +60,7 @@ kmp_library(
         "//utils/bigdecimal",
         "//utils/compose/filePicker",
         "//utils/compose/scrollbar",
+        "//utils/coroutines",
         "//utils/credentialvault",
         "@maven_kmp//:androidx_compose_runtime",
         "@maven_kmp//:compose_foundation",

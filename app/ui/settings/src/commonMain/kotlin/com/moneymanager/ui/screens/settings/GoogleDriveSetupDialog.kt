@@ -20,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.coroutines.runCatchingCancellable
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.remotestorage.RemoteFile
 import com.moneymanager.ui.util.PasswordField
@@ -59,7 +60,7 @@ fun GoogleDriveSetupDialog(
         connecting = true
         error = null
         scope.launch {
-            runCatching {
+            runCatchingCancellable {
                 onSignIn(null)
                 // List in both modes: OPEN needs the picker, CREATE needs it to warn about name clashes.
                 files = onList(null)

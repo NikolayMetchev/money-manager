@@ -36,6 +36,7 @@ import com.moneymanager.domain.strategy.StrategyLibrary
 import com.moneymanager.presenter.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.components.ReferenceResolutionRow
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 /**
@@ -203,6 +204,8 @@ fun ImportStrategyDialog(
                             )
                             onImportSuccess()
                             onDismiss()
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
                         } catch (expected: Exception) {
                             errorMessage = "Failed to import: ${expected.message}"
                             isImporting = false

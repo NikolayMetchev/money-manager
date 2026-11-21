@@ -84,6 +84,7 @@ kmp_library(
         "//app/ui/settings",
         "//app/ui/transactions",
         "//utils/compose/filePicker",
+        "//utils/coroutines",
         "//utils/credentialvault",
         "//utils/currency",
         "//utils/regex",

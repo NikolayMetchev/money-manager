@@ -1,5 +1,6 @@
 package com.moneymanager.rest
 
+import com.moneymanager.coroutines.runCatchingCancellable
 import com.moneymanager.domain.model.apistrategy.ApiRequestSigningConfig
 import com.moneymanager.domain.model.apistrategy.BodyFormat
 import com.moneymanager.domain.model.apistrategy.FieldPlacement
@@ -536,7 +537,7 @@ private suspend fun decodeP256PrivateKey(secret: String): ECDSA.PrivateKey {
         "The API secret looks like an Ed25519 key; this provider needs an ECDSA (ES256) key - recreate it as ECDSA"
     }
     val formats = listOf(EC.PrivateKey.Format.DER.SEC1, EC.PrivateKey.Format.DER.Generic, EC.PrivateKey.Format.RAW)
-    return formats.firstNotNullOfOrNull { format -> runCatching { decoder.decodeFromByteArray(format, bytes) }.getOrNull() }
+    return formats.firstNotNullOfOrNull { format -> runCatchingCancellable { decoder.decodeFromByteArray(format, bytes) }.getOrNull() }
         ?: throw IllegalArgumentException("The API secret is not a P-256 (ECDSA) private key")
 }
 

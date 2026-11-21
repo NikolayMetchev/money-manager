@@ -26,6 +26,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import com.moneymanager.compose.filepicker.rememberFilePicker
 import com.moneymanager.compose.filepicker.rememberFileSaver
+import com.moneymanager.coroutines.runCatchingCancellable
 import com.moneymanager.database.json.AssetListExportCodec
 import com.moneymanager.database.service.AssetExportService
 import com.moneymanager.domain.model.AppVersion
@@ -121,7 +122,7 @@ private fun AssetExportActions(
             onResult = { result ->
                 if (result != null) {
                     scope.launch {
-                        runCatching { assetExportService.importAssets(AssetListExportCodec.decode(result.content)) }
+                        runCatchingCancellable { assetExportService.importAssets(AssetListExportCodec.decode(result.content)) }
                             .onSuccess { errorMessage = null }
                             .onFailure { errorMessage = "Failed to import: ${it.message}" }
                     }
@@ -140,8 +141,12 @@ private fun AssetExportActions(
         IconButton(
             onClick = {
                 scope.launch {
-                    runCatching { fileSaver.launch("assets.json", AssetListExportCodec.encode(assetExportService.toExport(appVersion))) }
-                        .onSuccess { errorMessage = null }
+                    runCatchingCancellable {
+                        fileSaver.launch(
+                            "assets.json",
+                            AssetListExportCodec.encode(assetExportService.toExport(appVersion)),
+                        )
+                    }.onSuccess { errorMessage = null }
                         .onFailure { errorMessage = "Failed to export: ${it.message}" }
                 }
             },

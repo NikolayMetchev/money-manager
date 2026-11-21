@@ -43,6 +43,7 @@ import com.moneymanager.importengineapi.updatePassThroughAccount
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.regex.compileRegex
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 /**
@@ -92,6 +93,8 @@ fun PassThroughAccountsScreen(
                             } else {
                                 importEngine.updatePassThroughAccount(account)
                             }
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
                         } catch (expected: Exception) {
                             errorMessage = "Failed to import: ${expected.message}"
                         }

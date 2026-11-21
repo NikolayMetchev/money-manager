@@ -2,6 +2,7 @@ package com.moneymanager.database.write
 
 import app.cash.sqldelight.async.coroutines.awaitAsList
 import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
+import com.moneymanager.coroutines.runCatchingCancellable
 import com.moneymanager.database.rawsql.RawSql
 
 data class DbObjectSize(
@@ -25,7 +26,7 @@ data class DbObjectSize(
  */
 suspend fun MoneyManagerDatabaseWrapper.getDbSizeBreakdown(): List<DbObjectSize> {
     val raw = RawSql(driver)
-    return runCatching {
+    return runCatchingCancellable {
         val result =
             raw
                 .query(
@@ -84,7 +85,7 @@ private suspend fun RawSql.tableColumnCounts(): Map<String, Long> =
 
 /** Returns `COUNT(*)` for a table, or null if it can't be queried. */
 private suspend fun RawSql.tableRowCount(tableName: String): Long? =
-    runCatching {
+    runCatchingCancellable {
         // tableName comes from sqlite_master (trusted schema); still quote-escape defensively.
         val quoted = "\"" + tableName.replace("\"", "\"\"") + "\""
         query("SELECT COUNT(*) FROM $quoted") { it.getLong(0)!! }.awaitAsOneOrNull()

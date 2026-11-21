@@ -60,40 +60,40 @@ import kotlinx.coroutines.sync.withLock
  * importers build an [ImportBatch] and call [import]; all shared import logic lives here.
  */
 class ImportEngineImpl(
-    private val transactionRepository: TransactionWriteRepository,
+    transactionRepository: TransactionWriteRepository,
     private val accountRepository: AccountWriteRepository,
     private val accountAttributeRepository: AccountAttributeWriteRepository,
-    private val personRepository: PersonWriteRepository,
-    private val personAttributeRepository: PersonAttributeWriteRepository,
-    private val ownershipRepository: PersonAccountOwnershipWriteRepository,
-    private val categoryRepository: CategoryWriteRepository,
-    private val currencyRepository: CurrencyWriteRepository,
+    personRepository: PersonWriteRepository,
+    personAttributeRepository: PersonAttributeWriteRepository,
+    ownershipRepository: PersonAccountOwnershipWriteRepository,
+    categoryRepository: CategoryWriteRepository,
+    currencyRepository: CurrencyWriteRepository,
     cryptoRepository: CryptoWriteRepository,
     private val tradeRepository: TradeWriteRepository,
-    private val exchangeOrderRepository: ExchangeOrderWriteRepository,
+    exchangeOrderRepository: ExchangeOrderWriteRepository,
     private val attributeTypeRepository: AttributeTypeWriteRepository,
     private val relationshipTypeRepository: RelationshipTypeWriteRepository,
     private val csvImportStrategyRepository: CsvImportStrategyWriteRepository,
     private val apiImportStrategyRepository: ApiImportStrategyWriteRepository,
-    private val accountMappingRepository: AccountMappingWriteRepository,
+    accountMappingRepository: AccountMappingWriteRepository,
     private val csvImportRepository: CsvImportWriteRepository,
     private val apiSessionRepository: ApiSessionWriteRepository,
-    private val settingsRepository: SettingsWriteRepository,
-    private val importDirectoryRepository: ImportDirectoryWriteRepository,
-    private val passThroughAccountRepository: PassThroughAccountWriteRepository,
+    settingsRepository: SettingsWriteRepository,
+    importDirectoryRepository: ImportDirectoryWriteRepository,
+    passThroughAccountRepository: PassThroughAccountWriteRepository,
     /** The locations business-day reconcile windows count on. */
-    private val holidayCalendarRepository: HolidayCalendarWriteRepository,
+    holidayCalendarRepository: HolidayCalendarWriteRepository,
     /** Transfer relationships: the fee and `pass-through` links a duplicate row observes beside its twin. */
     private val relationshipRepository: RelationshipWriteRepository,
     /** Writes shadow→real reconciliation links. */
-    private val reconciliationLinkRepository: ReconciliationLinkWriteRepository,
+    reconciliationLinkRepository: ReconciliationLinkWriteRepository,
     /** Observations and the materialized rows built from them, with [personOverrideRepository] the overrides on top. */
     private val observationRepository: ObservationWriteRepository,
     private val personOverrideRepository: PersonOverrideWriteRepository,
     /** Staged files' import records. */
     private val importRecordRepository: ImportRecordWriteRepository,
     /** The running balances statements report beside their records. */
-    private val reportedBalanceRepository: ReportedBalanceWriteRepository,
+    reportedBalanceRepository: ReportedBalanceWriteRepository,
     private val editGate: EditGate,
 ) : ImportEngine {
     private val commitLock = Mutex()

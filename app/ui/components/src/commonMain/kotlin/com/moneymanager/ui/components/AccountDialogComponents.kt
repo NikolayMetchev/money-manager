@@ -20,6 +20,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.Category
+import com.moneymanager.ui.util.ExposedDropdownMenu
 import com.moneymanager.ui.util.onEnterKeyDown
 
 @Composable

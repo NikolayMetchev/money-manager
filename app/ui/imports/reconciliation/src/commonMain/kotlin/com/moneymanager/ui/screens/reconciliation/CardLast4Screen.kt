@@ -60,6 +60,7 @@ import com.moneymanager.ui.components.imports.resolveImportDirectories
 import com.moneymanager.ui.components.imports.stagedImportPath
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.tasks.LocalTaskManager
+import com.moneymanager.ui.util.ExposedDropdownMenu
 
 /** The task that applies Card Last-4's changes. */
 const val CARD_ASSIGNMENT_TASK_KEY = "card-last4"

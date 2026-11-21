@@ -35,6 +35,7 @@ import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.strategy.CsvReferenceType
 import com.moneymanager.domain.strategy.CsvResolution
 import com.moneymanager.domain.strategy.CsvUnresolvedReference
+import com.moneymanager.ui.util.ExposedDropdownMenu
 
 /**
  * Row for resolving a single unresolved account/category/currency reference to an existing entity or a

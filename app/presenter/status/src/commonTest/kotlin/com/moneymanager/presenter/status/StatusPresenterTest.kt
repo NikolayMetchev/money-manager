@@ -91,6 +91,16 @@ class StatusPresenterTest {
         }
 
     @Test
+    fun aCloudCopyWithoutASessionStillReportsLocalChanges() =
+        withStatus(cloud = true, restarted = true) { session, remote, vault, scope ->
+            present(session, remote, vault, scope).test(timeout = TIMEOUT) {
+                val model = awaitUntil { it.cloud != null }
+                assertEquals(false, checkNotNull(model.cloud).connected)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
     fun locksAndUnlocksTheVault() =
         withStatus(cloud = false) { session, remote, vault, scope ->
             present(session, remote, vault, scope).test(timeout = TIMEOUT) {
@@ -133,16 +143,18 @@ class StatusPresenterTest {
     // The presenter gets its own unlocked vault: opening a database rebinds the session's vault to that file.
     private fun withStatus(
         cloud: Boolean,
+        restarted: Boolean = false,
         test: suspend (DatabaseSession, RemoteDatabaseController?, CredentialVault, CoroutineScope) -> Unit,
     ) = runTest(timeout = WHOLE_TEST_TIMEOUT) {
         // Real time, one coroutine at a time, off runTest's scheduler: in the context, Turbine would collect on its
         // virtual clock, and the presenter's local-changes poll would spin without waiting. A hang fails the test
         // rather than the whole CI job.
-        CoroutineScope(Dispatchers.Default.limitedParallelism(1)).async { runStatus(cloud, test) }.await()
+        CoroutineScope(Dispatchers.Default.limitedParallelism(1)).async { runStatus(cloud, restarted, test) }.await()
     }
 
     private suspend fun runStatus(
         cloud: Boolean,
+        restarted: Boolean,
         test: suspend (DatabaseSession, RemoteDatabaseController?, CredentialVault, CoroutineScope) -> Unit,
     ) {
         val location = createTestDatabaseLocation()
@@ -156,7 +168,17 @@ class StatusPresenterTest {
         val scope = CoroutineScope(SupervisorJob() + currentCoroutineContext().minusKey(Job))
         try {
             if (cloud) remote.createRemote(provider.id, null, "db.mmdb", location, session.database, "pw")
-            test(session, remote, unlockedCredentialVault(), scope)
+            // The app started again: the binding is remembered, but nobody has entered the cloud password yet.
+            val controller =
+                if (restarted) {
+                    RemoteDatabaseController(
+                        RemoteDatabaseSyncService(manager, settings),
+                        SingleProviderFactory(provider),
+                    )
+                } else {
+                    remote
+                }
+            test(session, controller, unlockedCredentialVault(), scope)
         } finally {
             scope.cancel()
             session.database.close()

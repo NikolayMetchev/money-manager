@@ -44,6 +44,7 @@ import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.ui.navigation.linuxHorizontalScrollWheel
+import com.moneymanager.ui.util.ExposedDropdownMenu
 
 @Composable
 fun StrategySelector(

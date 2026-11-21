@@ -37,6 +37,7 @@ import com.moneymanager.domain.model.rules.ConditionOperand
 import com.moneymanager.domain.model.rules.isStructural
 import com.moneymanager.domain.model.rules.operand
 import com.moneymanager.domain.model.rules.withOp
+import com.moneymanager.ui.util.ExposedDropdownMenu
 
 /** The ops a flat row of columns supports — everything but the JSON-structure ops. */
 val FLAT_CONDITION_OPS: List<ConditionOp> = ConditionOp.entries.filterNot { it.isStructural }
