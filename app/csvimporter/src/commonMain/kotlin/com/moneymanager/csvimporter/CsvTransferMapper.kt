@@ -1315,7 +1315,7 @@ class CsvTransferMapper(
         values: List<String>,
         timezone: TimeZone,
     ): Instant? {
-        val raw = rules.resolve(at, { getColumnValueOrNull(it, values)?.trim() }).trim()
+        val raw = rules.resolve(at) { getColumnValueOrNull(it, values)?.trim() }.trim()
         if (raw.isEmpty()) return null
         return parseTimestamp(mapping, values, timezone, raw) ?: error("Failed to parse balance time: $raw")
     }
