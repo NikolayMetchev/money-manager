@@ -216,11 +216,42 @@ and the materialized views are refreshed once at the end.
 | `reimportSuggested` | file name | re-importing it (its columns changed) |
 | `unassignedCard` | card reference | assigning it to an account (Imports → Reconciliation → Card Last-4) |
 | `counterparties` | `"<strategy> session #<id>"` | confirming the account names when importing the session in the app |
+| `reimportBlocked` | `"<file> (<reason>)"` | `import reimport` only: setting the file's account or currency in the app (nothing was re-imported) |
 | `tokenExpired` | strategy name | creating a new access token at the strategy's token page and saving it under the connection in the app |
 | `vaultLocked` | `"APIs"` | `import all` only: unlocking the vault (`--vault-password-stdin` or `MM_VAULT_PASSWORD`) |
 
 The exit code is `3` when anything needs attention or any folder, file, connection or session failed. The summary
 is printed either way.
+
+### `import reimport [--dir NAME]… [--force]`
+
+"Re-import all" over the imported (not ignored) CSV, QIF, OFX, Excel and PDF files of the import directories, or only
+the `--dir` folders and their subfolders. Each file is imported again with the current strategies and mappings; a
+transaction keeps its id where it is still created. A file whose inputs hash to what its last import recorded is
+skipped (`filesUnchanged`) unless `--force` is given, which re-imports every file (`filesUnchanged` is then `0`); use it
+after a change to the importer or matcher, which the check can't see. A file whose strategy is gone is left alone
+(`filesSkippedNoStrategy`). If any file can't be imported again because nothing says which account or currency it
+imports in, nothing is re-imported (see `blocked`) and the exit code is `3`. `data` has the same shape as the other import commands, with a `reimport`
+section instead of `directories` and `apis`, and `plan` is the re-import's own plan.
+
+`reimport`:
+
+| Field | |
+|---|---|
+| `filesImported` | files the re-import ran over |
+| `filesUnchanged` | files left alone because nothing they read changed |
+| `filesSkippedNoStrategy` | files with no matching strategy |
+| `filesFailed` | files that failed |
+| `filesNotStarted` | files not started because the run was stopped |
+| `transfersCreated` | transactions the run imported (after folding any that matched another record) |
+| `duplicatesSkipped` | records that duplicated an existing one |
+| `emptyAccountsDeleted` | accounts the files created that are now empty, and were deleted |
+| `handEditedNoLongerImported` | `["#<id>"]`: hand-edited transactions no record creates any more (their overrides no longer apply) |
+| `blocked` | `["<file> (<reason>)"]`: files that refused the run; also in `needsAttention` as `reimportBlocked`, and every count is `0` |
+
+`plan.created`, `updated` and `removed` count the run's changes to transactions, and `plan.conflicts` lists each hand
+edit a new import value met, as `"#<id> <field>: kept '<override>' over '<import value>'"`. The exit code is `3` when a
+file is blocked or failed, or the run was stopped before every file started.
 
 A Google Drive folder with no sign-in in the vault opens the Google consent page. With `--no-browser`, mm prints
 the URL instead and waits for the redirect on a loopback port. Over SSH, forward that port

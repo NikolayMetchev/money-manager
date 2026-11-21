@@ -4,6 +4,7 @@ import com.moneymanager.coroutines.ioDispatcher
 import com.moneymanager.csvimporter.AttributeAccountMatcher
 import com.moneymanager.csvimporter.BulkApplyResult
 import com.moneymanager.csvimporter.BulkFileStatus
+import com.moneymanager.csvimporter.BulkReimportResult
 import com.moneymanager.csvimporter.DirectoryRedownloadResult
 import com.moneymanager.csvimporter.Reimports
 import com.moneymanager.csvimporter.ScanResult
@@ -370,6 +371,31 @@ class ImportDirectoryService(
             csvPlan.needsAttention + redownloadAttention + unassignedCards(csv)
         needsAttention.forEach { task.reportIssue("${it.subject}: ${it.reason.description}") }
         return ImportAllResult(download, csv, needsAttention, redownloaded)
+    }
+
+    /**
+     * "Re-import all" over the imported files staged from [directories] and their subfolders (every included folder's
+     * when null): what the desktop's Imported tab runs for the same files ([Reimports.prepareAll]). Ignored and
+     * never-imported files are left out. A file that can't be imported again refuses the whole run before anything
+     * is deleted ([com.moneymanager.importengineapi.RerunBlockedException]). A file whose inputs hash to what its import
+     * records hold is left alone and counted in [com.moneymanager.csvimporter.BulkReimportResult.filesUnchanged], unless [force].
+     * [refreshViews] false leaves the materialized views to a caller that batches several runs.
+     */
+    suspend fun reimportAll(
+        task: TaskScope,
+        directories: List<ImportDirectory>? = null,
+        refreshViews: Boolean = true,
+        force: Boolean = false,
+    ): BulkReimportResult {
+        val folders = scope(directories, importDirectoryRepository.getAllDirectories().first())
+        val ids = filesIn(folders)
+        val files = csvImportRepository.getAllImports().first().filter { it.id in ids && !it.ignored && it.lastAppliedAt != null }
+        try {
+            val run = reimports.prepareAll(files, onProgress = { task.report(it) }, force = force)
+            return run()
+        } finally {
+            if (refreshViews) withContext(NonCancellable) { maintenance.refreshMaterializedViews() }
+        }
     }
 
     // The imports staged from [folders].

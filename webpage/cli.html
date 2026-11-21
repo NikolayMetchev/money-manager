@@ -366,6 +366,26 @@ EOF</code></pre>
         <code>plan</code> sums up what the run did to the transactions (how many it created, updated and removed, and any hand
         edit a new import value met), as the app's re-import dialogs do. The TUI's Imports tab shows the same line.
       </p>
+      <h3><code>import reimport</code></h3>
+      <p class="synopsis"><code>mm import reimport [--dir NAME]… [--force]</code></p>
+      <p>
+        Runs the desktop app's <em>Re-import all</em> over the imported CSV, QIF, OFX, Excel and PDF files of the import
+        folders (or only the <code>--dir</code> folders and their subfolders): each file is imported again with the current
+        strategies and mappings, every transaction keeps its id where it is still created, and only what changed is written.
+        Ignored and never-imported files are left out. A file whose inputs (rows, strategy, mappings, aliases, accounts) hash
+        to what its last import recorded is skipped and counted as <code>filesUnchanged</code>. <code>--force</code> re-imports
+        every file anyway; use it after a change to the importer or matcher, which that check can't see.
+      </p>
+      <p>
+        A file whose strategy is gone is left alone and counted in <code>filesSkippedNoStrategy</code>. If any file can't be
+        imported again because nothing says which account or currency it imports in, mm refuses the whole run before deleting anything, lists those files under <code>needsAttention</code>
+        (<code>reimportBlocked</code>) and exits <code>3</code>; so does a file that fails. The hand-edited transactions the
+        run no longer creates are listed in <code>reimport.handEditedNoLongerImported</code>. Ctrl-C stops it (exit
+        <code>130</code>); files not yet started are left reset, waiting for another re-import.
+      </p>
+      <pre><code>mm --push import reimport --dir Monzo
+mm import reimport | jq '.data.reimport'</code></pre>
+
       <pre><code># Nightly: import everything, upload the cloud copy, fail loudly on anything to resolve
 MM_VAULT_PASSWORD=… mm --quiet --push --keep-local import all
 [ $? -eq 3 ] &amp;&amp; echo "Money Manager needs attention"

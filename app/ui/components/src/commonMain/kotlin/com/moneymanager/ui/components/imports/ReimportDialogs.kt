@@ -1,7 +1,10 @@
 package com.moneymanager.ui.components.imports
 
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -10,8 +13,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import co.touchlab.kermit.Logger
 import com.moneymanager.csvimporter.BulkReimportResult
@@ -35,6 +40,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 private val logger = Logger.withTag("ReimportDialogs")
+
+/** The checkbox that makes a run re-import files even when nothing they read changed (a change to the importer isn't in that check). */
+const val REIMPORT_FORCE_LABEL = "Re-import files even if nothing they read changed"
 
 /** What [ReimportDialog] reads: where each file came from (to name it by its path), and its pickers' lists. */
 data class ReimportRepositories(
@@ -73,6 +81,7 @@ fun ReimportDialog(
     val importDirectories = remember(directoryIds, directories) { resolveImportDirectories(directoryIds, directories) }
     val fileLabel: (CsvImport) -> String = { stagedImportPath(it, importDirectories) }
     var stopRequested by remember { mutableStateOf(false) }
+    var force by remember { mutableStateOf(false) }
 
     var accountId by remember { mutableStateOf<AccountId?>(null) }
     var currencyId by remember { mutableStateOf<CurrencyId?>(null) }
@@ -116,6 +125,7 @@ fun ReimportDialog(
                             onProgress = { progress = it },
                             fileLabel = fileLabel,
                             stopRequested = { stopRequested },
+                            force = force,
                         )
                 } catch (expected: CancellationException) {
                     throw expected
@@ -178,6 +188,13 @@ fun ReimportDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(modifier = Modifier.height(12.dp))
+            }
+            Row(
+                modifier = Modifier.toggleable(value = force, enabled = !isRunning, role = Role.Checkbox) { force = it },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Checkbox(checked = force, onCheckedChange = null, enabled = !isRunning)
+                Text(text = REIMPORT_FORCE_LABEL, style = MaterialTheme.typography.bodyMedium)
             }
             ReimportSettingsPickers(
                 needsAccount = planned.needsAccount,

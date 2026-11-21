@@ -7,6 +7,7 @@ import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.session.ApiImport
 import com.moneymanager.session.DatabaseSession
 import com.moneymanager.session.DirectoryImport
+import com.moneymanager.session.DirectoryReimport
 import com.moneymanager.session.ImportRequest
 import com.moneymanager.session.ImportRunOutcome
 import com.moneymanager.session.SessionImports
@@ -19,6 +20,12 @@ internal data class DirectoriesRequest(
     val names: List<String>,
     val apply: Boolean,
     val redownload: Boolean,
+)
+
+/** Re-import the imported files of these folders and their subfolders ([names] empty: every folder), as a run of its own. */
+internal data class ReimportRequest(
+    val names: List<String>,
+    val force: Boolean = false,
 )
 
 /**
@@ -45,8 +52,9 @@ internal class ImportRun(
     suspend fun run(
         directories: DirectoriesRequest?,
         apis: ApisRequest?,
+        reimport: ReimportRequest? = null,
     ) {
-        val summary = runtime.withSession { session -> runOn(session, directories, apis) }
+        val summary = runtime.withSession { session -> runOn(session, directories, apis, reimport) }
         runtime.output.emit(summary, ImportJson.serializer(), table = ::summaryTable)
         if (summary.incomplete) {
             throw NeedsAttention(
@@ -63,6 +71,7 @@ internal class ImportRun(
         session: DatabaseSession,
         directories: DirectoriesRequest?,
         apis: ApisRequest?,
+        reimport: ReimportRequest?,
     ): ImportJson {
         val services = session.services
         val imports =
@@ -85,10 +94,20 @@ internal class ImportRun(
                         .first()
                 resolveByName(strategies, request.strategies, "API strategy") { it.name }?.mapTo(mutableSetOf()) { it.id }
             }
+        val reimportFolders =
+            reimport?.let {
+                resolveDirectories(
+                    services.imports.importDirectoryRepository
+                        .getAllDirectories()
+                        .first(),
+                    it.names,
+                )
+            }
         val request =
             ImportRequest(
                 directories = directories?.let { DirectoryImport(folders, it.apply, it.redownload) },
                 apis = apis?.let { ApiImport(strategyIds, it.forceFull, it.apply, it.optional) },
+                reimport = reimport?.let { DirectoryReimport(reimportFolders, it.force) },
             )
         val outcome =
             coroutineScope {
@@ -126,13 +145,15 @@ internal fun <T> resolveByName(
     }
 }
 
-private fun ImportRunOutcome.toJson(): ImportJson {
+internal fun ImportRunOutcome.toJson(): ImportJson {
     val directories = directories?.toJson()
     val apis = apis?.toJson()
+    val reimportJson = reimport?.toJson() ?: reimportBlocked.takeIf { it.isNotEmpty() }?.let { ReimportJson.refused(it) }
     return ImportJson(
         directories = directories,
         apis = apis,
-        plan = PlanJson.of(directories, apis),
+        reimport = reimportJson,
+        plan = reimport?.plan?.let { PlanJson.of(it) } ?: PlanJson.of(directories, apis),
         needsAttention = needsAttention.map { NeedsAttentionJson(it.kind, it.subject, it.reason) },
         errors = errors,
     )
@@ -152,6 +173,19 @@ private fun summaryTable(summary: ImportJson): Widget =
                 apis.connections.forEach { row("connection", it.strategy.orEmpty(), it.status, it.message.orEmpty()) }
                 apis.sessions.forEach {
                     row("session", "${it.strategy.orEmpty()} #${it.id}", it.status, it.error ?: "${it.transactions} transactions")
+                }
+            }
+            summary.reimport?.let { re ->
+                if (re.blocked.isEmpty()) {
+                    row(
+                        "reimport",
+                        "",
+                        if (re.filesFailed > 0) "failed" else "reimported",
+                        "${re.filesImported} reimported, ${re.filesUnchanged} unchanged, ${re.filesFailed} failed" +
+                            (if (re.filesNotStarted > 0) ", ${re.filesNotStarted} not started" else "") +
+                            ", ${re.emptyAccountsDeleted} empty accounts removed",
+                    )
+                    re.handEditedNoLongerImported.forEach { row("released", it, "", "hand-edited, no longer imported") }
                 }
             }
             row("plan", "", "", summary.plan.summary)

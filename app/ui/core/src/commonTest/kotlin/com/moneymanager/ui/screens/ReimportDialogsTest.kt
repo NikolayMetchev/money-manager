@@ -33,8 +33,10 @@ import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
 import com.moneymanager.test.database.installBuiltInCsvStrategies
 import com.moneymanager.test.database.planFile
+import com.moneymanager.test.database.reimportFile
 import com.moneymanager.test.database.reimports
 import com.moneymanager.test.database.upsertCurrencyByCode
+import com.moneymanager.ui.components.imports.REIMPORT_FORCE_LABEL
 import com.moneymanager.ui.components.imports.ReimportDialog
 import com.moneymanager.ui.components.imports.ReimportRepositories
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
@@ -159,6 +161,59 @@ class ReimportDialogsTest {
             )
             // The edit is an override on the kept id (#1430): nothing is replayed, and nothing is lost.
             onNodeWithText("no longer imported", substring = true).assertDoesNotExist()
+        }
+
+    @Test
+    fun reimportDialog_forceCheckboxRunsAFileNothingItReadChanged() =
+        runMoneyManagerComposeUiTest {
+            val fixture = setUp()
+            // One run first, so the next finds the file unchanged.
+            runBlocking { fixture.dc.reimports().reimportFile(fixture.csvImport.id) }
+
+            fun showDialog() =
+                setContent {
+                    ProvideSchemaAwareScope {
+                        ReimportDialog(
+                            files = listOf(fixture.csvImport),
+                            reimports = fixture.dc.reimports(),
+                            repositories = fixture.repositories,
+                            onDismiss = { },
+                            onComplete = { },
+                        )
+                    }
+                }
+            showDialog()
+
+            waitUntilAtLeastOneExists(hasText("Re-import 1 file"), timeoutMillis = 15_000)
+            onNodeWithText(REIMPORT_FORCE_LABEL).performClick()
+            onNodeWithText("Re-import 1 file").performClick()
+
+            waitUntilAtLeastOneExists(hasText("Re-imported 1 file", substring = true), timeoutMillis = 15_000)
+            onNodeWithText("unchanged", substring = true).assertDoesNotExist()
+        }
+
+    @Test
+    fun reimportDialog_withoutTheCheckboxSkipsAnUnchangedFile() =
+        runMoneyManagerComposeUiTest {
+            val fixture = setUp()
+            runBlocking { fixture.dc.reimports().reimportFile(fixture.csvImport.id) }
+
+            setContent {
+                ProvideSchemaAwareScope {
+                    ReimportDialog(
+                        files = listOf(fixture.csvImport),
+                        reimports = fixture.dc.reimports(),
+                        repositories = fixture.repositories,
+                        onDismiss = { },
+                        onComplete = { },
+                    )
+                }
+            }
+
+            waitUntilAtLeastOneExists(hasText("Re-import 1 file"), timeoutMillis = 15_000)
+            onNodeWithText("Re-import 1 file").performClick()
+
+            waitUntilAtLeastOneExists(hasText("1 unchanged", substring = true), timeoutMillis = 15_000)
         }
 
     @Test

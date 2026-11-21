@@ -15,8 +15,10 @@ import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryProvider
 import com.moneymanager.files.absolutePath
 import com.moneymanager.files.writeText
+import com.moneymanager.importengineapi.deleteCsvStrategy
 import com.moneymanager.query.AccountJson
 import com.moneymanager.query.Envelope
+import com.moneymanager.session.ImportRunOutcome
 import com.moneymanager.session.apiImportService
 import com.moneymanager.session.importDirectoryService
 import com.moneymanager.tasks.TaskManager
@@ -256,6 +258,103 @@ class ImportCommandsTest {
             val uuid = Regex("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
             assertEquals(IMPORT_DIRS_GOLDEN, run.stdout.trim().replace(uuid, "<uuid>"))
         }
+
+    @Test
+    fun importReimportRunsOverTheImportedFilesAndKeepsTheBalances() =
+        withFixture { fixture ->
+            fixture.mm("import", "dirs")
+            val before = fixture.balances()
+
+            val run = fixture.mm("--format", "json", "import", "reimport")
+
+            assertEquals(ExitCodes.OK, run.exitCode, run.stderr)
+            val summary = run.summary()
+            val reimport = checkNotNull(summary.reimport)
+            // Only the imported file: unknown.csv never was.
+            assertEquals(1, reimport.filesImported + reimport.filesUnchanged, "$reimport")
+            assertEquals(0, reimport.filesFailed)
+            assertEquals(emptyList(), reimport.blocked)
+            assertEquals(null, summary.directories)
+            assertEquals(emptyList(), summary.needsAttention)
+            assertEquals(before, fixture.balances())
+        }
+
+    @Test
+    fun importReimportForceRunsFilesNothingTheyReadChanged() =
+        withFixture { fixture ->
+            fixture.mm("import", "dirs")
+            fixture.mm("import", "reimport")
+            val before = fixture.balances()
+
+            val plain = checkNotNull(fixture.mm("--format", "json", "import", "reimport").summary().reimport)
+            val forced = fixture.mm("--format", "json", "import", "reimport", "--force")
+
+            assertEquals(1, plain.filesUnchanged, "$plain")
+            assertEquals(0, plain.filesImported)
+            assertEquals(ExitCodes.OK, forced.exitCode, forced.stderr)
+            val reimport = checkNotNull(forced.summary().reimport)
+            assertEquals(0, reimport.filesUnchanged)
+            assertEquals(1, reimport.filesImported)
+            assertEquals(before, fixture.balances())
+        }
+
+    @Test
+    fun importReimportWithNothingImportedDoesNothing() =
+        withFixture { fixture ->
+            val run = fixture.mm("--format", "json", "import", "reimport", "--dir", "monzo")
+
+            assertEquals(ExitCodes.OK, run.exitCode, run.stderr)
+            assertEquals(0, checkNotNull(run.summary().reimport).filesImported)
+        }
+
+    @Test
+    fun importReimportWithAnUnknownFolderIsAUsageError() =
+        withFixture { fixture ->
+            val run = fixture.mm("import", "reimport", "--dir", "Nope")
+
+            assertEquals(ExitCodes.USAGE, run.exitCode)
+            assertContains(run.stderr, "No import directory is named 'Nope'. Known: Monzo")
+        }
+
+    @Test
+    fun importReimportLeavesAFileWhoseStrategyIsGoneAlone() =
+        withFixture { fixture ->
+            fixture.mm("import", "dirs")
+            val before = fixture.balances()
+            fixture.deleteCsvStrategies()
+
+            val run = fixture.mm("--format", "json", "import", "reimport")
+
+            assertEquals(ExitCodes.OK, run.exitCode, run.stderr)
+            val reimport = checkNotNull(run.summary().reimport)
+            assertEquals(1, reimport.filesSkippedNoStrategy)
+            assertEquals(0, reimport.filesImported)
+            assertEquals(before, fixture.balances(), "a file with no strategy is not deleted")
+        }
+
+    @Test
+    fun aRefusedReimportIsReportedAsNeedingAttention() {
+        val summary = ImportRunOutcome(reimportBlocked = listOf("a.csv (nothing says which account it imports onto)")).toJson()
+
+        val reimport = checkNotNull(summary.reimport)
+        assertEquals(listOf("a.csv (nothing says which account it imports onto)"), reimport.blocked)
+        assertEquals(0, reimport.filesImported)
+        assertTrue(summary.incomplete)
+        assertEquals(listOf("reimportBlocked"), summary.needsAttention.map { it.kind })
+    }
+
+    private suspend fun Fixture.deleteCsvStrategies() {
+        val database = cli.databaseManager.openDatabase(db)
+        try {
+            val component = openDatabaseComponent(database)
+            component.csvImportStrategyRepository
+                .getAllStrategies()
+                .first()
+                .forEach { component.importEngine.deleteCsvStrategy(it.id) }
+        } finally {
+            database.close()
+        }
+    }
 
     @Test
     fun importDirsDownloadOnlyStagesWithoutImporting() =

@@ -9,6 +9,7 @@ import com.moneymanager.apiimport.ApiSessionNeedsAttention
 import com.moneymanager.credentialvault.CredentialVault
 import com.moneymanager.credentialvault.CredentialVaultLockedException
 import com.moneymanager.credentialvault.VaultState
+import com.moneymanager.csvimporter.BulkReimportResult
 import com.moneymanager.database.di.AppServices
 import com.moneymanager.domain.model.ApiCredential
 import com.moneymanager.domain.model.ApiImportStrategyId
@@ -18,6 +19,7 @@ import com.moneymanager.importdirectory.ImportAllResult
 import com.moneymanager.importdirectory.ImportDirectoryService
 import com.moneymanager.importdirectory.NeedsAttention
 import com.moneymanager.importdirectory.NeedsAttentionReason
+import com.moneymanager.importengineapi.RerunBlockedException
 import com.moneymanager.importfilesource.ImportFileSourceFactory
 import com.moneymanager.tasks.TaskManager
 import com.moneymanager.tasks.TaskScope
@@ -53,11 +55,29 @@ data class ApiImport(
     val optional: Boolean = false,
 )
 
-/** What one run imports: directories, APIs, or both at once. */
+/**
+ * Re-import the imported files staged from [folders] (null: every folder), as the desktop's "Re-import all" does. A file
+ * whose inputs are unchanged since its last import is left alone and reported as unchanged.
+ */
+data class DirectoryReimport(
+    val folders: List<ImportDirectory>? = null,
+    /** Run every file, even those nothing they read changed (a change to the importer isn't in that check). */
+    val force: Boolean = false,
+)
+
+/**
+ * What one run imports: directories, APIs, or both at once. A [reimport] is a run of its own, as it deletes and replays
+ * files under the write lock, so it can't be combined with the others.
+ */
 data class ImportRequest(
     val directories: DirectoryImport? = null,
     val apis: ApiImport? = null,
-)
+    val reimport: DirectoryReimport? = null,
+) {
+    init {
+        require(reimport == null || (directories == null && apis == null)) { "A re-import can't be combined with an import" }
+    }
+}
 
 /** Something only a person can resolve: [kind] says what, [subject] names the file, card or session. */
 data class ImportAttention(
@@ -69,23 +89,36 @@ data class ImportAttention(
 /**
  * What an import run did. A section is null when the run didn't do it; [errors] holds a section that failed as
  * a whole (a combined run keeps going past one), and [vaultLocked] why an optional API section was skipped.
+ * [reimportBlocked] names the files that refused a re-import (which then changed nothing), each with its reason.
  */
 data class ImportRunOutcome(
     val directories: ImportAllResult? = null,
     val apis: ApiDownloadAndImportAllResult? = null,
     val errors: List<String> = emptyList(),
     val vaultLocked: String? = null,
+    val reimport: BulkReimportResult? = null,
+    val reimportBlocked: List<String> = emptyList(),
 ) {
     val needsAttention: List<ImportAttention>
         get() =
             buildList {
                 directories?.needsAttention.orEmpty().mapTo(this) { it.toAttention() }
+                reimportBlocked.mapTo(
+                    this,
+                ) { ImportAttention("reimportBlocked", it, "it can't be imported again, so nothing was re-imported") }
                 apis?.needsAttention.orEmpty().mapTo(this) { it.toAttention() }
                 apis?.credentials.orEmpty().mapNotNullTo(this) { it.tokenExpiredAttention() }
                 vaultLocked?.let { add(ImportAttention("vaultLocked", "APIs", "the credential vault is locked: $it")) }
             }
 
-    fun summary(): String = listOfNotNull(directories?.summary(), apis?.summary(), *errors.toTypedArray()).joinToString(" ")
+    fun summary(): String =
+        listOfNotNull(
+            directories?.summary(),
+            apis?.summary(),
+            reimport?.toSummary(),
+            "Nothing was re-imported: ${reimportBlocked.size} file(s) can't be imported again".takeIf { reimportBlocked.isNotEmpty() },
+            *errors.toTypedArray(),
+        ).joinToString(" ")
 }
 
 /**
@@ -147,9 +180,14 @@ class SessionImports(
             }
         val directories = request.directories
         val apis = targets?.let { it to checkNotNull(request.apis) }
+        val reimport = request.reimport
         val outcome =
             try {
                 when {
+                    reimport != null -> {
+                        reimportDirectories(manager, reimport)
+                    }
+
                     directories != null && apis != null -> {
                         manager.await("import-all", "Import all", ImportRunOutcome::summary) {
                             importBoth(directories, apis.first, apis.second)
@@ -173,13 +211,26 @@ class SessionImports(
                     }
                 }
             } finally {
-                if (directories?.apply == true || request.apis?.apply == true) {
+                if (directories?.apply == true || request.apis?.apply == true || reimport != null) {
                     withContext(NonCancellable) { services.imports.maintenance.refreshMaterializedViews() }
                 }
             }.copy(vaultLocked = vaultLocked)
         mutableLastRun.value = outcome
         return outcome
     }
+
+    // A refused re-import (RerunBlockedException) is an outcome, not a failure: it names the files and changed nothing.
+    private suspend fun reimportDirectories(
+        manager: TaskManager,
+        request: DirectoryReimport,
+    ): ImportRunOutcome =
+        manager.await(REIMPORT_ALL_TASK_KEY, "Re-import files", ImportRunOutcome::summary) {
+            try {
+                ImportRunOutcome(reimport = directories.reimportAll(this, request.folders, refreshViews = false, force = request.force))
+            } catch (blocked: RerunBlockedException) {
+                ImportRunOutcome(reimportBlocked = blocked.files)
+            }
+        }
 
     // The connections a run downloads: unlocks the vault, gives every installed strategy with secrets its
     // connection row, then picks [request]'s strategies' connections. Null: nothing to do.
@@ -235,6 +286,8 @@ class SessionImports(
         refreshViews = false,
     )
 }
+
+private const val REIMPORT_ALL_TASK_KEY = "reimport-all"
 
 /** Thrown by [SessionImports.run] while another run is under way. */
 class ImportAlreadyRunningException : IllegalStateException("An import is already running")

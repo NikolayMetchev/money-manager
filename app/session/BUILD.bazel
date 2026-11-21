@@ -52,6 +52,7 @@ kmp_library(
         "@maven_kmp//:ktor_client_core",
     ],
     deps = [
+        "//app/csvimporter",
         "//app/query",
         "@maven_kmp//:kermit",
     ],

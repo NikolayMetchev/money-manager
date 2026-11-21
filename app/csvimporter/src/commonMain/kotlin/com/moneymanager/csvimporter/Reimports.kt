@@ -170,7 +170,8 @@ class Reimports(
      * rows, then replays them through the normal importer in their original import order. Each row takes its old ids back and
      * writes only what changed. The run releases unclaimed ids, deletes empty accounts and refreshes the materialized views.
      * [accountId] and [currencyId] are for the files whose last import didn't record them. Progress names each
-     * file by [fileLabel], and once [stopRequested] says yes no further file starts (see [runBulkReimport]).
+     * file by [fileLabel], and once [stopRequested] says yes no further file starts (see [runBulkReimport]). [force] runs
+     * every file, including those nothing they read changed (see [unchangedFiles]).
      */
     suspend fun reimportAll(
         plan: ReimportAllPlan,
@@ -179,9 +180,10 @@ class Reimports(
         onProgress: suspend (Progress) -> Unit,
         fileLabel: (CsvImport) -> String = { it.originalFileName },
         stopRequested: () -> Boolean = { false },
+        force: Boolean = false,
     ): BulkReimportResult {
         if (writeLock.isLocked) onProgress(Progress("Waiting for another import to finish", phase = RerunPhases.CHECKING))
-        return writeLock.withLock { reimportAllLocked(plan, accountId, currencyId, onProgress, fileLabel, stopRequested) }
+        return writeLock.withLock { reimportAllLocked(plan, accountId, currencyId, onProgress, fileLabel, stopRequested, force) }
     }
 
     /**
@@ -192,11 +194,12 @@ class Reimports(
     suspend fun prepareAll(
         files: List<CsvImport>,
         onProgress: suspend (Progress) -> Unit,
+        force: Boolean = false,
         fileLabel: (CsvImport) -> String = { it.originalFileName },
     ): suspend () -> BulkReimportResult {
         val plan = planAll(files, onProgress)
         checkReimportable(plan, accountId = null, currencyId = null)
-        return { reimportAll(plan, accountId = null, currencyId = null, onProgress = onProgress, fileLabel = fileLabel) }
+        return { reimportAll(plan, accountId = null, currencyId = null, onProgress = onProgress, fileLabel = fileLabel, force = force) }
     }
 
     /**
@@ -224,11 +227,13 @@ class Reimports(
         onProgress: suspend (Progress) -> Unit,
         fileLabel: (CsvImport) -> String,
         stopRequested: () -> Boolean,
+        force: Boolean,
     ): BulkReimportResult {
         val picked = plan.runFiles()
         checkReimportable(plan, accountId, currencyId)
         val skipped = plan.files.count { it.rowCount > 0 && plan.strategies[it.source] == null && it !in picked }
-        val unchanged = unchangedFiles(picked, plan, accountId, currencyId, onProgress, fileLabel)
+        // Forced, nothing is compared: a change to the importer or matcher isn't in a file's inputs hash.
+        val unchanged = if (force) emptySet() else unchangedFiles(picked, plan, accountId, currencyId, onProgress, fileLabel)
         val run = picked - unchanged
         val rerunFiles = plan.rerunFiles.filter { rerun -> run.any { it.source == rerun.file } }
         if (picked.isNotEmpty() && run.isEmpty()) {
