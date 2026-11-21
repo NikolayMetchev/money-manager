@@ -803,9 +803,8 @@ set of writes.
 - Share commonTest sources with a device test via `# gazelle:kmp_device_test_srcs`
 - **Android Device Tests**: `bazel test //app/ui/core:test_device` (or every one:
   `bazel test $(bazel query 'attr(tags, android_device, tests(//...))')`) on a connected device, or with none on the API 36 emulator `tools/android-device-test` boots from `@android_emulator`.
-  **Android emulator API level sync**: change the level here and you must change it in `MODULE.bazel`
-  (`android_sdk.levels`' `target_sdk`), the CI emulator (`.github/workflows/build.yml` and
-  `.github/workflows/android-release-smoke-test.yml`) too.
+  **Android emulator API level**: it is `MODULE.bazel`'s `android_sdk.levels` `target_sdk`; the system image follows it, so after
+  changing it run `bazel/renovate/repin.sh` (CI no longer names a level).
 - **Test Stability**: Always call `waitForIdle()` after `waitUntilDoesNotExist()` to ensure recompositions complete before test ends
 
 ### Platform Support

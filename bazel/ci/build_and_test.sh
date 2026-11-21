@@ -34,6 +34,11 @@ if [ -n "${BUILDBUDDY_CI_RUNNER_ROOT_DIR:-}" ]; then
   fi
 fi
 
+# PROBE (remove): can this runner accelerate an emulator? Decides whether the device tests can fold into this job.
+if [ "${ANDROID}" = true ]; then
+  { ls -l /dev/kvm; id; grep -c -E 'vmx|svm' /proc/cpuinfo; uname -a; } 2>&1 | sed 's/^/KVM-PROBE: /' | tee "$out/kvm-probe.log"
+fi
+
 # `bazel test` builds every target it's given, tests or not, so one invocation builds `//...` and runs its tests.
 # Android, Kotlin/Native and the browser are optional (bazel/kmp/optional.bzl): their targets are incompatible, and `//...`
 # skips them, unless the platform's flag is on. A pull request without the matching label (build.yml) leaves it off.
