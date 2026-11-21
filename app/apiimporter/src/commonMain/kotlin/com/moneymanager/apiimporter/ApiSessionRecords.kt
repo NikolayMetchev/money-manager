@@ -1,6 +1,7 @@
 package com.moneymanager.apiimporter
 
 import com.moneymanager.domain.model.ApiSession
+import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
@@ -11,7 +12,7 @@ import kotlinx.serialization.json.Json
 
 /**
  * What a session's import reads besides its stored responses, as one hash: the strategy, the counterparty account
- * names, the asset aliases and the pass-through accounts. A session's responses never change once downloaded, so a
+ * names, the asset aliases, the global account mappings and the pass-through accounts. A session's responses never change once downloaded, so a
  * re-import is how a change to any of these reaches what the session booked, and only such a change makes it run.
  */
 suspend fun apiSessionInputsHash(
@@ -19,6 +20,7 @@ suspend fun apiSessionInputsHash(
     counterpartyAccountNames: Map<String, String>,
     passThroughAccounts: List<PassThroughAccount>,
     assetAliases: Map<String, String>,
+    accountMappings: List<AccountMapping>,
 ): String {
     val canonical =
         buildString {
@@ -30,6 +32,10 @@ suspend fun apiSessionInputsHash(
                 .forEach(::appendLine)
             assetAliases.entries
                 .map { (alias, code) -> "alias=$alias|$code" }
+                .sorted()
+                .forEach(::appendLine)
+            accountMappings
+                .map { "mapping=${it.id}|${it.valuePattern.pattern}|${it.accountId.id}" }
                 .sorted()
                 .forEach(::appendLine)
             appendLine(CANONICAL_JSON.encodeToString(PASS_THROUGHS_SERIALIZER, passThroughAccounts.sortedBy { it.id.value }))
@@ -53,7 +59,13 @@ suspend fun isApiSessionUnchanged(
     val records = reads.importRecordRepository.getApiSessionRecords(session.id)
     if (records.isEmpty()) return false
     val inputsHash =
-        apiSessionInputsHash(strategy, counterpartyAccountNames, passThroughAccounts, reads.cryptoRepository.assetAliasMap())
+        apiSessionInputsHash(
+            strategy,
+            counterpartyAccountNames,
+            passThroughAccounts,
+            reads.cryptoRepository.assetAliasMap(),
+            reads.globalAccountMappings(),
+        )
     return records.all { it.contentHash == inputsHash }
 }
 

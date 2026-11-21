@@ -657,6 +657,7 @@ suspend fun importApiSessionTransactions(
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
     // The database's asset aliases, so a currency the feed writes as an alias (`POUND STERLING`) resolves.
     assetAliases: Map<String, String> = emptyMap(),
+    merchantMappings: MerchantMappings = MerchantMappings.NONE,
     onProgress: suspend (Progress) -> Unit = {},
 ): ApiSessionImportResult {
     val setup =
@@ -670,6 +671,7 @@ suspend fun importApiSessionTransactions(
             assetAliases = assetAliases,
             onProgress = onProgress,
             passThroughDetector = passThroughAccounts.takeIf { it.isNotEmpty() }?.let { PassThroughDetector(it) },
+            merchantMappings = merchantMappings,
         )
     onProgress(Progress(detail = "Preparing import session...", fraction = 0.05f))
     // Build the import model purely (no DB writes): allocate account/counterparty/people/ownership
@@ -766,6 +768,8 @@ private data class ImportSetup(
     val importEngine: ImportEngine,
     /** Detects pass-through (conduit) charges (e.g. Curve) from a transaction description; null disables it. */
     val passThroughDetector: PassThroughDetector? = null,
+    /** The global account mappings a pass-through merchant is routed by before an account is created for it. */
+    val merchantMappings: MerchantMappings = MerchantMappings.NONE,
 )
 
 private suspend fun setupImportSession(
@@ -778,6 +782,7 @@ private suspend fun setupImportSession(
     assetAliases: Map<String, String>,
     onProgress: suspend (Progress) -> Unit,
     passThroughDetector: PassThroughDetector? = null,
+    merchantMappings: MerchantMappings = MerchantMappings.NONE,
 ): ImportSetup {
     val requestsById = apiSessionRepository.getRequestsBySession(sessionId).associateBy { it.id }
     val responses = apiSessionRepository.getResponsesBySession(sessionId)
@@ -862,6 +867,7 @@ private suspend fun setupImportSession(
         apiSessionRepository = apiSessionRepository,
         importEngine = importEngine,
         passThroughDetector = passThroughDetector,
+        merchantMappings = merchantMappings,
     )
 }
 
@@ -2012,7 +2018,10 @@ private suspend fun prepareValidTransactionItem(
                 match.accounts.map { account ->
                     AccountRef.Local(setup.accountResolver.resolveNamedAccount(account.conduitAccountName, source))
                 }
-            val merchantRef = AccountRef.Local(setup.accountResolver.resolveNamedAccount(match.merchantName, source))
+            // A mapping on the stripped merchant or on the whole description routes it onto an existing account.
+            val merchantRef =
+                setup.merchantMappings.find(match.merchantName, data.description)?.let { AccountRef.Existing(it) }
+                    ?: AccountRef.Local(setup.accountResolver.resolveNamedAccount(match.merchantName, source))
             ConduitRouting(
                 conduit = conduitRefs.first(),
                 passThrough =

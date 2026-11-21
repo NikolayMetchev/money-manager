@@ -119,6 +119,7 @@ class ApiImportServiceTest : DbTest() {
             cryptoRepository = repositories.cryptoRepository,
             importRecordRepository = repositories.importRecordRepository,
             passThroughAccountRepository = repositories.passThroughAccountRepository,
+            accountMappingRepository = repositories.accountMappingRepository,
             maintenance = maintenance,
             importEngine = repositories.importEngine,
             credentialVault = vault,

@@ -523,6 +523,7 @@ class OracleDatabase private constructor(
             currencyRepository = db.currencyRepository,
             cryptoRepository = db.cryptoRepository,
             importRecordRepository = db.importRecordRepository,
+            accountMappingRepository = db.accountMappingRepository,
         )
 
     /** One `bulkApplyCsv` call with every argument the import folders pass it. */

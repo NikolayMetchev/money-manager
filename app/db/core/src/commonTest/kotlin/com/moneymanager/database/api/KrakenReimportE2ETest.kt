@@ -192,6 +192,7 @@ class KrakenReimportE2ETest : DbTest() {
                     currencyRepository = repositories.currencyRepository,
                     cryptoRepository = repositories.cryptoRepository,
                     importRecordRepository = repositories.importRecordRepository,
+                    accountMappingRepository = repositories.accountMappingRepository,
                 )
             val plan = planApiReimport(sessionId, repositories.apiSessionRepository, reimports.reads)
             assertTrue(plan.createdTransfers.contains(withdrawalBefore.id), "the plan should target the withdrawal this session created")
@@ -307,6 +308,7 @@ class KrakenReimportE2ETest : DbTest() {
                             currencyRepository = repositories.currencyRepository,
                             cryptoRepository = repositories.cryptoRepository,
                             importRecordRepository = repositories.importRecordRepository,
+                            accountMappingRepository = repositories.accountMappingRepository,
                         ),
                     reads = reimports.reads,
                     maintenance = testMaintenance,
@@ -382,6 +384,7 @@ class KrakenReimportE2ETest : DbTest() {
                             currencyRepository = repositories.currencyRepository,
                             cryptoRepository = repositories.cryptoRepository,
                             importRecordRepository = repositories.importRecordRepository,
+                            accountMappingRepository = repositories.accountMappingRepository,
                         ),
                     reads = reimports.reads,
                     maintenance = testMaintenance,
