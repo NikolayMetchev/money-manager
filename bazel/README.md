@@ -374,7 +374,7 @@ it is relative, so it runs under any prefix.
   `# gazelle:kmp_device_test_srcs` shares, with `device_deps`, `device_manifest` and `device_resources`
   (`kmp_device_test_resources`); the test runner is `kmp_keep_dep … androidDeviceTest`. `android_apk(test_runner = …)`
   builds the self-instrumenting test APK (`com.moneymanager.<module path>.test`, targetSdk = compileSdk), and
-  `android_device_test` runs it with `adb install` and `am instrument -w -r` (`DeviceTestRunner`, which writes
+  `android_device_test` runs it with `adb install` and `am instrument -w -r` (`tools/android-device-test`, which writes
   `test.xml`) on the device adb picks (`ANDROID_SERIAL` among several). They're `manual`, `local` and `exclusive`,
   tagged `android_device`, so `bazel test //...` leaves them out; run them with
   `bazel test $(bazel query 'attr(tags, android_device, tests(//...))')` against an API 36 emulator (Espresso 3.5.0
