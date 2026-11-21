@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.AssetId
 import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.CurrencyId
@@ -43,6 +44,7 @@ import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.AttributeTypeReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
+import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.importengineapi.AccountRef
@@ -52,6 +54,7 @@ import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.components.AccountPicker
+import com.moneymanager.ui.components.AssetPicker
 import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.components.DateTimePickerField
 import com.moneymanager.ui.components.LoadingTextButton
@@ -78,6 +81,7 @@ fun TransactionEditDialog(
     currencyRepository: CurrencyReadRepository,
     attributeTypeRepository: AttributeTypeReadRepository,
     personRepository: PersonReadRepository,
+    cryptoRepository: CryptoReadRepository? = null,
     maintenance: Maintenance,
     preSelectedSourceAccountId: AccountId? = null,
     preSelectedCurrencyId: CurrencyId? = null,
@@ -87,15 +91,10 @@ fun TransactionEditDialog(
     val isEditMode = transaction != null
     var sourceAccountId by remember { mutableStateOf(transaction?.sourceAccountId ?: preSelectedSourceAccountId) }
     var targetAccountId by remember { mutableStateOf(transaction?.targetAccountId) }
-    var currencyId by remember {
-        mutableStateOf(
-            transaction
-                ?.amount
-                ?.asset
-                ?.id
-                ?.let { CurrencyId(it.id) } ?: preSelectedCurrencyId,
-        )
-    }
+    // Held as the asset itself, not an id: a crypto transfer (e.g. a reconciliation copy) must keep its asset.
+    var selectedAsset by remember { mutableStateOf(transaction?.amount?.asset) }
+    var preSelectedAssetId by remember { mutableStateOf<AssetId?>(preSelectedCurrencyId) }
+    val currencyId: AssetId? = selectedAsset?.id ?: preSelectedAssetId
     var amount by remember {
         mutableStateOf(
             transaction
@@ -272,7 +271,8 @@ fun TransactionEditDialog(
                     try {
                         // Get the currency object from repository
                         val currency =
-                            currencyRepository.getCurrencyById(currencyId!!).first()
+                            selectedAsset
+                                ?: preSelectedAssetId?.let { currencyRepository.getCurrencyById(CurrencyId(it.id)).first() }
                                 ?: error("Currency not found")
 
                         val timestamp =
@@ -480,19 +480,37 @@ fun TransactionEditDialog(
                 )
 
                 // Currency Picker
-                CurrencyPicker(
-                    selectedCurrencyId = currencyId,
-                    onCurrencySelected = {
-                        currencyId = it
-                        currencyError = false
-                    },
-                    label = "Currency",
-                    currencyRepository = currencyRepository,
-                    enabled = !isSaving,
-                    isError = currencyError,
-                    focusRequester = currencyFocusRequester,
-                    onSubmit = submit,
-                )
+                if (cryptoRepository != null) {
+                    AssetPicker(
+                        selectedAssetId = currencyId,
+                        onAssetSelected = {
+                            selectedAsset = it
+                            currencyError = false
+                        },
+                        label = "Currency",
+                        currencyRepository = currencyRepository,
+                        cryptoRepository = cryptoRepository,
+                        enabled = !isSaving,
+                        isError = currencyError,
+                        focusRequester = currencyFocusRequester,
+                        onSubmit = submit,
+                    )
+                } else {
+                    CurrencyPicker(
+                        selectedCurrencyId = currencyId?.let { CurrencyId(it.id) },
+                        onCurrencySelected = {
+                            selectedAsset = null
+                            preSelectedAssetId = it
+                            currencyError = false
+                        },
+                        label = "Currency",
+                        currencyRepository = currencyRepository,
+                        enabled = !isSaving,
+                        isError = currencyError,
+                        focusRequester = currencyFocusRequester,
+                        onSubmit = submit,
+                    )
+                }
 
                 DateTimePickerField(
                     value = LocalDateTime(selectedDate, LocalTime(selectedHour, selectedMinute)),

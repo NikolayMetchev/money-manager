@@ -50,7 +50,6 @@ import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.ExchangeOrderId
 import com.moneymanager.domain.model.Trade
@@ -758,12 +757,7 @@ fun AccountTransactionsScreen(
                                 screenSizeClass = screenSizeClass,
                                 isHighlighted = highlightedTransactionId == runningBalance.transactionId,
                                 onEditClick = { transfer ->
-                                    // TransactionEditDialog is fiat-only (CurrencyPicker + currencyRepository
-                                    // save path); opening it on a crypto-denominated transfer would corrupt
-                                    // its asset. Only fiat transfers are editable here for now.
-                                    if (transfer.amount.asset is Currency) {
-                                        transactionIdToEdit = transfer.id
-                                    }
+                                    transactionIdToEdit = transfer.id
                                 },
                                 onEditTradeClick = { tradeIdToEdit = it },
                                 onAuditClick = onAuditClick,
@@ -864,6 +858,7 @@ fun AccountTransactionsScreen(
             accountRepository = accountRepository,
             categoryRepository = categoryRepository,
             currencyRepository = currencyRepository,
+            cryptoRepository = cryptoRepository,
             attributeTypeRepository = attributeTypeRepository,
             personRepository = personRepository,
             maintenance = maintenance,

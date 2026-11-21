@@ -31,6 +31,8 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Category
+import com.moneymanager.domain.model.CryptoAsset
+import com.moneymanager.domain.model.CryptoId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DbLocation
@@ -57,6 +59,7 @@ import com.moneymanager.domain.repository.write.CurrencyWriteRepository
 import com.moneymanager.domain.repository.write.PersonAccountOwnershipWriteRepository
 import com.moneymanager.domain.repository.write.PersonWriteRepository
 import com.moneymanager.domain.repository.write.TransactionWriteRepository
+import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportResult
 import com.moneymanager.presenter.error.ProvideSchemaAwareScope
@@ -242,6 +245,71 @@ class AccountTransactionsScreenTest {
             waitForIdle()
             assertTrue(dismissed)
             verifySuspend { importEngine.import(any()) }
+        }
+    }
+
+    @Test
+    fun transactionEditDialog_keepsCryptoAssetWhenEditingDescription() {
+        runMoneyManagerComposeUiTest {
+            val now = Clock.System.now()
+            val bitcoin = CryptoAsset(id = CryptoId(7L), code = "BTC", name = "Bitcoin")
+            val transfer =
+                Transfer(
+                    id = TransferId(104846L),
+                    timestamp = now,
+                    description = "Reconciled copy",
+                    sourceAccountId = AccountId(1L),
+                    targetAccountId = AccountId(2L),
+                    amount = Money.fromDisplayValue("0.5", bitcoin),
+                )
+            val cryptoRepository =
+                mock<CryptoReadRepository>(MockMode.autoUnit) {
+                    every { getAllCryptoAssets() } returns flowOf(listOf(bitcoin))
+                }
+            val batches = mutableListOf<ImportBatch>()
+            val importEngine = mock<ImportEngine>(MockMode.autoUnit)
+            everySuspend { importEngine.import(any()) } calls { (batch: ImportBatch) ->
+                batches += batch
+                ImportResult()
+            }
+            var saved = false
+            val accounts =
+                listOf(
+                    Account(id = AccountId(1L), name = "Wallet", openingDate = now),
+                    Account(id = AccountId(2L), name = "Exchange", openingDate = now),
+                )
+
+            setContent {
+                CompositionLocalProvider(LocalImportEngine provides importEngine) {
+                    ProvideSchemaAwareScope {
+                        TransactionEditDialog(
+                            transaction = transfer,
+                            accountRepository = createAccountRepository(accounts),
+                            categoryRepository = createCategoryRepository(),
+                            currencyRepository = createCurrencyRepository(emptyList()),
+                            cryptoRepository = cryptoRepository,
+                            attributeTypeRepository = createAttributeTypeRepository(),
+                            personRepository = createPersonRepository(),
+                            maintenance = createMaintenance(),
+                            onDismiss = {},
+                            onSaved = { saved = true },
+                        )
+                    }
+                }
+            }
+
+            waitUntilExactlyOneExists(hasText("Edit Transaction"))
+            onNodeWithText("Reconciled copy").performTextReplacement("Edited copy")
+            onNodeWithText("Update").performClick()
+            waitUntil(timeoutMillis = 5_000) { saved }
+            assertEquals(
+                Money.fromDisplayValue("0.5", bitcoin),
+                batches
+                    .single()
+                    .transfers
+                    .single()
+                    .amount,
+            )
         }
     }
 
