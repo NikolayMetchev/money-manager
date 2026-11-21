@@ -214,4 +214,55 @@ class RunnerTest {
         assertTrue("exited" in error.message.orEmpty())
         assertTrue("Broken AVD" in error.message.orEmpty())
     }
+
+    private class Booked : AutoCloseable {
+        var closed = false
+
+        override fun close() {
+            closed = true
+        }
+    }
+
+    @Test
+    fun `a command runs with an emulator booted around it, and stopped after`() {
+        val booked = Booked()
+        val ran = mutableListOf<List<String>>()
+        val adb = FakeAdb { "List of devices attached\n\n" }
+
+        val status =
+            withEmulator(adb, dir.resolve("p"), listOf("bazel", "test"), start = { _, _ -> booked }) {
+                ran += it
+                3
+            }
+
+        assertEquals(3, status)
+        assertEquals(listOf(listOf("bazel", "test")), ran)
+        assertTrue(booked.closed)
+    }
+
+    @Test
+    fun `a command with a device already connected boots nothing`() {
+        var started = false
+        val adb = FakeAdb { "List of devices attached\nR58N\tdevice\n" }
+
+        val status =
+            withEmulator(adb, dir.resolve("p"), listOf("true"), start = { _, _ ->
+                started = true
+                Booked()
+            }) { 0 }
+
+        assertEquals(0, status)
+        assertFalse(started)
+    }
+
+    @Test
+    fun `no command is a usage error`() {
+        assertFailsWith<IllegalArgumentException> { withEmulator(FakeAdb(), dir.resolve("p"), emptyList()) { 0 } }
+    }
+
+    @Test
+    fun `a command's exit status is reported, from the directory bazel run was started in`() {
+        assertEquals(0, runCommand(listOf(java.toString(), "-version"), dir))
+        assertTrue(runCommand(listOf(java.toString(), "--no-such-option"), null) != 0)
+    }
 }

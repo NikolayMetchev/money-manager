@@ -1,3 +1,4 @@
+load("@rules_java//java:java_binary.bzl", "java_binary")
 load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
 
 # gazelle:kmp_generate true
@@ -8,6 +9,24 @@ kmp_library(
     name = "android-device-test",
     jvm_srcs = glob(["src/main/kotlin/**/*.kt"]),
     visibility = ["//visibility:public"],
+)
+
+# One emulator for a command that runs many device tests (see WithEmulator.kt):
+#   bazel run --config=device //tools/android-device-test:with-emulator -- bazel test --config=device //...
+java_binary(
+    name = "with-emulator",
+    args = [
+        "$(rootpath @android_platform_tools//:adb)",
+        "$(rootpath @android_emulator//:emulator.properties)",
+    ],
+    data = [
+        "@android_emulator//:emulator.properties",
+        "@android_platform_tools//:adb",
+        "@android_platform_tools//:adb_files",
+    ],
+    main_class = "com.moneymanager.tools.androiddevicetest.WithEmulatorKt",
+    visibility = ["//visibility:public"],
+    runtime_deps = [":android-device-test_jvm"],
 )
 
 kmp_test(
