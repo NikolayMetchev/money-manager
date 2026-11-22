@@ -188,7 +188,7 @@ fun AccountTransactionsScreen(
     val scrollScope = rememberSchemaAwareCoroutineScope()
 
     // Pagination state
-    var runningBalances by remember { mutableStateOf<List<com.moneymanager.domain.model.AccountRow>>(emptyList()) }
+    var runningBalances by remember { mutableStateOf<List<AccountRow>>(emptyList()) }
     var currentPagingInfo by remember { mutableStateOf<com.moneymanager.domain.model.PagingInfo?>(null) }
     var isLoadingPage by remember { mutableStateOf(false) }
     var hasLoadedFirstPage by remember { mutableStateOf(false) }

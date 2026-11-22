@@ -1126,7 +1126,7 @@ class AccountTransactionsScreenTest {
                 batches += batch
                 ImportResult()
             }
-            setContent { DeleteTestScreen(importEngine) }
+            setContent(deleteTestContent(importEngine))
             waitForIdle()
 
             onNodeWithTag("deleteTransactionButton").performClick()
@@ -1151,7 +1151,7 @@ class AccountTransactionsScreenTest {
                 batches += batch
                 ImportResult()
             }
-            setContent { DeleteTestScreen(importEngine) }
+            setContent(deleteTestContent(importEngine))
             waitForIdle()
 
             onNodeWithTag("deleteTransactionButton").performClick()
@@ -1165,8 +1165,7 @@ class AccountTransactionsScreenTest {
     }
 
     /** An account holding one transfer ("Coffee", id 10), with [importEngine] provided for its writes. */
-    @Composable
-    private fun DeleteTestScreen(importEngine: ImportEngine) {
+    private fun deleteTestContent(importEngine: ImportEngine): @Composable () -> Unit {
         val now = Clock.System.now()
         val usd = Currency(id = CurrencyId(1L), code = "USD", name = "US Dollar", scaleFactor = 100)
         val own = Account(id = AccountId(1L), name = "Checking", openingDate = now)
@@ -1180,21 +1179,26 @@ class AccountTransactionsScreenTest {
                 targetAccountId = shop.id,
                 amount = Money.fromDisplayValue("100", usd),
             )
-        CompositionLocalProvider(LocalImportEngine provides importEngine) {
-            ProvideSchemaAwareScope {
-                AccountTransactionsScreen(
-                    accountId = own.id,
-                    transactionRepository = createTransactionRepository(listOf(transfer)),
-                    accountRepository = createAccountRepository(listOf(own, shop)),
-                    accountAttributeRepository = createAccountAttributeRepository(),
-                    categoryRepository = createCategoryRepository(),
-                    currencyRepository = createCurrencyRepository(listOf(usd)),
-                    attributeTypeRepository = createAttributeTypeRepository(),
-                    personRepository = createPersonRepository(),
-                    personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
-                    exchangeOrderRepository = createExchangeOrderRepository(),
-                    maintenance = createMaintenance(),
-                )
+        val transactionRepository = createTransactionRepository(listOf(transfer))
+        val accountRepository = createAccountRepository(listOf(own, shop))
+        val currencyRepository = createCurrencyRepository(listOf(usd))
+        return {
+            CompositionLocalProvider(LocalImportEngine provides importEngine) {
+                ProvideSchemaAwareScope {
+                    AccountTransactionsScreen(
+                        accountId = own.id,
+                        transactionRepository = transactionRepository,
+                        accountRepository = accountRepository,
+                        accountAttributeRepository = createAccountAttributeRepository(),
+                        categoryRepository = createCategoryRepository(),
+                        currencyRepository = currencyRepository,
+                        attributeTypeRepository = createAttributeTypeRepository(),
+                        personRepository = createPersonRepository(),
+                        personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
+                        exchangeOrderRepository = createExchangeOrderRepository(),
+                        maintenance = createMaintenance(),
+                    )
+                }
             }
         }
     }
