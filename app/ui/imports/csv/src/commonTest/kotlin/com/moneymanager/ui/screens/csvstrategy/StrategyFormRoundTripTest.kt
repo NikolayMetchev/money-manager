@@ -1,6 +1,10 @@
 package com.moneymanager.ui.screens.csvstrategy
 
-import com.moneymanager.builtin.BuiltInCsvStrategies
+import com.moneymanager.builtin.AccointingStrategies
+import com.moneymanager.builtin.CelsiusStrategies
+import com.moneymanager.builtin.FreetradeStrategies
+import com.moneymanager.builtin.KoinlyStrategies
+import com.moneymanager.builtin.MarcusStrategies
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.csv.CsvColumn
@@ -310,7 +314,7 @@ class StrategyFormRoundTripTest {
     fun `the built-in Koinly strategy survives a no-op save`() {
         // Its conditional source, credited-leg (trade) mappings, extractions, fee currency, aliases and
         // reconciliation config have no dedicated widgets; saving unchanged must keep every one of them.
-        val koinly = BuiltInCsvStrategies.buildKoinlyCsvStrategy(timestamp)
+        val koinly = KoinlyStrategies.buildKoinlyCsvStrategy(timestamp)
 
         val state = CsvStrategyEditorState(koinly, koinly.config.identificationColumns)
         val rebuilt = buildStrategyFromEditorState(state, koinly.id, koinly.createdAt, koinly.updatedAt)
@@ -320,7 +324,7 @@ class StrategyFormRoundTripTest {
 
     @Test
     fun `the built-in Accointing strategy survives a no-op save`() {
-        val accointing = BuiltInCsvStrategies.buildAccointingCsvStrategy(timestamp)
+        val accointing = AccointingStrategies.buildAccointingCsvStrategy(timestamp)
 
         val state = CsvStrategyEditorState(accointing, accointing.config.identificationColumns)
         val rebuilt = buildStrategyFromEditorState(state, accointing.id, accointing.createdAt, accointing.updatedAt)
@@ -330,7 +334,7 @@ class StrategyFormRoundTripTest {
 
     @Test
     fun `the built-in Celsius strategy survives a no-op save`() {
-        val celsius = BuiltInCsvStrategies.buildCelsiusCsvStrategy(timestamp)
+        val celsius = CelsiusStrategies.buildCelsiusCsvStrategy(timestamp)
 
         val state = CsvStrategyEditorState(celsius, celsius.config.identificationColumns)
         val rebuilt = buildStrategyFromEditorState(state, celsius.id, celsius.createdAt, celsius.updatedAt)
@@ -340,7 +344,7 @@ class StrategyFormRoundTripTest {
 
     @Test
     fun `the built-in Freetrade strategy survives a no-op save`() {
-        val freetrade = BuiltInCsvStrategies.buildFreetradeCsvStrategy(timestamp)
+        val freetrade = FreetradeStrategies.buildFreetradeCsvStrategy(timestamp)
 
         val state = CsvStrategyEditorState(freetrade, freetrade.config.identificationColumns)
         val rebuilt = buildStrategyFromEditorState(state, freetrade.id, freetrade.createdAt, freetrade.updatedAt)
@@ -350,7 +354,7 @@ class StrategyFormRoundTripTest {
 
     @Test
     fun `the built-in Marcus strategy survives a no-op save`() {
-        val marcus = BuiltInCsvStrategies.buildMarcusCsvStrategy(timestamp, CurrencyId(1))
+        val marcus = MarcusStrategies.buildMarcusCsvStrategy(timestamp, CurrencyId(1))
 
         val state = CsvStrategyEditorState(marcus, marcus.config.identificationColumns)
         val rebuilt = buildStrategyFromEditorState(state, marcus.id, marcus.createdAt, marcus.updatedAt)
@@ -361,7 +365,7 @@ class StrategyFormRoundTripTest {
     @Test
     fun `optional columns the sample file lacks survive a save`() {
         // Editing the strategy against an older export, which has none of its optional columns, must not drop them.
-        val koinly = BuiltInCsvStrategies.buildKoinlyCsvStrategy(timestamp)
+        val koinly = KoinlyStrategies.buildKoinlyCsvStrategy(timestamp)
 
         val state = CsvStrategyEditorState(koinly, koinly.config.identificationColumns)
         val rebuilt = buildStrategyFromEditorState(state, koinly.id, koinly.createdAt, koinly.updatedAt)

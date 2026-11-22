@@ -1,6 +1,7 @@
 package com.moneymanager.csvimporter
 
 import com.moneymanager.builtin.BuiltInCsvStrategies
+import com.moneymanager.builtin.FreetradeStrategies
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.CurrencyId
@@ -406,7 +407,7 @@ class StrategySelectorTest {
     fun `a Freetrade export selects the Freetrade strategy when its file name says the account type`() {
         val builtIns = BuiltInCsvStrategies.builtInCsvStrategies(Clock.System.now(), CurrencyId(1))
         val names =
-            BuiltInCsvStrategies
+            FreetradeStrategies
                 .buildFreetradeCsvStrategy(Clock.System.now())
                 .config.identificationColumns
                 .toList()

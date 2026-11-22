@@ -1,6 +1,7 @@
 package com.moneymanager.database.csv
 
 import com.moneymanager.bigdecimal.BigDecimal
+import com.moneymanager.builtin.BarclaycardStrategies
 import com.moneymanager.builtin.BuiltInCsvStrategies
 import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.MappingResult
@@ -29,10 +30,10 @@ import kotlin.test.assertNull
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
-/** The built-in Barclaycard OFX strategy ([BuiltInCsvStrategies.buildBarclaycardOfxStrategy]) over a Barclaycard download. */
+/** The built-in Barclaycard OFX strategy ([BarclaycardStrategies.buildBarclaycardOfxStrategy]) over a Barclaycard download. */
 class BarclaycardOfxMapperTest {
     private val now = Clock.System.now()
-    private val strategy = BuiltInCsvStrategies.buildBarclaycardOfxStrategy(now)
+    private val strategy = BarclaycardStrategies.buildBarclaycardOfxStrategy(now)
 
     private val gbp =
         Currency(id = CurrencyId(1), code = "GBP", name = "British Pound", scaleFactor = CurrencyScaleFactors.DEFAULT_SCALE_FACTOR)

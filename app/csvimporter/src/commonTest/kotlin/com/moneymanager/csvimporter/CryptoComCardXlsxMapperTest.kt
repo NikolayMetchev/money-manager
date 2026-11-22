@@ -2,6 +2,7 @@ package com.moneymanager.csvimporter
 
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.builtin.BuiltInCsvStrategies
+import com.moneymanager.builtin.CryptoComStrategies
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Category
@@ -33,7 +34,7 @@ import kotlin.uuid.Uuid
  */
 class CryptoComCardXlsxMapperTest {
     private val now = Clock.System.now()
-    private val strategy = BuiltInCsvStrategies.buildCryptoComCardXlsxStrategy(now)
+    private val strategy = CryptoComStrategies.buildCryptoComCardXlsxStrategy(now)
 
     private val gbp =
         Currency(id = CurrencyId(1), code = "GBP", name = "British Pound", scaleFactor = CurrencyScaleFactors.DEFAULT_SCALE_FACTOR)

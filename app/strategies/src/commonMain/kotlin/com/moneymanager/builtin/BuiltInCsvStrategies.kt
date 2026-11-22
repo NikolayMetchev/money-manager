@@ -41,89 +41,28 @@ object BuiltInCsvStrategies {
         qifCurrencyId: CurrencyId,
     ): List<CsvImportStrategy> =
         listOf(
-            buildSantanderQifStrategy(now, qifCurrencyId),
-            buildAmexQifStrategy(now, qifCurrencyId),
-            buildAmexPdfStrategy(now, qifCurrencyId),
-            buildBarclaycardOfxStrategy(now),
-            buildBarclaycardCsvStrategy(now, qifCurrencyId),
-            buildWiseCsvStrategy(now),
-            buildMonzoCsvStrategy(now),
-            buildMarcusCsvStrategy(now, qifCurrencyId),
-            buildRevolutCsvStrategy(now),
-            buildCryptoComCardStrategy(now),
-            buildCryptoComFiatStrategy(now),
-            buildCryptoComCryptoStrategy(now),
-            buildCurveCsvStrategy(now),
-            buildCryptoComCardXlsxStrategy(now),
-            buildBinanceCsvStrategy(now),
-            buildKoinlyCsvStrategy(now),
-            buildAccointingCsvStrategy(now),
-            buildCelsiusCsvStrategy(now),
-            buildFreetradeCsvStrategy(now),
-            buildBybitSpotCsvStrategy(now),
-            buildBybitFundingCsvStrategy(now),
-            buildBybitUnifiedCsvStrategy(now),
-            buildPayPalCsvStrategy(now),
+            SantanderQifStrategies.buildSantanderQifStrategy(now, qifCurrencyId),
+            AmexStrategies.buildAmexQifStrategy(now, qifCurrencyId),
+            AmexStrategies.buildAmexPdfStrategy(now, qifCurrencyId),
+            BarclaycardStrategies.buildBarclaycardOfxStrategy(now),
+            BarclaycardStrategies.buildBarclaycardCsvStrategy(now, qifCurrencyId),
+            WiseStrategies.buildWiseCsvStrategy(now),
+            MonzoStrategies.buildMonzoCsvStrategy(now),
+            MarcusStrategies.buildMarcusCsvStrategy(now, qifCurrencyId),
+            RevolutStrategies.buildRevolutCsvStrategy(now),
+            CryptoComStrategies.buildCryptoComCardStrategy(now),
+            CryptoComStrategies.buildCryptoComFiatStrategy(now),
+            CryptoComStrategies.buildCryptoComCryptoStrategy(now),
+            CurveStrategies.buildCurveCsvStrategy(now),
+            CryptoComStrategies.buildCryptoComCardXlsxStrategy(now),
+            BinanceStrategies.buildBinanceCsvStrategy(now),
+            KoinlyStrategies.buildKoinlyCsvStrategy(now),
+            AccointingStrategies.buildAccointingCsvStrategy(now),
+            CelsiusStrategies.buildCelsiusCsvStrategy(now),
+            FreetradeStrategies.buildFreetradeCsvStrategy(now),
+            BybitStrategies.buildBybitSpotCsvStrategy(now),
+            BybitStrategies.buildBybitFundingCsvStrategy(now),
+            BybitStrategies.buildBybitUnifiedCsvStrategy(now),
+            PayPalStrategies.buildPayPalCsvStrategy(now),
         )
-
-    fun buildAccointingCsvStrategy(now: Instant): CsvImportStrategy = AccointingStrategies.buildAccointingCsvStrategy(now)
-
-    fun buildAmexPdfStrategy(
-        now: Instant,
-        currencyId: CurrencyId,
-    ): CsvImportStrategy = AmexStrategies.buildAmexPdfStrategy(now, currencyId)
-
-    fun buildAmexQifStrategy(
-        now: Instant,
-        currencyId: CurrencyId,
-    ): CsvImportStrategy = AmexStrategies.buildAmexQifStrategy(now, currencyId)
-
-    fun buildBarclaycardCsvStrategy(
-        now: Instant,
-        currencyId: CurrencyId,
-    ): CsvImportStrategy = BarclaycardStrategies.buildBarclaycardCsvStrategy(now, currencyId)
-
-    fun buildBarclaycardOfxStrategy(now: Instant): CsvImportStrategy = BarclaycardStrategies.buildBarclaycardOfxStrategy(now)
-
-    fun buildBinanceCsvStrategy(now: Instant): CsvImportStrategy = BinanceStrategies.buildBinanceCsvStrategy(now)
-
-    fun buildBybitFundingCsvStrategy(now: Instant): CsvImportStrategy = BybitStrategies.buildBybitFundingCsvStrategy(now)
-
-    fun buildBybitSpotCsvStrategy(now: Instant): CsvImportStrategy = BybitStrategies.buildBybitSpotCsvStrategy(now)
-
-    fun buildBybitUnifiedCsvStrategy(now: Instant): CsvImportStrategy = BybitStrategies.buildBybitUnifiedCsvStrategy(now)
-
-    fun buildCelsiusCsvStrategy(now: Instant): CsvImportStrategy = CelsiusStrategies.buildCelsiusCsvStrategy(now)
-
-    fun buildCryptoComCardStrategy(now: Instant): CsvImportStrategy = CryptoComStrategies.buildCryptoComCardStrategy(now)
-
-    fun buildCryptoComCardXlsxStrategy(now: Instant): CsvImportStrategy = CryptoComStrategies.buildCryptoComCardXlsxStrategy(now)
-
-    fun buildCryptoComCryptoStrategy(now: Instant): CsvImportStrategy = CryptoComStrategies.buildCryptoComCryptoStrategy(now)
-
-    fun buildCryptoComFiatStrategy(now: Instant): CsvImportStrategy = CryptoComStrategies.buildCryptoComFiatStrategy(now)
-
-    fun buildCurveCsvStrategy(now: Instant): CsvImportStrategy = CurveStrategies.buildCurveCsvStrategy(now)
-
-    fun buildFreetradeCsvStrategy(now: Instant): CsvImportStrategy = FreetradeStrategies.buildFreetradeCsvStrategy(now)
-
-    fun buildKoinlyCsvStrategy(now: Instant): CsvImportStrategy = KoinlyStrategies.buildKoinlyCsvStrategy(now)
-
-    fun buildMarcusCsvStrategy(
-        now: Instant,
-        currencyId: CurrencyId,
-    ): CsvImportStrategy = MarcusStrategies.buildMarcusCsvStrategy(now, currencyId)
-
-    fun buildMonzoCsvStrategy(now: Instant): CsvImportStrategy = MonzoStrategies.buildMonzoCsvStrategy(now)
-
-    fun buildPayPalCsvStrategy(now: Instant): CsvImportStrategy = PayPalStrategies.buildPayPalCsvStrategy(now)
-
-    fun buildRevolutCsvStrategy(now: Instant): CsvImportStrategy = RevolutStrategies.buildRevolutCsvStrategy(now)
-
-    fun buildSantanderQifStrategy(
-        now: Instant,
-        currencyId: CurrencyId,
-    ): CsvImportStrategy = SantanderQifStrategies.buildSantanderQifStrategy(now, currencyId)
-
-    fun buildWiseCsvStrategy(now: Instant): CsvImportStrategy = WiseStrategies.buildWiseCsvStrategy(now)
 }

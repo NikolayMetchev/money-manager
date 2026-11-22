@@ -1,6 +1,6 @@
 package com.moneymanager.csvimporter
 
-import com.moneymanager.builtin.BuiltInCsvStrategies
+import com.moneymanager.builtin.BinanceStrategies
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CryptoAsset
@@ -27,7 +27,7 @@ import kotlin.uuid.Uuid
  */
 class BinanceCsvMapperTest {
     private val now = Clock.System.now()
-    private val strategy = BuiltInCsvStrategies.buildBinanceCsvStrategy(now)
+    private val strategy = BinanceStrategies.buildBinanceCsvStrategy(now)
 
     // Production seeds every currency at the same 18-decimal scale as crypto, which is what lets
     // Binance's 8-decimal fiat amounts (e.g. "186.70374170" GBP) be represented exactly.

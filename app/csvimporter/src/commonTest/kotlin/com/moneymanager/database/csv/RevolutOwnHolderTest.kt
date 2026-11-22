@@ -1,6 +1,6 @@
 package com.moneymanager.database.csv
 
-import com.moneymanager.builtin.BuiltInCsvStrategies
+import com.moneymanager.builtin.RevolutStrategies
 import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.MappingResult
 import com.moneymanager.domain.model.Account
@@ -18,7 +18,7 @@ import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 class RevolutOwnHolderTest {
-    private val strategy = BuiltInCsvStrategies.buildRevolutCsvStrategy(Clock.System.now())
+    private val strategy = RevolutStrategies.buildRevolutCsvStrategy(Clock.System.now())
     private val gbp = Currency(id = CurrencyId(1), code = "GBP", name = "British Pound", scaleFactor = 100)
     private val revolut = Account(id = AccountId(13), name = "Revolut", openingDate = Clock.System.now())
     private val holder = Account(id = AccountId(20), name = "Nikolay Metchev", openingDate = Clock.System.now())

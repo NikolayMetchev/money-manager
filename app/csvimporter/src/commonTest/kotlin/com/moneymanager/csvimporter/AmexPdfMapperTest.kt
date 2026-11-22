@@ -1,7 +1,7 @@
 package com.moneymanager.csvimporter
 
 import com.moneymanager.bigdecimal.BigDecimal
-import com.moneymanager.builtin.BuiltInCsvStrategies
+import com.moneymanager.builtin.AmexStrategies
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
@@ -24,10 +24,10 @@ import kotlin.test.assertNull
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
-/** The built-in American Express PDF strategy ([BuiltInCsvStrategies.buildAmexPdfStrategy]) over its statements' layouts. */
+/** The built-in American Express PDF strategy ([AmexStrategies.buildAmexPdfStrategy]) over its statements' layouts. */
 class AmexPdfMapperTest {
     private val now = Clock.System.now()
-    private val strategy = BuiltInCsvStrategies.buildAmexPdfStrategy(now, CurrencyId(1))
+    private val strategy = AmexStrategies.buildAmexPdfStrategy(now, CurrencyId(1))
 
     private val gbp =
         Currency(id = CurrencyId(1), code = "GBP", name = "British Pound", scaleFactor = CurrencyScaleFactors.DEFAULT_SCALE_FACTOR)

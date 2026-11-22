@@ -1,6 +1,7 @@
 package com.moneymanager.database.csv
 
 import com.moneymanager.builtin.BuiltInCsvStrategies
+import com.moneymanager.builtin.SantanderQifStrategies
 import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.MappingResult
 import com.moneymanager.csvimporter.OWN_FEE_ACCOUNT_ID
@@ -25,14 +26,14 @@ import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 /**
- * Exercises the built-in Santander QIF strategy ([BuiltInCsvStrategies.buildSantanderQifStrategy]) — which
+ * Exercises the built-in Santander QIF strategy ([SantanderQifStrategies.buildSantanderQifStrategy]) — which
  * is pure config — against the real Santander Payee formats. Verifies the config-driven parsing
  * extracts a clean counterparty (target account), tags transaction-type / reference / mandate / date
  * attributes, cleans the description, and flags person-to-person counterparties.
  */
 class SantanderQifMapperTest {
     private val now = Clock.System.now()
-    private val strategy = BuiltInCsvStrategies.buildSantanderQifStrategy(now, CurrencyId(1))
+    private val strategy = SantanderQifStrategies.buildSantanderQifStrategy(now, CurrencyId(1))
 
     private val gbp =
         Currency(id = CurrencyId(1), code = "GBP", name = "British Pound", scaleFactor = CurrencyScaleFactors.DEFAULT_SCALE_FACTOR)
