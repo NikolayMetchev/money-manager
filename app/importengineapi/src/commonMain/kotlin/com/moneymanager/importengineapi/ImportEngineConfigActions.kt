@@ -93,19 +93,26 @@ suspend fun ImportEngine.setTransferExcluded(
     transfer: Transfer,
     reason: String?,
 ) {
+    val update = exclusionUpdate(transfer, reason) ?: return
+    import(ImportBatch.manualEdits(transfers = listOf(update)))
+}
+
+/** The hand edit that gives [transfer] exactly the exclusion [reason] (none when null), or null when it already has it. */
+private fun exclusionUpdate(
+    transfer: Transfer,
+    reason: String?,
+): ImportTransfer? {
     val typeId = AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID)
     val current = transfer.attributes.filter { it.attributeType.id == typeId }
-    if (current.map { it.value } == listOfNotNull(reason)) return
-    val update =
-        ImportTransfer(
-            source = Source.Manual,
-            operation = ImportOperation.UPDATE,
-            existingId = transfer.id,
-            description = transfer.description,
-            deletedAttributeIds = current.mapTo(mutableSetOf()) { it.id },
-            attributes = listOfNotNull(reason?.let { NewAttribute(typeId, it) }),
-        )
-    import(ImportBatch.manualEdits(transfers = listOf(update)))
+    if (current.map { it.value } == listOfNotNull(reason)) return null
+    return ImportTransfer(
+        source = Source.Manual,
+        operation = ImportOperation.UPDATE,
+        existingId = transfer.id,
+        description = transfer.description,
+        deletedAttributeIds = current.mapTo(mutableSetOf()) { it.id },
+        attributes = listOfNotNull(reason?.let { NewAttribute(typeId, it) }),
+    )
 }
 
 // endregion
@@ -140,6 +147,56 @@ suspend fun ImportEngine.createReconciliationMatches(
             )
         }
     import(ImportBatch(relationshipMutations = mutations))
+}
+
+/**
+ * A person's statement that [reversing] reverses [original] (a refund, or a payment returned to its sender): a
+ * "reversal" relationship, [reversing] its primary, written by hand so a re-import rebuilds it. With [excludeBoth],
+ * neither transfer counts towards balances either ([WellKnownIds.REVERSED_EXCLUSION_REASON]), which is what a payment
+ * returned before it arrived needs: its statement names an account the money never reached, and the return comes
+ * from another. All in one write.
+ */
+suspend fun ImportEngine.linkReversal(
+    original: Transfer,
+    reversing: Transfer,
+    excludeBoth: Boolean,
+) {
+    require(original.id != reversing.id) { "A transfer can't reverse itself" }
+    val link =
+        RelationshipMutation.Create(
+            typeId = RelationshipTypeId(WellKnownIds.REVERSAL_RELATIONSHIP_TYPE_ID),
+            members =
+                listOf(
+                    RelationshipMember(reversing.id, RelationshipRole.PRIMARY),
+                    RelationshipMember(original.id, RelationshipRole.RELATED),
+                ),
+            source = Source.Manual,
+        )
+    val exclusions =
+        if (excludeBoth) {
+            listOf(original, reversing).mapNotNull { exclusionUpdate(it, WellKnownIds.REVERSED_EXCLUSION_REASON) }
+        } else {
+            emptyList()
+        }
+    import(ImportBatch.manualEdits(transfers = exclusions).copy(relationshipMutations = listOf(link)))
+}
+
+/**
+ * Undoes [linkReversal]: deletes the [relationshipId] link and brings back whichever of [members] it excluded (those
+ * whose only exclusion reason is still [WellKnownIds.REVERSED_EXCLUSION_REASON]).
+ */
+suspend fun ImportEngine.unlinkReversal(
+    relationshipId: RelationshipId,
+    members: Collection<Transfer>,
+) {
+    val excludedType = AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID)
+    val restores =
+        members
+            .filter { transfer ->
+                transfer.attributes.filter { it.attributeType.id == excludedType }.map { it.value } ==
+                    listOf(WellKnownIds.REVERSED_EXCLUSION_REASON)
+            }.mapNotNull { exclusionUpdate(it, null) }
+    import(ImportBatch.manualEdits(transfers = restores).copy(relationshipMutations = listOf(RelationshipMutation.Delete(relationshipId))))
 }
 
 suspend fun ImportEngine.deleteRelationship(id: RelationshipId) {

@@ -47,6 +47,8 @@ import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
+import com.moneymanager.domain.repository.RelationshipReadRepository
+import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportOperation
@@ -85,6 +87,9 @@ fun TransactionEditDialog(
     maintenance: Maintenance,
     preSelectedSourceAccountId: AccountId? = null,
     preSelectedAssetId: AssetId? = null,
+    // Both needed for the reversal section (edit mode only); without them it's left out.
+    transactionRepository: TransactionReadRepository? = null,
+    relationshipRepository: RelationshipReadRepository? = null,
     onDismiss: () -> Unit,
     onSaved: () -> Unit = {},
 ) {
@@ -594,6 +599,21 @@ fun TransactionEditDialog(
                         nextTempId--
                     },
                 )
+
+                if (transaction != null && transactionRepository != null && relationshipRepository != null) {
+                    ReversalLinkSection(
+                        transfer = transaction,
+                        transactionRepository = transactionRepository,
+                        relationshipRepository = relationshipRepository,
+                        accountRepository = accountRepository,
+                        maintenance = maintenance,
+                        enabled = !isSaving,
+                        onChanged = {
+                            onSaved()
+                            onDismiss()
+                        },
+                    )
+                }
 
                 errorMessage?.let { error ->
                     Text(
