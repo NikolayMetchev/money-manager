@@ -2004,6 +2004,86 @@ class AccountTransactionsScreenTest {
             everySuspend { fullRefreshMaterializedViews() } returns Duration.ZERO
         }
 
+    @Test
+    fun auditOfATransferWhoseAccountWasMergedAway_drawsThatAccountStruckThrough() {
+        // The audit trail names the account a transfer started from. Once that account is merged away it is no
+        // longer in the account list, so the reference is drawn struck through as plain text, not as a link.
+        var testDbLocation: DbLocation? = null
+        lateinit var repositories: DatabaseComponent
+        var mergedAccountId by Delegates.notNull<AccountId>()
+        var mergedTransferId by Delegates.notNull<TransferId>()
+
+        try {
+            runBlocking {
+                testDbLocation = createTestDatabaseLocation()
+                val databaseManager = createTestDatabaseManager()
+                repositories = openDatabaseComponent(databaseManager.openDatabase(testDbLocation))
+
+                val now = Clock.System.now()
+                val usdCurrency = repositories.currencyRepository.getCurrencyByCode("USD").first()!!
+                mergedAccountId =
+                    repositories.accountRepository.createAccount(
+                        Account(id = AccountId(0L), name = "Merged Away", openingDate = now),
+                        testSource,
+                    )
+                val counterpartyId =
+                    repositories.accountRepository.createAccount(
+                        Account(id = AccountId(0L), name = "Counterparty", openingDate = now),
+                        testSource,
+                    )
+                // The merge refuses accounts with transfers between them, so the survivor is a third account.
+                val survivingAccountId =
+                    repositories.accountRepository.createAccount(
+                        Account(id = AccountId(0L), name = "Survivor", openingDate = now),
+                        testSource,
+                    )
+                repositories.transactionRepository.createTransfers(
+                    transfers =
+                        listOf(
+                            Transfer(
+                                id = TransferId(0L),
+                                timestamp = now,
+                                description = "Transfer from the account merged away",
+                                sourceAccountId = mergedAccountId,
+                                targetAccountId = counterpartyId,
+                                amount = Money.fromDisplayValue("10", usdCurrency),
+                            ),
+                        ),
+                    sources = listOf(testSource),
+                )
+                mergedTransferId =
+                    repositories.transactionRepository
+                        .getTransactionsByAccount(counterpartyId)
+                        .first()
+                        .first()
+                        .id
+                repositories.accountRepository.mergeAccounts(
+                    deletedAccount = mergedAccountId,
+                    survivingAccount = survivingAccountId,
+                )
+                repositories.maintenanceService.fullRefreshMaterializedViews()
+            }
+
+            runMoneyManagerComposeUiTest {
+                setContent {
+                    ProvideSchemaAwareScope {
+                        TransactionAuditScreen(
+                            transferId = mergedTransferId,
+                            auditRepository = repositories.auditRepository,
+                            accountRepository = repositories.accountRepository,
+                            transactionRepository = repositories.transactionRepository,
+                            onBack = {},
+                        )
+                    }
+                }
+                waitUntilAtLeastOneExists(hasText("#${mergedAccountId.id}", substring = true), timeoutMillis = 15_000)
+                waitForIdle()
+            }
+        } finally {
+            testDbLocation?.let { deleteTestDatabase(it) }
+        }
+    }
+
     private fun createExchangeOrderRepository(): ExchangeOrderReadRepository =
         mock(MockMode.autoUnit) {
             every { countOrdersByAccount(any()) } returns flowOf(0L)
