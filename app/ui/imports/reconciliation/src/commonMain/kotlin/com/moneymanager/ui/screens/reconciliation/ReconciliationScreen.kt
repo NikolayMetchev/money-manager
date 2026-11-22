@@ -300,7 +300,7 @@ private fun SourceReconciliation(
         } else {
             // Not in any list (hidden, or not compared): at least open the wallet and month it belongs to.
             tab = ResultTab.UNMATCHED
-            listOf("near", "source-only", "mm-only", "matched", "ignored").forEach { prefix ->
+            listOf("near", "source-only", "mm-only", "accepted", "not-accepted", "ignored").forEach { prefix ->
                 val wallet = "$prefix-${request.walletAccountId.id}"
                 expanded[wallet] = true
                 expanded["$wallet-${request.month}"] = true
@@ -512,9 +512,8 @@ private fun SourceReconciliation(
             }
             when (tab) {
                 ResultTab.UNMATCHED -> {
-                    // Accept all stores the exact matches under the same header too, not only the near ones listed here.
                     sectionHeading("Near matches (${loaded.nearMatches.size})") {
-                        loaded.unstoredMatches().let { BulkButton("Accept all", it.size, enabled = !bulkRunning) { storeMatches(it) } }
+                        loaded.unstoredNearMatches().let { BulkButton("Accept all", it.size, enabled = !bulkRunning) { storeMatches(it) } }
                     }
                     legGroups(
                         prefix = "near",
@@ -531,7 +530,7 @@ private fun SourceReconciliation(
                         empty = "No near matches: every match agrees to the second.",
                         headerAction = { _, wallet, month ->
                             loaded
-                                .unstoredMatches(
+                                .unstoredNearMatches(
                                     wallet,
                                     month,
                                 ).let { BulkButton("Accept all", it.size, enabled = !bulkRunning) { storeMatches(it) } }
@@ -596,51 +595,46 @@ private fun SourceReconciliation(
                 }
 
                 ResultTab.MATCHED -> {
-                    sectionHeading("Matched (${loaded.matched.size})") {
-                        loaded.unstoredMatches().filter { it.settled }.let {
-                            BulkButton(
-                                "Accept all",
-                                it.size,
-                                enabled = !bulkRunning,
-                            ) { storeMatches(it) }
-                        }
+                    // Accepted and not-yet-accepted apart, so "Accept all" covers exactly the rows listed beneath it.
+                    val accepted = loaded.matched.filter { it.matchId != null }
+                    val notAccepted = loaded.matched.filter { it.matchId == null }
+                    sectionHeading("Not accepted (${notAccepted.size})") {
+                        BulkButton("Accept all", notAccepted.size, enabled = !bulkRunning) { storeMatches(notAccepted) }
                     }
                     legGroups(
-                        prefix = "matched",
-                        groups = groupByWalletAndMonth(loaded.matched, { it.sourceLeg.accountId }, { it.sourceLeg.timestamp }, walletName),
+                        prefix = "not-accepted",
+                        groups = groupByWalletAndMonth(notAccepted, { it.sourceLeg.accountId }, { it.sourceLeg.timestamp }, walletName),
                         expanded = expanded,
                         leafIds = { match -> match.sourceLegs.map { it.transactionId } },
                         highlight = highlightedLeaf,
-                        empty = "Nothing matched yet — link the wallets above.",
-                        // Only the rows the matcher found: a stored one is already accepted.
-                        headerAction = { _, wallet, month ->
-                            loaded
-                                .unstoredMatches(
-                                    wallet,
-                                    month,
-                                ).filter { it.settled }
-                                .let { BulkButton("Accept all", it.size, enabled = !bulkRunning) { storeMatches(it) } }
+                        empty = "Nothing waiting to be accepted.",
+                        headerAction = { items, _, _ ->
+                            BulkButton("Accept all", items.size, enabled = !bulkRunning) { storeMatches(items) }
                         },
                     ) { match ->
-                        val matchId = match.matchId
-                        MatchRow(
-                            match,
-                            accountNames,
-                            onOpenLeg,
-                            action =
-                                if (matchId == null) {
-                                    null
-                                } else {
-                                    {
-                                        TextButton(
-                                            onClick = { write("Unmatching") { importEngine.deleteRelationship(RelationshipId(matchId)) } },
-                                            enabled = !bulkRunning,
-                                        ) {
-                                            Text("Unmatch")
-                                        }
-                                    }
-                                },
-                        )
+                        MatchRow(match, accountNames, onOpenLeg) {
+                            TextButton(
+                                onClick = { write("Matching") { importEngine.acceptMatches(listOf(match.memberTransactions())) } },
+                                enabled = !bulkRunning,
+                            ) { Text("Accept") }
+                        }
+                    }
+                    sectionHeading("Accepted (${accepted.size})")
+                    legGroups(
+                        prefix = "accepted",
+                        groups = groupByWalletAndMonth(accepted, { it.sourceLeg.accountId }, { it.sourceLeg.timestamp }, walletName),
+                        expanded = expanded,
+                        leafIds = { match -> match.sourceLegs.map { it.transactionId } },
+                        highlight = highlightedLeaf,
+                        empty = "Nothing accepted yet.",
+                    ) { match ->
+                        val matchId = requireNotNull(match.matchId)
+                        MatchRow(match, accountNames, onOpenLeg) {
+                            TextButton(
+                                onClick = { write("Unmatching") { importEngine.deleteRelationship(RelationshipId(matchId)) } },
+                                enabled = !bulkRunning,
+                            ) { Text("Unmatch") }
+                        }
                     }
                     sectionHeading("Ignored (${loaded.ignored.size})")
                     legGroups(
@@ -1066,7 +1060,8 @@ private fun locateLeaf(
     } ?: result.missingInMm.firstOrNull { it.holds() && (!hideUnknownAssets || !it.assetUnknownToMm) }?.let {
         LeafLocation(ResultTab.UNMATCHED, "source-only", it.walletAccountId, monthKey(it.leg.timestamp))
     } ?: result.matched.firstOrNull { it.holds() }?.let {
-        LeafLocation(ResultTab.MATCHED, "matched", it.sourceLeg.accountId, monthKey(it.sourceLeg.timestamp))
+        val prefix = if (it.matchId == null) "not-accepted" else "accepted"
+        LeafLocation(ResultTab.MATCHED, prefix, it.sourceLeg.accountId, monthKey(it.sourceLeg.timestamp))
     } ?: result.ignored.firstOrNull { it.holds() }?.let {
         LeafLocation(ResultTab.MATCHED, "ignored", it.walletAccountId, monthKey(it.leg.timestamp))
     }
