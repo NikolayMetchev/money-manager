@@ -222,6 +222,46 @@ class AccountsScreenTest {
     }
 
     @Test
+    fun editAccountDialog_picksOwnersFromSearchableDropdown() {
+        runMoneyManagerComposeUiTest {
+            // Given
+            val account = Account(id = AccountId(1L), name = "My Checking", openingDate = Clock.System.now())
+            val people =
+                listOf(
+                    Person(id = PersonId(1L), firstName = "Alice", middleName = null, lastName = null),
+                    Person(id = PersonId(2L), firstName = "Bob", middleName = null, lastName = null),
+                )
+
+            setContent {
+                ProvideSchemaAwareScope {
+                    AccountsScreen(
+                        accountRepository = createAccountRepository(listOf(account)),
+                        accountAttributeRepository = createAccountAttributeRepository(),
+                        attributeTypeRepository = createAttributeTypeRepository(),
+                        categoryRepository = createCategoryRepository(),
+                        transactionRepository = createTransactionRepository(),
+                        personRepository = createPersonRepository(people),
+                        personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
+                        maintenance = createMaintenance(),
+                        scrollToAccountId = null,
+                        onAccountClick = {},
+                    )
+                }
+            }
+
+            // When
+            onNodeWithText("✏️").performClick()
+            onNodeWithText("Edit Account").assertIsDisplayed()
+            onNodeWithText("No owners").performClick()
+            onNodeWithText("Alice").performClick()
+            onNodeWithText("Bob").performClick()
+
+            // Then - the menu stays open across picks, so Bob was still reachable after Alice
+            onNodeWithText("Bob").assertIsDisplayed()
+        }
+    }
+
+    @Test
     fun accountCard_displaysAccountInformation() {
         runMoneyManagerComposeUiTest {
             // Given
