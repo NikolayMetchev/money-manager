@@ -3,7 +3,6 @@ package com.moneymanager.builtin
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import kotlin.time.Instant
-import kotlin.uuid.Uuid
 
 /** Built-in CSV/QIF import strategy definitions. db-free; the catalog artifacts are exported from these. */
 object BuiltInCsvStrategies {
