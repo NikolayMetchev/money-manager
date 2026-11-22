@@ -30,7 +30,7 @@ import kotlin.test.assertNull
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
-/** The built-in Barclaycard OFX strategy ([BarclaycardStrategies.buildBarclaycardOfxStrategy]) over a Barclaycard download. */
+/** The built-in Barclaycard OFX strategy (`BarclaycardStrategies.buildBarclaycardOfxStrategy`) over a Barclaycard download. */
 class BarclaycardOfxMapperTest {
     private val now = Clock.System.now()
     private val strategy = BarclaycardStrategies.buildBarclaycardOfxStrategy(now)

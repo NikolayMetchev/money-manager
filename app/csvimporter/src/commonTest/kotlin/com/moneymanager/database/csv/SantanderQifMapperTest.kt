@@ -26,7 +26,7 @@ import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 /**
- * Exercises the built-in Santander QIF strategy ([SantanderQifStrategies.buildSantanderQifStrategy]) — which
+ * Exercises the built-in Santander QIF strategy (`SantanderQifStrategies.buildSantanderQifStrategy`) — which
  * is pure config — against the real Santander Payee formats. Verifies the config-driven parsing
  * extracts a clean counterparty (target account), tags transaction-type / reference / mandate / date
  * attributes, cleans the description, and flags person-to-person counterparties.

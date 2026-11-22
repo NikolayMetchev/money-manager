@@ -23,7 +23,7 @@ import kotlin.test.assertNull
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
-/** The built-in American Express QIF strategy ([AmexStrategies.buildAmexQifStrategy]) over Amex's record shapes. */
+/** The built-in American Express QIF strategy (`AmexStrategies.buildAmexQifStrategy`) over Amex's record shapes. */
 class AmexQifMapperTest {
     private val now = Clock.System.now()
     private val strategy = AmexStrategies.buildAmexQifStrategy(now, CurrencyId(1))

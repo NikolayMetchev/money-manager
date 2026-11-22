@@ -26,7 +26,7 @@ import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 /**
- * Exercises the built-in "Crypto.com Card (Excel)" strategy ([BuiltInCsvStrategies]) — pure config —
+ * Exercises the built-in "Crypto.com Card (Excel)" strategy (`BuiltInCsvStrategies`) — pure config —
  * against row shapes from the real "Card Transaction History" workbook. Unlike the CSV export, its
  * `Amount Processed` column is already signed (negative = spend, positive = load/refund), so direction
  * comes entirely from the standard positive-amount source/target flip plus a Service Abbreviation

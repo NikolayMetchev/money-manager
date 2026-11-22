@@ -24,7 +24,7 @@ import kotlin.test.assertNull
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
-/** The built-in American Express PDF strategy ([AmexStrategies.buildAmexPdfStrategy]) over its statements' layouts. */
+/** The built-in American Express PDF strategy (`AmexStrategies.buildAmexPdfStrategy`) over its statements' layouts. */
 class AmexPdfMapperTest {
     private val now = Clock.System.now()
     private val strategy = AmexStrategies.buildAmexPdfStrategy(now, CurrencyId(1))

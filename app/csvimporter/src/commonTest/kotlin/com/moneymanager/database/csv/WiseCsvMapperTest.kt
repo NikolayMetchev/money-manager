@@ -28,7 +28,7 @@ import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 /**
- * Exercises the built-in Wise CSV strategy (as seeded by [WiseStrategies.buildWiseCsvStrategy])
+ * Exercises the built-in Wise CSV strategy (as seeded by `WiseStrategies.buildWiseCsvStrategy`)
  * against the row shapes found in real Wise transaction-history.csv exports.
  */
 class WiseCsvMapperTest {

@@ -26,7 +26,7 @@ import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 /**
- * Exercises the built-in crypto.com Card and Fiat strategies ([BuiltInCsvStrategies]) — pure config —
+ * Exercises the built-in crypto.com Card and Fiat strategies (`BuiltInCsvStrategies`) — pure config —
  * against the real export row shapes. The fiat export's quirk under test: the amount's sign does not
  * encode direction (viban_card_top_up and viban_purchase are positive but money leaves the Cash
  * account), so row rules flip per Transaction Kind, and crypto_viban conversions carry the wallet
