@@ -1,12 +1,9 @@
 package com.moneymanager.ui.components
 
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -15,7 +12,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import co.touchlab.kermit.Logger
@@ -261,29 +257,17 @@ fun EditAccountDialog(
                 onNameSubmit = submit,
             ) {
                 AccountOwnersSection(hasPeople = people.isNotEmpty()) {
-                    people.forEach { person ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Checkbox(
-                                checked = selectedOwnerIds.contains(person.id.id),
-                                onCheckedChange = { checked ->
-                                    selectedOwnerIds =
-                                        if (checked) {
-                                            selectedOwnerIds + person.id.id
-                                        } else {
-                                            selectedOwnerIds - person.id.id
-                                        }
-                                },
-                                enabled = !accountState.isSaving,
-                            )
-                            Text(
-                                text = person.fullName,
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
-                        }
-                    }
+                    MultiSelectFilterDropdown(
+                        items = people,
+                        selectedKeys = selectedOwnerIds,
+                        itemKey = { it.id.id },
+                        itemLabel = { it.fullName },
+                        itemNoun = "owner",
+                        onSelectionChange = { if (!accountState.isSaving) selectedOwnerIds = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        fieldLabel = "Owners",
+                        allLabel = "No owners",
+                    )
                     TextButton(
                         onClick = { accountState.showCreatePersonDialog = true },
                         enabled = !accountState.isSaving,
