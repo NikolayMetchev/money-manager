@@ -18,6 +18,8 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.repository.write.NewTrade
 import com.moneymanager.importengineapi.createReconciliationMatch
+import com.moneymanager.importengineapi.linkReversal
+import com.moneymanager.importengineapi.unlinkReversal
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.read.testReads
@@ -27,6 +29,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 
 /**
@@ -565,5 +568,115 @@ class RelationshipDbTest : DbTest() {
             assertNotNull(failure)
             // A transaction nothing matches yet is fine.
             writes.insertRelationshipMemberUnchecked(relationshipId, third.id, RelationshipRole.MEMBER.id)
+        }
+
+    @Test
+    fun linkReversal_linksAReturnedPaymentAndExcludesBoth_unlinkRestoresThem() =
+        runDbTest {
+            val currency = gbp()
+            val sender = createAccount("Monzo")
+            val payee = createAccount("Marcus")
+            val returner = createAccount("Goldman Sachs International Bank")
+            // The payment names the payee, but the money comes back from the payee's bank before it ever arrives.
+            val (paymentId, returnId) =
+                repositories.transactionRepository.importTransfers(
+                    transfers =
+                        listOf(
+                            Transfer(
+                                TransferId(-1),
+                                timestamp = baseTime,
+                                description = "Sent",
+                                sourceAccountId = sender,
+                                targetAccountId = payee,
+                                amount = Money(1000, currency),
+                            ),
+                            Transfer(
+                                TransferId(-2),
+                                timestamp = baseTime + 1.hours,
+                                description = "Returned",
+                                sourceAccountId = returner,
+                                targetAccountId = sender,
+                                amount = Money(1000, currency),
+                            ),
+                        ),
+                    newAttributes = emptyMap(),
+                    sources = listOf(Source.SampleGenerator, Source.SampleGenerator),
+                    updates = emptyList(),
+                    updateSources = emptyList(),
+                )
+
+            suspend fun transfer(id: TransferId) = assertNotNull(repositories.transactionRepository.getTransactionById(id.id).first())
+
+            suspend fun exclusion(id: TransferId) = transfer(id).attributes.filter { it.attributeType.name == "excluded" }.map { it.value }
+
+            repositories.importEngine.linkReversal(transfer(paymentId), transfer(returnId), excludeBoth = true)
+
+            val link =
+                repositories.relationshipRepository
+                    .getByTransaction(paymentId)
+                    .first()
+                    .single()
+            assertEquals(WellKnownIds.REVERSAL_RELATIONSHIP_TYPE_NAME, link.relationshipType.name)
+            assertEquals(returnId, link.primary)
+            assertEquals(paymentId, link.related)
+            assertEquals(listOf(WellKnownIds.REVERSED_EXCLUSION_REASON), exclusion(paymentId))
+            assertEquals(listOf(WellKnownIds.REVERSED_EXCLUSION_REASON), exclusion(returnId))
+
+            repositories.importEngine.unlinkReversal(link.id, listOf(transfer(paymentId), transfer(returnId)))
+
+            assertEquals(emptyList(), repositories.relationshipRepository.getByTransaction(paymentId).first())
+            assertEquals(emptyList(), exclusion(paymentId))
+            assertEquals(emptyList(), exclusion(returnId))
+        }
+
+    @Test
+    fun linkReversal_withoutExcluding_keepsBothCounted() =
+        runDbTest {
+            val currency = gbp()
+            val card = createAccount("Card")
+            val shop = createAccount("Shop")
+            val (chargeId, refundId) =
+                repositories.transactionRepository.importTransfers(
+                    transfers =
+                        listOf(
+                            Transfer(
+                                TransferId(-1),
+                                timestamp = baseTime,
+                                description = "Charge",
+                                sourceAccountId = card,
+                                targetAccountId = shop,
+                                amount = Money(500, currency),
+                            ),
+                            Transfer(
+                                TransferId(-2),
+                                timestamp = baseTime + 1.hours,
+                                description = "Refund",
+                                sourceAccountId = shop,
+                                targetAccountId = card,
+                                amount = Money(500, currency),
+                            ),
+                        ),
+                    newAttributes = emptyMap(),
+                    sources = listOf(Source.SampleGenerator, Source.SampleGenerator),
+                    updates = emptyList(),
+                    updateSources = emptyList(),
+                )
+            val charge = assertNotNull(repositories.transactionRepository.getTransactionById(chargeId.id).first())
+            val refund = assertNotNull(repositories.transactionRepository.getTransactionById(refundId.id).first())
+
+            repositories.importEngine.linkReversal(charge, refund, excludeBoth = false)
+
+            assertEquals(
+                refundId,
+                repositories.relationshipRepository
+                    .getByTransaction(chargeId)
+                    .first()
+                    .single()
+                    .primary,
+            )
+            listOf(chargeId, refundId).forEach { id ->
+                val attributes = assertNotNull(repositories.transactionRepository.getTransactionById(id.id).first()).attributes
+                assertEquals(emptyList(), attributes.filter { it.attributeType.name == "excluded" })
+            }
         }
 }

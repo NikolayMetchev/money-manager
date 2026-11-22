@@ -141,6 +141,12 @@ object WellKnownIds {
      */
     const val REVERSAL_RELATIONSHIP_TYPE_NAME: String = "reversal"
 
+    /** The seeded id of the [REVERSAL_RELATIONSHIP_TYPE_NAME] type, which a person's reversal links are written with. */
+    const val REVERSAL_RELATIONSHIP_TYPE_ID: Long = 4
+
+    /** The exclusion reason a person's reversal link gives both of its transfers when it excludes them. */
+    const val REVERSED_EXCLUSION_REASON: String = "reversed"
+
     /**
      * "conversion" relationship type: the primary member is the debit leg of an asset conversion and the related one the credit
      * leg it was paired with — the shape a source books when it cannot say which credit came from

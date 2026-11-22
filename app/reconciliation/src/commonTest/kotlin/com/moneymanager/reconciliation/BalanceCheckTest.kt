@@ -109,6 +109,17 @@ class BalanceCheckTest {
     }
 
     @Test
+    fun `several balances at one instant compare the one nearest the computed balance whatever their order`() {
+        // Three of a statement's rows at one instant, stored with the balance after every record first: comparing the
+        // row stored last (after only the first record) would show a £9,990 break, not the £10 one the £10 leg is.
+        val legs = listOf(leg("1000", 0), leg("10", 1), leg("4990", 1), leg("5000", 1))
+        val result = checkBalances(coin, listOf(balance("1000", 0), balance("10990", 1), balance("5990", 1), balance("1010", 1)), legs)
+
+        assertEquals(money("-10"), result.breaks.single().change)
+        assertEquals(money("10990"), result.checkpoints.last().reportedBalance)
+    }
+
+    @Test
     fun `a break that a later one undoes shows twice`() {
         // Money Manager books the payment a day before the statement does.
         val legs = listOf(leg("100", 0), leg("-30", 1))

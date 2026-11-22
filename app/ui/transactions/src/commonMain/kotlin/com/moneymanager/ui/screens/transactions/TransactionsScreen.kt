@@ -886,6 +886,8 @@ fun AccountTransactionsScreen(
             attributeTypeRepository = attributeTypeRepository,
             personRepository = personRepository,
             maintenance = maintenance,
+            transactionRepository = transactionRepository,
+            relationshipRepository = relationshipRepository,
             onDismiss = { transactionIdToEdit = null },
             onSaved = { refreshTrigger++ },
         )
