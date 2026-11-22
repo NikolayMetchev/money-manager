@@ -1,6 +1,5 @@
 package com.moneymanager.builtin
 
-import com.moneymanager.builtin.BuiltInCsvStrategies.accointingCsvStrategyId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
@@ -26,9 +25,12 @@ import com.moneymanager.domain.model.rules.RuleValue
 import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 /** Built-in Accointing reconciliation-source CSV strategy. */
 object AccointingStrategies {
+    private val accointingCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000016")
+
     /** Accointing wallet accounts are named with this prefix; see [buildAccointingCsvStrategy]. */
     private const val ACCOINTING_WALLET_PREFIX = "Accointing · "
 

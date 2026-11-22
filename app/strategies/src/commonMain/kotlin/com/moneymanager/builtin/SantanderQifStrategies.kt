@@ -1,6 +1,5 @@
 package com.moneymanager.builtin
 
-import com.moneymanager.builtin.BuiltInCsvStrategies.santanderQifStrategyId
 import com.moneymanager.builtin.StatementDefaults.QIF_STATEMENT_RECONCILE_WINDOW_SECONDS
 import com.moneymanager.builtin.StatementDefaults.STATEMENT_PLACEHOLDER_WINDOW
 import com.moneymanager.domain.model.CsvImportStrategyId
@@ -23,9 +22,12 @@ import com.moneymanager.domain.model.rules.Extraction
 import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 /** Built-in Santander QIF strategy. */
 object SantanderQifStrategies {
+    private val santanderQifStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000006")
+
     /**
      * Built-in QIF strategy for Santander UK statement exports. Santander packs the whole
      * transaction description into the QIF Payee field (e.g. "DIRECT DEBIT PAYMENT TO AMERICAN

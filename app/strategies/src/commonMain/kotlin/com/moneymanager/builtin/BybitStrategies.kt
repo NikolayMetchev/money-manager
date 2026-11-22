@@ -1,8 +1,5 @@
 package com.moneymanager.builtin
 
-import com.moneymanager.builtin.BuiltInCsvStrategies.bybitFundingCsvStrategyId
-import com.moneymanager.builtin.BuiltInCsvStrategies.bybitSpotCsvStrategyId
-import com.moneymanager.builtin.BuiltInCsvStrategies.bybitUnifiedCsvStrategyId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
@@ -25,9 +22,16 @@ import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 /** Built-in Bybit spot, funding and unified CSV strategies. */
 object BybitStrategies {
+    private val bybitUnifiedCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000010")
+
+    private val bybitFundingCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000f")
+
+    private val bybitSpotCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000e")
+
     /**
      * The one Bybit account, named as the Bybit API strategy's synthetic account. Bybit splits a user's
      * holdings across Spot, Funding, Unified Trading and Earn wallets and exports one ledger per wallet,

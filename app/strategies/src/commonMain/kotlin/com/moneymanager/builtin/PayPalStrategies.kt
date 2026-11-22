@@ -1,6 +1,5 @@
 package com.moneymanager.builtin
 
-import com.moneymanager.builtin.BuiltInCsvStrategies.payPalCsvStrategyId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csvstrategy.AmountMode
@@ -25,9 +24,12 @@ import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 /** Built-in PayPal CSV strategies, modern and legacy exports. */
 object PayPalStrategies {
+    private val payPalCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000011")
+
     /**
      * The PayPal account, holding one balance per currency. Matches
      * [com.moneymanager.builtin.BuiltInPassThroughs.payPal]'s conduitAccountName, so the movement a card

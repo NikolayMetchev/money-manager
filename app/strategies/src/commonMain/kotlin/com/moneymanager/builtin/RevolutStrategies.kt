@@ -1,6 +1,5 @@
 package com.moneymanager.builtin
 
-import com.moneymanager.builtin.BuiltInCsvStrategies.revolutCsvStrategyId
 import com.moneymanager.builtin.StatementDefaults.QIF_STATEMENT_RECONCILE_WINDOW_SECONDS
 import com.moneymanager.builtin.StatementDefaults.STATEMENT_PLACEHOLDER_WINDOW
 import com.moneymanager.domain.model.CsvImportStrategyId
@@ -25,9 +24,12 @@ import com.moneymanager.domain.model.rules.RuleValue
 import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 /** Built-in Revolut CSV strategy. */
 object RevolutStrategies {
+    private val revolutCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000001a")
+
     private const val REVOLUT_STARTED_COLUMN = "Started Date"
     private const val REVOLUT_COMPLETED_COLUMN = "Completed Date"
 

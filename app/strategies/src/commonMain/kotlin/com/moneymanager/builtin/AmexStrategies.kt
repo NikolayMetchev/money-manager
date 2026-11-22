@@ -1,7 +1,5 @@
 package com.moneymanager.builtin
 
-import com.moneymanager.builtin.BuiltInCsvStrategies.amexPdfStrategyId
-import com.moneymanager.builtin.BuiltInCsvStrategies.amexQifStrategyId
 import com.moneymanager.builtin.StatementDefaults.QIF_STATEMENT_RECONCILE_WINDOW_SECONDS
 import com.moneymanager.builtin.StatementDefaults.STATEMENT_PLACEHOLDER_WINDOW
 import com.moneymanager.domain.model.CsvImportStrategyId
@@ -29,9 +27,14 @@ import com.moneymanager.domain.model.rules.RuleValue
 import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 /** Built-in American Express QIF and PDF strategies. */
 object AmexStrategies {
+    private val amexPdfStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000015")
+
+    private val amexQifStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000014")
+
     /**
      * An American Express payee recording a payment INTO the card ("PAYMENT RECEIVED - THANK YOU"). It never
      * says who paid, so the payer is a placeholder that reconciles against the paying bank's own record.

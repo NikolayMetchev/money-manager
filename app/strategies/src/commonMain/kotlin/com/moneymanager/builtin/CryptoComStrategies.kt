@@ -1,9 +1,5 @@
 package com.moneymanager.builtin
 
-import com.moneymanager.builtin.BuiltInCsvStrategies.cryptoComCardStrategyId
-import com.moneymanager.builtin.BuiltInCsvStrategies.cryptoComCardXlsxStrategyId
-import com.moneymanager.builtin.BuiltInCsvStrategies.cryptoComCryptoStrategyId
-import com.moneymanager.builtin.BuiltInCsvStrategies.cryptoComFiatStrategyId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
@@ -27,9 +23,18 @@ import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 /** Built-in crypto.com card, fiat and crypto CSV strategies. */
 object CryptoComStrategies {
+    private val cryptoComCardXlsxStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000b")
+
+    private val cryptoComCryptoStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000009")
+
+    private val cryptoComFiatStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000008")
+
+    private val cryptoComCardStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000007")
+
     /** Fixed account names shared by the crypto.com Card and Fiat strategies, so both files resolve the same accounts. */
     private const val CRYPTO_COM_CARD_ACCOUNT = "Crypto.com Card"
     private const val CRYPTO_COM_CASH_ACCOUNT = "Crypto.com Cash"

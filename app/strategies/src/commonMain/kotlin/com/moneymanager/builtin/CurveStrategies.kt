@@ -1,6 +1,5 @@
 package com.moneymanager.builtin
 
-import com.moneymanager.builtin.BuiltInCsvStrategies.curveCsvStrategyId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csvstrategy.AmountMode
@@ -23,9 +22,12 @@ import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 /** Built-in Curve CSV strategy (a conduit: every card payment passes through it). */
 object CurveStrategies {
+    private val curveCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000a")
+
     /**
      * The Curve conduit account. Matches [com.moneymanager.builtin.BuiltInPassThroughs.curve]'s
      * conduitAccountName, so a Curve CSV row's chain (funding card -> Curve -> merchant) runs through the

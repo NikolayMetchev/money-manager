@@ -1,6 +1,5 @@
 package com.moneymanager.builtin
 
-import com.moneymanager.builtin.BuiltInCsvStrategies.freetradeCsvStrategyId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
@@ -20,9 +19,12 @@ import com.moneymanager.domain.model.rules.RuleValue
 import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 /** Built-in Freetrade CSV strategy. */
 object FreetradeStrategies {
+    private val freetradeCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000018")
+
     private const val FREETRADE_ISA_ACCOUNT = "Freetrade ISA"
     private const val FREETRADE_GIA_ACCOUNT = "Freetrade GIA"
     private const val FREETRADE_TOP_UPS_ACCOUNT = "Freetrade Top Ups"

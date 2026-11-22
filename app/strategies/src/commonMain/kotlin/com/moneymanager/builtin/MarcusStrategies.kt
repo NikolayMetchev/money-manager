@@ -1,6 +1,5 @@
 package com.moneymanager.builtin
 
-import com.moneymanager.builtin.BuiltInCsvStrategies.marcusCsvStrategyId
 import com.moneymanager.builtin.StatementDefaults.QIF_STATEMENT_RECONCILE_WINDOW_SECONDS
 import com.moneymanager.builtin.StatementDefaults.STATEMENT_PLACEHOLDER_WINDOW
 import com.moneymanager.domain.model.CsvImportStrategyId
@@ -21,9 +20,12 @@ import com.moneymanager.domain.model.rules.RuleValue
 import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 /** Built-in Marcus CSV strategy. */
 object MarcusStrategies {
+    private val marcusCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000019")
+
     private const val MARCUS_DATE_COLUMN = "TransactionDate"
     private const val MARCUS_DESCRIPTION_COLUMN = "Description"
     private const val MARCUS_VALUE_COLUMN = "Value"

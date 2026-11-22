@@ -1,6 +1,5 @@
 package com.moneymanager.builtin
 
-import com.moneymanager.builtin.BuiltInCsvStrategies.celsiusCsvStrategyId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
@@ -14,9 +13,12 @@ import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.rules.AccountSide
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 /** Built-in Celsius CSV strategy. */
 object CelsiusStrategies {
+    private val celsiusCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000017")
+
     /** The name Koinly and Accointing give this wallet, so linking their shadow wallets to it finds it by name. */
     private const val CELSIUS_ACCOUNT = "Celsius Network"
     private const val CELSIUS_REWARDS_ACCOUNT = "Celsius Rewards"

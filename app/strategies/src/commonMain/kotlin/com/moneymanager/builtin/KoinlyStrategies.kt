@@ -1,6 +1,5 @@
 package com.moneymanager.builtin
 
-import com.moneymanager.builtin.BuiltInCsvStrategies.koinlyCsvStrategyId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
@@ -24,9 +23,12 @@ import com.moneymanager.domain.model.rules.LegRole
 import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 /** Built-in Koinly reconciliation-source CSV strategy. */
 object KoinlyStrategies {
+    private val koinlyCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000d")
+
     /** Koinly wallet accounts are named with this prefix; see [buildKoinlyCsvStrategy]. */
     private const val KOINLY_WALLET_PREFIX = "Koinly · "
 

@@ -1,7 +1,6 @@
 package com.moneymanager.csvimporter
 
 import com.moneymanager.bigdecimal.BigDecimal
-import com.moneymanager.builtin.BuiltInCsvStrategies
 import com.moneymanager.builtin.CryptoComStrategies
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
