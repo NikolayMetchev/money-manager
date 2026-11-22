@@ -44,9 +44,9 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.AppVersion
+import com.moneymanager.domain.model.AssetId
 import com.moneymanager.domain.model.CryptoCatalogRefresher
 import com.moneymanager.domain.model.CsvImportId
-import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.Source
@@ -185,8 +185,8 @@ fun MoneyManagerApp(
         var showAddMenu by remember { mutableStateOf(false) }
         var preSelectedAccountId by remember { mutableStateOf<AccountId?>(null) }
         var currentlyViewedAccountId by remember { mutableStateOf<AccountId?>(null) }
-        var preSelectedCurrencyId by remember { mutableStateOf<CurrencyId?>(null) }
-        var currentlyViewedCurrencyId by remember { mutableStateOf<CurrencyId?>(null) }
+        var preSelectedAssetId by remember { mutableStateOf<AssetId?>(null) }
+        var currentlyViewedAssetId by remember { mutableStateOf<AssetId?>(null) }
         var transactionRefreshTrigger by remember { mutableStateOf(0) }
 
         // Multi-device sync state: when the remote is ahead, editing is locked until the user downloads.
@@ -391,7 +391,7 @@ fun MoneyManagerApp(
                                         onClick = {
                                             showAddMenu = false
                                             preSelectedAccountId = currentlyViewedAccountId
-                                            preSelectedCurrencyId = currentlyViewedCurrencyId ?: defaultCurrencyId
+                                            preSelectedAssetId = currentlyViewedAssetId ?: defaultCurrencyId
                                             showTransactionDialog = true
                                         },
                                     )
@@ -428,7 +428,7 @@ fun MoneyManagerApp(
                             val resetViewedIds: @Composable () -> Unit = {
                                 LaunchedEffect(Unit) {
                                     currentlyViewedAccountId = null
-                                    currentlyViewedCurrencyId = null
+                                    currentlyViewedAssetId = null
                                 }
                             }
                             // Every audit screen links back to the same three source views; hoisted so the
@@ -605,15 +605,15 @@ fun MoneyManagerApp(
                                                 onAccountIdChange = { accountId ->
                                                     currentlyViewedAccountId = accountId
                                                 },
-                                                onCurrencyIdChange = { currencyId ->
-                                                    currentlyViewedCurrencyId = currencyId
+                                                onAssetIdChange = { assetId ->
+                                                    currentlyViewedAssetId = assetId
                                                 },
-                                                onAccountClick = { accountId, accountName, currencyId, transferId ->
+                                                onAccountClick = { accountId, accountName, assetId, transferId ->
                                                     navigationHistory.navigateTo(
                                                         Screen.AccountTransactions(
                                                             accountId = accountId,
                                                             accountName = accountName,
-                                                            selectedCurrencyId = currencyId,
+                                                            selectedAssetId = assetId,
                                                             scrollToTransferId = transferId,
                                                         ),
                                                     )
@@ -633,7 +633,7 @@ fun MoneyManagerApp(
                                                     navigationHistory.navigateTo(Screen.ExchangeOrderDetail(orderId))
                                                 },
                                                 scrollToTransferId = screen.scrollToTransferId,
-                                                initialCurrencyId = screen.selectedCurrencyId,
+                                                initialAssetId = screen.selectedAssetId,
                                                 externalRefreshTrigger = transactionRefreshTrigger,
                                                 onBack = { navigationHistory.navigateBack() },
                                             )
@@ -1090,11 +1090,11 @@ fun MoneyManagerApp(
                         personRepository = services.people.personRepository,
                         maintenance = services.imports.maintenance,
                         preSelectedSourceAccountId = preSelectedAccountId,
-                        preSelectedCurrencyId = preSelectedCurrencyId,
+                        preSelectedAssetId = preSelectedAssetId,
                         onDismiss = {
                             showTransactionDialog = false
                             preSelectedAccountId = null
-                            preSelectedCurrencyId = null
+                            preSelectedAssetId = null
                         },
                         onSaved = {
                             transactionRefreshTrigger++

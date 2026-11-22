@@ -63,5 +63,7 @@ kmp_test(
     deps = [
         "//bazel/kmp/deps:kotlin_test",
         "//utils/bigdecimal",
+        "@maven_kmp//:kotlinx_serialization_core",
+        "@maven_kmp//:kotlinx_serialization_json",
     ],
 )

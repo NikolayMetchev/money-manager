@@ -5,6 +5,8 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
+import com.moneymanager.domain.model.AssetId
+import com.moneymanager.domain.model.AssetIdSerializer
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.CurrencyId
@@ -114,7 +116,8 @@ sealed class Screen : NavKey {
         val accountId: AccountId,
         val accountName: String,
         val scrollToTransferId: TransferId? = null,
-        val selectedCurrencyId: CurrencyId? = null,
+        @Serializable(with = AssetIdSerializer::class)
+        val selectedAssetId: AssetId? = null,
     ) : Screen() {
         override val title: String get() = accountName
     }

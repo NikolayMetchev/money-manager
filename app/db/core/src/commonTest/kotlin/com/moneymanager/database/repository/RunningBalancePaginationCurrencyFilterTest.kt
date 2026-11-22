@@ -95,7 +95,7 @@ class RunningBalancePaginationCurrencyFilterTest : DbTest() {
             // Filtered by USD: both old rows arrive on the FIRST page.
             val usdPage =
                 repositories.transactionRepository
-                    .getRunningBalanceByAccountPaginated(card, pageSize = 5, pagingInfo = null, currencyId = usd.id)
+                    .getRunningBalanceByAccountPaginated(card, pageSize = 5, pagingInfo = null, assetId = usd.id)
             assertEquals(listOf("Old USD 2", "Old USD 1"), usdPage.items.map { it.description })
             assertTrue(usdPage.items.all { it.transactionAmount.asset.code == "USD" })
             assertEquals(false, usdPage.pagingInfo.hasMore)
@@ -107,7 +107,7 @@ class RunningBalancePaginationCurrencyFilterTest : DbTest() {
             val usdTransferId = usdPage.items.last().transactionId
             val page =
                 repositories.transactionRepository
-                    .getPageContainingTransaction(card, TransferId(usdTransferId.id), pageSize = 5, currencyId = usd.id)
+                    .getPageContainingTransaction(card, TransferId(usdTransferId.id), pageSize = 5, assetId = usd.id)
             assertEquals(2, page.items.size)
             assertTrue(page.items.any { it.transactionId.id == usdTransferId.id })
             assertTrue(page.items.all { it.transactionAmount.asset.code == "USD" })
@@ -122,7 +122,7 @@ class RunningBalancePaginationCurrencyFilterTest : DbTest() {
                         pageSize = 5,
                         firstTimestamp = oldest.timestamp,
                         firstId = oldest.transactionId,
-                        currencyId = usd.id,
+                        assetId = usd.id,
                     )
             assertEquals(listOf("Old USD 2"), backward.items.map { it.description })
             assertEquals(listOf("-3000"), backward.items.map { it.runningBalance.amount.toString() })
@@ -148,7 +148,7 @@ class RunningBalancePaginationCurrencyFilterTest : DbTest() {
 
             val page =
                 repositories.transactionRepository
-                    .getPageContainingTransaction(isa, tradeId, pageSize = 5, currencyId = usd.id)
+                    .getPageContainingTransaction(isa, tradeId, pageSize = 5, assetId = usd.id)
 
             assertEquals(listOf(tradeId.id), page.items.map { it.transactionId.id })
         }
