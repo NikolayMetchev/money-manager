@@ -7,6 +7,7 @@ import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
@@ -132,6 +133,49 @@ class BalanceReconciliationScreenTest {
             waitForIdle()
         }
         assertEquals(listOf(3L), opened)
+    }
+
+    @Test
+    fun aFullyReconciledSeriesIsHiddenUntilAskedFor() {
+        val otherAccount = AccountId(9)
+        val balances: ReportedBalanceReadRepository =
+            mock {
+                every { getSeries() } returns
+                    flowOf(
+                        listOf(
+                            ReportedBalanceSeries(account, "Revolut", coin, 2, t0 + 1.days),
+                            ReportedBalanceSeries(otherAccount, "Marcus", coin, 1, t0),
+                        ),
+                    )
+                everySuspend { getBalances(account, any()) } returns reported
+                everySuspend { getBalances(otherAccount, any()) } returns listOf(balance(20, "0", 0))
+                everySuspend { getTransactionBalanceTimes(any(), any()) } returns emptyMap()
+                everySuspend { getSources(any()) } returns emptyList()
+            }
+        val reconciliation: ReconciliationReadRepository =
+            mock {
+                everySuspend { getLegs(setOf(account)) } returns legs
+                everySuspend { getLegs(setOf(otherAccount)) } returns emptyList()
+            }
+        val engine: ImportEngine = mock { every { writeVersion } returns MutableStateFlow(0L) }
+        runMoneyManagerComposeUiTest {
+            setContent {
+                CompositionLocalProvider(LocalImportEngine provides engine) {
+                    ProvideSchemaAwareScope {
+                        BalanceReconciliationScreen(
+                            reportedBalanceRepository = balances,
+                            reconciliationRepository = reconciliation,
+                            onOpenLeg = {},
+                            onOpenSource = {},
+                        )
+                    }
+                }
+            }
+            // Reconciled starts collapsed: only the series that breaks is listed, under Not reconciled.
+            waitUntil { onAllNodesWithTag("balance-series").fetchSemanticsNodes().size == 1 }
+            onNodeWithTag("tree-node-reconciled").performClick()
+            waitUntil { onAllNodesWithTag("balance-series").fetchSemanticsNodes().size == 2 }
+        }
     }
 
     @Test

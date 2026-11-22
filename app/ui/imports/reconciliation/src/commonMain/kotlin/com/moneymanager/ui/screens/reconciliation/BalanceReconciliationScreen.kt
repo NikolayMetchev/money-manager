@@ -1,5 +1,6 @@
 package com.moneymanager.ui.screens.reconciliation
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -10,9 +11,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -23,13 +24,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.reconciliation.ReconciliationLeg
 import com.moneymanager.domain.model.reconciliation.ReportedBalance
@@ -73,11 +75,16 @@ class BalanceCheckCache {
     }
 }
 
+private const val RECONCILED_NODE = "reconciled"
+private const val NOT_RECONCILED_NODE = "not-reconciled"
+
 /**
  * The balances statements report (a strategy's `Balance` rule action) against the running balance Money Manager
  * computes from the account's legs, one account and asset at a time. Where the two stop differing by the same amount,
  * something between that statement balance and the one before broke the reconciliation: its legs are listed, each
  * opening the account's transactions on it, and each statement balance opens the file row or API item that reported it.
+ *
+ * The list is a tree: reconciled or not at the top, then account, then asset. Reconciled is collapsed by default.
  */
 @Composable
 fun BalanceReconciliationScreen(
@@ -107,62 +114,153 @@ fun BalanceReconciliationScreen(
 
     val importEngine = LocalImportEngine.current
     val writeVersion by importEngine.writeVersion.collectAsState()
-    var result by remember { mutableStateOf(cache.get(selected.key, writeVersion)) }
-    LaunchedEffect(selected, writeVersion) {
-        cache.get(selected.key, writeVersion)?.let {
-            result = it
-            return@LaunchedEffect
+    // Every series is checked, not just the selected one: whether a series is reconciled decides where it is listed.
+    val checks = remember { mutableStateMapOf<String, BalanceCheckResult>() }
+    LaunchedEffect(loaded, writeVersion) {
+        for (entry in loaded) {
+            val check =
+                cache.get(entry.key, writeVersion) ?: run {
+                    val reported = reportedBalanceRepository.getBalances(entry.accountId, entry.asset)
+                    val legs = reconciliationRepository.getLegs(setOf(entry.accountId))
+                    val balanceTimes = reportedBalanceRepository.getTransactionBalanceTimes(entry.accountId, entry.asset)
+                    withContext(Dispatchers.Default) { checkBalances(entry.asset, reported, legs, balanceTimes) }
+                        .also { cache.put(entry.key, writeVersion, it) }
+                }
+            checks[entry.key] = check
         }
-        result = null
-        val reported = reportedBalanceRepository.getBalances(selected.accountId, selected.asset)
-        val legs = reconciliationRepository.getLegs(setOf(selected.accountId))
-        val balanceTimes = reportedBalanceRepository.getTransactionBalanceTimes(selected.accountId, selected.asset)
-        val computed = withContext(Dispatchers.Default) { checkBalances(selected.asset, reported, legs, balanceTimes) }
-        cache.put(selected.key, writeVersion, computed)
-        result = computed
     }
 
+    // A series not checked yet counts as not reconciled until its check lands.
+    val reconciled = loaded.filter { checks[it.key]?.breaks?.isEmpty() == true }
+    val notReconciled = loaded.filter { checks[it.key]?.breaks?.isEmpty() != true }
+    val tree = BalanceTree(mutableStateMapOf(), checks, selected.key) { selectedKey = it }
+
     Row(modifier = Modifier.fillMaxSize()) {
-        LazyColumn(modifier = Modifier.width(280.dp).fillMaxHeight().padding(8.dp)) {
-            items(loaded, key = { it.key }) { entry ->
-                val chosen = entry.key == selected.key
-                Card(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(
-                                vertical = 4.dp,
-                            ).clickable { selectedKey = entry.key }
-                            .testTag("balance-series"),
-                    colors =
-                        if (chosen) {
-                            CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
-                        } else {
-                            CardDefaults.cardColors()
-                        },
-                ) {
-                    Column(modifier = Modifier.padding(8.dp)) {
-                        Text(entry.accountName, fontWeight = FontWeight.Bold)
-                        Text("${entry.asset.code} · ${entry.count} statement balances", style = MaterialTheme.typography.bodySmall)
-                        cache.get(entry.key, writeVersion)?.let { check ->
-                            Text(
-                                if (check.breaks.isEmpty()) "✓ Reconciles" else "${check.breaks.size} breaks",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (check.breaks.isEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                            )
-                        }
-                    }
-                }
-            }
+        LazyColumn(modifier = Modifier.width(320.dp).fillMaxHeight().padding(8.dp)) {
+            balanceGroup(tree, NOT_RECONCILED_NODE, "Not reconciled", notReconciled, defaultOpen = true)
+            balanceGroup(tree, RECONCILED_NODE, "Reconciled", reconciled, defaultOpen = false)
         }
-        val shown = result
+        val shown = checks[selected.key]
         if (shown == null) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("Checking ${selected.accountName}…")
+                Text("Checking ${selected.accountName} ${selected.asset.code}…")
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
             }
         } else {
             BalanceCheckDetail(selected, shown, reportedBalanceRepository, onOpenLeg, onOpenSource)
+        }
+    }
+}
+
+/** Open or closed state of each tree branch, and the checks and selection the leaves show. */
+private class BalanceTree(
+    val expanded: MutableMap<String, Boolean>,
+    val checks: Map<String, BalanceCheckResult>,
+    val selectedKey: String,
+    val onSelect: (String) -> Unit,
+) {
+    fun isOpen(
+        id: String,
+        defaultOpen: Boolean,
+    ): Boolean = expanded[id] ?: defaultOpen
+
+    fun toggle(
+        id: String,
+        defaultOpen: Boolean,
+    ) {
+        expanded[id] = !isOpen(id, defaultOpen)
+    }
+}
+
+/** One top-level branch of the tree (reconciled or not), with its accounts and their assets below it. */
+private fun LazyListScope.balanceGroup(
+    tree: BalanceTree,
+    id: String,
+    title: String,
+    series: List<ReportedBalanceSeries>,
+    defaultOpen: Boolean,
+) {
+    val open = tree.isOpen(id, defaultOpen)
+    item(key = id) {
+        TreeHeader(
+            label = "$title (${series.size})",
+            depth = 0,
+            open = open,
+            tag = "tree-node-$id",
+            onClick = { tree.toggle(id, defaultOpen) },
+        )
+    }
+    if (!open) return
+    series.groupBy { it.accountId }.forEach { (accountId, assets) ->
+        val accountNode = "$id/account-${accountId.id}"
+        val accountOpen = tree.isOpen(accountNode, defaultOpen = true)
+        item(key = accountNode) {
+            TreeHeader(
+                label = assets.first().accountName,
+                depth = 1,
+                open = accountOpen,
+                tag = "tree-node-$accountNode",
+                onClick = { tree.toggle(accountNode, defaultOpen = true) },
+            )
+        }
+        if (accountOpen) {
+            items(assets, key = { "$accountNode/${it.key}" }) { entry ->
+                AssetLeaf(
+                    entry = entry,
+                    check = tree.checks[entry.key],
+                    chosen = entry.key == tree.selectedKey,
+                    onClick = { tree.onSelect(entry.key) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TreeHeader(
+    label: String,
+    depth: Int,
+    open: Boolean,
+    tag: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(start = (depth * 16).dp, top = 6.dp, bottom = 6.dp)
+                .testTag(tag),
+    ) {
+        Text(if (open) "▾" else "▸", modifier = Modifier.width(20.dp))
+        Text(label, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun AssetLeaf(
+    entry: ReportedBalanceSeries,
+    check: BalanceCheckResult?,
+    chosen: Boolean,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(if (chosen) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
+                .clickable(onClick = onClick)
+                .padding(start = 36.dp, end = 8.dp, top = 4.dp, bottom = 4.dp)
+                .testTag("balance-series"),
+    ) {
+        Text(entry.asset.code, fontWeight = FontWeight.SemiBold)
+        Text("${entry.count} statement balances", style = MaterialTheme.typography.bodySmall)
+        if (check != null) {
+            Text(
+                if (check.breaks.isEmpty()) "✓ Reconciles" else "${check.breaks.size} breaks",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (check.breaks.isEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+            )
         }
     }
 }
