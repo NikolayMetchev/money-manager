@@ -101,10 +101,7 @@ class AttributeGroupMoveTest : DbTest() {
         groupKey: String = "",
     ) = NewAttribute(AttributeTypeId(WellKnownIds.ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID), value, groupKey)
 
-    private fun sortCodeType(
-        value: String,
-        groupKey: String,
-    ) = NewAttribute(AttributeTypeId(WellKnownIds.ACCOUNT_SORT_CODE_ATTR_TYPE_ID), value, groupKey)
+    private fun sortCode() = NewAttribute(AttributeTypeId(WellKnownIds.ACCOUNT_SORT_CODE_ATTR_TYPE_ID), SORT_CODE, GROUP)
 
     /** Every non-zero balance, by account name. */
     private suspend fun balances(): Map<String, String> {
@@ -146,7 +143,7 @@ class AttributeGroupMoveTest : DbTest() {
     fun `moving the group re-imports the files so their rows land on the new account`() =
         runDbTest {
             account("Marcus account", listOf(numberType(MARCUS_NUMBER)))
-            val old = account("Old", listOf(numberType(BANK_NUMBER, GROUP), sortCodeType(SORT_CODE, GROUP)))
+            val old = account("Old", listOf(numberType(BANK_NUMBER, GROUP), sortCode()))
             val new = account("New")
             importFile(stage(listOf(deposit)))
             assertEquals(mapOf("Marcus account" to "22.5", "Old" to "-22.5"), balances())
