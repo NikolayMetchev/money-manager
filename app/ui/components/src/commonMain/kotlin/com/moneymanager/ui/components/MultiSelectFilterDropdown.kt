@@ -39,6 +39,7 @@ import com.moneymanager.ui.util.ExposedDropdownMenu
  *   [itemLabel], and differs where the row carries more than the name (e.g. "GBP — Pound" vs "GBP").
  * @param searchText the text the typed query is matched against — defaults to [itemLabel].
  * @param fieldLabel the text field's label, for a call site too narrow for "Filter by …".
+ * @param allLabel the text of the clear-selection row and of the collapsed summary when nothing is selected.
  * @param maxVisibleItems the most rows the menu lists at once, for a long list; typing narrows it.
  */
 @Composable
@@ -55,11 +56,11 @@ fun <T, K> MultiSelectFilterDropdown(
     searchText: (T) -> String = itemLabel,
     fieldLabel: String = "Filter by $itemNoun",
     maxVisibleItems: Int = Int.MAX_VALUE,
+    allLabel: String = "All $itemNounPlural",
 ) {
     var expanded by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
 
-    val allLabel = "All $itemNounPlural"
     val selectionLabel =
         when (selectedKeys.size) {
             0 -> allLabel
