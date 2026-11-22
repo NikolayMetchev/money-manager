@@ -87,6 +87,16 @@ fun ReconciliationResult.unstoredMatches(
             (month == null || monthKey(it.sourceLeg.timestamp) == month)
     }
 
+/**
+ * The near matches (see [ReconciliationResult.nearMatches]) nobody has stored yet, on [wallet] and in [month] when given.
+ * A section that lists only near matches must count only these: an exact match is settled, listed under Matched, and
+ * stored from there.
+ */
+fun ReconciliationResult.unstoredNearMatches(
+    wallet: AccountId? = null,
+    month: String? = null,
+): List<LegMatch> = unstoredMatches(wallet, month).filterNot { it.settled }
+
 /** Every transaction a near match spans, each once: the members of its `reconciliation-match` relationship. */
 fun LegMatch.memberTransactions(): List<TransactionId> = (sourceLegs + realLegs).map { it.transactionRef }.distinct()
 

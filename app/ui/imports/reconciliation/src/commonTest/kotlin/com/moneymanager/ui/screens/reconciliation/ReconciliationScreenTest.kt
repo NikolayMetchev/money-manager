@@ -535,9 +535,9 @@ class ReconciliationScreenTest {
     }
 
     @Test
-    fun acceptAllStoresTheAutoMatchedRowsToo() {
+    fun acceptAllOnTheNearSectionStoresOnlyTheNearMatchesItLists() {
         runMoneyManagerComposeUiTest {
-            // 10↔20 agree to the second (auto-matched), 11↔21 are an hour apart (near).
+            // 10↔20 agree to the second (exact, listed under Matched), 11↔21 are an hour apart (near).
             val batches =
                 showLegs(
                     listOf(leg(10, wallet.accountId, "5", t0), leg(11, wallet.accountId, "6", t0 + 1.hours)),
@@ -545,12 +545,12 @@ class ReconciliationScreenTest {
                 )
             reveal(hasText("Near matches (1)"))
 
-            onAllNodesWithText("Accept all (2)")[0].performClick()
+            onAllNodesWithText("Accept all (1)")[0].performClick()
             // A bulk run is a background task, so wait for its writes.
             waitUntil(timeoutMillis = 10_000) { batches.isNotEmpty() }
 
             val create = batches.single().relationshipMutations.filterIsInstance<RelationshipMutation.Create>()
-            assertEquals(setOf(listOf(match(10), match(20)), listOf(match(11), match(21))), create.map { it.members }.toSet())
+            assertEquals(setOf(listOf(match(11), match(21))), create.map { it.members }.toSet())
         }
     }
 
@@ -614,6 +614,17 @@ class ReconciliationScreenTest {
                     .filterIsInstance<RelationshipMutation.Create>()
                     .map { it.members },
             )
+        }
+    }
+
+    @Test
+    fun theNearMatchesAcceptAllOffersOnlyTheNearMatchesItLists() {
+        runMoneyManagerComposeUiTest {
+            // An exact pair is settled: it is listed under Matched, not here, so this section offers nothing.
+            showLegs(listOf(leg(10, wallet.accountId, "5", t0)), listOf(leg(20, binance, "5", t0)))
+
+            onNodeWithText("Near matches (0)").assertExists()
+            onAllNodesWithText("Accept all").assertCountEquals(0)
         }
     }
 
@@ -862,6 +873,33 @@ class ReconciliationScreenTest {
             clickText("Unmatch")
 
             assertEquals(listOf(RelationshipMutation.Delete(RelationshipId(42))), batches.single().relationshipMutations)
+        }
+    }
+
+    @Test
+    fun matchedAcceptAllStoresOnlyTheNotAcceptedMatchesOnScreen() {
+        runMoneyManagerComposeUiTest {
+            // 10↔20 agree to the second and are not stored yet; 30↔40 are already accepted (stored as match 42).
+            val batches =
+                showLegs(
+                    listOf(leg(10, wallet.accountId, "5", t0), leg(30, wallet.accountId, "7", t0 + 5.days, matchIds = setOf(42))),
+                    listOf(leg(20, binance, "5", t0), leg(40, binance, "7", t0 + 5.days, matchIds = setOf(42))),
+                )
+            clickText("Matched")
+
+            onNodeWithText("Accepted (1)").assertExists()
+            onNodeWithText("Not accepted (1)").assertExists()
+            onAllNodesWithText("Accept all (1)")[0].performClick()
+            waitUntil(timeoutMillis = 10_000) { batches.isNotEmpty() }
+
+            assertEquals(
+                listOf(listOf(match(10), match(20))),
+                batches
+                    .single()
+                    .relationshipMutations
+                    .filterIsInstance<RelationshipMutation.Create>()
+                    .map { it.members },
+            )
         }
     }
 
