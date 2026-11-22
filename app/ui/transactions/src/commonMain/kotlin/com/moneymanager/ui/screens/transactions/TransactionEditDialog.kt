@@ -84,7 +84,7 @@ fun TransactionEditDialog(
     cryptoRepository: CryptoReadRepository? = null,
     maintenance: Maintenance,
     preSelectedSourceAccountId: AccountId? = null,
-    preSelectedCurrencyId: CurrencyId? = null,
+    preSelectedAssetId: AssetId? = null,
     onDismiss: () -> Unit,
     onSaved: () -> Unit = {},
 ) {
@@ -93,8 +93,8 @@ fun TransactionEditDialog(
     var targetAccountId by remember { mutableStateOf(transaction?.targetAccountId) }
     // Held as the asset itself, not an id: a crypto transfer (e.g. a reconciliation copy) must keep its asset.
     var selectedAsset by remember { mutableStateOf(transaction?.amount?.asset) }
-    var preSelectedAssetId by remember { mutableStateOf<AssetId?>(preSelectedCurrencyId) }
-    val currencyId: AssetId? = selectedAsset?.id ?: preSelectedAssetId
+    var pickedAssetId by remember { mutableStateOf(preSelectedAssetId) }
+    val currencyId: AssetId? = selectedAsset?.id ?: pickedAssetId
     var amount by remember {
         mutableStateOf(
             transaction
@@ -272,7 +272,7 @@ fun TransactionEditDialog(
                         // Get the currency object from repository
                         val currency =
                             selectedAsset
-                                ?: preSelectedAssetId?.let { currencyRepository.getCurrencyById(CurrencyId(it.id)).first() }
+                                ?: pickedAssetId?.let { currencyRepository.getCurrencyById(CurrencyId(it.id)).first() }
                                 ?: error("Currency not found")
 
                         val timestamp =
@@ -500,7 +500,7 @@ fun TransactionEditDialog(
                         selectedCurrencyId = currencyId?.let { CurrencyId(it.id) },
                         onCurrencySelected = {
                             selectedAsset = null
-                            preSelectedAssetId = it
+                            pickedAssetId = it
                             currencyError = false
                         },
                         label = "Currency",

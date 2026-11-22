@@ -30,6 +30,7 @@ import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
+import com.moneymanager.domain.model.AssetId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CryptoAsset
@@ -453,7 +454,7 @@ class AccountTransactionsScreenTest {
                         exchangeOrderRepository = createExchangeOrderRepository(),
                         maintenance = maintenance,
                         onAccountIdChange = { currentAccountId = it },
-                        onCurrencyIdChange = {},
+                        onAssetIdChange = {},
                     )
                 }
             }
@@ -538,7 +539,7 @@ class AccountTransactionsScreenTest {
                         exchangeOrderRepository = createExchangeOrderRepository(),
                         maintenance = maintenance,
                         onAccountIdChange = { currentAccountId = it },
-                        onCurrencyIdChange = {},
+                        onAssetIdChange = {},
                     )
                 }
             }
@@ -653,7 +654,7 @@ class AccountTransactionsScreenTest {
                         PagingResult(emptyList(), PagingInfo(null, null, hasMore = false))
                     everySuspend { getPageContainingTransaction(any(), any(), any(), any()) } calls
                         { args ->
-                            val currencyId = args.arg<CurrencyId?>(3)
+                            val currencyId = args.arg<AssetId?>(3)
                             val rows = allRows.filterByCurrency(currencyId)
                             val window = rows.subList(160, 200)
                             PageWithTargetIndex(
@@ -671,7 +672,7 @@ class AccountTransactionsScreenTest {
                         { args ->
                             val firstTimestamp = args.arg<Instant>(2)
                             val firstId = args.arg<TransactionId>(3)
-                            val currencyId = args.arg<CurrencyId?>(4)
+                            val currencyId = args.arg<AssetId?>(4)
                             backwardCalls++
                             // Suspend like a real DB query: setting isLoadingPreviousPage recomposes
                             // before this returns, so if the trigger effect keys on that flag it
@@ -966,7 +967,7 @@ class AccountTransactionsScreenTest {
                         exchangeOrderRepository = createExchangeOrderRepository(),
                         maintenance = createMaintenance(),
                         onAccountIdChange = {},
-                        onCurrencyIdChange = {},
+                        onAssetIdChange = {},
                     )
                 }
             }
@@ -1300,7 +1301,7 @@ class AccountTransactionsScreenTest {
                                     exchangeOrderRepository = repositories.exchangeOrderRepository,
                                     maintenance = repositories.maintenanceService,
                                     onAccountIdChange = { currentAccountId = it },
-                                    onCurrencyIdChange = {},
+                                    onAssetIdChange = {},
                                     onAuditClick = { auditTransferId = it },
                                 )
                             }
@@ -1511,7 +1512,7 @@ class AccountTransactionsScreenTest {
                                     exchangeOrderRepository = repositories.exchangeOrderRepository,
                                     maintenance = repositories.maintenanceService,
                                     onAccountIdChange = { currentAccountId = it },
-                                    onCurrencyIdChange = {},
+                                    onAssetIdChange = {},
                                     onAuditClick = { auditTransferId = it },
                                 )
                             }
@@ -1692,7 +1693,7 @@ class AccountTransactionsScreenTest {
                                     exchangeOrderRepository = repositories.exchangeOrderRepository,
                                     maintenance = repositories.maintenanceService,
                                     onAccountIdChange = { currentAccountId = it },
-                                    onCurrencyIdChange = {},
+                                    onAssetIdChange = {},
                                     onAuditClick = { auditTransferId = it },
                                 )
                             }
@@ -1861,7 +1862,7 @@ class AccountTransactionsScreenTest {
                 { args ->
                     val accountId = args.arg<AccountId>(0)
                     val pageSize = args.arg<Int>(1)
-                    val currencyId = args.arg<CurrencyId?>(3)
+                    val currencyId = args.arg<AssetId?>(3)
                     val allRows = buildAccountRows(transfers, accountId, feeLinks).filterByCurrency(currencyId)
                     val items = allRows.take(pageSize)
                     PagingResult(
@@ -1880,7 +1881,7 @@ class AccountTransactionsScreenTest {
                 { args ->
                     val accountId = args.arg<AccountId>(0)
                     val pageSize = args.arg<Int>(2)
-                    val currencyId = args.arg<CurrencyId?>(3)
+                    val currencyId = args.arg<AssetId?>(3)
                     val allRows = buildAccountRows(transfers, accountId, feeLinks).filterByCurrency(currencyId)
                     val items = allRows.take(pageSize)
                     PageWithTargetIndex(
@@ -1897,7 +1898,7 @@ class AccountTransactionsScreenTest {
         }
 
     /** Mirrors the repository's SQL currency filter so the test double matches production semantics. */
-    private fun List<AccountRow>.filterByCurrency(currencyId: CurrencyId?): List<AccountRow> =
+    private fun List<AccountRow>.filterByCurrency(currencyId: AssetId?): List<AccountRow> =
         if (currencyId == null) this else filter { it.transactionAmount.asset.id == currencyId }
 
     private fun buildAccountRows(

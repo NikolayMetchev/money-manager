@@ -51,7 +51,8 @@ import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
-import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.AssetId
+import com.moneymanager.domain.model.AssetIdSerializer
 import com.moneymanager.domain.model.ExchangeOrderId
 import com.moneymanager.domain.model.Trade
 import com.moneymanager.domain.model.TradeId
@@ -108,14 +109,14 @@ fun AccountTransactionsScreen(
     relationshipRepository: RelationshipReadRepository? = null,
     cryptoRepository: CryptoReadRepository? = null,
     onAccountIdChange: (AccountId) -> Unit = {},
-    onCurrencyIdChange: (CurrencyId?) -> Unit = {},
-    onAccountClick: (AccountId, String, CurrencyId?, TransferId?) -> Unit = { _, _, _, _ -> },
+    onAssetIdChange: (AssetId?) -> Unit = {},
+    onAccountClick: (AccountId, String, AssetId?, TransferId?) -> Unit = { _, _, _, _ -> },
     onAuditClick: (TransferId) -> Unit = {},
     onFeeLinkClick: (TransferId) -> Unit = {},
     onOrdersClick: (AccountId, String) -> Unit = { _, _ -> },
     onOrderLinkClick: (ExchangeOrderId) -> Unit = {},
     scrollToTransferId: TransferId? = null,
-    initialCurrencyId: CurrencyId? = null,
+    initialAssetId: AssetId? = null,
     externalRefreshTrigger: Int = 0,
     onBack: () -> Unit = {},
 ) {
@@ -222,29 +223,26 @@ fun AccountTransactionsScreen(
     // Selected currency state - initialized from parameter
     // Remembered per account so it survives opening an audit trail and coming back (the navigation
     // entry only carries the currency the screen was first opened with).
-    var selectedCurrencyId by rememberPersistedState(
-        "transactions.currency.${accountId.id}",
-        CurrencyId.serializer().nullable,
-    ) { initialCurrencyId }
+    var selectedAssetId by rememberPersistedState(
+        "transactions.asset.${accountId.id}",
+        AssetIdSerializer.nullable,
+    ) { initialAssetId }
 
     // A currency chosen by navigation (e.g. clicking a row's account) wins over the remembered one.
-    LaunchedEffect(initialCurrencyId) {
-        if (initialCurrencyId != null) selectedCurrencyId = initialCurrencyId
+    LaunchedEffect(initialAssetId) {
+        if (initialAssetId != null) selectedAssetId = initialAssetId
     }
 
     // Notify parent when selected currency changes
-    LaunchedEffect(selectedCurrencyId) {
-        onCurrencyIdChange(selectedCurrencyId)
+    LaunchedEffect(selectedAssetId) {
+        onAssetIdChange(selectedAssetId)
     }
 
+    // Only judge the selection once the balances have loaded: an empty list just means "not yet", and
+    // clearing then would throw away the remembered asset on every return from an audit trail.
     LaunchedEffect(accountAssets) {
-        if (accountAssets.isNotEmpty()) {
-            if (selectedCurrencyId != null && accountAssets.none { it.id == selectedCurrencyId }) {
-                selectedCurrencyId = null
-            }
-        } else if (initialCurrencyId == null) {
-            // Only clear if we didn't receive an initial currency from navigation
-            selectedCurrencyId = null
+        if (accountAssets.isNotEmpty() && selectedAssetId != null && accountAssets.none { it.id == selectedAssetId }) {
+            selectedAssetId = null
         }
     }
 
@@ -279,7 +277,7 @@ fun AccountTransactionsScreen(
         // If scrollToTransferId is provided, load the page containing that transaction
         LaunchedEffect(
             selectedAccountId,
-            selectedCurrencyId,
+            selectedAssetId,
             pageSize,
             scrollToTransferId,
             dateRange,
@@ -301,7 +299,7 @@ fun AccountTransactionsScreen(
                             accountId = selectedAccountId,
                             transactionId = scrollToTransferId,
                             pageSize = pageSize,
-                            currencyId = selectedCurrencyId,
+                            assetId = selectedAssetId,
                         )
                     runningBalances = pageResult.items
                     currentPagingInfo = pageResult.pagingInfo
@@ -315,7 +313,7 @@ fun AccountTransactionsScreen(
                                 accountId = selectedAccountId,
                                 pageSize = pageSize,
                                 pagingInfo = dateRange.firstPageCursor(),
-                                currencyId = selectedCurrencyId,
+                                assetId = selectedAssetId,
                             ),
                         )
                     runningBalances = result.items
@@ -349,7 +347,7 @@ fun AccountTransactionsScreen(
                             accountId = selectedAccountId,
                             pageSize = pageSize,
                             pagingInfo = currentPagingInfo,
-                            currencyId = selectedCurrencyId,
+                            assetId = selectedAssetId,
                         ),
                     )
                 runningBalances = runningBalances + result.items
@@ -378,7 +376,7 @@ fun AccountTransactionsScreen(
                         pageSize = pageSize,
                         firstTimestamp = firstItem.timestamp,
                         firstId = firstItem.transactionId,
-                        currencyId = selectedCurrencyId,
+                        assetId = selectedAssetId,
                     )
                 val newer = dateRange.clipNewer(result.items)
                 if (newer.isNotEmpty()) {
@@ -445,8 +443,8 @@ fun AccountTransactionsScreen(
                 }
                 AssetFilterDropdown(
                     assets = accountAssets,
-                    selectedAssetId = selectedCurrencyId?.id,
-                    onSelected = { selectedCurrencyId = it?.let { asset -> CurrencyId(asset.id.id) } },
+                    selectedAssetId = selectedAssetId?.id,
+                    onSelected = { selectedAssetId = it?.id },
                 )
             }
 
@@ -489,7 +487,7 @@ fun AccountTransactionsScreen(
                                 "Couldn't load these transactions."
                             } else if (dateRange.isActive) {
                                 "No transactions in this period."
-                            } else if (selectedCurrencyId != null) {
+                            } else if (selectedAssetId != null) {
                                 "No transactions for selected currency."
                             } else {
                                 "No transactions yet for this account."
@@ -635,9 +633,9 @@ fun AccountTransactionsScreen(
 
                         // Set currency filter to match the transaction; that reloads the page, so the
                         // centering scroll happens on the next pass over the filtered list
-                        val targetCurrencyId = CurrencyId(transaction.transactionAmount.asset.id.id)
-                        if (selectedCurrencyId != targetCurrencyId) {
-                            selectedCurrencyId = targetCurrencyId
+                        val targetAssetId = transaction.transactionAmount.asset.id
+                        if (selectedAssetId != targetAssetId) {
+                            selectedAssetId = targetAssetId
                             return@let
                         }
 
@@ -798,7 +796,7 @@ fun AccountTransactionsScreen(
                                 },
                                 onAccountClick = { clickedAccountId ->
                                     highlightedTransactionId = runningBalance.transactionId
-                                    selectedCurrencyId = CurrencyId(runningBalance.transactionAmount.asset.id.id)
+                                    selectedAssetId = runningBalance.transactionAmount.asset.id
 
                                     // Notify parent to switch to the clicked account
                                     onAccountIdChange(clickedAccountId)
@@ -810,7 +808,7 @@ fun AccountTransactionsScreen(
                                         onAccountClick(
                                             clickedAccountId,
                                             clickedAccount.name,
-                                            CurrencyId(runningBalance.transactionAmount.asset.id.id),
+                                            runningBalance.transactionAmount.asset.id,
                                             TransferId(runningBalance.transactionId.id),
                                         )
                                     }
