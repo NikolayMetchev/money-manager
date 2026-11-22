@@ -53,7 +53,8 @@ data class BalanceCheckResult(
  * Balances are compared per instant, never per transaction, so the order of records within a second, or a fee booked
  * as a transfer of its own, never shows as a break. At an instant reported several times (two records, or two
  * sources of one account) the balance compared is the one that keeps the previous difference, if any does, else the
- * last in statement order: the balance after every record of that instant.
+ * one nearest the computed balance. The stored order of the rows says nothing about which of them is the balance after
+ * every record, so picking the last one stored showed a £10 break as £10,000.
  *
  * A leg counts from its transaction's [balanceTimes] entry when it has one, else from its own time: a statement whose
  * running balance counts a record when it completed (Revolut) counts a card payment started two days before then, so
@@ -82,11 +83,12 @@ fun checkBalances(
         val windowStart = legIndex
         while (legIndex < counted.size && countsAt(counted[legIndex]) <= timestamp) running += counted[legIndex++].amount
         val keepsDifference = previous?.difference?.let { offset -> balances.lastOrNull { it.amount - running == offset } }
+        val nearest = balances.minBy { (it.amount - running).abs() }.amount
         val checkpoint =
             BalanceCheckpoint(
                 timestamp = timestamp,
                 reported = balances,
-                reportedBalance = (keepsDifference ?: balances.last()).amount,
+                reportedBalance = keepsDifference?.amount ?: nearest,
                 computed = running,
             )
         previous?.let { before ->
