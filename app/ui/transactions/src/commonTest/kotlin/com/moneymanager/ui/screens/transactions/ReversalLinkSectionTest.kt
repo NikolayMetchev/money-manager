@@ -78,12 +78,12 @@ class ReversalLinkSectionTest {
     private val returned = transfer(2, goldman.id, monzo.id, after = 1.hours)
 
     private fun accountRepository(): AccountReadRepository =
-        mock<AccountReadRepository>(MockMode.autoUnit) {
+        mock(MockMode.autoUnit) {
             every { getAllAccounts() } returns flowOf(listOf(monzo, marcus, goldman))
         }
 
     private fun relationshipRepository(relationships: List<Relationship>): RelationshipReadRepository =
-        mock<RelationshipReadRepository>(MockMode.autoUnit) {
+        mock(MockMode.autoUnit) {
             every { getByTransaction(any()) } returns flowOf(relationships)
         }
 
@@ -91,18 +91,18 @@ class ReversalLinkSectionTest {
         candidates: List<Transfer> = emptyList(),
         linked: Map<TransferId, Transfer> = emptyMap(),
     ): TransactionReadRepository =
-        mock<TransactionReadRepository>(MockMode.autoUnit) {
+        mock(MockMode.autoUnit) {
             everySuspend { getUnreversedTransfersTouchingAccounts(any(), any(), any(), any()) } returns candidates
             everySuspend { getTransactionsByIds(any()) } returns linked
         }
 
     private fun maintenance(): Maintenance =
-        mock<Maintenance>(MockMode.autoUnit) {
+        mock(MockMode.autoUnit) {
             everySuspend { refreshMaterializedViews() } returns Duration.ZERO
         }
 
     @Composable
-    private fun Section(
+    private fun reversalSection(
         transfer: Transfer,
         transactions: TransactionReadRepository,
         relationships: RelationshipReadRepository,
@@ -141,7 +141,7 @@ class ReversalLinkSectionTest {
             val batches = mutableListOf<ImportBatch>()
             var changed = false
             setContent {
-                Section(
+                reversalSection(
                     transfer = payment,
                     transactions = transactionRepository(candidates = listOf(returned)),
                     relationships = relationshipRepository(emptyList()),
@@ -176,7 +176,7 @@ class ReversalLinkSectionTest {
             val batches = mutableListOf<ImportBatch>()
             var changed = false
             setContent {
-                Section(
+                reversalSection(
                     transfer = payment,
                     transactions = transactionRepository(candidates = listOf(returned)),
                     relationships = relationshipRepository(emptyList()),
@@ -202,7 +202,7 @@ class ReversalLinkSectionTest {
     fun pickerWithNoMatchingTransferSaysSo() {
         runMoneyManagerComposeUiTest {
             setContent {
-                Section(
+                reversalSection(
                     transfer = payment,
                     transactions = transactionRepository(candidates = emptyList()),
                     relationships = relationshipRepository(emptyList()),
@@ -232,7 +232,7 @@ class ReversalLinkSectionTest {
                         ),
                 )
             setContent {
-                Section(
+                reversalSection(
                     transfer = payment,
                     transactions =
                         transactionRepository(
