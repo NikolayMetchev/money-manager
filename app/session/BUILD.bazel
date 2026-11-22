@@ -75,6 +75,7 @@ kmp_test(
         "js",
     ],
     deps = [
+        "//app/apiimporter",
         "//app/csvimporter",
         "//app/db/core",
         "//app/db/di",

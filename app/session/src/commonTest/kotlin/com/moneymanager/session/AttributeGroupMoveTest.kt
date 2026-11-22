@@ -1,17 +1,22 @@
 package com.moneymanager.session
 
+import com.moneymanager.apiimporter.ApiBulkReimportResult
+import com.moneymanager.apiimporter.ApiSessionReimportFailure
 import com.moneymanager.bigdecimal.BigInteger
 import com.moneymanager.credentialvault.testing.inMemoryCredentialVault
 import com.moneymanager.csvimporter.AttributeAccountMatcher
+import com.moneymanager.csvimporter.BulkReimportResult
 import com.moneymanager.csvimporter.bulkApplyCsv
 import com.moneymanager.database.di.toAppServices
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csv.CsvImport
+import com.moneymanager.importengineapi.createApiSession
 import com.moneymanager.tasks.TaskManager
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.addAccountAttributes
@@ -24,6 +29,7 @@ import kotlinx.coroutines.flow.first
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration
 
@@ -172,6 +178,46 @@ class AttributeGroupMoveTest : DbTest() {
                     .size,
             )
         }
+
+    @Test
+    fun `an API session whose connection is gone is reported as failed`() =
+        runDbTest {
+            val services = repositories.toAppServices(repositories.importEngine)
+            val sessionId = repositories.importEngine.createApiSession(services.deviceId, now)
+            val imports = sessionImports()
+
+            val result = imports.apis.reimportSessions(setOf(sessionId), imports.directories.reimports.reads)
+
+            assertEquals(0, result.sessionsReimported)
+            assertEquals(listOf(sessionId), result.failures.map { it.sessionId })
+        }
+
+    @Test
+    fun `the summary names the files and the API sessions it re-imported`() {
+        val result =
+            AttributeGroupMoveResult(
+                attributesMoved = 2,
+                files =
+                    BulkReimportResult(
+                        filesImported = 3,
+                        transfersCreated = 0,
+                        duplicatesSkipped = 0,
+                        filesSkippedNoStrategy = 0,
+                        filesFailed = 0,
+                    ),
+                apiSessions =
+                    ApiBulkReimportResult(
+                        sessionsReimported = 1,
+                        failures = listOf(ApiSessionReimportFailure(ApiSessionId(7), "gone")),
+                    ),
+            )
+
+        val summary = result.summary()
+
+        assertTrue(summary.startsWith("Moved 2 attributes. Re-imported 3 files"), summary)
+        assertTrue(summary.endsWith("Re-imported 1 API session · 1 failed"), summary)
+        assertEquals("Moved 1 attribute", AttributeGroupMoveResult(1, null, null).summary())
+    }
 
     private companion object {
         const val MARCUS_NUMBER = "40001234"
