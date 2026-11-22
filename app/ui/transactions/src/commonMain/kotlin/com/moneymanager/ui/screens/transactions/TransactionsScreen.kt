@@ -50,6 +50,7 @@ import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.ExchangeOrderId
 import com.moneymanager.domain.model.Trade
@@ -72,10 +73,13 @@ import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.RelationshipReadRepository
 import com.moneymanager.domain.repository.TradeReadRepository
 import com.moneymanager.domain.repository.TransactionReadRepository
+import com.moneymanager.importengineapi.deleteTransaction
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.components.DateRangeFilterFields
+import com.moneymanager.ui.components.DestructiveConfirmDialog
 import com.moneymanager.ui.components.EditAccountDialog
+import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.foundation.LocalStartupProbe
 import com.moneymanager.ui.foundation.StartupMilestone
 import com.moneymanager.ui.foundation.rememberPersistedState
@@ -146,6 +150,10 @@ fun AccountTransactionsScreen(
     // Refresh trigger - increment to force reload after edits
     var refreshTrigger by remember { mutableStateOf(0) }
 
+    // The row whose delete is awaiting confirmation
+    var rowToDelete by remember { mutableStateOf<AccountRow?>(null) }
+    val importEngine = LocalImportEngine.current
+
     // Fetch the actual transfer when transactionIdToEdit changes
     LaunchedEffect(transactionIdToEdit) {
         val id = transactionIdToEdit
@@ -180,7 +188,7 @@ fun AccountTransactionsScreen(
     val scrollScope = rememberSchemaAwareCoroutineScope()
 
     // Pagination state
-    var runningBalances by remember { mutableStateOf<List<com.moneymanager.domain.model.AccountRow>>(emptyList()) }
+    var runningBalances by remember { mutableStateOf<List<AccountRow>>(emptyList()) }
     var currentPagingInfo by remember { mutableStateOf<com.moneymanager.domain.model.PagingInfo?>(null) }
     var isLoadingPage by remember { mutableStateOf(false) }
     var hasLoadedFirstPage by remember { mutableStateOf(false) }
@@ -761,6 +769,7 @@ fun AccountTransactionsScreen(
                                 },
                                 onEditTradeClick = { tradeIdToEdit = it },
                                 onAuditClick = onAuditClick,
+                                onDeleteClick = { rowToDelete = it },
                                 onOrderLinkClick = onOrderLinkClick,
                                 onFeeLinkClick = { linkedTransferId ->
                                     val targetIndex =
@@ -849,6 +858,23 @@ fun AccountTransactionsScreen(
                 onSaved = { refreshTrigger++ },
             )
         }
+    }
+
+    rowToDelete?.let { row ->
+        val kindLabel = row.kind.displayLabel().lowercase()
+        DestructiveConfirmDialog(
+            title = "Delete Transaction",
+            targetName = row.description.ifBlank { "this $kindLabel" },
+            consequence = "This $kindLabel is removed from every account it touches. Linked fees and relationships go with it.",
+            failureMessage = "Failed to delete transaction",
+            onConfirm = {
+                importEngine.deleteTransaction(row.transactionId)
+                maintenance.refreshMaterializedViews()
+                refreshTrigger++
+                rowToDelete = null
+            },
+            onDismiss = { rowToDelete = null },
+        )
     }
 
     // Show edit dialog if a transaction is selected for editing

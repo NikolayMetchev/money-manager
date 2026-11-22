@@ -39,6 +39,7 @@ import com.moneymanager.importengineapi.PersonMatchKey
 import com.moneymanager.importengineapi.createAccounts
 import com.moneymanager.importengineapi.createCrypto
 import com.moneymanager.importengineapi.createTrade
+import com.moneymanager.importengineapi.deleteTransaction
 import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.importengineapi.personalCounterpartyKey
 import com.moneymanager.importengineapi.updateTrade
@@ -101,6 +102,46 @@ class ImportEngineDbTest : DbTest() {
             assertEquals(Money(600, gbp), updated.from)
             assertEquals(Money(250, eur), updated.to)
             assertEquals(2L, updated.revisionId)
+        }
+
+    @Test
+    fun deleteTransactionRemovesATrade() =
+        runDbTest {
+            val accountId = createSourceAccount()
+            val currencies = repositories.currencyRepository.getAllCurrencies().first()
+            val gbp = currencies.first { it.code == "GBP" }
+            val eur = currencies.first { it.code == "EUR" }
+            val engine = repositories.importEngine
+            val tradeId =
+                engine.createTrade(
+                    timestamp = baseTime,
+                    description = "Trade to delete",
+                    fromAccountId = accountId,
+                    fromAmount = Money(500, gbp),
+                    toAccountId = accountId,
+                    toAmount = Money(200, eur),
+                )
+            assertTrue(repositories.tradeRepository.getTradeById(tradeId).first() != null)
+
+            engine.deleteTransaction(tradeId)
+
+            assertNull(repositories.tradeRepository.getTradeById(tradeId).first())
+        }
+
+    @Test
+    fun deleteTransactionRemovesATransfer() =
+        runDbTest {
+            val sourceId = createSourceAccount()
+            val created =
+                repositories.importEngine.import(
+                    batchWithCounterparty(sourceId, gbp(), "Transfer to delete", Source.Manual),
+                )
+            val transferId = created.createdTransferIds.values.single()
+            assertTrue(repositories.transactionRepository.getTransactionById(transferId.id).first() != null)
+
+            repositories.importEngine.deleteTransaction(transferId)
+
+            assertNull(repositories.transactionRepository.getTransactionById(transferId.id).first())
         }
 
     private suspend fun createSourceAccount(): AccountId {

@@ -1,6 +1,7 @@
 package com.moneymanager.ui.screens.transactions
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -61,6 +62,7 @@ import com.moneymanager.domain.repository.write.PersonWriteRepository
 import com.moneymanager.domain.repository.write.TransactionWriteRepository
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportResult
 import com.moneymanager.presenter.error.ProvideSchemaAwareScope
 import com.moneymanager.test.database.createTestDatabaseLocation
@@ -190,6 +192,43 @@ class AccountTransactionsScreenTest {
             waitForIdle()
             assertEquals(TradeId(42L), editedTrade)
             assertEquals(null, editedTransfer)
+        }
+    }
+
+    @Test
+    fun deleteButton_reportsTheRowItWasClickedOn() {
+        runMoneyManagerComposeUiTest {
+            val now = Clock.System.now()
+            val usd = Currency(id = CurrencyId(1L), code = "USD", name = "US Dollar", scaleFactor = 100)
+            val own = Account(id = AccountId(1L), name = "Exchange", openingDate = now)
+            val other = Account(id = AccountId(2L), name = "Other", openingDate = now)
+            val row =
+                AccountRow(
+                    transactionId = TradeId(42L),
+                    timestamp = now,
+                    description = "Buy crypto",
+                    accountId = own.id,
+                    transactionAmount = Money(-500, usd),
+                    runningBalance = Money(-500, usd),
+                    sourceAccountId = own.id,
+                    targetAccountId = other.id,
+                    kind = TransactionKind.TRADE,
+                )
+            var deleted: AccountRow? = null
+            setContent {
+                ProvideSchemaAwareScope {
+                    AccountTransactionCard(
+                        runningBalance = row,
+                        accounts = listOf(own, other),
+                        screenSizeClass = ScreenSizeClass.Expanded,
+                        onDeleteClick = { deleted = it },
+                    )
+                }
+            }
+            waitForIdle()
+            onNodeWithTag("deleteTransactionButton").performClick()
+            waitForIdle()
+            assertEquals(row, deleted)
         }
     }
 
@@ -1075,6 +1114,92 @@ class AccountTransactionsScreenTest {
 
             // Then: it's handled in place (highlight) — no navigation to another screen.
             assertEquals(false, navigated)
+        }
+    }
+
+    @Test
+    fun deleteTransaction_confirmingDeletesTheTransferThroughImportEngine() {
+        runMoneyManagerComposeUiTest {
+            val batches = mutableListOf<ImportBatch>()
+            val importEngine = mock<ImportEngine>(MockMode.autoUnit)
+            everySuspend { importEngine.import(any()) } calls { (batch: ImportBatch) ->
+                batches += batch
+                ImportResult()
+            }
+            setContent(deleteTestContent(importEngine))
+            waitForIdle()
+
+            onNodeWithTag("deleteTransactionButton").performClick()
+            waitUntilExactlyOneExists(hasText("Delete Transaction"))
+            onNodeWithText("Delete").performClick()
+            waitUntil(timeoutMillis = 5_000) { batches.isNotEmpty() }
+            waitUntilDoesNotExist(hasText("Delete Transaction"))
+            waitForIdle()
+
+            val deleted = batches.single().transfers.single()
+            assertEquals(ImportOperation.DELETE, deleted.operation)
+            assertEquals(TransferId(10L), deleted.existingId)
+        }
+    }
+
+    @Test
+    fun deleteTransaction_cancellingLeavesTheTransferAlone() {
+        runMoneyManagerComposeUiTest {
+            val batches = mutableListOf<ImportBatch>()
+            val importEngine = mock<ImportEngine>(MockMode.autoUnit)
+            everySuspend { importEngine.import(any()) } calls { (batch: ImportBatch) ->
+                batches += batch
+                ImportResult()
+            }
+            setContent(deleteTestContent(importEngine))
+            waitForIdle()
+
+            onNodeWithTag("deleteTransactionButton").performClick()
+            waitUntilExactlyOneExists(hasText("Delete Transaction"))
+            onNodeWithText("Cancel").performClick()
+            waitUntilDoesNotExist(hasText("Delete Transaction"))
+            waitForIdle()
+
+            assertTrue(batches.isEmpty())
+        }
+    }
+
+    /** An account holding one transfer ("Coffee", id 10), with [importEngine] provided for its writes. */
+    private fun deleteTestContent(importEngine: ImportEngine): @Composable () -> Unit {
+        val now = Clock.System.now()
+        val usd = Currency(id = CurrencyId(1L), code = "USD", name = "US Dollar", scaleFactor = 100)
+        val own = Account(id = AccountId(1L), name = "Checking", openingDate = now)
+        val shop = Account(id = AccountId(2L), name = "Coffee Shop", openingDate = now)
+        val transfer =
+            Transfer(
+                id = TransferId(10L),
+                timestamp = now,
+                description = "Coffee",
+                sourceAccountId = own.id,
+                targetAccountId = shop.id,
+                amount = Money.fromDisplayValue("100", usd),
+            )
+        val transactionRepository = createTransactionRepository(listOf(transfer))
+        val accountRepository = createAccountRepository(listOf(own, shop))
+        val currencyRepository = createCurrencyRepository(listOf(usd))
+        return {
+            CompositionLocalProvider(LocalImportEngine provides importEngine) {
+                ProvideSchemaAwareScope {
+                    AccountTransactionsScreen(
+                        accountId = own.id,
+                        transactionRepository = transactionRepository,
+                        accountRepository = accountRepository,
+                        accountAttributeRepository = createAccountAttributeRepository(),
+                        categoryRepository = createCategoryRepository(),
+                        currencyRepository = currencyRepository,
+                        attributeTypeRepository = createAttributeTypeRepository(),
+                        personRepository = createPersonRepository(),
+                        personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
+                        exchangeOrderRepository = createExchangeOrderRepository(),
+                        maintenance = createMaintenance(),
+                    )
+                }
+            }
         }
     }
 
