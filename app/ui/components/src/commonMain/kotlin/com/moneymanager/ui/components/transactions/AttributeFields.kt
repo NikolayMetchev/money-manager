@@ -52,6 +52,9 @@ fun EditableAttributesSection(
     onAttributesChange: (Map<Long, EditableAttribute>) -> Unit,
     onAddAttribute: (groupKey: String) -> Unit,
     grouping: Boolean = false,
+    // A group in [movableGroups] gets a "Move to account" button that calls this with its key.
+    onMoveGroup: ((groupKey: String) -> Unit)? = null,
+    movableGroups: Set<String> = emptySet(),
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -118,6 +121,7 @@ fun EditableAttributesSection(
                 editableAttributes = editableAttributes,
                 onAttributesChange = onAttributesChange,
                 onAddAttribute = onAddAttribute,
+                onMove = onMoveGroup?.takeIf { groupKey in movableGroups }?.let { move -> { move(groupKey) } },
             )
         }
     }
@@ -182,6 +186,7 @@ private fun AttributeGroupCard(
     editableAttributes: Map<Long, EditableAttribute>,
     onAttributesChange: (Map<Long, EditableAttribute>) -> Unit,
     onAddAttribute: (groupKey: String) -> Unit,
+    onMove: (() -> Unit)?,
 ) {
     OutlinedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -200,15 +205,22 @@ private fun AttributeGroupCard(
                 )
                 // Ungroup is a deliberate action: for a two-identity account, ungrouping both identities
                 // leaves their sort/account numbers unpairable and the account no longer matches on import.
-                TextButton(
-                    onClick = {
-                        onAttributesChange(
-                            editableAttributes.mapValues { (_, a) -> if (a.groupKey == groupKey) a.copy(groupKey = "") else a },
-                        )
-                    },
-                    enabled = !isSaving,
-                ) {
-                    Text("Ungroup")
+                Row {
+                    if (onMove != null) {
+                        TextButton(onClick = onMove, enabled = !isSaving) {
+                            Text("Move to account…")
+                        }
+                    }
+                    TextButton(
+                        onClick = {
+                            onAttributesChange(
+                                editableAttributes.mapValues { (_, a) -> if (a.groupKey == groupKey) a.copy(groupKey = "") else a },
+                            )
+                        },
+                        enabled = !isSaving,
+                    ) {
+                        Text("Ungroup")
+                    }
                 }
             }
             members.forEach { (id, attribute) ->

@@ -16,11 +16,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import co.touchlab.kermit.Logger
 import com.moneymanager.domain.model.Account
+import com.moneymanager.domain.model.AccountAttribute
 import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
+import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.AttributeTypeReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.HolidayCalendarReadRepository
@@ -61,6 +63,8 @@ fun EditAccountDialog(
     personRepository: PersonReadRepository,
     personAttributeRepository: PersonAttributeReadRepository? = null,
     personAccountOwnershipRepository: PersonAccountOwnershipReadRepository,
+    // Offers moving an attribute group to another account (with the re-import that follows); needs [LocalAttributeGroupMover] too.
+    accountRepository: AccountReadRepository? = null,
     onDismiss: () -> Unit,
     // Offers a location picker: the holiday calendar this account's business-day reconcile windows count. Without
     // it, the location is still an ordinary attribute below.
@@ -89,8 +93,10 @@ fun EditAccountDialog(
     // Attribute state
     var existingAttributeTypes by remember { mutableStateOf<List<AttributeType>>(emptyList()) }
     var editableAttributes by remember { mutableStateOf<Map<Long, EditableAttribute>>(emptyMap()) }
-    var originalAttributeList by remember { mutableStateOf<List<com.moneymanager.domain.model.AccountAttribute>>(emptyList()) }
+    var originalAttributeList by remember { mutableStateOf<List<AccountAttribute>>(emptyList()) }
     var nextTempId by remember { mutableStateOf(-1L) }
+    val attributeGroupMover = LocalAttributeGroupMover.current
+    var movingGroupKey by remember { mutableStateOf<String?>(null) }
     var attributesLoaded by remember { mutableStateOf(false) }
 
     // Load existing attribute types for autocomplete
@@ -324,6 +330,9 @@ fun EditAccountDialog(
                         nextTempId--
                     },
                     grouping = true,
+                    onMoveGroup = if (accountRepository != null && attributeGroupMover != null) ({ movingGroupKey = it }) else null,
+                    // Only a group as saved moves: an edited or new row isn't in the database yet.
+                    movableGroups = unchangedGroupKeys(originalAttributeList, editableAttributes),
                 )
 
                 accountState.errorMessage?.let { error -> ErrorMessageText(error) }
@@ -347,6 +356,22 @@ fun EditAccountDialog(
         },
     )
 
+    val movingKey = movingGroupKey
+    if (movingKey != null && accountRepository != null && attributeGroupMover != null) {
+        MoveAttributeGroupDialog(
+            from = account,
+            accountRepository = accountRepository,
+            categoryRepository = categoryRepository,
+            personRepository = personRepository,
+            onConfirm = { target ->
+                attributeGroupMover.move(account.id, movingKey, target)
+                movingGroupKey = null
+                onDismiss()
+            },
+            onDismiss = { movingGroupKey = null },
+        )
+    }
+
     if (accountState.showCreateCategoryDialog) {
         CreateCategoryDialog(
             categoryRepository = categoryRepository,
@@ -363,4 +388,20 @@ fun EditAccountDialog(
             attributeTypeRepository = attributeTypeRepository,
         )
     }
+}
+
+/** The groups whose rows are all as stored: the ones the database can move as they are. */
+private fun unchangedGroupKeys(
+    original: List<AccountAttribute>,
+    edited: Map<Long, EditableAttribute>,
+): Set<String> {
+    val stored = original.filter { it.groupKey.isNotEmpty() }.groupBy { it.groupKey }
+    return stored
+        .filter { (key, members) ->
+            val current = edited.filterValues { it.groupKey == key }
+            current.size == members.size &&
+                members.all { member ->
+                    current[member.id]?.let { it.typeName == member.attributeType.name && it.value == member.value } == true
+                }
+        }.keys
 }

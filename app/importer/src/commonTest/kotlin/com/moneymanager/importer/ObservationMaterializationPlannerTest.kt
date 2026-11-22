@@ -162,6 +162,8 @@ class ObservationMaterializationPlannerTest {
 
         override suspend fun getObservationsOnAccounts(accountIds: Collection<AccountId>): Nothing = error("Unexpected lookup: $accountIds")
 
+        override suspend fun getRecordSourcesOnAccount(accountId: AccountId): Nothing = error("Unexpected lookup: $accountId")
+
         override suspend fun getAccountsWithObservations(accountIds: Collection<AccountId>): Nothing =
             error("Unexpected lookup: $accountIds")
 

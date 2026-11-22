@@ -28,7 +28,9 @@ import com.moneymanager.domain.model.observation.ObservedAssetId
 import com.moneymanager.domain.model.observation.ObservedValues
 import com.moneymanager.domain.model.observation.VacantObservation
 import com.moneymanager.domain.repository.ObservationReadRepository
+import com.moneymanager.domain.repository.ObservedRecordSources
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 class ObservationReadRepositoryImpl(
     database: MoneyManagerDatabase,
@@ -85,6 +87,16 @@ class ObservationReadRepositoryImpl(
                 addAll(queries.selectRecordTransactionsByApiSessions(ids, ::storedTransactionId).awaitAsList())
             }
         }
+
+    override suspend fun getRecordSourcesOnAccount(accountId: AccountId): ObservedRecordSources =
+        ObservedRecordSources(
+            csvImports =
+                queries
+                    .selectCsvImportsOnAccount(accountId.id)
+                    .awaitAsList()
+                    .mapTo(mutableSetOf()) { CsvImportId(Uuid.parse(it)) },
+            apiSessions = queries.selectApiSessionsOnAccount(accountId.id).awaitAsList().mapTo(mutableSetOf(), ::ApiSessionId),
+        )
 
     override suspend fun getTransactionsObservedByOtherRecords(
         transactions: Collection<TransactionId>,

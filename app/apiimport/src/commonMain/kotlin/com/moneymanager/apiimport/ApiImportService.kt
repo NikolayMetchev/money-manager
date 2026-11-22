@@ -3,12 +3,15 @@ package com.moneymanager.apiimport
 import co.touchlab.kermit.Logger
 import com.moneymanager.apiimporter.API_ENGINE_BATCH_SIZE
 import com.moneymanager.apiimporter.ApiAuthException
+import com.moneymanager.apiimporter.ApiBulkReimportResult
 import com.moneymanager.apiimporter.ApiCounterpartySuggestion
 import com.moneymanager.apiimporter.ApiDownloadCredentials
 import com.moneymanager.apiimporter.ApiDownloadNotPossibleException
 import com.moneymanager.apiimporter.ApiImportReads
 import com.moneymanager.apiimporter.ApiSessionDownloadResult
 import com.moneymanager.apiimporter.ApiSessionImportResult
+import com.moneymanager.apiimporter.ApiSessionReimportFailure
+import com.moneymanager.apiimporter.bulkReimportApiSessions
 import com.moneymanager.apiimporter.discoverApiCounterpartiesToCreate
 import com.moneymanager.apiimporter.displaySummary
 import com.moneymanager.apiimporter.downloadApiSession
@@ -34,6 +37,7 @@ import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.ImportRecordReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
 import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.RerunReads
 import com.moneymanager.importengineapi.createApiSession
 import com.moneymanager.importengineapi.ensureApiCredentials
 import com.moneymanager.importengineapi.markApiSessionImported
@@ -342,6 +346,66 @@ class ApiImportService(
     ): ApiSessionImportResult =
         writeLock.withLock {
             importLocked(task, sessionId, strategy, counterpartyAccountNames, refreshViews)
+        }
+
+    /**
+     * Re-imports the already-imported [sessionIds] under their credentials' current strategies, from the responses the
+     * database holds (no download, so no credentials). A session whose credential or strategy is gone can't be re-imported
+     * and is reported as failed. Runs under the write lock the session's other imports share.
+     */
+    suspend fun reimportSessions(
+        sessionIds: Set<ApiSessionId>,
+        reads: RerunReads,
+        onProgress: (suspend (Progress) -> Unit)? = null,
+    ): ApiBulkReimportResult =
+        writeLock.withLock {
+            val credentials = apiSessionRepository.getAllCredentials().associateBy { it.id }
+            val sessions = sessionIds.mapNotNull { apiSessionRepository.getSessionById(it) }
+            val apiReads =
+                ApiImportReads(
+                    apiSessionRepository = apiSessionRepository,
+                    accountRepository = accountRepository,
+                    accountAttributeRepository = accountAttributeRepository,
+                    currencyRepository = currencyRepository,
+                    cryptoRepository = cryptoRepository,
+                    importRecordRepository = importRecordRepository,
+                    accountMappingRepository = accountMappingRepository,
+                )
+            val passThroughAccounts = passThroughAccountRepository.getAll().first()
+            var result = ApiBulkReimportResult(sessionsReimported = 0)
+            val byCredential = sessions.groupBy { it.credentialId }
+            for ((credentialId, group) in byCredential) {
+                val credential = credentialId?.let { credentials[it] }
+                val strategy = credential?.let { resolveStrategy(it) }
+                if (credentialId == null || strategy == null) {
+                    result =
+                        result.copy(
+                            failures =
+                                result.failures +
+                                    group.map { ApiSessionReimportFailure(it.id, "Its connection or strategy no longer exists") },
+                        )
+                    continue
+                }
+                val run =
+                    bulkReimportApiSessions(
+                        credentialId = credentialId,
+                        strategy = strategy,
+                        apiReads = apiReads,
+                        reads = reads,
+                        maintenance = maintenance,
+                        importEngine = importEngine,
+                        passThroughAccounts = passThroughAccounts,
+                        onProgress = onProgress,
+                        onlySessions = group.mapTo(mutableSetOf()) { it.id },
+                    )
+                result =
+                    ApiBulkReimportResult(
+                        sessionsReimported = result.sessionsReimported + run.sessionsReimported,
+                        failures = result.failures + run.failures,
+                        plan = result.plan + run.plan,
+                    )
+            }
+            result
         }
 
     private suspend fun importLocked(

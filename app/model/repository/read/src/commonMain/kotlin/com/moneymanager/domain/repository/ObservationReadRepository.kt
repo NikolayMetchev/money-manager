@@ -49,6 +49,9 @@ interface ObservationReadRepository {
     /** Every observation naming one of [accountIds] (either end of a transfer, either side of a trade), by id. */
     suspend fun getObservationsOnAccounts(accountIds: Collection<AccountId>): List<Observation>
 
+    /** The files and API sessions whose records have an observation naming [accountId]. */
+    suspend fun getRecordSourcesOnAccount(accountId: AccountId): ObservedRecordSources
+
     /** The `transfer` or `trade` row [transactionId] has, with its attributes, or null when it has none. */
     suspend fun getMaterialized(transactionId: TransactionId): MaterializedTransaction?
 
@@ -80,3 +83,9 @@ interface ObservationReadRepository {
     /** Whether a re-run reserved observation [id] (#1430) and its record hasn't said it again yet. */
     suspend fun isReserved(id: ObservationId): Boolean
 }
+
+/** The files and API sessions that say something about an account. */
+data class ObservedRecordSources(
+    val csvImports: Set<CsvImportId>,
+    val apiSessions: Set<ApiSessionId>,
+)

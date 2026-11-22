@@ -315,3 +315,25 @@ SELECT COUNT(*) FROM observation_reserved WHERE observation_id = ?;
 -- Scoped to the ids a caller holds: a re-run can leave tens of thousands vacant, and every batch asks.
 selectVacantTransactionIds:
 SELECT transaction_id, kind FROM vacant_transaction WHERE transaction_id IN ?;
+
+-- The files whose records have an observation naming :accountId: what re-importing must run again when the account's identity moves.
+selectCsvImportsOnAccount:
+SELECT DISTINCT csv_import_record.csv_import_id
+FROM csv_import_record
+JOIN observation_record USING (record_id)
+WHERE observation_record.observation_id IN (
+  SELECT observation_id FROM transfer_observation WHERE source_account_id = :accountId OR target_account_id = :accountId
+  UNION
+  SELECT observation_id FROM trade_observation WHERE from_account_id = :accountId OR to_account_id = :accountId
+);
+
+-- The API sessions whose records have an observation naming :accountId.
+selectApiSessionsOnAccount:
+SELECT DISTINCT api_import_record.api_session_id
+FROM api_import_record
+JOIN observation_record USING (record_id)
+WHERE observation_record.observation_id IN (
+  SELECT observation_id FROM transfer_observation WHERE source_account_id = :accountId OR target_account_id = :accountId
+  UNION
+  SELECT observation_id FROM trade_observation WHERE from_account_id = :accountId OR to_account_id = :accountId
+);

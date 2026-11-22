@@ -66,9 +66,12 @@ import com.moneymanager.remotestorage.sync.StrategySyncController
 import com.moneymanager.remotestorage.sync.SyncState
 import com.moneymanager.remotestorage.sync.SyncStatus
 import com.moneymanager.session.SessionImports
+import com.moneymanager.session.moveAttributeGroup
 import com.moneymanager.session.transactionDetailQuery
 import com.moneymanager.strategycatalog.StrategyCatalogController
+import com.moneymanager.ui.components.AttributeGroupMover
 import com.moneymanager.ui.components.DefaultCurrencyInitDialog
+import com.moneymanager.ui.components.LocalAttributeGroupMover
 import com.moneymanager.ui.foundation.LocalCredentialVault
 import com.moneymanager.ui.foundation.LocalDeviceId
 import com.moneymanager.ui.foundation.LocalImportEngine
@@ -127,6 +130,7 @@ import kotlinx.coroutines.launch
 import kotlin.uuid.Uuid
 
 private const val LAST_SCREEN_KEY = "lastScreen"
+private const val MOVE_ATTRIBUTE_GROUP_TASK_KEY = "move-attribute-group"
 
 /** The screen to reopen on the next start: a top-level one, since the others name rows that may be gone. */
 private fun Screen.restorable(): Screen? =
@@ -173,6 +177,14 @@ fun MoneyManagerApp(
             }
         val importDirectoryService = sessionImports.directories
         val apiImportService = sessionImports.apis
+        val attributeGroupMover =
+            remember(sessionImports, taskManager, services) {
+                AttributeGroupMover { from, groupKey, to ->
+                    taskManager.start(MOVE_ATTRIBUTE_GROUP_TASK_KEY, "Move attribute group", "Planning the re-import") {
+                        sessionImports.moveAttributeGroup(this, from, groupKey, to).summary()
+                    }
+                }
+            }
         val uiStateStore = LocalUiStateStore.current
         val startScreen = remember { uiStateStore?.get(LAST_SCREEN_KEY, Screen.serializer())?.restorable() ?: Screen.Accounts() }
         val backStack = rememberNavBackStack(ScreenSavedStateConfiguration, startScreen)
@@ -249,6 +261,7 @@ fun MoneyManagerApp(
                 LocalTaskManager provides taskManager,
                 LocalDeviceId provides services.deviceId,
                 LocalImportEngine provides services.transactions.importEngine,
+                LocalAttributeGroupMover provides attributeGroupMover,
             ) {
                 if (showSetupWizard) {
                     SetupWizardScreen(
