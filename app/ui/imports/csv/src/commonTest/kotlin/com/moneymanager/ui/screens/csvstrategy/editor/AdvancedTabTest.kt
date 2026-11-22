@@ -10,7 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTextReplacement
-import com.moneymanager.builtin.BuiltInCsvStrategies
+import com.moneymanager.builtin.BinanceStrategies
 import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import kotlin.test.Test
@@ -21,7 +21,7 @@ import kotlin.test.assertTrue
 import kotlin.time.Instant
 
 class AdvancedTabTest {
-    private val strategy = BuiltInCsvStrategies.buildBinanceCsvStrategy(Instant.fromEpochMilliseconds(1_000))
+    private val strategy = BinanceStrategies.buildBinanceCsvStrategy(Instant.fromEpochMilliseconds(1_000))
 
     private fun showAdvancedTab(
         test: ComposeUiTest,

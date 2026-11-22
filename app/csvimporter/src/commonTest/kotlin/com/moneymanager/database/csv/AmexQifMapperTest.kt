@@ -1,5 +1,6 @@
 package com.moneymanager.database.csv
 
+import com.moneymanager.builtin.AmexStrategies
 import com.moneymanager.builtin.BuiltInCsvStrategies
 import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.MappingResult
@@ -22,10 +23,10 @@ import kotlin.test.assertNull
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
-/** The built-in American Express QIF strategy ([BuiltInCsvStrategies.buildAmexQifStrategy]) over Amex's record shapes. */
+/** The built-in American Express QIF strategy (`AmexStrategies.buildAmexQifStrategy`) over Amex's record shapes. */
 class AmexQifMapperTest {
     private val now = Clock.System.now()
-    private val strategy = BuiltInCsvStrategies.buildAmexQifStrategy(now, CurrencyId(1))
+    private val strategy = AmexStrategies.buildAmexQifStrategy(now, CurrencyId(1))
 
     private val gbp =
         Currency(id = CurrencyId(1), code = "GBP", name = "British Pound", scaleFactor = CurrencyScaleFactors.DEFAULT_SCALE_FACTOR)

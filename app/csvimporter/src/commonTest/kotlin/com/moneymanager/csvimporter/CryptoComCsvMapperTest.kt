@@ -2,6 +2,7 @@ package com.moneymanager.csvimporter
 
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.builtin.BuiltInCsvStrategies
+import com.moneymanager.builtin.CryptoComStrategies
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CryptoAsset
@@ -25,7 +26,7 @@ import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 /**
- * Exercises the built-in crypto.com Card and Fiat strategies ([BuiltInCsvStrategies]) — pure config —
+ * Exercises the built-in crypto.com Card and Fiat strategies (`BuiltInCsvStrategies`) — pure config —
  * against the real export row shapes. The fiat export's quirk under test: the amount's sign does not
  * encode direction (viban_card_top_up and viban_purchase are positive but money leaves the Cash
  * account), so row rules flip per Transaction Kind, and crypto_viban conversions carry the wallet
@@ -33,9 +34,9 @@ import kotlin.uuid.Uuid
  */
 class CryptoComCsvMapperTest {
     private val now = Clock.System.now()
-    private val cardStrategy = BuiltInCsvStrategies.buildCryptoComCardStrategy(now)
-    private val fiatStrategy = BuiltInCsvStrategies.buildCryptoComFiatStrategy(now)
-    private val cryptoStrategy = BuiltInCsvStrategies.buildCryptoComCryptoStrategy(now)
+    private val cardStrategy = CryptoComStrategies.buildCryptoComCardStrategy(now)
+    private val fiatStrategy = CryptoComStrategies.buildCryptoComFiatStrategy(now)
+    private val cryptoStrategy = CryptoComStrategies.buildCryptoComCryptoStrategy(now)
 
     private val gbp =
         Currency(id = CurrencyId(1), code = "GBP", name = "British Pound", scaleFactor = CurrencyScaleFactors.DEFAULT_SCALE_FACTOR)

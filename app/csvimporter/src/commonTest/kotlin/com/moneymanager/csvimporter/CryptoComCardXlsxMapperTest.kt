@@ -1,7 +1,7 @@
 package com.moneymanager.csvimporter
 
 import com.moneymanager.bigdecimal.BigDecimal
-import com.moneymanager.builtin.BuiltInCsvStrategies
+import com.moneymanager.builtin.CryptoComStrategies
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Category
@@ -25,7 +25,7 @@ import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 /**
- * Exercises the built-in "Crypto.com Card (Excel)" strategy ([BuiltInCsvStrategies]) — pure config —
+ * Exercises the built-in "Crypto.com Card (Excel)" strategy (`BuiltInCsvStrategies`) — pure config —
  * against row shapes from the real "Card Transaction History" workbook. Unlike the CSV export, its
  * `Amount Processed` column is already signed (negative = spend, positive = load/refund), so direction
  * comes entirely from the standard positive-amount source/target flip plus a Service Abbreviation
@@ -33,7 +33,7 @@ import kotlin.uuid.Uuid
  */
 class CryptoComCardXlsxMapperTest {
     private val now = Clock.System.now()
-    private val strategy = BuiltInCsvStrategies.buildCryptoComCardXlsxStrategy(now)
+    private val strategy = CryptoComStrategies.buildCryptoComCardXlsxStrategy(now)
 
     private val gbp =
         Currency(id = CurrencyId(1), code = "GBP", name = "British Pound", scaleFactor = CurrencyScaleFactors.DEFAULT_SCALE_FACTOR)

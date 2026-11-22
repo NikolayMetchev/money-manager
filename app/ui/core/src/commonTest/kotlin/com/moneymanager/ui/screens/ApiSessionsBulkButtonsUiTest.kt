@@ -8,6 +8,7 @@ import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.isEnabled
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
@@ -16,6 +17,9 @@ import com.moneymanager.credentialvault.CredentialBundle
 import com.moneymanager.credentialvault.StoredApiCredential
 import com.moneymanager.credentialvault.testing.unlockedCredentialVault
 import com.moneymanager.database.di.toAppServices
+import com.moneymanager.domain.model.ApiRequest
+import com.moneymanager.domain.model.ApiSessionId
+import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.presenter.error.ProvideSchemaAwareScope
 import com.moneymanager.session.apiImportService
 import com.moneymanager.tasks.TaskManager
@@ -32,6 +36,7 @@ import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -162,4 +167,83 @@ class ApiSessionsBulkButtonsUiTest : DbTest() {
             waitUntilDoesNotExist(hasText("Re-import complete"), timeoutMillis = 10_000)
             waitForIdle()
         }
+
+    @Test
+    fun sessionImport_showsItsPreparation_whileTheCounterpartyScanIsStillReading() {
+        runMoneyManagerComposeUiTest {
+            val vault =
+                runBlocking {
+                    unlockedCredentialVault(
+                        CredentialBundle(
+                            apiCredentials = listOf(StoredApiCredential(strategyName = "Monzo", token = "t", createdAtEpochMillis = 1)),
+                        ),
+                    )
+                }
+            val services = repositories.toAppServices(repositories.importEngine)
+            val gatedSessions = GatedSessionRepository(services.imports.apiSessionRepository)
+            runBlocking { apiConnection("Monzo", Instant.fromEpochMilliseconds(1_700_000_000_000L)) }
+            // The same factory the other test uses, over services whose session reads go through the gate.
+            val gatedServices = services.copy(imports = services.imports.copy(apiSessionRepository = gatedSessions))
+            val importService = gatedServices.apiImportService(vault, Mutex(), monzo)
+            setContent {
+                CompositionLocalProvider(
+                    LocalImportEngine provides repositories.importEngine,
+                    LocalCredentialVault provides vault,
+                    LocalTaskManager provides TaskManager(CoroutineScope(Dispatchers.Default)),
+                ) {
+                    ProvideSchemaAwareScope {
+                        ApiSessionsScreen(
+                            apiSessionRepository = repositories.apiSessionRepository,
+                            importTimelineRepository = repositories.importTimelineRepository,
+                            apiImportStrategyRepository = repositories.apiImportStrategyRepository,
+                            accountAttributeRepository = repositories.accountAttributeRepository,
+                            accountRepository = repositories.accountRepository,
+                            currencyRepository = repositories.currencyRepository,
+                            cryptoRepository = repositories.cryptoRepository,
+                            importRecordRepository = repositories.importRecordRepository,
+                            accountMappingRepository = repositories.accountMappingRepository,
+                            maintenance = repositories.maintenanceService,
+                            deviceId = services.deviceId,
+                            apiImportService = importService,
+                            reimports = repositories.reimports(),
+                        )
+                    }
+                }
+            }
+
+            waitUntilAtLeastOneExists(hasText("Download all (1)"), timeoutMillis = 10_000)
+            onNodeWithText("Download all (1)").performClick()
+            waitUntilAtLeastOneExists(hasText("Import all (1)"), timeoutMillis = 10_000)
+            waitUntilAtLeastOneExists(hasText("Download all (1)") and isEnabled(), timeoutMillis = 10_000)
+
+            // Hold the scan at its read of the downloaded requests: the import is then in its preparation phase, with
+            // progress that has no fraction yet, so its bar is indeterminate.
+            val released = CompletableDeferred<Unit>()
+            gatedSessions.gate = released
+            // The session row's own Import: its scan reports progress to the row, which is where the preparation shows.
+            val importButtons = onAllNodesWithText("Import").fetchSemanticsNodes().size
+            onAllNodesWithText("Import")[importButtons - 1].performClick()
+            waitUntilAtLeastOneExists(hasText("Reading downloaded transactions...", substring = true), timeoutMillis = 10_000)
+            waitForIdle()
+
+            released.complete(Unit)
+            gatedSessions.gate = null
+            waitUntilAtLeastOneExists(hasText("Confirm Counterparties"), timeoutMillis = 10_000)
+            onNodeWithText("Create and Import").performClick()
+            waitUntilDoesNotExist(hasText("Confirm Counterparties"), timeoutMillis = 10_000)
+            waitForIdle()
+        }
+    }
+}
+
+/** Holds the session repository's reads while [gate] is set, so an import can be seen while its counterparty scan reads. */
+private class GatedSessionRepository(
+    private val delegate: ApiSessionReadRepository,
+) : ApiSessionReadRepository by delegate {
+    var gate: CompletableDeferred<Unit>? = null
+
+    override suspend fun getRequestsBySession(sessionId: ApiSessionId): List<ApiRequest> {
+        gate?.await()
+        return delegate.getRequestsBySession(sessionId)
+    }
 }

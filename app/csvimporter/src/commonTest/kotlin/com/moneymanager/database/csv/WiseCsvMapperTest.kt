@@ -1,7 +1,7 @@
 package com.moneymanager.database.csv
 
 import com.moneymanager.bigdecimal.BigInteger
-import com.moneymanager.builtin.BuiltInCsvStrategies
+import com.moneymanager.builtin.WiseStrategies
 import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.ExistingTransferInfo
 import com.moneymanager.csvimporter.MappingResult
@@ -28,11 +28,11 @@ import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 /**
- * Exercises the built-in Wise CSV strategy (as seeded by [BuiltInCsvStrategies.buildWiseCsvStrategy])
+ * Exercises the built-in Wise CSV strategy (as seeded by `WiseStrategies.buildWiseCsvStrategy`)
  * against the row shapes found in real Wise transaction-history.csv exports.
  */
 class WiseCsvMapperTest {
-    private val strategy = BuiltInCsvStrategies.buildWiseCsvStrategy(Clock.System.now())
+    private val strategy = WiseStrategies.buildWiseCsvStrategy(Clock.System.now())
 
     private val eur = Currency(id = CurrencyId(1), code = "EUR", name = "Euro", scaleFactor = 100)
     private val gbp = Currency(id = CurrencyId(2), code = "GBP", name = "British Pound", scaleFactor = 100)
