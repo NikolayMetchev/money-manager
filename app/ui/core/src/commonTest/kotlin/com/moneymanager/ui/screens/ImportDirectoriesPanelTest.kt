@@ -27,6 +27,7 @@ import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
 import com.moneymanager.ui.test.MoneyManagerTestApp
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -63,6 +64,23 @@ private class BankFolders : ImportFileSourceFactory {
                     .map { ImportSubfolder(ref = it, name = it.substringAfterLast('/')) }
 
             override suspend fun download(fileRef: String): ByteArray = "Date,Amount\n2024-01-01,1.00\n$fileRef\n".encodeToByteArray()
+        }
+}
+
+/** A folder whose listing waits for [listed], so a test can hold a download in its "Connecting…" state. */
+private class GatedFolder(
+    private val listed: CompletableDeferred<Unit>,
+) : ImportFileSourceFactory {
+    override suspend fun create(directory: ImportDirectory): ImportFileSource =
+        object : ImportFileSource {
+            override suspend fun list(): List<ImportFileEntry> {
+                listed.await()
+                return listOf(ImportFileEntry(ref = FILE_NAME, name = FILE_NAME, lastModifiedEpochMs = 1_000))
+            }
+
+            override suspend fun listSubfolders(): List<ImportSubfolder> = emptyList()
+
+            override suspend fun download(fileRef: String): ByteArray = "Date,Amount\n2024-01-01,1.00\n".encodeToByteArray()
         }
 }
 
@@ -198,6 +216,22 @@ class ImportDirectoriesPanelTest {
             waitForIdle()
             // Savings' new file is left for its own Download (or "Download all").
             onNodeWithText("Unimported (3)").assertExists()
+        }
+    }
+
+    @Test
+    fun downloadAll_showsConnecting_untilTheFolderIsListed() {
+        runMoneyManagerComposeUiTest {
+            val listed = CompletableDeferred<Unit>()
+            openImportsOn(folders = GatedFolder(listed))
+
+            onNodeWithText("Download all").performClick()
+            // The listing is held, so the folder has no total yet and its progress reads "Connecting…".
+            waitUntilAtLeastOneExists(hasText("Connecting…"), timeoutMillis = 15000)
+
+            listed.complete(Unit)
+            waitUntilExactlyOneExists(hasText("downloaded 1 file(s)", substring = true), timeoutMillis = 15000)
+            waitForIdle()
         }
     }
 }
