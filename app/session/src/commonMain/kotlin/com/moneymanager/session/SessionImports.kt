@@ -127,7 +127,7 @@ data class ImportRunOutcome(
  * (`mm import …`, the TUI's Imports tab) imports directories, APIs or both. Build one per session.
  */
 class SessionImports(
-    private val services: AppServices,
+    internal val services: AppServices,
     private val vault: CredentialVault,
     fileSources: ImportFileSourceFactory?,
     httpEngine: HttpClientEngine? = null,

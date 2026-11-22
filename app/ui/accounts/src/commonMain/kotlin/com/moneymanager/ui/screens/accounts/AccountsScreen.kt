@@ -267,6 +267,7 @@ fun AccountsScreen(
         EditAccountDialog(
             account = currentAccountToEdit,
             accountAttributeRepository = accountAttributeRepository,
+            accountRepository = accountRepository,
             attributeTypeRepository = attributeTypeRepository,
             categoryRepository = categoryRepository,
             personRepository = personRepository,

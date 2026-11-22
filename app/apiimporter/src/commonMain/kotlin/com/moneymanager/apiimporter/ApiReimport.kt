@@ -151,6 +151,8 @@ data class ApiBulkReimportResult(
  * change the outcome, only the ordering of sessions relative to each other (oldest first, so an
  * earlier session's re-created transfers exist before a later session's own dedupe runs against them).
  *
+ * [onlySessions], when given, limits the run to those of them the credential owns.
+ *
  * A session that fails does not abort the run: it is logged, recorded in
  * [ApiBulkReimportResult.failures] and the remaining sessions are still re-imported — mirroring how
  * the CSV and QIF bulk re-import collects per-file failures. A run that attempted writes refreshes materialized
@@ -167,6 +169,7 @@ suspend fun bulkReimportApiSessions(
     counterpartyAccountNames: Map<String, String> = emptyMap(),
     passThroughAccounts: List<PassThroughAccount> = emptyList(),
     onProgress: (suspend (Progress) -> Unit)? = null,
+    onlySessions: Set<ApiSessionId>? = null,
 ): ApiBulkReimportResult {
     val apiSessionRepository = apiReads.apiSessionRepository
     val importedSessionIds = apiSessionRepository.getImportedSessionRevisions().map { it.sessionId }.toSet()
@@ -174,6 +177,7 @@ suspend fun bulkReimportApiSessions(
         apiSessionRepository
             .getSessionsByCredential(credentialId)
             .filter { it.id in importedSessionIds }
+            .filter { onlySessions == null || it.id in onlySessions }
             .sortedBy { it.createdAt }
 
     var importPlan = ImportPlan()

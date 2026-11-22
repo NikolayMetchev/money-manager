@@ -896,6 +896,7 @@ fun AccountTransactionsScreen(
         EditAccountDialog(
             account = account,
             accountAttributeRepository = accountAttributeRepository,
+            accountRepository = accountRepository,
             attributeTypeRepository = attributeTypeRepository,
             categoryRepository = categoryRepository,
             personRepository = personRepository,

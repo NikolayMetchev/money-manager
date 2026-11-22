@@ -6,13 +6,16 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
+import com.moneymanager.domain.model.AccountAttribute
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
@@ -30,6 +33,8 @@ import com.moneymanager.domain.repository.write.PersonAccountOwnershipWriteRepos
 import com.moneymanager.domain.repository.write.PersonWriteRepository
 import com.moneymanager.domain.repository.write.TransactionWriteRepository
 import com.moneymanager.presenter.error.ProvideSchemaAwareScope
+import com.moneymanager.ui.components.AttributeGroupMover
+import com.moneymanager.ui.components.LocalAttributeGroupMover
 import com.moneymanager.ui.foundation.LocalStartupProbe
 import com.moneymanager.ui.foundation.StartupMilestone
 import com.moneymanager.ui.foundation.StartupProbe
@@ -258,6 +263,61 @@ class AccountsScreenTest {
 
             // Then - the menu stays open across picks, so Bob was still reachable after Alice
             onNodeWithText("Bob").assertIsDisplayed()
+        }
+    }
+
+    @Test
+    fun editAccountDialog_movesAnAttributeGroupToAnotherAccount() {
+        runMoneyManagerComposeUiTest {
+            // Given
+            val now = Clock.System.now()
+            val checking = Account(id = AccountId(1L), name = "My Checking", openingDate = now)
+            val savings = Account(id = AccountId(2L), name = "Savings", openingDate = now)
+            val moves = mutableListOf<Triple<AccountId, String, AccountId>>()
+            val group =
+                listOf(
+                    AccountAttribute(10L, checking.id, AttributeType(AttributeTypeId(-5L), "account-sort-code"), "090128", "g1"),
+                    AccountAttribute(11L, checking.id, AttributeType(AttributeTypeId(-4L), "account-account-number"), "12345678", "g1"),
+                )
+            val attributes: AccountAttributeWriteRepository =
+                mock(MockMode.autoUnit) {
+                    every { getByAccount(checking.id) } returns flowOf(group)
+                    every { getByAccount(savings.id) } returns flowOf(emptyList())
+                    every { getByType(any()) } returns flowOf(emptyList())
+                }
+
+            setContent {
+                ProvideSchemaAwareScope {
+                    CompositionLocalProvider(
+                        LocalAttributeGroupMover provides AttributeGroupMover { from, key, to -> moves += Triple(from, key, to) },
+                    ) {
+                        AccountsScreen(
+                            accountRepository = createAccountRepository(listOf(checking, savings)),
+                            accountAttributeRepository = attributes,
+                            attributeTypeRepository = createAttributeTypeRepository(),
+                            categoryRepository = createCategoryRepository(),
+                            transactionRepository = createTransactionRepository(),
+                            personRepository = createPersonRepository(),
+                            personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
+                            maintenance = createMaintenance(),
+                            scrollToAccountId = null,
+                            onAccountClick = {},
+                        )
+                    }
+                }
+            }
+
+            // When
+            onAllNodesWithText("✏️")[0].performClick()
+            onNodeWithText("Move to account…").performClick()
+            onNodeWithText("Move to another account").assertIsDisplayed()
+            onNodeWithText("Move to").performClick()
+            // The account's own card also says "Savings": the picker's option is the one in the menu, listed last.
+            onAllNodesWithText("Savings").onLast().performClick()
+            onNodeWithText("Move and re-import").performClick()
+
+            // Then
+            assertEquals(listOf(Triple(checking.id, "g1", savings.id)), moves)
         }
     }
 
