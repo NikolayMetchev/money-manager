@@ -33,7 +33,6 @@ class PersonMergeDbTest : DbTest() {
 
     private suspend fun person(
         first: String,
-        last: String,
         owns: List<AccountId> = emptyList(),
     ): PersonId {
         val key = LocalPersonKey(first)
@@ -44,9 +43,9 @@ class PersonMergeDbTest : DbTest() {
                         listOf(
                             ImportPersonIntent(
                                 key = key,
-                                match = PersonMatchKey.ByNameKey("${first.lowercase()} ${last.lowercase()}"),
+                                match = PersonMatchKey.ByNameKey("${first.lowercase()} smith"),
                                 firstName = first,
-                                lastName = last,
+                                lastName = "Smith",
                                 source = Source.Manual,
                             ),
                         ),
@@ -76,8 +75,8 @@ class PersonMergeDbTest : DbTest() {
         runDbTest {
             val shared = account("Shared")
             val onlyDup = account("OnlyDup")
-            val keep = person("Alice", "Smith", listOf(shared))
-            val dup = person("Alicia", "Smith", listOf(shared, onlyDup))
+            val keep = person("Alice", listOf(shared))
+            val dup = person("Alicia", listOf(shared, onlyDup))
 
             repositories.importEngine.import(
                 ImportBatch.manualEdits(personMerges = listOf(PersonMergeRequest(deletedId = dup, survivingId = keep))),
@@ -98,8 +97,8 @@ class PersonMergeDbTest : DbTest() {
     fun importNamingTheMergedAwayPersonFindsTheSurvivor() =
         runDbTest {
             val acct = account("Acct")
-            val keep = person("Alice", "Smith")
-            val dup = person("Alicia", "Smith")
+            val keep = person("Alice")
+            val dup = person("Alicia")
             repositories.importEngine.import(
                 ImportBatch.manualEdits(personMerges = listOf(PersonMergeRequest(deletedId = dup, survivingId = keep))),
             )
@@ -141,8 +140,8 @@ class PersonMergeDbTest : DbTest() {
         runDbTest {
             val shared = account("Shared")
             val onlyDup = account("OnlyDup")
-            val keep = person("Alice", "Smith", listOf(shared))
-            val dup = person("Alicia", "Smith", listOf(shared, onlyDup))
+            val keep = person("Alice", listOf(shared))
+            val dup = person("Alicia", listOf(shared, onlyDup))
             repositories.importEngine.import(
                 ImportBatch.manualEdits(personMerges = listOf(PersonMergeRequest(deletedId = dup, survivingId = keep))),
             )

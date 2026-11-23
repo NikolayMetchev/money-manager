@@ -62,16 +62,13 @@ class PersonReadRepositoryImpl(
     override fun getMerge(id: MergeId): Flow<PersonMerge?> =
         mergeQueries.selectById(id.id, ::toMerge).asFlow().mapToOneOrNull(Dispatchers.Default)
 
-    @Suppress("LongParameterList", "UNUSED_PARAMETER")
     private fun toMerge(
         id: Long,
-        mergedAt: Long,
         survivingPersonId: Long,
         deletedPersonId: Long,
         firstName: String,
         middleName: String?,
         lastName: String?,
-        deletedRevisionId: Long,
         reversed: Long,
     ): PersonMerge =
         PersonMerge(

@@ -241,7 +241,7 @@ class PersonWriteRepositoryImpl(
                 if (merge.reversed != 0L) return@transaction
                 val survivor = merge.surviving_person_id
                 val deletedId = merge.deleted_person_id
-                val revision = merge.deleted_person_revision_id + 1
+                val revision = mergeSelectQueries.selectDeletedRevision(mergeId.id).awaitAsOne() + 1
                 personWriteQueries.insertWithId(
                     deletedId,
                     revision,
