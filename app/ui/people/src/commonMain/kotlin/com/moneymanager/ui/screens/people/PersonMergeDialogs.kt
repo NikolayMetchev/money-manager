@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -31,6 +33,7 @@ import com.moneymanager.importengineapi.PersonMergeRequest
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.components.DestructiveConfirmDialog
 import com.moneymanager.ui.foundation.LocalImportEngine
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 /** Merges [person] into a person the user picks: its accounts move across and its name becomes an alias of the survivor. */
@@ -131,6 +134,7 @@ fun UnmergePersonDialog(
         targetName = merge.deletedName,
         confirmLabel = "Undo merge",
         failureMessage = "Failed to undo merge",
+        confirmQuestion = "Are you sure you want to undo the merge of",
         consequence = "\"${merge.deletedName}\" will be recreated and get back the accounts the merge moved.",
         onConfirm = {
             importEngine.import(ImportBatch.manualEdits(personUnmerges = listOf(merge.id)))
@@ -150,12 +154,28 @@ fun PersonAliasesDialog(
     val importEngine = LocalImportEngine.current
     val scope = rememberSchemaAwareCoroutineScope()
     var newAlias by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    // Runs an alias write; a failure is shown in the dialog instead of escaping the scope.
+    fun write(mutation: PersonAliasMutation) {
+        error = null
+        scope.launch {
+            try {
+                importEngine.import(ImportBatch(personAliasMutations = listOf(mutation)))
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (expected: Exception) {
+                error = "Failed to update aliases: ${expected.message}"
+            }
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Aliases of ${person.fullName}") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
                 if (aliases.isEmpty()) {
                     Text("No aliases.", style = MaterialTheme.typography.bodyMedium)
                 }
@@ -167,13 +187,7 @@ fun PersonAliasesDialog(
                     ) {
                         Text(alias.alias, modifier = Modifier.weight(1f))
                         TextButton(
-                            onClick = {
-                                scope.launch {
-                                    importEngine.import(
-                                        ImportBatch(personAliasMutations = listOf(PersonAliasMutation.Remove(alias.alias))),
-                                    )
-                                }
-                            },
+                            onClick = { write(PersonAliasMutation.Remove(alias.alias)) },
                         ) { Text("Remove") }
                     }
                 }
@@ -190,11 +204,7 @@ fun PersonAliasesDialog(
                         onClick = {
                             val alias = newAlias
                             newAlias = ""
-                            scope.launch {
-                                importEngine.import(
-                                    ImportBatch(personAliasMutations = listOf(PersonAliasMutation.Set(alias, person.id))),
-                                )
-                            }
+                            write(PersonAliasMutation.Set(alias, person.id))
                         },
                     ) { Text("Add") }
                 }

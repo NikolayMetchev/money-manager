@@ -185,19 +185,20 @@ class PersonWriteRepositoryImpl(
                     }
 
                     // Attributes carry the deleted person's external ids, so an API import still finds the survivor.
-                    val survivorSlots =
-                        attributeSelectQueries
-                            .selectByPerson(survivingPerson.id)
-                            .awaitAsList()
-                            .map { it.attribute_type_id to it.group_key }
-                            .toSet()
-                    attributeSelectQueries.selectByPerson(deletedPerson.id).awaitAsList().forEach { attr ->
-                        val grafted = (attr.attribute_type_id to attr.group_key) !in survivorSlots
+                    // A slot the survivor holds with the same value needs nothing; with a different value, both
+                    // identities are kept: the deleted person's goes in a fresh group so imports still resolve it.
+                    val survivorAttrs = attributeSelectQueries.selectByPerson(survivingPerson.id).awaitAsList()
+                    val survivorSlots = survivorAttrs.associate { (it.attribute_type_id to it.group_key) to it.attribute_value }
+                    attributeSelectQueries.selectByPerson(deletedPerson.id).awaitAsList().forEachIndexed { index, attr ->
+                        val held = survivorSlots[attr.attribute_type_id to attr.group_key]
+                        val grafted = held != attr.attribute_value
+                        val destGroupKey = if (held == null) attr.group_key else "m$mergeId:$index"
                         mergeWriteQueries.insertAttribute(
                             mergeId,
                             attr.attribute_type_id,
                             attr.attribute_value,
                             attr.group_key,
+                            destGroupKey,
                             if (grafted) 1L else 0L,
                         )
                         if (grafted) {
@@ -205,7 +206,7 @@ class PersonWriteRepositoryImpl(
                                 person_id = survivingPerson.id,
                                 attribute_type_id = attr.attribute_type_id,
                                 attribute_value = attr.attribute_value,
-                                group_key = attr.group_key,
+                                group_key = destGroupKey,
                             )
                         }
                     }
@@ -239,6 +240,10 @@ class PersonWriteRepositoryImpl(
             val merge = mergeSelectQueries.selectById(mergeId.id).awaitAsOneOrNull()
             // Unknown or already undone: nothing to restore.
             if (merge == null || merge.reversed != 0L) return@withContext
+            // The survivor was itself merged away since: that later merge has to be undone first.
+            check(personSelectQueries.selectById(merge.surviving_person_id).awaitAsOneOrNull() != null) {
+                "The person this merge went into has since been merged away: undo that merge first"
+            }
             database.transaction {
                 val survivor = merge.surviving_person_id
                 val deletedId = merge.deleted_person_id
@@ -272,7 +277,7 @@ class PersonWriteRepositoryImpl(
                                 .awaitAsList()
                                 .filter {
                                     it.attribute_type_id == row.attribute_type_id &&
-                                        it.group_key == row.group_key &&
+                                        it.group_key == row.dest_group_key &&
                                         it.attribute_value == row.attribute_value
                                 }.forEach { attributeWriteQueries.deleteById(it.id) }
                         }

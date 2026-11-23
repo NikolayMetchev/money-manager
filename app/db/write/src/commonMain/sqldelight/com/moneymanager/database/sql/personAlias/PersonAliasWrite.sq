@@ -12,3 +12,10 @@ DELETE FROM person_alias WHERE name_key = ?;
 
 moveToPerson:
 UPDATE person_alias SET person_id = :toPersonId WHERE name_key = :nameKey;
+
+-- Only while the alias still belongs to :fromPersonId: a later reassignment is someone's own decision.
+moveToPersonIf:
+UPDATE person_alias SET person_id = :toPersonId WHERE name_key = :nameKey AND person_id = :fromPersonId;
+
+deleteIf:
+DELETE FROM person_alias WHERE name_key = :nameKey AND person_id = :personId;

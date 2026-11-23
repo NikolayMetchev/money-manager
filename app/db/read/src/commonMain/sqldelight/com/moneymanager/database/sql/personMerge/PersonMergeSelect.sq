@@ -14,7 +14,7 @@ selectOwnershipsForMerge:
 SELECT account_id, grafted FROM person_merge_ownership WHERE merge_id = ?;
 
 selectAttributesForMerge:
-SELECT attribute_type_id, attribute_value, group_key, grafted FROM person_merge_attribute WHERE merge_id = ?;
+SELECT attribute_type_id, attribute_value, group_key, dest_group_key, grafted FROM person_merge_attribute WHERE merge_id = ?;
 
 selectAliasesForMerge:
 SELECT name_key, kind FROM person_merge_alias WHERE merge_id = ?;

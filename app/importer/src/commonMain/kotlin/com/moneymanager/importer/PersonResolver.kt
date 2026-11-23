@@ -36,7 +36,9 @@ internal class PersonResolver(
         val existingPeople = personRepository.getAllPeople().first()
         val byNameKey = existingPeople.associate { normalizeNameKey(it.fullName) to it.id }.toMutableMap()
         // A merged-away or otherwise renamed person is still found by its old names; a real name wins over an alias.
-        personRepository.getAllAliases().first().forEach { byNameKey.getOrPut(it.nameKey) { it.personId } }
+        val byAlias = personRepository.getAllAliases().first().associate { it.nameKey to it.personId }
+
+        fun byName(key: String): PersonId? = byNameKey[key] ?: byAlias[key]
         val byAttr = buildExistingPersonAttrIndex(batch)
 
         val keyToId = mutableMapOf<LocalPersonKey, PersonId>()
@@ -51,7 +53,7 @@ internal class PersonResolver(
                         // resolve them by id. Creation mode records the attribute at the person's existing
                         // revision rather than bumping a new one (no orphan revision).
                         byAttr[match.typeId to match.value]
-                            ?: match.nameKeyFallback?.let { byNameKey[it] }?.also { matchedId ->
+                            ?: match.nameKeyFallback?.let(::byName)?.also { matchedId ->
                                 if (byAttr[match.typeId to match.value] == null) {
                                     runCatchingCancellable {
                                         personAttributeRepository.insertInCreationMode(matchedId, match.typeId, match.value)
@@ -62,7 +64,7 @@ internal class PersonResolver(
                     }
 
                     is PersonMatchKey.ByNameKey -> {
-                        byNameKey[match.nameKey]
+                        byName(match.nameKey)
                     }
                 }
             if (existingId != null) {

@@ -170,4 +170,30 @@ class PersonMergeDbTest : DbTest() {
                     .isEmpty(),
             )
         }
+
+    @Test
+    fun mergeThenMergeTheSurvivor_undoesInReverseOrder() =
+        runDbTest {
+            val acct = account("Acct")
+            val a = person("Ann", "Lee", listOf(acct))
+            val b = person("Anne", "Leigh")
+            val c = person("Anna", "Lea")
+            repositories.importEngine.import(
+                ImportBatch.manualEdits(personMerges = listOf(PersonMergeRequest(deletedId = a, survivingId = b))),
+            )
+            repositories.importEngine.import(
+                ImportBatch.manualEdits(personMerges = listOf(PersonMergeRequest(deletedId = b, survivingId = c))),
+            )
+            assertEquals(setOf(acct), owned(c))
+
+            val merges = repositories.personRepository.getReversibleMerges().first()
+            val first = merges.first { it.deletedPersonId == a }
+            val second = merges.first { it.deletedPersonId == b }
+            repositories.importEngine.import(ImportBatch.manualEdits(personUnmerges = listOf(second.id)))
+            repositories.importEngine.import(ImportBatch.manualEdits(personUnmerges = listOf(first.id)))
+
+            assertEquals(setOf(acct), owned(a))
+            assertTrue(owned(b).isEmpty())
+            assertTrue(owned(c).isEmpty())
+        }
 }

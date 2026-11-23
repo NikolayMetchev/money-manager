@@ -11,8 +11,8 @@ insertOwnership:
 INSERT INTO person_merge_ownership(merge_id, account_id, grafted) VALUES (?, ?, ?);
 
 insertAttribute:
-INSERT INTO person_merge_attribute(merge_id, attribute_type_id, attribute_value, group_key, grafted)
-VALUES (?, ?, ?, ?, ?);
+INSERT INTO person_merge_attribute(merge_id, attribute_type_id, attribute_value, group_key, dest_group_key, grafted)
+VALUES (?, ?, ?, ?, ?, ?);
 
 insertAlias:
 INSERT INTO person_merge_alias(merge_id, name_key, kind) VALUES (?, ?, ?);

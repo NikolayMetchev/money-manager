@@ -125,7 +125,13 @@ class MoneyManagerDatabaseWrapper(
             dataChangeSelectQueries
                 .relationshipMemberFingerprint { count, ids, roles -> listOf(count, ids.orZero(), roles.orZero()) }
                 .awaitAsOneOrNull()
-        return tradeAttributes.fold(relationships.mixInto(links.mixInto(base))) { token, row -> row.mixInto(token) }
+        // Aliases are edited in place and reassigned by merges, so fold their content, not just ids.
+        val aliases =
+            dataChangeSelectQueries
+                .personAliasRows { nameKey, alias, personId -> listOf(nameKey.hashCode().toLong(), alias.hashCode().toLong(), personId) }
+                .awaitAsList()
+        val withTradeAttributes = tradeAttributes.fold(relationships.mixInto(links.mixInto(base))) { token, row -> row.mixInto(token) }
+        return aliases.fold(withTradeAttributes) { token, row -> row.mixInto(token) }
     }
 
     /**
