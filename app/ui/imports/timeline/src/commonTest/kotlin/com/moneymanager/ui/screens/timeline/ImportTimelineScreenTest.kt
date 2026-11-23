@@ -14,7 +14,9 @@ import com.moneymanager.domain.model.MergeId
 import com.moneymanager.domain.model.MergeMovedTransfer
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonAccountOwnership
+import com.moneymanager.domain.model.PersonAlias
 import com.moneymanager.domain.model.PersonId
+import com.moneymanager.domain.model.PersonMerge
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.timeline.ImportFileDateRange
 import com.moneymanager.domain.model.timeline.TimelineSourceKind
@@ -87,6 +89,18 @@ class ImportTimelineScreenTest {
             override fun getAllPeople(): Flow<List<Person>> = flowOf(people)
 
             override fun getPersonById(id: PersonId): Flow<Person?> = flowOf(people.find { it.id == id })
+
+            override fun getAllAliases(): Flow<List<PersonAlias>> = flowOf(emptyList())
+
+            override fun getAliasesByPerson(id: PersonId): Flow<List<PersonAlias>> = flowOf(emptyList())
+
+            override fun getReversibleMerges(): Flow<List<PersonMerge>> = flowOf(emptyList())
+
+            override fun getMergesForSurvivingPerson(id: PersonId): Flow<List<PersonMerge>> = flowOf(emptyList())
+
+            override fun getMergesForDeletedPerson(id: PersonId): Flow<List<PersonMerge>> = flowOf(emptyList())
+
+            override fun getMerge(id: MergeId): Flow<PersonMerge?> = flowOf(null)
         }
 
     private fun createPersonAccountOwnershipRepository(

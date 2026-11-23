@@ -16,6 +16,7 @@ import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.LocalCategoryKey
 import com.moneymanager.importengineapi.LocalCryptoKey
 import com.moneymanager.importengineapi.LocalCurrencyKey
+import com.moneymanager.importengineapi.PersonAliasMutation
 import kotlinx.coroutines.flow.first
 
 /**
@@ -122,6 +123,14 @@ internal class ReferenceDataWriter(
     suspend fun applyMerges(batch: ImportBatch) {
         batch.accountMerges.forEach { accountRepository.mergeAccounts(it.deletedId, it.survivingId, it.mapDeletedName) }
         batch.accountUnmerges.forEach { accountRepository.unmergeAccount(it) }
+        batch.personMerges.forEach { personRepository.mergePeople(it.deletedId, it.survivingId) }
+        batch.personUnmerges.forEach { personRepository.unmergePerson(it) }
+        batch.personAliasMutations.forEach {
+            when (it) {
+                is PersonAliasMutation.Set -> personRepository.setAlias(it.alias, it.personId)
+                is PersonAliasMutation.Remove -> personRepository.removeAlias(it.alias)
+            }
+        }
     }
 
     /** Deletes the batch's ownerships: dependents go first. */

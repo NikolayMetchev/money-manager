@@ -58,6 +58,7 @@ class AccountReadRepositoryImpl(
                 .selectAccountOwnerNames { accountId, first, middle, last ->
                     AccountId(accountId) to listOfNotNull(first, middle, last).joinToString(" ")
                 }.awaitAsList()
+                .plus(selectQueries.selectAccountOwnerAliases { accountId, alias -> AccountId(accountId) to alias }.awaitAsList())
                 .groupBy({ it.first }, { it.second })
         }
 

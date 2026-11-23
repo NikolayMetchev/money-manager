@@ -35,6 +35,8 @@ internal class PersonResolver(
 
         val existingPeople = personRepository.getAllPeople().first()
         val byNameKey = existingPeople.associate { normalizeNameKey(it.fullName) to it.id }.toMutableMap()
+        // A merged-away or otherwise renamed person is still found by its old names; a real name wins over an alias.
+        personRepository.getAllAliases().first().forEach { byNameKey.getOrPut(it.nameKey) { it.personId } }
         val byAttr = buildExistingPersonAttrIndex(batch)
 
         val keyToId = mutableMapOf<LocalPersonKey, PersonId>()

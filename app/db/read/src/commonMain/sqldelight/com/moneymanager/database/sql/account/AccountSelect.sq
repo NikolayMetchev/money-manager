@@ -27,3 +27,9 @@ selectAccountOwnerNames:
 SELECT o.account_id, p.first_name, p.middle_name, p.last_name
 FROM person_account_ownership o
 JOIN person p ON p.id = o.person_id;
+
+-- Other names the owners go by: a statement naming one of them names the holder.
+selectAccountOwnerAliases:
+SELECT o.account_id, a.alias
+FROM person_account_ownership o
+JOIN person_alias a ON a.person_id = o.person_id;

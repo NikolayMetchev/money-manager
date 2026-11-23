@@ -32,3 +32,9 @@ DELETE FROM person_account_ownership WHERE account_id = ?;
 
 ownershipLastInsertRowId:
 SELECT last_insert_rowid();
+
+-- Recreates a merged-away person under its original id (unmerge).
+insertWithId:
+INSERT INTO person(id, revision_id, first_name, middle_name, last_name)
+VALUES (?, ?, ?, ?, ?);
+

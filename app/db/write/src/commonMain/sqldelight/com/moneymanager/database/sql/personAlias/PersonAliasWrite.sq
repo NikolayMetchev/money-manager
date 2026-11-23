@@ -1,0 +1,14 @@
+upsert:
+INSERT INTO person_alias(name_key, alias, person_id)
+VALUES (?, ?, ?)
+ON CONFLICT(name_key) DO UPDATE SET alias = excluded.alias, person_id = excluded.person_id;
+
+insertIfAbsent:
+INSERT OR IGNORE INTO person_alias(name_key, alias, person_id)
+VALUES (?, ?, ?);
+
+delete:
+DELETE FROM person_alias WHERE name_key = ?;
+
+moveToPerson:
+UPDATE person_alias SET person_id = :toPersonId WHERE name_key = :nameKey;

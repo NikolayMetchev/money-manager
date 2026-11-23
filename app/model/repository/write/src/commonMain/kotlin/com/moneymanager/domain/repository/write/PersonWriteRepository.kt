@@ -1,5 +1,6 @@
 package com.moneymanager.domain.repository.write
 
+import com.moneymanager.domain.model.MergeId
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
@@ -32,4 +33,24 @@ interface PersonWriteRepository : PersonReadRepository {
     ): Long
 
     suspend fun deletePerson(id: PersonId)
+
+    /**
+     * Merges [deletedPerson] into [survivingPerson]: the accounts it owns and its attributes move across, the
+     * survivor gains the deleted person's name and aliases as aliases (so imports naming them find the survivor),
+     * and the deleted person is removed. Reversible with [unmergePerson].
+     */
+    suspend fun mergePeople(
+        deletedPerson: PersonId,
+        survivingPerson: PersonId,
+    ): MergeId
+
+    suspend fun unmergePerson(mergeId: MergeId)
+
+    /** Gives [person] the name [alias]; an alias another person holds moves to [person]. */
+    suspend fun setAlias(
+        alias: String,
+        person: PersonId,
+    )
+
+    suspend fun removeAlias(alias: String)
 }

@@ -37,11 +37,13 @@ kmp_library(
         "js",
     ],
     deps = [
+        "//app/importengineapi",
         "//app/model/core",
         "//app/model/repository/read",
         "//app/presenter/core",
         "//app/ui/audit",
         "//app/ui/components",
+        "//app/ui/foundation",
         "//utils/compose/scrollbar",
         "@maven_kmp//:androidx_compose_runtime",
         "@maven_kmp//:compose_foundation",

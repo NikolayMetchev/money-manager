@@ -47,6 +47,8 @@ class MoneyManagerDatabaseWrapper(
     val personOverrideWriteQueries get() = writeDb.personOverrideWriteQueries
     val personAttributeWriteQueries get() = writeDb.personAttributeWriteQueries
     val personWriteQueries get() = writeDb.personWriteQueries
+    val personAliasWriteQueries get() = writeDb.personAliasWriteQueries
+    val personMergeWriteQueries get() = writeDb.personMergeWriteQueries
     val passThroughAccountWriteQueries get() = writeDb.passThroughAccountWriteQueries
     val assetAliasWriteQueries get() = writeDb.assetAliasWriteQueries
     val holidayCalendarWriteQueries get() = writeDb.holidayCalendarWriteQueries
