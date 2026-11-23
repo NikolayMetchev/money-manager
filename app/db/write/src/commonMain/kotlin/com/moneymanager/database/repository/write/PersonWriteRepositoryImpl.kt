@@ -236,9 +236,10 @@ class PersonWriteRepositoryImpl(
 
     override suspend fun unmergePerson(mergeId: MergeId): Unit =
         withContext(Dispatchers.Default) {
+            val merge = mergeSelectQueries.selectById(mergeId.id).awaitAsOneOrNull()
+            // Unknown or already undone: nothing to restore.
+            if (merge == null || merge.reversed != 0L) return@withContext
             database.transaction {
-                val merge = mergeSelectQueries.selectById(mergeId.id).awaitAsOneOrNull() ?: return@transaction
-                if (merge.reversed != 0L) return@transaction
                 val survivor = merge.surviving_person_id
                 val deletedId = merge.deleted_person_id
                 val revision = mergeSelectQueries.selectDeletedRevision(mergeId.id).awaitAsOne() + 1
