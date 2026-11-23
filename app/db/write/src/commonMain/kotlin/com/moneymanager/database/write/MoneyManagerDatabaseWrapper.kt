@@ -47,6 +47,8 @@ class MoneyManagerDatabaseWrapper(
     val personOverrideWriteQueries get() = writeDb.personOverrideWriteQueries
     val personAttributeWriteQueries get() = writeDb.personAttributeWriteQueries
     val personWriteQueries get() = writeDb.personWriteQueries
+    val personAliasWriteQueries get() = writeDb.personAliasWriteQueries
+    val personMergeWriteQueries get() = writeDb.personMergeWriteQueries
     val passThroughAccountWriteQueries get() = writeDb.passThroughAccountWriteQueries
     val assetAliasWriteQueries get() = writeDb.assetAliasWriteQueries
     val holidayCalendarWriteQueries get() = writeDb.holidayCalendarWriteQueries
@@ -123,7 +125,13 @@ class MoneyManagerDatabaseWrapper(
             dataChangeSelectQueries
                 .relationshipMemberFingerprint { count, ids, roles -> listOf(count, ids.orZero(), roles.orZero()) }
                 .awaitAsOneOrNull()
-        return tradeAttributes.fold(relationships.mixInto(links.mixInto(base))) { token, row -> row.mixInto(token) }
+        // Aliases are edited in place and reassigned by merges, so fold their content, not just ids.
+        val aliases =
+            dataChangeSelectQueries
+                .personAliasRows { nameKey, alias, personId -> listOf(nameKey.hashCode().toLong(), alias.hashCode().toLong(), personId) }
+                .awaitAsList()
+        val withTradeAttributes = tradeAttributes.fold(relationships.mixInto(links.mixInto(base))) { token, row -> row.mixInto(token) }
+        return aliases.fold(withTradeAttributes) { token, row -> row.mixInto(token) }
     }
 
     /**

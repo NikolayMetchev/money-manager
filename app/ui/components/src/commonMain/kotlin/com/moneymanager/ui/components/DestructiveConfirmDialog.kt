@@ -45,6 +45,7 @@ fun DestructiveConfirmDialog(
     confirmLabel: String = "Delete",
     confirmEnabled: Boolean = true,
     failureMessage: String = "Failed to delete",
+    confirmQuestion: String = "Are you sure you want to delete",
     body: @Composable ColumnScope.(isBusy: Boolean) -> Unit = {},
 ) {
     var isBusy by remember { mutableStateOf(false) }
@@ -63,7 +64,7 @@ fun DestructiveConfirmDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    text = "Are you sure you want to delete \"$targetName\"?",
+                    text = "$confirmQuestion \"$targetName\"?",
                     style = MaterialTheme.typography.bodyLarge,
                 )
                 consequence?.let {

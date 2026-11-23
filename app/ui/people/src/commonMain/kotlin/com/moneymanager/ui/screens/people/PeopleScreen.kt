@@ -34,7 +34,9 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonAccountOwnership
+import com.moneymanager.domain.model.PersonAlias
 import com.moneymanager.domain.model.PersonId
+import com.moneymanager.domain.model.PersonMerge
 import com.moneymanager.domain.repository.AttributeTypeReadRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
 import com.moneymanager.domain.repository.PersonAttributeReadRepository
@@ -58,6 +60,15 @@ fun PeopleScreen(
     var showCreateDialog by remember { mutableStateOf(false) }
     var personToEdit by remember { mutableStateOf<Person?>(null) }
     var personToDelete by remember { mutableStateOf<Person?>(null) }
+    var personToMerge by remember { mutableStateOf<Person?>(null) }
+    var personForAliases by remember { mutableStateOf<Person?>(null) }
+    var mergeToUndo by remember { mutableStateOf<PersonMerge?>(null) }
+    val allAliases by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList<PersonAlias>()) {
+        personRepository.getAllAliases()
+    }
+    val reversibleMerges by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList<PersonMerge>()) {
+        personRepository.getReversibleMerges()
+    }
 
     Column(
         modifier =
@@ -114,7 +125,12 @@ fun PeopleScreen(
                         PersonCard(
                             person = person,
                             ownerships = ownerships,
+                            aliases = allAliases.filter { it.personId == person.id },
+                            merges = reversibleMerges.filter { it.survivingPersonId == person.id },
                             onEdit = { personToEdit = person },
+                            onMerge = { personToMerge = person },
+                            onAliases = { personForAliases = person },
+                            onUndoMerge = { mergeToUndo = it },
                             onAudit = { onAuditClick(person) },
                             onDelete = { personToDelete = person },
                         )
@@ -147,6 +163,12 @@ fun PeopleScreen(
         )
     }
 
+    personToMerge?.let { MergePersonDialog(it, people) { personToMerge = null } }
+    mergeToUndo?.let { UnmergePersonDialog(it) { mergeToUndo = null } }
+    personForAliases?.let { target ->
+        PersonAliasesDialog(target, allAliases.filter { it.personId == target.id }) { personForAliases = null }
+    }
+
     val currentPersonToDelete = personToDelete
     if (currentPersonToDelete != null) {
         val ownerships by rememberFlowAsStateWithSchemaErrorHandling(
@@ -167,7 +189,12 @@ fun PeopleScreen(
 private fun PersonCard(
     person: Person,
     ownerships: List<PersonAccountOwnership>,
+    aliases: List<PersonAlias>,
+    merges: List<PersonMerge>,
     onEdit: () -> Unit,
+    onMerge: () -> Unit,
+    onAliases: () -> Unit,
+    onUndoMerge: (PersonMerge) -> Unit,
     onAudit: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -190,6 +217,16 @@ private fun PersonCard(
                     text = person.fullName,
                     style = MaterialTheme.typography.titleMedium,
                 )
+                if (aliases.isNotEmpty()) {
+                    Text(
+                        text = "Also known as: ${aliases.joinToString { it.alias }}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                merges.forEach { merge ->
+                    TextButton(onClick = { onUndoMerge(merge) }) { Text("Undo merge of ${merge.deletedName}") }
+                }
                 if (ownerships.isNotEmpty()) {
                     Text(
                         text = "${ownerships.size} account${if (ownerships.size != 1) "s" else ""}",
@@ -205,6 +242,8 @@ private fun PersonCard(
                         contentDescription = "Edit ${person.fullName}",
                     )
                 }
+                TextButton(onClick = onAliases) { Text("Aliases") }
+                TextButton(onClick = onMerge) { Text("Merge") }
                 IconButton(onClick = onAudit) {
                     Text(
                         text = "📋",

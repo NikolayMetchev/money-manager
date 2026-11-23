@@ -61,3 +61,6 @@ SELECT COUNT(*), COALESCE(SUM(relationship_id * 31 + transaction_id), 0), COALES
 
 settingsFingerprint:
 SELECT COALESCE(default_currency_id, 0), default_location FROM settings WHERE id = 1;
+
+personAliasRows:
+SELECT name_key, alias, person_id FROM person_alias ORDER BY name_key;

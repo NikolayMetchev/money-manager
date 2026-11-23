@@ -1,0 +1,21 @@
+insertMerge:
+INSERT INTO person_merge(
+    merged_at, surviving_person_id, deleted_person_id, deleted_first_name, deleted_middle_name,
+    deleted_last_name, deleted_person_revision_id)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+
+lastInsertRowId:
+SELECT last_insert_rowid();
+
+insertOwnership:
+INSERT INTO person_merge_ownership(merge_id, account_id, grafted) VALUES (?, ?, ?);
+
+insertAttribute:
+INSERT INTO person_merge_attribute(merge_id, attribute_type_id, attribute_value, group_key, dest_group_key, grafted)
+VALUES (?, ?, ?, ?, ?, ?);
+
+insertAlias:
+INSERT INTO person_merge_alias(merge_id, name_key, kind) VALUES (?, ?, ?);
+
+markReversed:
+UPDATE person_merge SET reversed = 1 WHERE id = ?;

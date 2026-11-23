@@ -30,6 +30,10 @@ class NoDirectRepositoryWritesArchitectureTest {
             "createPerson",
             "updatePersonWithAttributes",
             "deletePerson",
+            "mergePeople",
+            "unmergePerson",
+            "setAlias",
+            "removeAlias",
             "createOwnership",
             "deleteOwnership",
         )

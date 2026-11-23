@@ -1,0 +1,8 @@
+selectAll:
+SELECT name_key, alias, person_id FROM person_alias ORDER BY alias;
+
+selectByPerson:
+SELECT name_key, alias, person_id FROM person_alias WHERE person_id = ? ORDER BY alias;
+
+selectPersonIdByNameKey:
+SELECT person_id FROM person_alias WHERE name_key = ?;

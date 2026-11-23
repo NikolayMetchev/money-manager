@@ -363,6 +363,24 @@ data class AccountMergeRequest(
     val mapDeletedName: Boolean = false,
 )
 
+/** A request to merge person [deletedId] into [survivingId]: its accounts and attributes move, its name becomes an alias. */
+data class PersonMergeRequest(
+    val deletedId: PersonId,
+    val survivingId: PersonId,
+)
+
+/** An edit to a person's aliases (other names imports match to that person). */
+sealed interface PersonAliasMutation {
+    data class Set(
+        val alias: String,
+        val personId: PersonId,
+    ) : PersonAliasMutation
+
+    data class Remove(
+        val alias: String,
+    ) : PersonAliasMutation
+}
+
 /**
  * A fee charged on a transaction, modelled as its own movement linked to the main transfer via a
  * `fee` [NewRelationship] (main = primary, fee = related). The engine expands this into a second [Transfer]
@@ -626,6 +644,9 @@ data class ImportBatch(
     val settings: ImportSettings? = null,
     val accountMerges: List<AccountMergeRequest> = emptyList(),
     val accountUnmerges: List<MergeId> = emptyList(),
+    val personMerges: List<PersonMergeRequest> = emptyList(),
+    val personUnmerges: List<MergeId> = emptyList(),
+    val personAliasMutations: List<PersonAliasMutation> = emptyList(),
     /**
      * Attribute-type names to resolve (get-or-create) before anything else; the resulting ids are
      * returned in [ImportResult.attributeTypeIds]. Lets producers build [NewAttribute]s by id without
@@ -703,6 +724,9 @@ data class ImportBatch(
             currencies: List<ImportCurrencyIntent> = emptyList(),
             accountMerges: List<AccountMergeRequest> = emptyList(),
             accountUnmerges: List<MergeId> = emptyList(),
+            personMerges: List<PersonMergeRequest> = emptyList(),
+            personUnmerges: List<MergeId> = emptyList(),
+            personAliasMutations: List<PersonAliasMutation> = emptyList(),
         ): ImportBatch =
             ImportBatch(
                 transfers = transfers,
@@ -715,6 +739,9 @@ data class ImportBatch(
                 currencies = currencies,
                 accountMerges = accountMerges,
                 accountUnmerges = accountUnmerges,
+                personMerges = personMerges,
+                personUnmerges = personUnmerges,
+                personAliasMutations = personAliasMutations,
             )
     }
 }

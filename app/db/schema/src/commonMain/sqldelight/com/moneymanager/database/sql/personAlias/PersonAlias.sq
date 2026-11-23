@@ -1,0 +1,12 @@
+-- Other names a person is known by. name_key is normalizeNameKey(alias), so a name belongs to at most one
+-- person and an import that meets it finds that person instead of creating a duplicate. Merging person A into
+-- B gives B A's name as an alias. Excluded from the audit trail, like account_mapping: user-managed
+-- configuration, not an audited entity.
+CREATE TABLE person_alias (
+    name_key TEXT PRIMARY KEY NOT NULL CHECK(length(trim(name_key)) > 0),
+    alias TEXT NOT NULL CHECK(length(trim(alias)) > 0),
+    person_id INTEGER NOT NULL,
+    FOREIGN KEY (person_id) REFERENCES person(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_person_alias_person ON person_alias(person_id);

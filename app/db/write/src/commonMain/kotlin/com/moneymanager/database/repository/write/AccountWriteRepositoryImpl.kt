@@ -478,6 +478,8 @@ class AccountWriteRepositoryImpl(
         // ownership as a DELETE in person_account_ownership_audit, and the latest such batch for
         // this account is exactly the set deleted by this merge.
         auditQueries.selectDeletedOwnershipPersonIds(merge.deleted_account_id).awaitAsList().forEach { personId ->
+            // A person merged away since then no longer exists; there is no one to restore as owner.
+            if (database.personSelectQueries.selectById(personId).awaitAsOneOrNull() == null) return@forEach
             personWriteQueries.ownershipInsert(person_id = personId, account_id = merge.deleted_account_id)
         }
 

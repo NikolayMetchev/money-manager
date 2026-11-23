@@ -250,6 +250,8 @@ database's own assets and aliases, personal like the global mappings, so strateg
 An alias joins what is imported from then on: re-import to move what's booked. A trade whose two sides resolve to one asset
 fails its import, as a trade needs two assets; a CSV row naming two codes an alias joined, for different amounts, is a row error for the same reason.
 
+**People and aliases**: a person has aliases (`person_alias`, keyed by `personNameKey`, so a name belongs to one person). Merging person A into B (`ImportBatch.personMerges`, `PersonWriteRepository.mergePeople`) moves A's account ownerships, attributes and aliases to B, gives B A's name as an alias, and deletes A; `person_merge*` records exactly what moved so `personUnmerges` undoes it. `PersonResolver` and `getAccountOwnerNames` (so `isOwnHolder`) consult aliases, so a merged-away name never recreates a duplicate.
+
 **Locations**: likewise none are bundled. A database's locations (`holiday_calendar` table) are installed from the
 catalog (its Locations chip), and Settings → Locations and holiday calendars edits them. Tests use
 `TestHolidayCalendars` (`test/app/model/calendar`). The database has a default location (`settings.default_location`,

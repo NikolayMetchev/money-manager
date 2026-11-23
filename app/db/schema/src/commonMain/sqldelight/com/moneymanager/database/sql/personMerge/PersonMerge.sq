@@ -1,0 +1,55 @@
+-- Records a reversible person merge so it can be undone. Person D ("deleted") merged into S ("surviving"):
+-- D's account ownerships, attributes and aliases are carried to S and D is deleted. Excluded from the audit
+-- trail (see EXCLUDED_FROM_AUDIT): these tables ARE the reversal record.
+CREATE TABLE person_merge (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    merged_at INTEGER NOT NULL,
+    surviving_person_id INTEGER NOT NULL,
+    deleted_person_id INTEGER NOT NULL,
+    deleted_first_name TEXT NOT NULL,
+    deleted_middle_name TEXT,
+    deleted_last_name TEXT,
+    deleted_person_revision_id INTEGER NOT NULL,
+    reversed INTEGER NOT NULL DEFAULT 0
+    -- No foreign key on surviving_person_id: the survivor can itself be merged away later, and this record has to
+    -- outlive it so undoing that later merge makes this one undoable again.
+);
+
+CREATE INDEX idx_person_merge_surviving ON person_merge(surviving_person_id);
+
+-- Every account the deleted person owned; grafted = 1 when the survivor did not already own it, so unmerge
+-- removes exactly what the merge added.
+CREATE TABLE person_merge_ownership (
+    merge_id INTEGER NOT NULL,
+    account_id INTEGER NOT NULL,
+    grafted INTEGER NOT NULL,
+    FOREIGN KEY (merge_id) REFERENCES person_merge(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_person_merge_ownership_merge ON person_merge_ownership(merge_id);
+
+-- Every attribute the deleted person held; grafted = 1 when it was copied to the survivor.
+CREATE TABLE person_merge_attribute (
+    merge_id INTEGER NOT NULL,
+    attribute_type_id INTEGER NOT NULL,
+    attribute_value TEXT NOT NULL,
+    group_key TEXT NOT NULL,
+    -- The slot it was written to on the survivor: group_key, or a fresh one when the survivor held a different
+    -- value in the same slot (both identities are kept).
+    dest_group_key TEXT NOT NULL,
+    grafted INTEGER NOT NULL,
+    FOREIGN KEY (merge_id) REFERENCES person_merge(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_person_merge_attribute_merge ON person_merge_attribute(merge_id);
+
+-- Aliases the merge touched: kind 0 = the deleted person's own alias, moved to the survivor (unmerge moves it
+-- back); kind 1 = created for the deleted person's name (unmerge deletes it).
+CREATE TABLE person_merge_alias (
+    merge_id INTEGER NOT NULL,
+    name_key TEXT NOT NULL,
+    kind INTEGER NOT NULL,
+    FOREIGN KEY (merge_id) REFERENCES person_merge(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_person_merge_alias_merge ON person_merge_alias(merge_id);

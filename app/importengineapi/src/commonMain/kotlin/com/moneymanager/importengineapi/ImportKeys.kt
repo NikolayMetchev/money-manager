@@ -2,13 +2,14 @@ package com.moneymanager.importengineapi
 
 import com.moneymanager.domain.model.WellKnownIds.ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID
 import com.moneymanager.domain.model.WellKnownIds.ACCOUNT_SORT_CODE_ATTR_TYPE_ID
+import com.moneymanager.domain.model.personNameKey
 
 /**
  * Normalises a full name into a stable matching key (trim, collapse internal whitespace, lower-case).
  * Shared so importers that produce [PersonMatchKey.ByNameKey] derive the same key the engine uses to
  * index existing people.
  */
-fun normalizeNameKey(fullName: String): String = fullName.trim().replace(Regex("\\s+"), " ").lowercase()
+fun normalizeNameKey(fullName: String): String = personNameKey(fullName)
 
 /**
  * The composite identity for a personal counterparty account — sort code + account number — used as

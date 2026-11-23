@@ -96,6 +96,11 @@ private val EXCLUDED_FROM_AUDIT =
         "_import_batch",
         "_creation_mode",
         // Account-merge reversal records; they are the audit/undo data, not audited entities.
+        "person_alias",
+        "person_merge",
+        "person_merge_ownership",
+        "person_merge_attribute",
+        "person_merge_alias",
         "account_merge",
         "account_merge_transfer",
         "account_merge_attribute",

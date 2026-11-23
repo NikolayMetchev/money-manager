@@ -1,0 +1,23 @@
+selectReversible:
+SELECT id, surviving_person_id, deleted_person_id, deleted_first_name, deleted_middle_name, deleted_last_name, reversed FROM person_merge WHERE reversed = 0 ORDER BY id DESC;
+
+selectById:
+SELECT id, surviving_person_id, deleted_person_id, deleted_first_name, deleted_middle_name, deleted_last_name, reversed FROM person_merge WHERE id = ?;
+
+selectBySurvivingPerson:
+SELECT id, surviving_person_id, deleted_person_id, deleted_first_name, deleted_middle_name, deleted_last_name, reversed FROM person_merge WHERE surviving_person_id = ? ORDER BY id DESC;
+
+selectByDeletedPerson:
+SELECT id, surviving_person_id, deleted_person_id, deleted_first_name, deleted_middle_name, deleted_last_name, reversed FROM person_merge WHERE deleted_person_id = ? ORDER BY id DESC;
+
+selectOwnershipsForMerge:
+SELECT account_id, grafted FROM person_merge_ownership WHERE merge_id = ?;
+
+selectAttributesForMerge:
+SELECT attribute_type_id, attribute_value, group_key, dest_group_key, grafted FROM person_merge_attribute WHERE merge_id = ?;
+
+selectAliasesForMerge:
+SELECT name_key, kind FROM person_merge_alias WHERE merge_id = ?;
+
+selectDeletedRevision:
+SELECT deleted_person_revision_id FROM person_merge WHERE id = ?;
