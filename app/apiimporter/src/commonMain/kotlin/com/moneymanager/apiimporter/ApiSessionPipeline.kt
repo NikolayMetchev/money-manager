@@ -139,7 +139,7 @@ suspend fun downloadApiSession(
  * The bearer token a bank-shaped download sends: the credential's own token, or one exchanged for it when
  * the strategy has an [ApiTokenExchange].
  */
-private suspend fun bearerToken(
+internal suspend fun bearerToken(
     apiClient: ApiClient,
     strategy: ApiImportStrategy,
     credentials: ApiDownloadCredentials,
@@ -205,7 +205,7 @@ suspend fun importApiSession(
     return outcome
 }
 
-private suspend fun importByShape(
+internal suspend fun importByShape(
     reads: ApiImportReads,
     sessionId: ApiSessionId,
     strategy: ApiImportStrategy,

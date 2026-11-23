@@ -151,7 +151,7 @@ internal class AccountResolver(
      * only disambiguates the display name, so genuinely distinct accounts that share a real-world name
      * (e.g. five different people all named "Nikolay Metchev", two banks both trading as "Payward Ltd.")
      * stay separate and readable rather than colliding. Shape matches the sibling-collision convention
-     * already used for Monzo-style accounts: "Name (1234)" (see `ApiSessionImportService.displayName`).
+     * already used for Monzo-style accounts: "Name (1234)" (see `ApiImportAccount.displayName`).
      *
      * [selfId] excludes the intent's own current account from the collision check (for [adoptAccount]
      * renaming an account to a name it may already hold, or re-resolving to a name it already suffixed on

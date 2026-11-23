@@ -82,6 +82,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
@@ -92,7 +93,7 @@ private val logger = Logger.withTag("ExchangeApiImportService")
 /*
  * Generic download + import for signed exchange strategies — any ApiImportStrategy with a
  * a single-account source and dataEndpoints. Entirely config-driven (Crypto.com today; Binance/Kraken later as
- * config), so there is no per-provider code here. The bank-shaped path in ApiSessionImportService is
+ * config), so there is no per-provider code here. The bank-shaped path (the `Api*Import` files: ApiTransactionsImport, ApiTransactionPreparation) is
  * untouched; the two are dispatched by strategy shape.
  */
 
@@ -191,7 +192,7 @@ suspend fun downloadApiSessionExchange(
                 0L
             } else {
                 runCatchingCancellable {
-                    val url = buildExchangeEndpointUrl(strategy.config.baseUrl, sync.path)
+                    val url = buildEndpointUrl(strategy.config.baseUrl, sync.path)
                     val body = apiClient.send(method = "GET", url = url, storeResponse = false).body
                     val serverMillis =
                         requireNotNull(
@@ -235,7 +236,7 @@ suspend fun downloadApiSessionExchange(
         lastFetchWindowOutOfRange = false
         var rateLimitRetries = 0
         while (true) {
-            val endpointUrl = buildExchangeEndpointUrl(strategy.config.baseUrl, resolveFanOutPath(endpoint.path, fanOutValue))
+            val endpointUrl = buildEndpointUrl(strategy.config.baseUrl, resolveFanOutPath(endpoint.path, fanOutValue))
             val response =
                 if (endpoint.unsigned) {
                     apiClient.send(
@@ -466,13 +467,13 @@ internal fun resolveValueSet(
 
         is ApiValueSet.FromValueEndpoint -> {
             valueItemsByPath[valueSet.endpointPath].orEmpty().flatMap { item ->
-                valueSet.fields.mapNotNull { field -> item.str(field) }
+                valueSet.fields.mapNotNull { field -> item.resolveJsonPath(field) }
             }
         }
 
         is ApiValueSet.FromDataEndpoint -> {
             dataItemsByPath[valueSet.endpointPath].orEmpty().flatMap { item ->
-                valueSet.fields.mapNotNull { field -> item.str(field) }
+                valueSet.fields.mapNotNull { field -> item.resolveJsonPath(field) }
             }
         }
 
@@ -516,11 +517,6 @@ internal fun nextExchangeNonce(
     nowMillis: Long,
 ): Long = maxOf(nowMillis, lastNonce + 1)
 
-private fun buildExchangeEndpointUrl(
-    baseUrl: String,
-    path: String,
-): String = baseUrl.trimEnd('/') + "/" + path.trimStart('/')
-
 /**
  * A key identifying an endpoint uniquely enough to disambiguate two [ApiDataEndpoint]s that share the
  * same [ApiEndpointConfig.path] but differ only by a static query param baked into the signed body
@@ -559,7 +555,7 @@ private fun markerUrl(
     page: String?,
     fanOutValue: String?,
 ): String {
-    val sb = StringBuilder(buildExchangeEndpointUrl(baseUrl, path)).append("?ep=").append(endpointKey)
+    val sb = StringBuilder(buildEndpointUrl(baseUrl, path)).append("?ep=").append(endpointKey)
     window?.let {
         sb
             .append("&ws=")
@@ -578,7 +574,7 @@ internal fun stringFieldFromJson(
     field: String,
 ): String? =
     try {
-        (Json.parseToJsonElement(json).resolveJsonPathElement(field) as? JsonPrimitive)?.contentOrNullCompat()
+        (Json.parseToJsonElement(json).resolveJsonPathElement(field) as? JsonPrimitive)?.contentOrNull
     } catch (e: SerializationException) {
         null
     }
@@ -807,12 +803,12 @@ private fun parseEnrichment(
     obj: JsonObject,
     tm: ApiTransactionMappings,
 ): ParsedEnrichment? {
-    val id = obj.str(tm.idField) ?: return null
+    val id = obj.resolveJsonPath(tm.idField) ?: return null
     return ParsedEnrichment(
         id = id,
-        address = tm.counterpartyAddressField?.let { obj.str(it) }?.takeIf { it.isNotBlank() },
-        network = tm.counterpartyNetworkField?.let { obj.str(it) }?.takeIf { it.isNotBlank() },
-        txid = tm.txidField?.let { obj.str(it) }?.takeIf { it.isNotBlank() },
+        address = tm.counterpartyAddressField?.let { obj.resolveJsonPath(it) }?.takeIf { it.isNotBlank() },
+        network = tm.counterpartyNetworkField?.let { obj.resolveJsonPath(it) }?.takeIf { it.isNotBlank() },
+        txid = tm.txidField?.let { obj.resolveJsonPath(it) }?.takeIf { it.isNotBlank() },
     )
 }
 
@@ -1562,7 +1558,7 @@ private fun parseExchangeTransfer(
     val approximateUntil = approximateUntil(rawTimestamp, tm.timestampFormat, tm.timestampPattern, windowStart, windowEnd)
     val id = outcome.externalId ?: item.text(tm.idField) ?: return emptyList()
     val rawAmount = item.text(tm.amountField)?.let { runCatching { BigDecimal(it) }.getOrNull() }
-    val fee = outcome.fees.firstOrNull { rules.carries(it, item, currency) }
+    val fee = outcome.fees.firstOrNull { rules.evaluator.carriesFee(it, item, currency) }
     val rawFeeAmount =
         fee
             ?.let {
@@ -1882,23 +1878,10 @@ private fun moneyExact(
         )
     }
 
-private fun JsonObject.str(path: String): String? = (resolveJsonPathElement(path) as? JsonPrimitive)?.contentOrNullCompat()
-
-private fun JsonPrimitive.contentOrNullCompat(): String? = if (this is JsonNull) null else content
-
 private fun RuleEngine.resolve(
     expr: ValueExpr,
     item: Record,
 ): String = evaluator.resolve(expr) { item.text(it) }
-
-/** Whether [item] carries [fee]: its conditions hold and, when it is charged on one asset, [item] is in [itemAsset]. */
-private fun RuleEngine.carries(
-    fee: FeeRule,
-    item: Record,
-    itemAsset: String,
-): Boolean =
-    evaluator.all(fee.conditions, item) &&
-        fee.chargedOnAsset?.let { resolve(it, item).equals(itemAsset, ignoreCase = true) } != false
 
 /** The name the first of [namings] that names an account for [item] gives, with that naming, or null. */
 private fun RuleEngine.counterparty(
