@@ -126,12 +126,12 @@ internal object BinanceApiStrategy {
             method: HttpMethodType = HttpMethodType.GET,
             queryParams: List<ApiQueryParam> = emptyList(),
             requestCostWeight: Int = 1,
-        ) = ApiEndpointConfig(
-            path = path,
-            responseArrayKey = key,
-            queryParams = queryParams,
+        ) = exchangeEndpoint(
+            path,
+            key,
+            pagination,
             method = method,
-            pagination = pagination,
+            queryParams = queryParams,
             requestCostWeight = requestCostWeight,
         )
 
@@ -141,13 +141,12 @@ internal object BinanceApiStrategy {
             path: String,
             transactionType: String,
             requestCostWeight: Int = 1,
-        ) = ApiEndpointConfig(
-            path = path,
-            responseArrayKey = "data",
+        ) = exchangeEndpoint(
+            path,
+            "data",
+            fiatHistoryWindow,
+            success = ResponseSuccess.CodeField("code", "000000"),
             queryParams = listOf(ApiQueryParam(name = "transactionType", value = transactionType)),
-            pagination = fiatHistoryWindow,
-            successCodeField = "code",
-            successCodeOkValue = "000000",
             requestCostWeight = requestCostWeight,
         )
 

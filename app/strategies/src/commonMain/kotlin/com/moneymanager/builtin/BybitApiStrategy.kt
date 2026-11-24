@@ -89,13 +89,12 @@ internal object BybitApiStrategy {
             arrayKey: String,
             pagination: ApiPaginationConfig?,
             queryParams: List<ApiQueryParam> = emptyList(),
-        ) = ApiEndpointConfig(
-            path = path,
-            responseArrayKey = arrayKey,
+        ) = exchangeEndpoint(
+            path,
+            arrayKey,
+            pagination,
+            success = ResponseSuccess.CodeField("retCode", "0"),
             queryParams = queryParams,
-            pagination = pagination,
-            successCodeField = "retCode",
-            successCodeOkValue = "0",
         )
 
         fun status(value: String) = Condition("status", ConditionOp.EQUALS, value = value)

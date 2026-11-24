@@ -76,17 +76,17 @@ internal object KrakenApiStrategy {
             // endpoints (per Kraken's published REST rate-limit docs); TradesHistory/Ledgers are the
             // only callers relying on this default, DepositStatus/WithdrawStatus pass 1 explicitly.
             requestCostWeight: Int = 2,
-        ) = ApiEndpointConfig(
-            path = path,
-            responseArrayKey = key,
-            queryParams = queryParams,
-            method = HttpMethodType.POST,
+        ) = exchangeEndpoint(
+            path,
+            key,
+            pagination,
             // Kraken signals success/failure via an empty/absent "error" array, never a status code.
-            errorArrayField = "error",
-            pagination = pagination,
+            success = ResponseSuccess.ErrorArray("error"),
+            method = HttpMethodType.POST,
+            queryParams = queryParams,
+            requestCostWeight = requestCostWeight,
             responseObjectValues = responseObjectValues,
             itemKeyField = itemKeyField,
-            requestCostWeight = requestCostWeight,
         )
 
         val tradeMappings =

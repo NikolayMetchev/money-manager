@@ -65,13 +65,12 @@ internal object CryptoComExchangeApiStrategy {
             path: String,
             key: String,
             pagination: ApiPaginationConfig,
-        ) = ApiEndpointConfig(
-            path = path,
-            responseArrayKey = key,
+        ) = exchangeEndpoint(
+            path,
+            key,
+            pagination,
+            success = ResponseSuccess.CodeField("code", "0"),
             method = HttpMethodType.POST,
-            successCodeField = "code",
-            successCodeOkValue = "0",
-            pagination = pagination,
         )
         val tradeMappings =
             ApiTradeMappings(
