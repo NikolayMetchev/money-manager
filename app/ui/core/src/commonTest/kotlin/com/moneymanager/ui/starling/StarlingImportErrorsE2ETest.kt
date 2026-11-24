@@ -96,4 +96,56 @@ class StarlingImportErrorsE2ETest : DbTest() {
             assertEquals(1, result.transactionCount)
             assertEquals(1, result.errorCount)
         }
+
+    @Test
+    fun `transactions download and import against accounts held in an earlier session`() =
+        runDbTest {
+            val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
+            val at = Instant.fromEpochMilliseconds(1_700_000_000_000L)
+            val accountsSession = repositories.apiSessionRepository.createSession(deviceId, at, null)
+            val feedSession = repositories.apiSessionRepository.createSession(deviceId, at, null)
+            val strategy =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .single { it.name == "Starling" }
+            val apiClient =
+                createApiClient(
+                    trafficRecorder = ApiSessionTrafficRecorder(sessionId = accountsSession, importEngine = repositories.importEngine),
+                    engine = mockEngine(),
+                )
+            val feedClient =
+                createApiClient(
+                    trafficRecorder = ApiSessionTrafficRecorder(sessionId = feedSession, importEngine = repositories.importEngine),
+                    engine = mockEngine(),
+                )
+
+            downloadApiSessionAccounts(
+                token = "test-starling-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = accountsSession,
+                strategy = strategy,
+            )
+            downloadApiSessionTransactions(
+                token = "test-starling-token",
+                apiClient = feedClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = feedSession,
+                strategy = strategy,
+                importEngine = repositories.importEngine,
+                accountsSessionId = accountsSession,
+            )
+            val result =
+                importApiSessionTransactions(
+                    apiSessionRepository = repositories.apiSessionRepository,
+                    currencyRepository = repositories.currencyRepository,
+                    sessionId = feedSession,
+                    accountsSessionId = accountsSession,
+                    strategy = strategy,
+                    importEngine = repositories.importEngine,
+                )
+
+            assertEquals(1, result.transactionCount)
+        }
 }

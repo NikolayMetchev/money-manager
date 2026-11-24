@@ -1,6 +1,9 @@
 package com.moneymanager.apiimporter
 
 import com.moneymanager.bigdecimal.BigDecimal
+import com.moneymanager.domain.model.apistrategy.ApiPeopleMappings
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -102,5 +105,52 @@ class ParsedAmountTest {
         val decimal = ParsedAmount(null, BigDecimal("2.50"), 1)
         assertTrue(decimal.isMagnitudeOf(ParsedAmount(null, BigDecimal("-2.5"), -1)))
         assertFalse(decimal.isMagnitudeOf(ParsedAmount(250L, null, 1)))
+    }
+}
+
+class CounterpartyIdentityTest {
+    private val mappings = ApiPeopleMappings()
+
+    private fun identity(
+        json: String,
+        ignoreUserId: Boolean = false,
+    ) = Json
+        .parseToJsonElement(json)
+        .jsonObject
+        .resolveCounterpartyIdentity(counterpartyIdField = "counterparty.id", peopleMappings = mappings, ignoreUserId = ignoreUserId)
+
+    @Test
+    fun `a service user number identifies a counterparty first`() {
+        assertEquals("service_user:123", identity("""{"counterparty":{"service_user_number":"123","user_id":"u1"}}"""))
+    }
+
+    @Test
+    fun `a user id identifies a counterparty unless it is throwaway`() {
+        val json = """{"counterparty":{"user_id":"u1"}}"""
+
+        assertEquals("user:u1", identity(json))
+        assertNull(identity(json, ignoreUserId = true))
+    }
+
+    @Test
+    fun `a counterparty with nothing to identify it has no identity`() {
+        assertNull(identity("""{"counterparty":{"name":"Shop"}}"""))
+        assertNull(identity("""{"other":1}"""))
+    }
+}
+
+class ResponseItemsTest {
+    @Test
+    fun `a blank array key takes a bare array or object and rejects a scalar`() {
+        assertEquals(2, responseItemsArray("""[1,2]""", "")?.size)
+        assertEquals(1, responseItemsArray("""{"a":1}""", "")?.size)
+        assertNull(responseItemsArray("5", ""))
+    }
+
+    @Test
+    fun `the parent id falls back to the nearest ancestor item`() {
+        val context = ImportUrlContext(ancestorItems = listOf(Json.parseToJsonElement("""{"id":"p1"}""").jsonObject))
+
+        assertEquals("p1", context.resolve("parent.id"))
     }
 }
