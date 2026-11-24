@@ -758,6 +758,7 @@ jobs:
     if: always() && needs.changes.outputs.noise != 'true'
     permissions:
       checks: read
+      pull-requests: read
     steps:
       - name: Every required job passed or was skipped
         env:
@@ -776,6 +777,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           SHA: ${{ github.event.pull_request.head.sha }}
         run: |
+          # Codecov posts nothing when the PR changes no Kotlin source (an IDE-settings or docs change has no lines
+          # to cover), so there is nothing to wait for.
+          if ! gh pr diff "${{ github.event.pull_request.number }}" --repo "$GITHUB_REPOSITORY" --name-only | grep -qE '\.kts?$'; then
+            echo "No Kotlin files changed; Codecov reports nothing for this PR."
+            exit 0
+          fi
           # Codecov reports a few minutes after the upload; give it 3 minutes.
           for _ in $(seq 1 18); do
             checks=$(gh api "repos/$GITHUB_REPOSITORY/commits/$SHA/check-runs?per_page=100" --paginate \
