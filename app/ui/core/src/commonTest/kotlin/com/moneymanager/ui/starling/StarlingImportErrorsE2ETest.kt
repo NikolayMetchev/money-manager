@@ -44,9 +44,10 @@ private val FEED_WITH_UNKNOWN_CURRENCY_JSON =
 class StarlingImportErrorsE2ETest : DbTest() {
     override val installBuiltInStrategies: Boolean = true
 
-    private fun mockEngine() =
+    private fun mockEngine(requestLog: MutableList<String>? = null) =
         MockEngine { request ->
             val url = request.url.toString()
+            requestLog?.add(url)
             val json =
                 when {
                     url.contains("/identifiers") -> IDENTIFIERS_JSON
@@ -166,10 +167,11 @@ class StarlingImportErrorsE2ETest : DbTest() {
                     .getAllStrategies()
                     .first()
                     .single { it.name == "Starling" }
+            val requestLog = mutableListOf<String>()
             val client =
                 createApiClient(
                     trafficRecorder = ApiSessionTrafficRecorder(sessionId = accountsSession, importEngine = repositories.importEngine),
-                    engine = mockEngine(),
+                    engine = mockEngine(requestLog),
                 )
             val identifiersClient =
                 createApiClient(
@@ -194,6 +196,11 @@ class StarlingImportErrorsE2ETest : DbTest() {
                     importEngine = repositories.importEngine,
                 )
             }
+            assertEquals(
+                1,
+                requestLog.count { it.contains("/api/v2/accounts") },
+                "the second pass should reuse the stored accounts response",
+            )
             val identifiers =
                 downloadApiSessionAccountIdentifiers(
                     token = "test-starling-token",

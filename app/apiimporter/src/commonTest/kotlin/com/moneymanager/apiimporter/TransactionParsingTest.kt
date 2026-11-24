@@ -1,5 +1,6 @@
 package com.moneymanager.apiimporter
 
+import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
 import com.moneymanager.domain.model.apistrategy.ApiAccountsSource
@@ -112,8 +113,8 @@ class TransactionParsingTest {
                 withBalance,
             ).single()
 
-        assertNotNull(parsed.balance)
-        assertNotNull(parsed.balanceAt)
+        assertEquals(5000L, parsed.balance?.minorUnits)
+        assertEquals(Instant.parse("2025-03-01T11:00:00Z"), parsed.balanceAt)
     }
 
     @Test
@@ -139,6 +140,6 @@ class TransactionParsingTest {
         val parsed = parse("""{"transactions":[${item(amount = "\"12.34\"")}]}""", decimal).single()
 
         assertNull(parsed.amountMinorUnits)
-        assertNotNull(parsed.amountDecimalMajor)
+        assertEquals(0, BigDecimal("12.34").compareTo(assertNotNull(parsed.amountDecimalMajor)))
     }
 }

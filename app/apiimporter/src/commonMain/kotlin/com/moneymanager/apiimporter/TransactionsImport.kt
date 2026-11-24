@@ -48,8 +48,9 @@ suspend fun importApiSessionTransactions(
             merchantMappings = merchantMappings,
         )
     onProgress(Progress(detail = "Preparing import session...", fraction = 0.05f))
-    // Build the import model purely (no DB writes): allocate account/counterparty/people/ownership
-    // intents and the transfers, then hand the whole batch to the engine, which performs every write.
+    // Build the import model: allocate account/counterparty/people/ownership intents and the transfers, then hand
+    // the batch to the engine, which performs every entity write. Attribute types are the exception: the caches
+    // create them through the engine as they are first needed, so a failure in preparation can leave some behind.
     ensureSourceAccounts(setup)
     precreateCounterparties(
         transactionResponses = setup.transactionResponses,

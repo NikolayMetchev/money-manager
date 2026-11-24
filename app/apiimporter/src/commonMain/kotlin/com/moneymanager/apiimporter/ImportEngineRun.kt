@@ -18,9 +18,11 @@ import com.moneymanager.importengineapi.dedupePolicy
 import com.moneymanager.tasks.Progress
 
 /**
- * Assembles the single [ImportBatch] from the prepared transfers + the resolver's account/people/ownership
- * intents and runs the engine exactly once. The engine performs every write, including the API
- * bookkeeping (the response-transaction records, via an [ImportBatch] session mutation).
+ * Assembles the [ImportBatch] from the prepared transfers + the resolver's account/people/ownership
+ * intents and runs the engine. The engine performs every write. It runs twice: first the transfers, whose
+ * per-transfer outcomes decide each item's response-transaction record, then a second batch that replaces
+ * the session's response-transaction records (the API bookkeeping). The two are separate batches, so the
+ * second failing does not roll the first back.
  */
 internal suspend fun runImportEngine(
     setup: ImportSetup,
