@@ -1,8 +1,6 @@
 package com.moneymanager.apiimporter
 
-import co.touchlab.kermit.Logger
 import com.moneymanager.bigdecimal.BigDecimal
-import com.moneymanager.coroutines.runCatchingCancellable
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
@@ -16,29 +14,14 @@ import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.apistrategy.ApiAccountsSource
-import com.moneymanager.domain.model.apistrategy.ApiDataEndpoint
-import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
-import com.moneymanager.domain.model.apistrategy.ApiEndpointKind
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
-import com.moneymanager.domain.model.apistrategy.ApiLedgerTrades
-import com.moneymanager.domain.model.apistrategy.ApiTradeMappings
-import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
-import com.moneymanager.domain.model.apistrategy.ApiValueSet
-import com.moneymanager.domain.model.apistrategy.InstrumentSplitMode
-import com.moneymanager.domain.model.apistrategy.TimestampFormat
 import com.moneymanager.domain.model.apistrategy.TransferDirection
 import com.moneymanager.domain.model.codesByName
 import com.moneymanager.domain.model.observation.ImportRecordKey
 import com.moneymanager.domain.model.resolveAssetCode
-import com.moneymanager.domain.model.rules.AccountNaming
-import com.moneymanager.domain.model.rules.AccountSide
 import com.moneymanager.domain.model.rules.EXCLUDED_ATTRIBUTE_TYPE_NAME
 import com.moneymanager.domain.model.rules.Record
 import com.moneymanager.domain.model.rules.RuleAttribute
-import com.moneymanager.domain.model.rules.RuleEngine
-import com.moneymanager.domain.model.rules.RuleOutcome
-import com.moneymanager.domain.model.rules.ValueExpr
-import com.moneymanager.domain.model.rules.excludedAttributeValue
 import com.moneymanager.domain.model.rules.ownedAttributeValues
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.ApiSessionReadRepository
@@ -66,24 +49,11 @@ import com.moneymanager.importengineapi.createCrypto
 import com.moneymanager.importengineapi.dedupePolicy
 import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.importengineapi.internalTransferBridges
-import com.moneymanager.importengineapi.recordApiDownloadCoverage
 import com.moneymanager.importengineapi.tradeDedupePolicy
-import com.moneymanager.rest.ApiClient
-import com.moneymanager.rest.ApiRequestSigner
 import com.moneymanager.tasks.PhasedProgress
 import com.moneymanager.tasks.Progress
-import io.ktor.http.encodeURLParameter
-import io.ktor.http.encodeURLPathPart
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
-import kotlinx.serialization.SerializationException
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonObject
 import kotlin.time.Clock
-import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 
 /*
