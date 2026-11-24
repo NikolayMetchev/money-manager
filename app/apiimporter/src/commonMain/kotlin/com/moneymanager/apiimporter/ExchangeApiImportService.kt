@@ -33,7 +33,6 @@ import com.moneymanager.domain.model.resolveAssetCode
 import com.moneymanager.domain.model.rules.AccountNaming
 import com.moneymanager.domain.model.rules.AccountSide
 import com.moneymanager.domain.model.rules.EXCLUDED_ATTRIBUTE_TYPE_NAME
-import com.moneymanager.domain.model.rules.FeeRule
 import com.moneymanager.domain.model.rules.Record
 import com.moneymanager.domain.model.rules.RuleAttribute
 import com.moneymanager.domain.model.rules.RuleEngine
@@ -79,7 +78,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
