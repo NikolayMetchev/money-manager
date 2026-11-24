@@ -1,8 +1,6 @@
 package com.moneymanager.apiimporter
 
 import com.moneymanager.domain.model.apistrategy.TimestampFormat
-import kotlinx.coroutines.flow.first
-import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 /**

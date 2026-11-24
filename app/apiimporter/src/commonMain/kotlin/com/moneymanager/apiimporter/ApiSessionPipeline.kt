@@ -136,7 +136,7 @@ suspend fun downloadApiSession(
 
 /**
  * The bearer token a bank-shaped download sends: the credential's own token, or one exchanged for it when
- * the strategy has an [ApiTokenExchange].
+ * the strategy has an `ApiTokenExchange`.
  */
 internal suspend fun bearerToken(
     apiClient: ApiClient,

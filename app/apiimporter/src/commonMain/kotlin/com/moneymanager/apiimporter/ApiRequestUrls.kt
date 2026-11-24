@@ -9,7 +9,6 @@ import com.moneymanager.domain.model.apistrategy.ApiQueryParam
 import com.moneymanager.rest.ApiHttpResponse
 import io.ktor.http.URLBuilder
 import io.ktor.http.encodedPath
-import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.JsonObject
 import kotlin.time.Instant
 

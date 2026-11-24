@@ -15,7 +15,6 @@ import com.moneymanager.importengineapi.ImportResult
 import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.dedupePolicy
-import com.moneymanager.importengineapi.transactionIdAttributeName
 import com.moneymanager.tasks.Progress
 
 /**

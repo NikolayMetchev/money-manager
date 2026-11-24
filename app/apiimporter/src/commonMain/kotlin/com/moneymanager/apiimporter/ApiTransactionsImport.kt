@@ -18,7 +18,6 @@ import com.moneymanager.importengineapi.PassThroughDetector
 import com.moneymanager.importengineapi.transactionIdAttributeName
 import com.moneymanager.importengineapi.uniqueIdentifierAttributeNames
 import com.moneymanager.tasks.Progress
-import io.ktor.http.encodedPath
 import kotlinx.serialization.json.JsonObject
 
 suspend fun importApiSessionTransactions(
@@ -80,7 +79,7 @@ suspend fun importApiSessionTransactions(
 }
 
 /**
- * Allocates an [ImportAccountIntent] for every downloaded account up front, so a counterparty match
+ * Allocates an `ImportAccountIntent` for every downloaded account up front, so a counterparty match
  * (e.g. a self-transfer to another of the user's own Monzo accounts) can resolve onto it even though it
  * has no transaction feed of its own — and so it merges with any counterparty another provider already
  * created for the same real account via a shared bank identity. Its own bank details (e.g. from

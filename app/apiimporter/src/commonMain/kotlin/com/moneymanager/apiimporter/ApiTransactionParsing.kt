@@ -8,7 +8,6 @@ import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.model.rules.AccountSide
 import com.moneymanager.domain.model.rules.RuleEngine
 import com.moneymanager.domain.model.rules.ValueExpr
-import kotlinx.coroutines.flow.first
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.JsonObject
 import kotlin.math.absoluteValue

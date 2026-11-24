@@ -9,7 +9,6 @@ import com.moneymanager.domain.model.apistrategy.ApiPeopleMappings
 import com.moneymanager.domain.model.rules.RuleAttribute
 import com.moneymanager.domain.model.rules.RuleEngine
 import com.moneymanager.importengineapi.personalCounterpartyKey
-import io.ktor.http.encodedPath
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -20,7 +19,7 @@ private val logger = Logger.withTag("ApiImportAccounts")
 internal data class ApiImportAccount(
     /** The provider's id, as requests carry it (`{account.id}`). */
     val id: String,
-    /** The id stored on (and matched against) the account: the rules' [RuleAction.ExternalId], else [id]. */
+    /** The id stored on (and matched against) the account: the rules' `RuleAction.ExternalId`, else [id]. */
     val externalId: String = id,
     val description: String,
     /** The name the account rules give it, or null when they name none. */
@@ -127,7 +126,7 @@ internal fun parseAccounts(
     }
 
 /**
- * Fails when the account rules' [RuleAction.ExternalId] gives two distinct provider accounts the same
+ * Fails when the account rules' `RuleAction.ExternalId` gives two distinct provider accounts the same
  * stored id: they would be imported as one account.
  */
 internal fun requireDistinctExternalIds(

@@ -12,10 +12,7 @@ import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
-import com.moneymanager.importengineapi.dedupePolicy
 import com.moneymanager.importengineapi.getOrCreateAttributeType
-import io.ktor.http.encodedPath
-import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.JsonObject
 
 private val logger = Logger.withTag("ApiPeopleImport")

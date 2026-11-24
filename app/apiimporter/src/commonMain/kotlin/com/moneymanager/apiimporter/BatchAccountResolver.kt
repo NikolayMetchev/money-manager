@@ -30,7 +30,7 @@ internal data class AccountApiSource(
  * touches the database. It allocates one stable [LocalAccountKey] per distinct account and accumulates
  * an intent (with its match key + attributes) the first time it sees that account; callers wrap the
  * returned key in [AccountRef.Local]. All DB-existing dedupe (by name, by attribute, by bank key) and
- * all account/attribute writes are performed by the [ImportEngine] from the assembled [ImportBatch].
+ * all account/attribute writes are performed by the `ImportEngine` from the assembled `ImportBatch`.
  *
  * Only IN-BATCH dedupe lives here, via the in-memory indices below — so two transactions that name the
  * same counterparty share one intent (and thus one created account). Cross-key in-batch merging mirrors
@@ -63,7 +63,7 @@ internal class BatchAccountResolver {
     // The fee account intent of each own account, by that account.
     private val feeAccounts = mutableMapOf<AccountRef, LocalAccountKey>()
 
-    /** The accumulated intents, in allocation order, for [ImportBatch.accountsToCreate]. */
+    /** The accumulated intents, in allocation order, for `ImportBatch.accountsToCreate`. */
     suspend fun intents(): List<ImportAccountIntent> = mutex.withLock { intents.values.toList() }
 
     private fun allocateKey(): LocalAccountKey = LocalAccountKey("acct-${++keyCounter}")
