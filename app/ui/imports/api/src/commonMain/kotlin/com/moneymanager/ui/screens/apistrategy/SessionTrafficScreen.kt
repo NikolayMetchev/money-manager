@@ -1,7 +1,6 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package com.moneymanager.ui.screens.apistrategy
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -30,7 +29,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -58,7 +56,6 @@ import com.moneymanager.ui.util.ContentCopyIcon
 import com.moneymanager.ui.util.displayDateTime
 import com.moneymanager.ui.util.setPlainText
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlin.time.Instant
@@ -78,7 +75,6 @@ fun ApiSessionTrafficScreen(
     var isLoading by remember { mutableStateOf(true) }
     val pairs = remember(requests, responses) { pairRequestsAndResponses(requests, responses) }
     val pairsList = remember(pairs) { pairs.values.toList() }
-
     LaunchedEffect(sessionId) {
         try {
             session = apiSessionRepository.getSessionById(sessionId)
@@ -92,7 +88,6 @@ fun ApiSessionTrafficScreen(
             isLoading = false
         }
     }
-
     Column(
         modifier =
             Modifier
@@ -120,9 +115,7 @@ fun ApiSessionTrafficScreen(
                 Text("Back")
             }
         }
-
         Spacer(modifier = Modifier.height(16.dp))
-
         when {
             isLoading -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -146,7 +139,6 @@ fun ApiSessionTrafficScreen(
                 // Absolute Y (in root coordinates) of the highlighted JSON node, reported
                 // by JsonTreeNode once it is laid out, so we can center it in the viewport.
                 var highlightNodeRootY by remember(highlightJsonPath) { mutableFloatStateOf(-1f) }
-
                 // Find and scroll to the pair that contains the highlighted response
                 val highlightedPairIndex =
                     remember(highlightRequestId, highlightJsonPath, pairs, responseTransactionsByResponseId) {
@@ -180,7 +172,6 @@ fun ApiSessionTrafficScreen(
                             if (highlightedIndex >= 0) highlightedIndex + 1 else -1
                         }
                     }
-
                 LaunchedEffect(highlightedPairIndex, highlightJsonPath) {
                     if (highlightedPairIndex >= 0) {
                         lazyListState.animateScrollToItem(highlightedPairIndex)
@@ -198,7 +189,6 @@ fun ApiSessionTrafficScreen(
                         }
                     }
                 }
-
                 Box(
                     modifier =
                         Modifier
@@ -280,9 +270,7 @@ private fun ApiTrafficPairCard(
                     body = request.displayBody(),
                 )
             } ?: MissingTrafficItem(label = "Request")
-
             HorizontalDivider()
-
             pair.response?.let { response ->
                 ResponseTrafficItem(
                     title = "Response #${response.id}",
@@ -440,7 +428,6 @@ private fun pairRequestsAndResponses(
         responses
             .filter { response -> requests.none { request -> request.id == response.requestId } }
             .map { response -> response.requestId to ApiTrafficPair(request = null, response = response) }
-
     return (requestPairs + orphanPairs)
         .sortedByDescending { (_, pair) -> pair.request?.requestedAt ?: pair.response?.respondedAt ?: Instant.DISTANT_PAST }
         .toMap()

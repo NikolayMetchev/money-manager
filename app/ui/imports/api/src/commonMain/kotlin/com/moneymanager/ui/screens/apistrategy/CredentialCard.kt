@@ -1,7 +1,6 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package com.moneymanager.ui.screens.apistrategy
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -42,7 +41,6 @@ import com.moneymanager.tasks.Progress
 import com.moneymanager.tasks.formatElapsedTime
 import com.moneymanager.ui.util.displayDate
 import com.moneymanager.ui.util.displayDateTime
-import kotlinx.coroutines.flow.first
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -107,7 +105,6 @@ internal fun CredentialCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-
             if (requiresSigning) {
                 SigningKeySection(
                     publicKey = secrets?.publicKeyPem,
@@ -116,11 +113,9 @@ internal fun CredentialCard(
                     onCopyText = onCopyText,
                 )
             }
-
             downloadResult?.let {
                 Text(text = it.displaySummary(), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
             }
-
             if (isDownloading) {
                 Text(
                     text = downloadProgress?.detail ?: "Downloading...",
@@ -128,7 +123,6 @@ internal fun CredentialCard(
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
-
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(checked = forceFullDownload, onCheckedChange = onForceFullDownloadChange, enabled = !isDownloading)
                 Column {
@@ -140,7 +134,6 @@ internal fun CredentialCard(
                     )
                 }
             }
-
             Button(onClick = onDownload, enabled = !isDownloading, modifier = Modifier.fillMaxWidth()) {
                 if (isDownloading) {
                     CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
@@ -182,7 +175,6 @@ internal fun CredentialCard(
                     Text("Re-import all ($importedSessionCount)")
                 }
             }
-
             if (sessions.isNotEmpty()) {
                 HorizontalDivider()
                 sessions.forEach { session ->
@@ -227,14 +219,12 @@ internal fun SessionRow(
     onCopyError: (String) -> Unit,
 ) {
     val isActive = session.expiresAt?.let { it > Clock.System.now() } ?: true
-
     val containerColor =
         if (isActive) {
             MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f)
         } else {
             MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
         }
-
     Column(
         modifier =
             Modifier
@@ -257,13 +247,11 @@ internal fun SessionRow(
                 SessionStatusBadge(isActive = isActive)
             }
         }
-
         Text(
             text = "Created: ${session.createdAt.displayDateTime()}",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-
         dateRange?.let { range ->
             Text(
                 text =
@@ -273,7 +261,6 @@ internal fun SessionRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-
         session.importDurationMillis?.let { durationMillis ->
             Text(
                 text = "Import took: ${formatElapsedTime(durationMillis.milliseconds)}",
@@ -281,11 +268,9 @@ internal fun SessionRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-
         importResult?.let {
             Text(text = it.displaySummary(), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
         }
-
         if (isImporting) {
             val fraction = importProgress?.fraction
             // Before the first engine progress arrives, the import is still in the UI-side preparation
@@ -303,7 +288,6 @@ internal fun SessionRow(
                 LinearProgressIndicator(progress = { fraction.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
             }
         }
-
         importError?.let { error ->
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
@@ -315,7 +299,6 @@ internal fun SessionRow(
                 TextButton(onClick = { onCopyError(error) }) { Text("Copy") }
             }
         }
-
         if (isActive) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
@@ -386,7 +369,6 @@ private fun SessionStatusBadge(isActive: Boolean) {
         } else {
             MaterialTheme.colorScheme.onSurfaceVariant
         }
-
     Box(
         modifier =
             Modifier

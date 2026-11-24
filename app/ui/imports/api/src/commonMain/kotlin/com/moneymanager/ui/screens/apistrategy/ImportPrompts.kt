@@ -1,7 +1,6 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package com.moneymanager.ui.screens.apistrategy
-
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,7 +25,6 @@ import com.moneymanager.domain.model.ApiCredentialId
 import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.flow.map
 
 // [answer] is set when a bulk run asked and waits for the names (null: leave the session for later).
 internal class PendingApiImport(
@@ -57,7 +55,6 @@ internal fun CounterpartyConfirmationDialog(
         mutableStateOf(counterparties.map { it.suggestedAccountName })
     }
     val hasBlankName = names.any { it.isBlank() }
-
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Confirm Counterparties") },
