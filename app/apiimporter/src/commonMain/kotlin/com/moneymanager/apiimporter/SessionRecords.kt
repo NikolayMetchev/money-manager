@@ -69,5 +69,5 @@ suspend fun isApiSessionUnchanged(
     return records.all { it.contentHash == inputsHash }
 }
 
-private val CANONICAL_JSON = Json { encodeDefaults = true }
-private val PASS_THROUGHS_SERIALIZER = ListSerializer(PassThroughAccount.serializer())
+internal val CANONICAL_JSON = Json { encodeDefaults = true }
+internal val PASS_THROUGHS_SERIALIZER = ListSerializer(PassThroughAccount.serializer())

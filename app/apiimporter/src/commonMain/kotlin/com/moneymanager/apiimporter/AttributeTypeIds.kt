@@ -1,0 +1,10 @@
+package com.moneymanager.apiimporter
+
+import com.moneymanager.domain.model.AttributeTypeId
+import com.moneymanager.domain.model.WellKnownIds
+
+internal val ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID = AttributeTypeId(WellKnownIds.ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID)
+internal val BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID = AttributeTypeId(WellKnownIds.BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID)
+internal val ACCOUNT_SORT_CODE_ATTR_TYPE_ID = AttributeTypeId(WellKnownIds.ACCOUNT_SORT_CODE_ATTR_TYPE_ID)
+internal val ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID = AttributeTypeId(WellKnownIds.ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID)
+internal val ACCOUNT_COUNTERPARTY_NAME_KEY_ATTR_TYPE_ID = AttributeTypeId(WellKnownIds.ACCOUNT_COUNTERPARTY_NAME_KEY_ATTR_TYPE_ID)

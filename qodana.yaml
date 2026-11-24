@@ -114,7 +114,6 @@ exclude:
       - app/ui/core/src/commonTest/kotlin/com/moneymanager/ui/screens/MonzoImportAuditE2ETest.kt
       - app/ui/core/src/commonTest/kotlin/com/moneymanager/ui/screens/CsvReimportE2ETest.kt
       - app/importfilesource/localfolder/src/androidMain/kotlin/com/moneymanager/importfilesource/localfolder/SafFolderImportFileSource.kt
-      - app/apiimporter/src/commonMain/kotlin/com/moneymanager/apiimporter/ApiSessionImportService.kt
       # [5] — `awaitAsOneOrNull() ?: return` (or `?: throw`): SQLDelight's generated queries reach the model as
       # compiled classes, and the linter takes the async query's row as always null, so everything after the
       # elvis looks unreachable. Each file's tests run that code.

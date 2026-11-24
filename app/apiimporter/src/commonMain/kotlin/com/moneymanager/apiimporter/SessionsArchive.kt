@@ -44,19 +44,19 @@ data class ApiSessionsArchiveImportResult(
 
 /** The export file's shape: what [ApiSessionsArchive] writes and reads. */
 @Serializable
-private data class ArchiveFile(
+internal data class ArchiveFile(
     val version: Long,
     val strategies: List<ArchiveStrategy>,
 )
 
 @Serializable
-private data class ArchiveStrategy(
+internal data class ArchiveStrategy(
     val name: String,
     val sessions: List<ArchiveSession>,
 )
 
 @Serializable
-private data class ArchiveSession(
+internal data class ArchiveSession(
     val createdAt: Long,
     /** Endpoint key to the epoch millisecond it is downloaded up to. */
     val coverage: Map<String, Long>,
@@ -65,7 +65,7 @@ private data class ArchiveSession(
 )
 
 @Serializable
-private data class ArchiveRequest(
+internal data class ArchiveRequest(
     val method: String,
     val url: String,
     val headers: Map<String, String>,

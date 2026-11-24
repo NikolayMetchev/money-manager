@@ -3,7 +3,6 @@ package com.moneymanager.apiimporter
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.apistrategy.ApiAccountsSource
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
-import com.moneymanager.domain.model.apistrategy.ApiTokenExchange
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountMappingReadRepository
@@ -137,9 +136,9 @@ suspend fun downloadApiSession(
 
 /**
  * The bearer token a bank-shaped download sends: the credential's own token, or one exchanged for it when
- * the strategy has an [ApiTokenExchange].
+ * the strategy has an `ApiTokenExchange`.
  */
-private suspend fun bearerToken(
+internal suspend fun bearerToken(
     apiClient: ApiClient,
     strategy: ApiImportStrategy,
     credentials: ApiDownloadCredentials,
@@ -205,7 +204,7 @@ suspend fun importApiSession(
     return outcome
 }
 
-private suspend fun importByShape(
+internal suspend fun importByShape(
     reads: ApiImportReads,
     sessionId: ApiSessionId,
     strategy: ApiImportStrategy,
