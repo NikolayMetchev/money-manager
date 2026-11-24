@@ -301,6 +301,7 @@ class PersonMergeDbTest : DbTest() {
             assertEquals(4, merged.size)
             assertTrue(Triple("same", "s", "") in merged)
             assertTrue(Triple("only-dup", "d", "") in merged)
+            assertTrue(merged.any { it.first == "clash" && it.second == "keep" })
             assertTrue(merged.any { it.first == "clash" && it.second == "dup" && it.third.isNotEmpty() })
 
             val merge =
