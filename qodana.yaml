@@ -208,7 +208,8 @@ exclude:
       - app/ui/core/src/commonMain/kotlin/com/moneymanager/ui/screens/PassThroughAccountsScreen.kt
       - app/ui/currencies/src/commonMain/kotlin/com/moneymanager/ui/screens/currencies/AssetListTab.kt
       - app/ui/imports/api/src/commonMain/kotlin/com/moneymanager/ui/screens/apistrategy/ApiConnectionsScreen.kt
-      - app/ui/imports/api/src/commonMain/kotlin/com/moneymanager/ui/screens/apistrategy/ApiSessionsScreen.kt
+      - app/ui/imports/api/src/commonMain/kotlin/com/moneymanager/ui/screens/apistrategy/SessionTrafficScreen.kt
+      - app/ui/imports/api/src/commonMain/kotlin/com/moneymanager/ui/screens/apistrategy/SessionsScreen.kt
       - app/ui/imports/api/src/commonMain/kotlin/com/moneymanager/ui/screens/apistrategy/ApiStrategiesScreen.kt
       - app/ui/imports/api/src/commonMain/kotlin/com/moneymanager/ui/screens/apistrategy/editor/ApiEditorComponents.kt
       - app/ui/imports/csv/src/commonMain/kotlin/com/moneymanager/ui/components/csv/PdfLinesTable.kt
