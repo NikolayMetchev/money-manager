@@ -15,7 +15,6 @@ import com.moneymanager.tasks.Progress
 import io.ktor.http.encodeURLParameter
 import io.ktor.http.encodeURLPathPart
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject

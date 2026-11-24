@@ -4,7 +4,6 @@ import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.model.apistrategy.ApiLedgerTrades
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.model.apistrategy.TransferDirection
-import kotlinx.coroutines.flow.first
 
 /**
  * Reconciles parsed trades against their authoritative ledger legs (see

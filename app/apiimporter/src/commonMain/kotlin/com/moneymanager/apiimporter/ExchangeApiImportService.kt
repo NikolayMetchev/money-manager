@@ -20,7 +20,6 @@ import com.moneymanager.domain.model.codesByName
 import com.moneymanager.domain.model.observation.ImportRecordKey
 import com.moneymanager.domain.model.resolveAssetCode
 import com.moneymanager.domain.model.rules.EXCLUDED_ATTRIBUTE_TYPE_NAME
-import com.moneymanager.domain.model.rules.Record
 import com.moneymanager.domain.model.rules.RuleAttribute
 import com.moneymanager.domain.model.rules.ownedAttributeValues
 import com.moneymanager.domain.repository.AccountReadRepository

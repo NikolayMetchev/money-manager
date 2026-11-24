@@ -21,7 +21,6 @@ import com.moneymanager.domain.model.rules.excludedAttributeValue
 import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.importengineapi.ObservationSlot
 import com.moneymanager.tasks.PhasedProgress
-import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.JsonObject
 import kotlin.time.Instant
 
