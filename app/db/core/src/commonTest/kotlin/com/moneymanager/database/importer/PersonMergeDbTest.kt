@@ -2,15 +2,18 @@ package com.moneymanager.database.importer
 
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.ImportBatch
+import com.moneymanager.importengineapi.ImportOperation
 import com.moneymanager.importengineapi.ImportOwnershipIntent
 import com.moneymanager.importengineapi.ImportPersonIntent
 import com.moneymanager.importengineapi.LocalPersonKey
 import com.moneymanager.importengineapi.PersonMatchKey
 import com.moneymanager.importengineapi.PersonMergeRequest
+import com.moneymanager.importengineapi.getOrCreateAttributeType
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
 import kotlin.test.Test
@@ -35,6 +38,7 @@ class PersonMergeDbTest : DbTest() {
         first: String,
         last: String,
         owns: List<AccountId> = emptyList(),
+        attributes: List<NewAttribute> = emptyList(),
     ): PersonId {
         val key = LocalPersonKey(first)
         val result =
@@ -47,6 +51,7 @@ class PersonMergeDbTest : DbTest() {
                                 match = PersonMatchKey.ByNameKey("${first.lowercase()} ${last.lowercase()}"),
                                 firstName = first,
                                 lastName = last,
+                                attributes = attributes,
                                 source = Source.Manual,
                             ),
                         ),
@@ -195,5 +200,121 @@ class PersonMergeDbTest : DbTest() {
             assertEquals(setOf(acct), owned(a))
             assertTrue(owned(b).isEmpty())
             assertTrue(owned(c).isEmpty())
+        }
+
+    private suspend fun attributes(id: PersonId) =
+        repositories.personAttributeRepository
+            .getByPerson(id)
+            .first()
+            .map { Triple(it.attributeType.name, it.value, it.groupKey) }
+            .toSet()
+
+    @Test
+    fun updatingAPersonChangesTheirNameAndAttributes() =
+        runDbTest {
+            val email = repositories.importEngine.getOrCreateAttributeType("email")
+            val phone = repositories.importEngine.getOrCreateAttributeType("phone")
+            val nick = repositories.importEngine.getOrCreateAttributeType("nick")
+            val id = person("Alice", "Smith", attributes = listOf(NewAttribute(email, "a@x"), NewAttribute(phone, "1")))
+            val stored = repositories.personRepository.getPersonById(id).first()!!
+            val attrs = repositories.personAttributeRepository.getByPerson(id).first()
+
+            repositories.importEngine.import(
+                ImportBatch.manualEdits().copy(
+                    peopleToCreate =
+                        listOf(
+                            ImportPersonIntent(
+                                key = LocalPersonKey("edit"),
+                                source = Source.Manual,
+                                operation = ImportOperation.UPDATE,
+                                existingId = id,
+                                person = stored.copy(firstName = "Alicia"),
+                                deletedAttributeIds = setOf(attrs.first { it.attributeType.id == phone }.id),
+                                updatedAttributes = mapOf(attrs.first { it.attributeType.id == email }.id to NewAttribute(email, "b@x")),
+                                attributes = listOf(NewAttribute(nick, "Al")),
+                            ),
+                        ),
+                ),
+            )
+
+            assertEquals(
+                "Alicia",
+                repositories.personRepository
+                    .getPersonById(id)
+                    .first()!!
+                    .firstName,
+            )
+            assertEquals(setOf(Triple("email", "b@x", ""), Triple("nick", "Al", "")), attributes(id))
+        }
+
+    @Test
+    fun updatingOnlyAPersonsAttributesLeavesTheirName() =
+        runDbTest {
+            val email = repositories.importEngine.getOrCreateAttributeType("email")
+            val id = person("Alice", "Smith")
+
+            repositories.importEngine.import(
+                ImportBatch.manualEdits().copy(
+                    peopleToCreate =
+                        listOf(
+                            ImportPersonIntent(
+                                key = LocalPersonKey("edit"),
+                                source = Source.Manual,
+                                operation = ImportOperation.UPDATE,
+                                existingId = id,
+                                attributes = listOf(NewAttribute(email, "a@x")),
+                            ),
+                        ),
+                ),
+            )
+
+            assertEquals(
+                "Alice",
+                repositories.personRepository
+                    .getPersonById(id)
+                    .first()!!
+                    .firstName,
+            )
+            assertEquals(setOf(Triple("email", "a@x", "")), attributes(id))
+        }
+
+    @Test
+    fun mergeKeepsBothIdentitiesAndUnmergeRestoresThem() =
+        runDbTest {
+            val same = repositories.importEngine.getOrCreateAttributeType("same")
+            val onlyDup = repositories.importEngine.getOrCreateAttributeType("only-dup")
+            val clash = repositories.importEngine.getOrCreateAttributeType("clash")
+            val keep =
+                person("Alice", "Smith", attributes = listOf(NewAttribute(same, "s"), NewAttribute(clash, "keep")))
+            val dup =
+                person(
+                    "Alicia",
+                    "Smyth",
+                    attributes = listOf(NewAttribute(same, "s"), NewAttribute(onlyDup, "d"), NewAttribute(clash, "dup")),
+                )
+
+            repositories.importEngine.import(
+                ImportBatch.manualEdits(personMerges = listOf(PersonMergeRequest(deletedId = dup, survivingId = keep))),
+            )
+
+            val merged = attributes(keep)
+            assertEquals(4, merged.size)
+            assertTrue(Triple("same", "s", "") in merged)
+            assertTrue(Triple("only-dup", "d", "") in merged)
+            assertTrue(merged.any { it.first == "clash" && it.second == "keep" })
+            assertTrue(merged.any { it.first == "clash" && it.second == "dup" && it.third.isNotEmpty() })
+
+            val merge =
+                repositories.personRepository
+                    .getReversibleMerges()
+                    .first()
+                    .single()
+            repositories.importEngine.import(ImportBatch.manualEdits(personUnmerges = listOf(merge.id)))
+
+            assertEquals(setOf(Triple("same", "s", ""), Triple("clash", "keep", "")), attributes(keep))
+            assertEquals(
+                setOf(Triple("same", "s", ""), Triple("only-dup", "d", ""), Triple("clash", "dup", "")),
+                attributes(dup),
+            )
         }
 }
