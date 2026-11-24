@@ -91,7 +91,7 @@ private val logger = Logger.withTag("ExchangeApiImportService")
 /*
  * Generic download + import for signed exchange strategies — any ApiImportStrategy with a
  * a single-account source and dataEndpoints. Entirely config-driven (Crypto.com today; Binance/Kraken later as
- * config), so there is no per-provider code here. The bank-shaped path (the `Api*Import` files: ApiTransactionsImport, ApiTransactionPreparation) is
+ * config), so there is no per-provider code here. The bank-shaped path (the `TransactionsImport` and `TransactionPreparation` files) is
  * untouched; the two are dispatched by strategy shape.
  */
 

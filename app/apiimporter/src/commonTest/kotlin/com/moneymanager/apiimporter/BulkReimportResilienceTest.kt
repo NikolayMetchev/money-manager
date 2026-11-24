@@ -17,7 +17,7 @@ import kotlin.time.Instant
  * moment the first session's transfers are deleted. Whatever the run does about a failing session,
  * it must not leave the views describing the pre-re-import state (issue #737).
  */
-class ApiBulkReimportResilienceTest {
+class BulkReimportResilienceTest {
     private class CountingMaintenance : Maintenance {
         var refreshes = 0
 

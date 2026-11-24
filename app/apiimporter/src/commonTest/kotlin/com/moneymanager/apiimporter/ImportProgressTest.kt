@@ -16,7 +16,7 @@ import kotlin.time.Instant
  * A bulk API re-import gives each session its own slice of one bar (see `PhasedProgressTest` for the
  * scaling itself).
  */
-class ApiImportProgressTest {
+class ImportProgressTest {
     private class NoopMaintenance : Maintenance {
         override suspend fun reindex(): Duration = Duration.ZERO
 
