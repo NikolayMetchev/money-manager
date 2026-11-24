@@ -21,8 +21,11 @@ import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ConditionOp
 import com.moneymanager.domain.model.rules.RuleAction
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 internal object StarlingApiStrategy {
+    private val STRATEGY_ID: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000005")
+
     private const val STARLING_FEED_PATH = "/api/v2/feed/account/{account.id}/category/{account.defaultCategory}"
 
     /**
@@ -35,7 +38,7 @@ internal object StarlingApiStrategy {
      */
     fun strategy(now: Instant): ApiImportStrategy =
         ApiImportStrategy(
-            id = ApiImportStrategyId(BuiltInApiStrategies.starlingStrategyId),
+            id = ApiImportStrategyId(STRATEGY_ID),
             name = "Starling",
             config =
                 ApiStrategyConfig(

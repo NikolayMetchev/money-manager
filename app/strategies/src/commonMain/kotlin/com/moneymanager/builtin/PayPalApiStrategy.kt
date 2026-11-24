@@ -24,8 +24,11 @@ import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.RuleValue
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 internal object PayPalApiStrategy {
+    private val STRATEGY_ID: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000e")
+
     /**
      * The built-in PayPal API import strategy (Transaction Search). The credential is a REST app's client
      * id + secret, exchanged for a bearer token before every download. Each currency balance becomes its
@@ -35,7 +38,7 @@ internal object PayPalApiStrategy {
      */
     fun strategy(now: Instant): ApiImportStrategy =
         ApiImportStrategy(
-            id = ApiImportStrategyId(BuiltInApiStrategies.payPalStrategyId),
+            id = ApiImportStrategyId(STRATEGY_ID),
             name = "PayPal API",
             config =
                 ApiStrategyConfig(

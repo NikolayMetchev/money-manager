@@ -36,8 +36,11 @@ import com.moneymanager.domain.model.rules.FeeRule
 import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 internal object KrakenApiStrategy {
+    private val STRATEGY_ID: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000a")
+
     /**
      * Built-in Kraken API strategy — pure config over the generic signed-exchange engine (no provider
      * code). Kraken's REST auth is HMAC-SHA512 over `path + SHA256(nonce + form-body)`, with a
@@ -179,7 +182,7 @@ internal object KrakenApiStrategy {
             )
 
         return ApiImportStrategy(
-            id = ApiImportStrategyId(BuiltInApiStrategies.krakenStrategyId),
+            id = ApiImportStrategyId(STRATEGY_ID),
             name = "Kraken",
             config =
                 ApiStrategyConfig(

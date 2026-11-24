@@ -35,8 +35,11 @@ import com.moneymanager.domain.model.rules.RuleValue
 import com.moneymanager.domain.model.rules.SettlementWindow
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 internal object CryptoComExchangeApiStrategy {
+    private val STRATEGY_ID: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000009")
+
     /**
      * Built-in Crypto.com **Exchange** API strategy — pure config over the generic signed-exchange
      * engine (no provider code). Uses HMAC-SHA256 request signing, a single "Crypto.com Exchange"
@@ -126,7 +129,7 @@ internal object CryptoComExchangeApiStrategy {
                     ),
             )
         return ApiImportStrategy(
-            id = ApiImportStrategyId(BuiltInApiStrategies.cryptoComExchangeStrategyId),
+            id = ApiImportStrategyId(STRATEGY_ID),
             name = "Crypto.com Exchange",
             config =
                 ApiStrategyConfig(

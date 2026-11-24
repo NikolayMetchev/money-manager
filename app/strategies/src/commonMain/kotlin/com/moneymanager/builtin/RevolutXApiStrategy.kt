@@ -32,8 +32,11 @@ import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.RuleValue
 import com.moneymanager.domain.model.rules.StrategyRule
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 internal object RevolutXApiStrategy {
+    private val STRATEGY_ID: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000f")
+
     /**
      * Built-in Revolut X strategy — pure config over the generic signed-exchange engine (no provider code).
      * Revolut X signs `timestamp + verb + path + query` with the user's own Ed25519 key (base64) and carries the
@@ -111,7 +114,7 @@ internal object RevolutXApiStrategy {
         }
 
         return ApiImportStrategy(
-            id = ApiImportStrategyId(BuiltInApiStrategies.revolutXStrategyId),
+            id = ApiImportStrategyId(STRATEGY_ID),
             name = revolutX,
             config =
                 ApiStrategyConfig(

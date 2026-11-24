@@ -18,8 +18,11 @@ import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.model.apistrategy.WindowBoundFormat
 import com.moneymanager.domain.model.rules.AccountSide
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 internal object WiseApiStrategy {
+    private val STRATEGY_ID: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000002")
+
     /**
      * The built-in Wise API import strategy. Wise has a three-level hierarchy
      * (profiles → balances → statements): profiles are fetched as an ancestor endpoint and their id
@@ -28,7 +31,7 @@ internal object WiseApiStrategy {
      */
     fun strategy(now: Instant): ApiImportStrategy =
         ApiImportStrategy(
-            id = ApiImportStrategyId(BuiltInApiStrategies.wiseStrategyId),
+            id = ApiImportStrategyId(STRATEGY_ID),
             name = "Wise",
             config =
                 ApiStrategyConfig(

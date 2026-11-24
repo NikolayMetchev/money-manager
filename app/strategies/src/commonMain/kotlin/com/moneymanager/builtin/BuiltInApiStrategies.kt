@@ -7,15 +7,6 @@ import kotlin.uuid.Uuid
 /** Built-in API import strategy definitions. db-free domain objects. */
 object BuiltInApiStrategies {
     val monzoStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000001")
-    val wiseStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000002")
-    val starlingStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000005")
-    val cryptoComExchangeStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000009")
-    val krakenStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000a")
-    val binanceStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000b")
-    val coinbaseStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000c")
-    val bybitStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000d")
-    val payPalStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000e")
-    val revolutXStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000f")
 
     /** All built-in API import strategies. */
     fun builtInApiStrategies(now: Instant): List<ApiImportStrategy> =

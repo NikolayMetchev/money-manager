@@ -37,8 +37,11 @@ import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.RuleValue
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 internal object BinanceApiStrategy {
+    private val STRATEGY_ID: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000b")
+
     /**
      * Built-in Binance API strategy — pure config over the generic signed-exchange engine (no provider
      * code). Binance's REST auth is HMAC-SHA256 over the query string + body, api key in the
@@ -337,7 +340,7 @@ internal object BinanceApiStrategy {
             )
 
         return ApiImportStrategy(
-            id = ApiImportStrategyId(BuiltInApiStrategies.binanceStrategyId),
+            id = ApiImportStrategyId(STRATEGY_ID),
             name = "Binance",
             config =
                 ApiStrategyConfig(

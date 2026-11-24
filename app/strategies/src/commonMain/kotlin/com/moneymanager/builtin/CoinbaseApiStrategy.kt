@@ -27,8 +27,11 @@ import com.moneymanager.domain.model.rules.FeeRule
 import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.ValueExpr
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 internal object CoinbaseApiStrategy {
+    private val STRATEGY_ID: Uuid = Uuid.parse("00000000-0000-0000-0000-00000000000c")
+
     /**
      * Built-in Coinbase strategy — pure config over the generic signed-exchange engine (no provider code).
      * Coinbase CDP API keys authenticate each request with a freshly signed JWT (see [JwtSigningConfig]),
@@ -105,7 +108,7 @@ internal object CoinbaseApiStrategy {
             )
 
         return ApiImportStrategy(
-            id = ApiImportStrategyId(BuiltInApiStrategies.coinbaseStrategyId),
+            id = ApiImportStrategyId(STRATEGY_ID),
             name = "Coinbase",
             config =
                 ApiStrategyConfig(
