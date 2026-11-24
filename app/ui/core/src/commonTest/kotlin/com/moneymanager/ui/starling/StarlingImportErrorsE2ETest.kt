@@ -1,5 +1,6 @@
 package com.moneymanager.ui.starling
 
+import com.moneymanager.apiimporter.downloadApiSessionAccountIdentifiers
 import com.moneymanager.apiimporter.downloadApiSessionAccounts
 import com.moneymanager.apiimporter.downloadApiSessionTransactions
 import com.moneymanager.apiimporter.importApiSessionTransactions
@@ -26,6 +27,9 @@ private val ACCOUNTS_JSON =
 "currency":"GBP","createdAt":"2021-01-01T00:00:00.000Z","name":"Personal"}]}
     """.trimIndent()
 
+private const val IDENTIFIERS_JSON =
+    """{"accountIdentifier":"55556666","bankIdentifier":"099999","iban":"GB00SRLG09999955556666","bic":"SRLGGB2L"}"""
+
 /** One good item and one whose currency the database has never heard of. */
 private val FEED_WITH_UNKNOWN_CURRENCY_JSON =
     """
@@ -45,6 +49,7 @@ class StarlingImportErrorsE2ETest : DbTest() {
             val url = request.url.toString()
             val json =
                 when {
+                    url.contains("/identifiers") -> IDENTIFIERS_JSON
                     url.contains("/feed/account/") -> FEED_WITH_UNKNOWN_CURRENCY_JSON
                     url.contains("/api/v2/accounts") -> ACCOUNTS_JSON
                     else -> error("Unexpected request: $url")
@@ -147,5 +152,58 @@ class StarlingImportErrorsE2ETest : DbTest() {
                 )
 
             assertEquals(1, result.transactionCount)
+        }
+
+    @Test
+    fun `repeating a download in the same session reuses what is stored and identifiers read accounts from another`() =
+        runDbTest {
+            val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
+            val at = Instant.fromEpochMilliseconds(1_700_000_000_000L)
+            val accountsSession = repositories.apiSessionRepository.createSession(deviceId, at, null)
+            val identifiersSession = repositories.apiSessionRepository.createSession(deviceId, at, null)
+            val strategy =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .single { it.name == "Starling" }
+            val client =
+                createApiClient(
+                    trafficRecorder = ApiSessionTrafficRecorder(sessionId = accountsSession, importEngine = repositories.importEngine),
+                    engine = mockEngine(),
+                )
+            val identifiersClient =
+                createApiClient(
+                    trafficRecorder = ApiSessionTrafficRecorder(sessionId = identifiersSession, importEngine = repositories.importEngine),
+                    engine = mockEngine(),
+                )
+
+            repeat(2) {
+                downloadApiSessionAccounts(
+                    token = "test-starling-token",
+                    apiClient = client,
+                    apiSessionRepository = repositories.apiSessionRepository,
+                    sessionId = accountsSession,
+                    strategy = strategy,
+                )
+                downloadApiSessionTransactions(
+                    token = "test-starling-token",
+                    apiClient = client,
+                    apiSessionRepository = repositories.apiSessionRepository,
+                    sessionId = accountsSession,
+                    strategy = strategy,
+                    importEngine = repositories.importEngine,
+                )
+            }
+            val identifiers =
+                downloadApiSessionAccountIdentifiers(
+                    token = "test-starling-token",
+                    apiClient = identifiersClient,
+                    apiSessionRepository = repositories.apiSessionRepository,
+                    sessionId = identifiersSession,
+                    strategy = strategy,
+                    accountsSessionId = accountsSession,
+                )
+
+            assertEquals(1, identifiers.accountCount)
         }
 }

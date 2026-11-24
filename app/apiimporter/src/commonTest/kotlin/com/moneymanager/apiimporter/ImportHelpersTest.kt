@@ -1,11 +1,14 @@
 package com.moneymanager.apiimporter
 
 import com.moneymanager.bigdecimal.BigDecimal
+import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiPeopleMappings
+import com.moneymanager.domain.model.apistrategy.ApiPersonImportConfig
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -152,5 +155,26 @@ class ResponseItemsTest {
         val context = ImportUrlContext(ancestorItems = listOf(Json.parseToJsonElement("""{"id":"p1"}""").jsonObject))
 
         assertEquals("p1", context.resolve("parent.id"))
+    }
+}
+
+class ConfigValidationTest {
+    private val endpoint = ApiEndpointConfig(path = "/people", responseArrayKey = "people")
+
+    @Test
+    fun `owning every account and deriving owners from ancestors are exclusive`() {
+        val both =
+            ApiPersonImportConfig(endpoint, firstNameField = "first", accountOwnerAncestorExpr = "ancestor[0].id", ownsAllAccounts = true)
+
+        assertFailsWith<IllegalArgumentException> { validatePeopleOwnershipConfig(both) }
+        validatePeopleOwnershipConfig(both.copy(ownsAllAccounts = false))
+        validatePeopleOwnershipConfig(both.copy(accountOwnerAncestorExpr = null))
+    }
+
+    @Test
+    fun `an identifiers body that is not a json object reads as none`() {
+        assertNull(parseJsonObjectOrNull("not json"))
+        assertNull(parseJsonObjectOrNull("[1]"))
+        assertEquals(1, parseJsonObjectOrNull("""{"a":1}""")?.size)
     }
 }
