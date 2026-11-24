@@ -1,5 +1,6 @@
 package com.moneymanager.apiimporter
 
+import com.moneymanager.bigdecimal.BigDecimal
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -88,5 +89,18 @@ class ApiImportHelpersTest {
         assertFalse(responseCodeOk("""{"error":["boom"]}""", null, null, errorArrayField = "error"))
         assertTrue(responseCodeOk("""{"error":[]}""", null, null, errorArrayField = "error"))
         assertFalse(responseCodeOk("not json", null, null))
+    }
+}
+
+class ParsedAmountTest {
+    @Test
+    fun `a magnitude is the whole of an amount whatever its sign`() {
+        val minor = ParsedAmount(minorUnits = 250L, decimalMajor = null, sign = 1)
+        assertTrue(minor.isMagnitudeOf(ParsedAmount(-250L, null, -1)))
+        assertFalse(minor.isMagnitudeOf(ParsedAmount(300L, null, 1)))
+
+        val decimal = ParsedAmount(null, BigDecimal("2.50"), 1)
+        assertTrue(decimal.isMagnitudeOf(ParsedAmount(null, BigDecimal("-2.5"), -1)))
+        assertFalse(decimal.isMagnitudeOf(ParsedAmount(250L, null, 1)))
     }
 }
