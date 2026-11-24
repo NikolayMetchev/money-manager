@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.model.AccountId
@@ -129,7 +130,7 @@ class BalanceReconciliationScreenTest {
             assertEquals(1, onAllNodesWithTag("balance-break").fetchSemanticsNodes().size)
             onNodeWithText("Show 2 transactions", substring = true).performClick()
             waitUntilAtLeastOneExists(hasText("Coffee again", substring = true))
-            onNodeWithText("Coffee again", substring = true).performClick()
+            onNodeWithText("Coffee again", substring = true).performScrollTo().performClick()
             waitForIdle()
         }
         assertEquals(listOf(3L), opened)
