@@ -12,7 +12,6 @@ import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.importengineapi.AccountRef
-import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.importengineapi.PassThroughDetector
@@ -20,7 +19,6 @@ import com.moneymanager.importengineapi.transactionIdAttributeName
 import com.moneymanager.importengineapi.uniqueIdentifierAttributeNames
 import com.moneymanager.tasks.Progress
 import io.ktor.http.encodedPath
-import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.JsonObject
 
 suspend fun importApiSessionTransactions(

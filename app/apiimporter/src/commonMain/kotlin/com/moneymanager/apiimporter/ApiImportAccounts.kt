@@ -6,7 +6,6 @@ import com.moneymanager.domain.model.ApiResponse
 import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiPeopleMappings
-import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.RuleAttribute
 import com.moneymanager.domain.model.rules.RuleEngine
 import com.moneymanager.importengineapi.personalCounterpartyKey

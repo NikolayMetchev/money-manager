@@ -3,7 +3,6 @@ package com.moneymanager.apiimporter
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.apistrategy.ApiAccountsSource
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
-import com.moneymanager.domain.model.apistrategy.ApiTokenExchange
 import com.moneymanager.domain.model.passthrough.PassThroughAccount
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountMappingReadRepository

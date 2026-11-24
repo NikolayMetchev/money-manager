@@ -5,7 +5,6 @@ import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiResponse
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
-import com.moneymanager.domain.model.apistrategy.ApiPersonImportConfig
 import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.recordApiDownloadCoverage
@@ -14,7 +13,6 @@ import com.moneymanager.rest.ApiHttpResponse
 import com.moneymanager.rest.ScaParams
 import com.moneymanager.tasks.Progress
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.JsonObject
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds

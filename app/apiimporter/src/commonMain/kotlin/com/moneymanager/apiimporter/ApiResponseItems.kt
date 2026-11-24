@@ -2,7 +2,6 @@ package com.moneymanager.apiimporter
 
 import co.touchlab.kermit.Logger
 import com.moneymanager.domain.model.JsonPath
-import kotlinx.coroutines.flow.first
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray

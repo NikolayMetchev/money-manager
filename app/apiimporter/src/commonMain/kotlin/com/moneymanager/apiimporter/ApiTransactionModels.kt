@@ -9,7 +9,6 @@ import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.rules.FeeRule
-import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.RuleOutcome
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.ImportConversion
