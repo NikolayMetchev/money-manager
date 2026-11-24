@@ -53,7 +53,7 @@ class ReversalCandidatesTest {
     }
 
     @Test
-    fun `the same direction, another amount, another asset and a distant date are not offered`() {
+    fun `the same direction or another amount or another asset or a distant date are not offered`() {
         val retry = transfer(2, monzo, marcus, after = 17.hours)
         val smaller = transfer(3, goldman, monzo, after = 1.hours, amount = 999)
         val dollars = transfer(4, goldman, monzo, after = 1.hours, asset = other)
