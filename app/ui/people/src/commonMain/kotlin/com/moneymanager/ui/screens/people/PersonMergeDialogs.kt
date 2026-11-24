@@ -33,6 +33,7 @@ import com.moneymanager.importengineapi.PersonMergeRequest
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.components.DestructiveConfirmDialog
 import com.moneymanager.ui.foundation.LocalImportEngine
+import com.moneymanager.ui.util.ExposedDropdownMenu
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
