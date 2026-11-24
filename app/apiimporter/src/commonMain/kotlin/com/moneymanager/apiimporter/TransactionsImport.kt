@@ -155,8 +155,8 @@ internal suspend fun setupImportSession(
     importEngine: ImportEngine,
     assetAliases: Map<String, String>,
     onProgress: suspend (Progress) -> Unit,
-    passThroughDetector: PassThroughDetector? = null,
-    merchantMappings: MerchantMappings = MerchantMappings.NONE,
+    passThroughDetector: PassThroughDetector?,
+    merchantMappings: MerchantMappings,
 ): ImportSetup {
     val requestsById = apiSessionRepository.getRequestsBySession(sessionId).associateBy { it.id }
     val responses = apiSessionRepository.getResponsesBySession(sessionId)

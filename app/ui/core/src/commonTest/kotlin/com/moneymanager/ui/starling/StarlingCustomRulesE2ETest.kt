@@ -31,7 +31,8 @@ private const val CATEGORY_UID = "22222222-2222-2222-2222-222222222222"
 private val ACCOUNTS_JSON =
     """
 {"accounts":[{"accountUid":"$ACCOUNT_UID","accountType":"PRIMARY","defaultCategory":"$CATEGORY_UID",
-"currency":"GBP","createdAt":"2021-01-01T00:00:00.000Z","name":"Personal"}]}
+"currency":"GBP","createdAt":"2021-01-01T00:00:00.000Z","name":"Personal",
+"owners":[{"user_id":"u1","name":"Ada Lovelace"}]}]}
     """.trimIndent()
 
 private val FEED_JSON =
@@ -61,6 +62,7 @@ class StarlingCustomRulesE2ETest : DbTest() {
     private suspend fun starlingWith(
         feedRules: List<StrategyRule> = emptyList(),
         accountRules: List<StrategyRule> = emptyList(),
+        ownersField: String? = null,
     ): ApiImportStrategy {
         val builtIn =
             repositories.apiImportStrategyRepository
@@ -74,7 +76,12 @@ class StarlingCustomRulesE2ETest : DbTest() {
                 )
             }
         val accounts = builtIn.config.accounts as ApiAccountsSource.Downloaded
-        val accountMappings = accounts.mappings.copy(rules = accounts.mappings.rules + accountRules)
+        val accountMappings =
+            accounts.mappings.copy(
+                rules = accounts.mappings.rules + accountRules,
+                ownersArrayField =
+                    ownersField ?: accounts.mappings.ownersArrayField,
+            )
         return builtIn.copy(
             config = builtIn.config.copy(dataEndpoints = endpoints, accounts = accounts.copy(mappings = accountMappings)),
         )
@@ -196,5 +203,28 @@ class StarlingCustomRulesE2ETest : DbTest() {
             val strategy = starlingWith(accountRules = listOf(tag))
 
             assertEquals(1 to 0, downloadAndImport(strategy, newSession()))
+        }
+
+    @Test
+    fun `a fee rule that reads no amount books the item without a fee`() =
+        runDbTest {
+            val feeRule =
+                StrategyRule(actions = listOf(RuleAction.Fee(FeeRule(amount = ValueExpr.of("noSuchFee")))))
+            val strategy = starlingWith(feedRules = listOf(feeRule))
+
+            assertEquals(1 to 0, downloadAndImport(strategy, newSession()))
+        }
+
+    @Test
+    fun `a downloaded account owner is named by the fallback name field`() =
+        runDbTest {
+            assertEquals(1 to 0, downloadAndImport(starlingWith(ownersField = "owners"), newSession()))
+            assertEquals(
+                true,
+                repositories.personRepository
+                    .getAllPeople()
+                    .first()
+                    .any { it.fullName.contains("Ada") },
+            )
         }
 }

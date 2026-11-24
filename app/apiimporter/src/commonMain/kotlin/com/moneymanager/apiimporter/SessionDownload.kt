@@ -308,7 +308,7 @@ internal suspend fun fetchResponse(
     url: String,
     token: String,
     apiClient: ApiClient,
-    sca: ScaParams? = null,
+    sca: ScaParams?,
 ): ApiHttpResponse {
     var response = apiClient.get(url = url, bearerToken = token, sca = sca)
     var retries = 0

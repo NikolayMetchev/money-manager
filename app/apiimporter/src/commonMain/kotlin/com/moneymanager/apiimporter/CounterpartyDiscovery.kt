@@ -122,7 +122,7 @@ internal suspend fun collectCounterpartiesFromResponses(
     responses: List<ApiResponse>,
     strategy: ApiImportStrategy,
     counterpartyIdField: String,
-    onResponseProcessed: suspend (done: Int, total: Int) -> Unit = { _, _ -> },
+    onResponseProcessed: suspend (done: Int, total: Int) -> Unit,
 ): Map<String, List<String>> =
     responses
         .flatMapIndexed { index, response ->
