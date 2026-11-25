@@ -1,5 +1,11 @@
 # ProGuard rules for MoneyManager Desktop application
 
+# Parameter type specialization narrows a parameter to the one type every caller passes, but leaves a caller's
+# checkcast to the wider type in place, which the verifier rejects: navigation3's rememberNavBackStack casts its
+# NavBackStackSerializer to KSerializer before calling the narrowed rememberSerializable, and the app failed with a
+# VerifyError on startup (the v1.0.15 release's AOT training). CI builds without the optimizer, so only a release saw it.
+-optimizations !method/specialization/parametertype
+
 # Keep main entry point
 -keep class com.moneymanager.MainKt { *; }
 
