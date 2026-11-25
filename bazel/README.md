@@ -49,8 +49,10 @@ PR, and `renovate-pins.yml` runs the script on it. 3 is by hand.
   `exports` are API deps: also on the module's own classpath, and on native every klib dep is transitive anyway.
   Klibs are uniquely named after the full path (`utils.bigdecimal:utils-bigdecimal`) and compiled `-g -Werror`.
 - **Tests**: JVM tests run through `KmpJUnitRunner` (JUnit 4) as `:test_jvm`. Native tests link with konan's test
-  runner and run through `KnTestLauncher`, which turns its TeamCity output into `test.xml`, as `:test_<target>`, only
-  where the binary runs (on Linux x64, `_linuxX64`; CI cross-links `_linuxArm64` and runs it on an arm64 runner).
+  runner and run through the test launcher (`testing/launcher`, a Kotlin/Native program, so CI runs it on a runner
+  with no JDK), which turns its TeamCity output into `test.xml`, as `:test_<target>`, only where the binary runs (on
+  Linux x64, `_linuxX64`; CI cross-links `_linuxArm64` and its launcher and runs them on an arm64 runner). The
+  launcher builds whenever the native or the web flag is on, as the browser tests run through it too.
   Tests default to `medium`; a slower suite sets `# gazelle:kmp_test_size`, and one that reads files from the tree
   at run time `# gazelle:kmp_test_data` (paths relative to the workspace root, the runfiles' working directory).
   Test JVMs use `/tmp`. Every module's JVM runtime carries `kotlinx-coroutines-swing`.
@@ -275,8 +277,8 @@ nodejs.org's `SHASUMS256.txt` (`repo-scripts repin node`). A test program's npm 
 `:<name>_<target>_bin_node_modules/node_modules` (symlinks), and the runner resolves the program's bare imports from
 there (`module.registerHooks`). It also gives the program a global `require`, which kotlinx-io's js file system loads
 Node's modules with. `testing/web/runner.mjs` defines the `describe`/`it` globals kotlin-test's adapter
-registers tests with, runs them (awaiting async ones) and prints TeamCity service messages, which `KnTestLauncher
---node` turns into `test.xml` exactly as it does a native test binary's; `--test_filter` works the same way.
+registers tests with, runs them (awaiting async ones) and prints TeamCity service messages, which the test launcher
+(`--node`) turns into `test.xml` exactly as it does a native test binary's; `--test_filter` works the same way.
 
 Both links fail on any symbol they can't link, as native's does. A link passes every klib before the klibs it depends
 on (a topological depset), because the linker takes a class from the first library that declares it: on js,

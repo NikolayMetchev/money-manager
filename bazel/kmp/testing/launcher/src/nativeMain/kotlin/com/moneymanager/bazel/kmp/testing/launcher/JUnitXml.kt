@@ -6,7 +6,9 @@ package com.moneymanager.bazel.kmp.testing.launcher
  * the two in step.
  */
 class JUnitXml {
-    class Case(val name: String) {
+    class Case(
+        val name: String,
+    ) {
         var millis: Long = 0
         var failureMessage: String? = null
         var failureDetails: String? = null
@@ -17,8 +19,10 @@ class JUnitXml {
 
     private val suites = LinkedHashMap<String, LinkedHashMap<String, Case>>()
 
-    fun caseFor(className: String, method: String): Case =
-        suites.getOrPut(className) { LinkedHashMap() }.getOrPut(method) { Case(method) }
+    fun caseFor(
+        className: String,
+        method: String,
+    ): Case = suites.getOrPut(className) { LinkedHashMap() }.getOrPut(method) { Case(method) }
 
     fun count(): Int = suites.values.sumOf { it.size }
 
@@ -42,8 +46,14 @@ class JUnitXml {
                             append(escape(case.failureDetails.orEmpty()))
                             append("</failure>\n    </testcase>\n")
                         }
-                        case.skipped -> append(">\n      <skipped/>\n    </testcase>\n")
-                        else -> append("/>\n")
+
+                        case.skipped -> {
+                            append(">\n      <skipped/>\n    </testcase>\n")
+                        }
+
+                        else -> {
+                            append("/>\n")
+                        }
                     }
                 }
                 append("  </testsuite>\n")

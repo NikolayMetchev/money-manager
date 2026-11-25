@@ -1,8 +1,8 @@
 package com.moneymanager.bazel.kmp.testing.launcher
 
-import platform.posix.getenv
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.toKString
+import platform.posix.getenv
 import kotlin.system.exitProcess
 
 private const val PREFIX = "##teamcity["
@@ -58,14 +58,27 @@ fun main(args: Array<String>) {
             val attrs = message.attributes
             val name = attrs["name"] ?: ""
             when (message.type) {
-                "testSuiteStarted" -> suite = name
-                "testSuiteFinished" -> suite = ""
-                "testStarted" -> report.caseFor(suite, name)
-                "testFinished" -> report.caseFor(suite, name).millis = attrs["duration"]?.toLongOrNull() ?: 0
+                "testSuiteStarted" -> {
+                    suite = name
+                }
+
+                "testSuiteFinished" -> {
+                    suite = ""
+                }
+
+                "testStarted" -> {
+                    report.caseFor(suite, name)
+                }
+
+                "testFinished" -> {
+                    report.caseFor(suite, name).millis = attrs["duration"]?.toLongOrNull() ?: 0
+                }
+
                 "testIgnored" -> {
                     report.caseFor(suite, name).skipped = true
                     ignored++
                 }
+
                 "testFailed" -> {
                     val case = report.caseFor(suite, name)
                     case.failureMessage = attrs["message"] ?: ""

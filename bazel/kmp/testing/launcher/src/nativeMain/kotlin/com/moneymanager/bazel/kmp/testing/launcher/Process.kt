@@ -1,6 +1,7 @@
 package com.moneymanager.bazel.kmp.testing.launcher
 
 import kotlinx.cinterop.ByteVar
+import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.allocArray
@@ -8,13 +9,12 @@ import kotlinx.cinterop.convert
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.toKString
 import kotlinx.cinterop.usePinned
+import platform.posix.FILE
 import platform.posix.fclose
 import platform.posix.fopen
 import platform.posix.fread
 import platform.posix.fwrite
 import platform.posix.getcwd
-import platform.posix.pclose
-import platform.posix.popen
 import platform.posix.write
 import kotlin.experimental.ExperimentalNativeApi
 
@@ -27,19 +27,14 @@ private const val STDERR = 2
 
 /**
  * Runs [command] with its stderr merged into its stdout, hands [onLine] each line, and returns its exit code.
- * Through `popen`, the one way to start a process that every Kotlin/Native target has: `/bin/sh` on Linux and
- * macOS, `cmd.exe` on Windows, so each gets its own quoting.
+ * Through `popen` ([openShell]), the one way to start a process that every Kotlin/Native target has.
  */
 @OptIn(ExperimentalForeignApi::class)
-fun runMergingOutput(command: List<String>, onLine: (String) -> Unit): Int {
-    val shellCommand =
-        if (windows) {
-            // cmd /c drops the first and the last quote of a command holding more than two, so wrap it in a pair.
-            "\"" + command.joinToString(" ") { "\"" + it.replace("\"", "\\\"") + "\"" } + " 2>&1\""
-        } else {
-            command.joinToString(" ") { "'" + it.replace("'", "'\\''") + "'" } + " 2>&1"
-        }
-    val pipe = popen(shellCommand, "r") ?: error("Couldn't start ${command.first()}")
+fun runMergingOutput(
+    command: List<String>,
+    onLine: (String) -> Unit,
+): Int {
+    val pipe = openShell(command) ?: error("Couldn't start ${command.first()}")
     var pending = ByteArray(0)
     val buffer = ByteArray(BUFFER_SIZE)
     while (true) {
@@ -56,18 +51,15 @@ fun runMergingOutput(command: List<String>, onLine: (String) -> Unit): Int {
         pending = chunk.copyOfRange(lineStart, chunk.size)
     }
     if (pending.isNotEmpty()) onLine(line(pending, 0, pending.size))
-    val status = pclose(pipe)
-    return when {
-        status == -1 -> 1
-        windows -> status
-        // A wait status: the exit code, or the signal that ended it as a shell reports one.
-        (status and 0x7f) == 0 -> (status shr 8) and 0xff
-        else -> 128 + (status and 0x7f)
-    }
+    return closeShell(pipe)
 }
 
 /** The bytes from [start] to [end] as a line, without the `\r` of a `\r\n` (as Java's `readLine`). */
-private fun line(bytes: ByteArray, start: Int, end: Int): String {
+private fun line(
+    bytes: ByteArray,
+    start: Int,
+    end: Int,
+): String {
     val stop = if (end > start && bytes[end - 1] == '\r'.code.toByte()) end - 1 else end
     return bytes.decodeToString(start, stop)
 }
@@ -85,10 +77,11 @@ fun absolutePath(path: String): String {
         if (absolute) {
             path
         } else {
-            val cwd = memScoped {
-                val buf = allocArray<ByteVar>(BUFFER_SIZE)
-                getcwd(buf, BUFFER_SIZE.convert())?.toKString() ?: error("Couldn't read the working directory")
-            }
+            val cwd =
+                memScoped {
+                    val buf = allocArray<ByteVar>(BUFFER_SIZE)
+                    getcwd(buf, BUFFER_SIZE.convert())?.toKString() ?: error("Couldn't read the working directory")
+                }
             "$cwd/$path"
         }
     return if (windows) full.replace('/', '\\') else full
@@ -99,12 +92,15 @@ fun printOut(line: String) = writeFd(STDOUT, line + "\n")
 fun printErr(line: String) = writeFd(STDERR, line + "\n")
 
 @OptIn(ExperimentalForeignApi::class)
-private fun writeFd(fd: Int, text: String) {
+private fun writeFd(
+    fd: Int,
+    text: String,
+) {
     val bytes = text.encodeToByteArray()
     var offset = 0
     bytes.usePinned {
         while (offset < bytes.size) {
-            val written = write(fd, it.addressOf(offset), (bytes.size - offset).convert()).toInt()
+            val written = write(fd, it.addressOf(offset), (bytes.size - offset).convert()).convert<Int>()
             if (written <= 0) return
             offset += written
         }
@@ -112,7 +108,10 @@ private fun writeFd(fd: Int, text: String) {
 }
 
 @OptIn(ExperimentalForeignApi::class)
-fun writeFile(path: String, text: String) {
+fun writeFile(
+    path: String,
+    text: String,
+) {
     val bytes = text.encodeToByteArray()
     val file = fopen(path, "wb") ?: error("Couldn't write $path")
     try {
@@ -123,3 +122,14 @@ fun writeFile(path: String, text: String) {
         fclose(file)
     }
 }
+
+/**
+ * Starts [command] through the system shell's `popen` (`/bin/sh` on Linux and macOS, `cmd.exe` on Windows, each with
+ * its own quoting), its stderr merged into the stdout this reads.
+ */
+@OptIn(ExperimentalForeignApi::class)
+expect fun openShell(command: List<String>): CPointer<FILE>?
+
+/** Waits for the shell [openShell] started and returns its exit code. */
+@OptIn(ExperimentalForeignApi::class)
+expect fun closeShell(pipe: CPointer<FILE>): Int
