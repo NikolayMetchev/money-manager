@@ -16,11 +16,14 @@ _TARGETS = [
     "mingwX64",
 ]
 
-_FAMILIES = {
-    "linuxArm64": "linux",
-    "linuxX64": "linux",
-    "macosArm64": "apple",
-    "mingwX64": "mingw",
+_LINUX_SRCS = glob(["src/linuxMain/kotlin/**/*.kt"])
+
+# Each target's family sources (linuxMain, appleMain, mingwMain).
+_FAMILY_SRCS = {
+    "linuxArm64": _LINUX_SRCS,
+    "linuxX64": _LINUX_SRCS,
+    "macosArm64": glob(["src/appleMain/kotlin/**/*.kt"]),
+    "mingwX64": glob(["src/mingwMain/kotlin/**/*.kt"]),
 }
 
 selects.config_setting_group(
@@ -46,7 +49,7 @@ kmp_lint(
     kt_native_klib(
         name = "launcher_lib_" + target,
         exec_compatible_with = ["//bazel/platforms:compiles_klibs"],
-        family_srcs = glob(["src/%sMain/kotlin/**/*.kt" % _FAMILIES[target]]),
+        family_srcs = _FAMILY_SRCS[target],
         module = "launcher",
         native_srcs = glob(["src/nativeMain/kotlin/**/*.kt"]),
         target = target,
