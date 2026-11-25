@@ -239,7 +239,8 @@ its own exec platform, so under `rbe-mac` klibs compile on BuildBuddy and their 
 and Windows test binaries link uncached, as does anything depending on clikt-mordant (`_UNCACHEABLE_KLIBS`).
 
 `kmp_native_executable` links the release binary per target (`-opt`, the module's klib `-Xinclude`d, no compiler
-caches: Clikt's two klibs both define a private `Context.selfAndAncestors()`) as `:<name>_<target>`, all `manual`;
+caches: Clikt's two klibs both define a private `Context.selfAndAncestors()`; `--define=native_optimize=false`, as CI
+passes, makes it a debug link against the test binaries' compiler caches instead, through `cache_library`) as `:<name>_<target>`, all `manual`;
 `:<name>` is the build platform's own, so `bazel build //...` links only the host's `mm`. `release_assets` adds the
 release's `mm-<os>-<arch>` (`pkg_tar` keeping the exec bit; a copied `.exe` on Windows). `jvm_distribution`
 (`kmp/distribution.bzl`) is `mm-jvm/bin/` start scripts and `mm-jvm/lib/`, module jars named after their path

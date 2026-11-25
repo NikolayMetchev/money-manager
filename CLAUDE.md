@@ -92,6 +92,10 @@ Flags and configs:
 - `--stamp` writes the git commit into the release APK (`META-INF/version-control-info.textproto`); releases pass it.
 - `--define=proguard_optimize=false` skips ProGuard's optimizer in `//app/main/jvm:release` (shrinking alone checks
   the keep rules, and the optimizer is most of ProGuard's ~15 minutes); CI's Build and Test passes it.
+- `--define=native_optimize=false` links the native executables (`mm`) as debug links against the compiler caches
+  (`-g`, no `-opt`): ~15 seconds where the optimised, uncached link is ~8 minutes on BuildBuddy and ~14 on the macOS
+  runner. Only the host's own target has caches, so the Windows `mm.exe` link is just unoptimised. CI passes it wherever
+  it links `mm`, releases don't.
 - `--define=bundle_native_cli=true` puts the host's native `mm` into the desktop installer
   (`//app/main/jvm:installer`: a deb, dmg or msi on its own OS only).
 - `:<name>_linuxArm64_cross` and `:<name>_mingwX64_cross` (manual) are a module's test binary built for Linux arm64 or
@@ -114,7 +118,7 @@ on the orphan `perf-data` branch, which `webpage/performance.html` graphs. Pull 
 Releases: `//app/main/android:release` (R8, unsigned), `//app/main/jvm:installer`, and `//app/main/cli:mm-linux-x64`,
 `:mm-linux-arm64`, `:mm-windows-x64`, `:mm-macos-arm64` (the Apple one only on macOS). The release smoke test,
 `bazel test //app/main/android-smoketest:smoketest_test`, installs the debug-signed minified APK
-(`//app/main/android:release_debug_signed`) on a device and drives first run; CI runs it with the other device tests in Android Instrumented Tests, whenever the android flag is on. Cut a release by pushing a `v*` tag.
+(`//app/main/android:release_debug_signed`) on a device and drives first run; CI runs it with the other device tests in Android Instrumented Tests, whenever the android flag is on. Cut a release by bumping `VERSION`: the push to main that changes it builds the release beside the usual CI, and once `CI Passed` succeeds the Release job tags the commit `v<VERSION>` and publishes it (`build.yml`; retry with "Re-run failed jobs").
 
 **CI**: every workflow sets Bazel up through `.github/actions/bazel-setup` (on RBE without the disk cache, which
 BuildBuddy's cache already holds). `build.yml`'s Build and Test, on Linux (RBE), is `bazel/ci/build_and_test.sh`:

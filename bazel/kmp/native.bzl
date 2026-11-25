@@ -454,9 +454,22 @@ def _executable_impl(ctx):
     args = ctx.actions.args()
     args.add_all(["-target", target, "-produce", "program", "-o", exe, "-entry", ctx.attr.entry_point])
 
-    # KGP's release link: optimised, no debug info. It never uses the compiler caches (clikt and clikt-mordant
-    # both define a private Context.selfAndAncestors(), a duplicate symbol in a cached link).
-    args.add_all(["-opt", "-Werror", "-Xmulti-platform", "-Xexpect-actual-classes"])
+    # KGP's release link: optimised, no debug info, and no compiler caches, which only a debug link reads. With
+    # `optimize` off (`--define=native_optimize=false`, CI) it is a debug link against the caches the test binaries
+    # read: only what `_UNCACHEABLE_KLIBS` keeps out of them (clikt-mordant and what depends on it, the program's own
+    # module) compiles in the link. konan caches only its host's own target, so a cross link stays uncached.
+    caches = depset()
+    cached = False
+    if ctx.attr.optimize:
+        args.add("-opt")
+    elif ctx.attr.cache_library:
+        platform = kotlin_native_toolchain_info(ctx).platform_caches.get(target)
+        if platform != None:
+            caches = depset(transitive = [platform, ctx.attr.cache_library[KonanCacheInfo].dirs])
+            cached = True
+            args.add("-g")
+            args.add_all(caches, format_each = "-Xcache-directory=%s", expand_directories = False)
+    args.add_all(["-Werror", "-Xmulti-platform", "-Xexpect-actual-classes"])
     args.add("-Xinclude=" + library.klib.path)
     args.add_all([k for k in library.transitive_klibs.to_list() if k != library.klib], before_each = "-library")
     args.add("-Xpartial-linkage-loglevel=ERROR")
@@ -465,10 +478,10 @@ def _executable_impl(ctx):
         tool = "konanc",
         target = target,
         arguments = [args],
-        inputs = library.transitive_klibs,
+        inputs = depset(transitive = [library.transitive_klibs, caches]),
         outputs = [exe],
         mnemonic = "KotlinNativeLink",
-        progress_message = "Linking %{output}",
+        progress_message = "Linking %{output}" + ("" if ctx.attr.optimize else " (no optimization, cached)" if cached else " (no optimization)"),
     )
     return [DefaultInfo(files = depset([exe]), executable = exe)]
 
@@ -477,8 +490,14 @@ kt_native_executable = rule(
     doc = "A release executable for one Kotlin/Native target: KGP's `binaries.executable(RELEASE)`.",
     attrs = {
         "base_name": attr.string(mandatory = True, doc = "The file name, without `.kexe`/`.exe`."),
+        "cache_library": attr.label(
+            providers = [KlibInfo],
+            aspects = [_cache_aspect],
+            doc = "`library` again, set only when `optimize` is off, so a release link builds no compiler caches.",
+        ),
         "entry_point": attr.string(mandatory = True, doc = "The fully qualified `main` function."),
         "library": attr.label(mandatory = True, providers = [KlibInfo], doc = "The klib whose code is the program."),
+        "optimize": attr.bool(default = True, doc = "Link with `-opt`; off (`--define=native_optimize=false`), a debug link against `cache_library`'s caches."),
         "target": attr.string(mandatory = True, values = KONAN_TARGETS.keys()),
     },
     executable = True,

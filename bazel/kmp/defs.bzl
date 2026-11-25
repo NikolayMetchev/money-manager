@@ -914,6 +914,14 @@ def kmp_native_executable(name, library, entry_point, base_name, native_targets,
             library = platform_label(library, target),
             entry_point = entry_point,
             base_name = base_name,
+            optimize = select({
+                "//bazel/kmp/native:no_optimize": False,
+                "//conditions:default": True,
+            }),
+            cache_library = select({
+                "//bazel/kmp/native:no_optimize": platform_label(library, target),
+                "//conditions:default": None,
+            }),
             target = target,
             tags = ["manual"],
             # Every host links a Windows executable (the cross-linked test binaries do), so `rbe-windows` links it on

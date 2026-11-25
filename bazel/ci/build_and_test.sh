@@ -58,7 +58,7 @@ bazel fetch "${hubs[@]}"
 # (and the tool that times the installer): the installer is built from the ProGuard jars, so the check costs nothing
 # once it is built, and without it ProGuard is minutes of the run.
 # - the desktop ProGuard check: `//...` never runs ProGuard, so a new dependency that needs keep/dontwarn rules
-#   would otherwise surface only when release.yml ran. It shrinks the desktop app and checks every ServiceLoader
+#   would otherwise surface only when a release ran. It shrinks the desktop app and checks every ServiceLoader
 #   provider survived.
 # - the Linux desktop installer.
 # - the linuxArm64 and mingwX64 test binaries (`:<name>_<target>_cross`) and the launcher that turns their output
