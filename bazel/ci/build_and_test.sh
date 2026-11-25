@@ -43,6 +43,17 @@ WEB=${WEB:-true}
 INSTALLER=${INSTALLER:-true}
 flags+=("--//bazel/kmp/platforms:native=$NATIVE" "--//bazel/kmp/platforms:android=$ANDROID" "--//bazel/kmp/platforms:web=$WEB")
 
+# Every tool hub's lockfile (bazel/maven/<hub>_install.json) is checked whatever the flags: rules_jvm_external only
+# finds a stale one when the hub is fetched, and with a platform off nothing fetches its hubs (android_tools,
+# android_lint). Renovate's AGP bump #1585 then passed CI and auto-merged before renovate-pins.yml had re-pinned
+# them, and main's Android builds broke. A stale lock fails here, so CI Passed waits for the re-pin.
+hubs=()
+for lock in bazel/maven/*_install.json; do
+  hub=$(basename "$lock" _install.json)
+  hubs+=("@$hub//...")
+done
+bazel fetch "${hubs[@]}"
+
 # The rest are manual, so `//...` skips them. A pull request without the `installer` label leaves out the first two
 # (and the tool that times the installer): the installer is built from the ProGuard jars, so the check costs nothing
 # once it is built, and without it ProGuard is minutes of the run.
