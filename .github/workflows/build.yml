@@ -4,6 +4,10 @@
 # protection requires only `CI Passed` (the last job), which always runs and counts a skipped job as a pass (skipping at
 # the workflow level via `on.paths` would instead leave it pending forever and block the merge).
 #
+# Releases: a push to main that changes VERSION (to a version with no tag yet) is also the release's run. The release
+# builds run beside the tests, and Release tags the commit `v<VERSION>` and publishes them once CI Passed succeeds, so
+# nothing polls for another workflow. A failed release is retried with "Re-run failed jobs" on that run.
+#
 # Linux jobs run their actions on BuildBuddy's executors (`--config=rbe`, #1017); macOS and Windows build on
 # their runners and share its remote cache (`--config=cache`). Build results stream to BuildBuddy, linked from
 # each job's summary. On a fork's PR there is no key: the build runs on the restored disk cache alone.
@@ -19,8 +23,9 @@ on:
     types: [ opened, synchronize, reopened, labeled, unlabeled ]
 
 concurrency:
-  # A run for another label is a no-op, so it gets its own group instead of cancelling the real run in progress.
-  group: ${{ github.workflow }}-${{ github.ref }}${{ contains(fromJSON('["labeled", "unlabeled"]'), github.event.action) && !contains(fromJSON('["native", "installer", "android", "web"]'), github.event.label.name) && github.run_id || '' }}
+  # A run for another label is a no-op, so it gets its own group instead of cancelling the real run in progress. A push
+  # that changes VERSION may be a release, so it gets its own group too: a later push to main must not cancel it.
+  group: ${{ github.workflow }}-${{ github.ref }}${{ ((contains(fromJSON('["labeled", "unlabeled"]'), github.event.action) && !contains(fromJSON('["native", "installer", "android", "web"]'), github.event.label.name)) || (github.event_name == 'push' && contains(github.event.head_commit.modified, 'VERSION'))) && github.run_id || '' }}
   cancel-in-progress: true
 
 permissions:
@@ -49,6 +54,9 @@ jobs:
       # labelled `web`; any other PR leaves them out of the shared Bazel commands.
       web: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'web') }}
       noise: ${{ steps.label.outputs.noise }}
+      # The tag to release (`v<VERSION>`) on a push to main that changes VERSION to a version not yet tagged; empty
+      # otherwise. The release jobs run only when it is set.
+      release: ${{ steps.release.outputs.tag }}
     steps:
       - name: Ignore labels other than native, installer, android and web
         id: label
@@ -76,6 +84,20 @@ jobs:
               - '!**/*.md'
               - '!.github/workflows/static.yml'
               - '!.github/workflows/dependency-submission.yml'
+      # head_commit lists the files the pushed commit changed (main takes squash merges, one commit a push), the same
+      # test the concurrency group makes. A VERSION edit that leaves an already-released version releases nothing.
+      - name: Is this a release?
+        id: release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.modified, 'VERSION')
+        run: |
+          tag="v$(tr -d '[:space:]' < VERSION)"
+          rc=0
+          git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null || rc=$?
+          case $rc in
+            0) echo "$tag already exists: nothing to release" ;;
+            2) echo "Releasing $tag"; echo "tag=$tag" >> "$GITHUB_OUTPUT" ;;
+            *) echo "::error::Couldn't list the tags (git ls-remote exited $rc)"; exit 1 ;;
+          esac
 
   # Everything `bazel build //...` and `bazel test //...` cover on Linux: every compile (JVM, Android, linuxX64,
   # linuxArm64, mingwX64 and the commonMain metadata checks), the JVM, Android host and linuxX64 tests, ktlint,
@@ -103,7 +125,7 @@ jobs:
       WEB: ${{ needs.changes.outputs.web }}
       # On every command, so they share one analysis cache; they only change ProGuard, the installer and the JVM
       # tests. Shrink only: the keep rules and ServiceLoader providers don't depend on ProGuard's optimizer, which
-      # takes most of its time (release builds optimize). The installer bundles the native mm, as release.yml's does.
+      # takes most of its time (release builds optimize). The installer bundles the native mm, as the release's does.
       # The JVM and Android host tests run under the coverage agent, which Coverage reads.
       # A pull request also skips training the installer's AOT caches (the app starts under Xvfb on the runner, and
       # that step is most of the installer's build); main, releases and the macOS and Windows jobs on main keep them.
@@ -540,7 +562,7 @@ jobs:
           retention-days: 7
 
   # jpackage packages only for its host, so each OS builds its own installer (#1020): a dmg or msi here (Build and
-  # Test builds the deb) with the native mm bundled, as release.yml builds them. Then it installs it and starts the
+  # Test builds the deb) with the native mm bundled, as Release Build builds them. Then it installs it and starts the
   # app, mm-jvm and mm. ProGuard's optimizer is off, as in Build and Test's ProGuard check.
   desktop-installer:
     name: Desktop Installer (${{ matrix.name }})
@@ -676,7 +698,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: changes
     # The R8/minified release APK is manual (`bazel build //...` leaves it out), so build it on every push to
-    # main: R8 breakage surfaces there, and release.yml's check-build gate then blocks tagging a broken commit.
+    # main: R8 breakage surfaces there. On a release's run this APK is the one Release publishes.
     if: >-
       needs.changes.outputs.code == 'true' &&
       github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -697,7 +719,172 @@ jobs:
           cache-name: android-release
 
       - name: Build release APK
-        run: bazel build --config=android --stamp //app/main/android:release
+        run: bazel build --config=android --stamp --remote_download_outputs=toplevel //app/main/android:release
+
+      # Gradle's name for an unsigned release APK, which the release has always carried.
+      - name: Name the release APK
+        if: needs.changes.outputs.release != ''
+        run: mkdir -p dist && cp bazel-bin/app/main/android/release.apk dist/android-release-unsigned.apk
+
+      - name: Upload the release APK
+        if: needs.changes.outputs.release != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-android
+          path: dist/*.apk
+          if-no-files-found: error
+          retention-days: 7
+
+  # A release's desktop installers, stamped (`--stamp`) and with ProGuard's optimizer on, unlike Desktop Installer's
+  # and Build and Test's, which leave it off to save time. jpackage packages only for its host, so each builds on its OS.
+  release-installer:
+    name: Release Build (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
+    needs: changes
+    if: needs.changes.outputs.release != ''
+    strategy:
+      matrix:
+        include:
+          - platform: Windows
+            os: windows-latest
+            config: cache
+          - platform: macOS
+            os: macos-latest
+            config: cache
+          - platform: Linux
+            os: ubuntu-latest
+            config: rbe
+            # jpackage's deb needs fakeroot.
+            packages: fakeroot
+    defaults:
+      run:
+        shell: bash
+    env:
+      GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false  # read-only job, no git push
+
+      - name: Set up Bazel
+        uses: ./.github/actions/bazel-setup
+        with:
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
+          config: ${{ matrix.config }}
+          cache-name: release-${{ matrix.platform }}
+
+      - name: Install packaging tools
+        if: matrix.packages
+        run: sudo apt-get update && sudo apt-get install -y ${{ matrix.packages }}
+
+      - name: Build the installer
+        run: >-
+          bazel build --config=all-platforms --stamp --remote_download_outputs=toplevel
+          --define=bundle_native_cli=true //app/main/jvm:installer
+
+      - name: Upload the installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-${{ matrix.platform }}
+          path: |
+            bazel-bin/app/main/jvm/installer/*.msi
+            bazel-bin/app/main/jvm/installer/*.dmg
+            bazel-bin/app/main/jvm/installer/*.deb
+          if-no-files-found: error
+          retention-days: 7
+
+  # A release's standalone `mm` (app/main/cli), one native binary per target, as `mm-<os>-<arch>`
+  # (kmp_native_executable's release_assets: a tarball keeping the exec bit on Unix, the .exe on Windows). Linux links
+  # linuxX64, linuxArm64 (there is no Kotlin/Native compiler for Linux arm64 hosts) and mingwX64; macosArm64 only
+  # links on a Mac.
+  release-cli:
+    name: Release Build (mm ${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
+    needs: changes
+    if: needs.changes.outputs.release != ''
+    strategy:
+      matrix:
+        include:
+          - platform: Linux
+            os: ubuntu-latest
+            config: rbe
+            targets: //app/main/cli:mm-linux-x64 //app/main/cli:mm-linux-arm64 //app/main/cli:mm-windows-x64
+          - platform: macOS
+            os: macos-latest
+            config: cache
+            targets: //app/main/cli:mm-macos-arm64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false  # read-only job, no git push
+
+      - name: Set up Bazel
+        uses: ./.github/actions/bazel-setup
+        with:
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
+          config: ${{ matrix.config }}
+          cache-name: release-cli-${{ matrix.platform }}
+
+      - name: Link mm
+        run: |
+          bazel build --config=native --remote_download_outputs=toplevel ${{ matrix.targets }}
+          mkdir -p cli-dist
+          cp $(bazel cquery --config=native --output=files 'set(${{ matrix.targets }})') cli-dist/
+          ls -la cli-dist
+
+      - name: Upload mm (${{ matrix.platform }})
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-mm-${{ matrix.platform }}
+          path: cli-dist/*
+          if-no-files-found: error
+          retention-days: 7
+
+  # Publishes the release once everything CI checks on this commit passed (CI Passed) and every release build
+  # finished. The release creates its tag, `v<VERSION>`, on this commit. A failed or cancelled job it needs skips it, so
+  # re-running the failed jobs retries the release. Its status check is explicit: the implied success() also looks at
+  # CI Passed's own needs, and Auto-format PR is always skipped on a push, which would skip this too.
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: [ changes, ci-passed, desktop-installer, android-release, release-installer, release-cli ]
+    if: >-
+      !cancelled() && needs.changes.outputs.release != '' &&
+      !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') &&
+      !contains(needs.*.result, 'skipped')
+    permissions:
+      contents: write  # creates the tag and the release
+    steps:
+      - name: Download the release builds
+        uses: actions/download-artifact@v8
+        with:
+          pattern: release-*
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: List them
+        run: ls -la release-artifacts
+
+      - name: Create the release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ needs.changes.outputs.release }}
+          target_commitish: ${{ github.sha }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            release-artifacts/*.msi
+            release-artifacts/*.dmg
+            release-artifacts/*.deb
+            release-artifacts/*.apk
+            release-artifacts/mm-*
 
   lint-format:
     name: Auto-format PR
