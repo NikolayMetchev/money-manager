@@ -95,5 +95,16 @@ common:rbe-mac --spawn_strategy=worker,sandboxed,local
 common:rbe-mac --strategy=KotlinNativeCompile=remote
 common:rbe-mac --jobs=100
 
+# `rbe-windows`: CI's Windows installer job. Everything runs on the runner but the Kotlin/Native work for mingwX64 that
+# every host can do: its klib compiles and the native `mm`'s link (5+ minutes on the runner) go to BuildBuddy's Linux
+# executors, as `rbe-mac` does for klibs. `sandboxed` is left out: Windows has no sandbox.
+common:rbe-windows --config=cache
+common:rbe-windows --remote_executor=grpcs://remote.buildbuddy.io
+common:rbe-windows --extra_execution_platforms=@platforms//host,//bazel/platforms:rbe_linux_x64
+common:rbe-windows --spawn_strategy=worker,local
+common:rbe-windows --strategy=KotlinNativeCompile=remote
+common:rbe-windows --strategy=KotlinNativeLink=remote
+common:rbe-windows --jobs=100
+
 # Personal overrides (disk cache, jobs, …), not checked in. user.bazelrc.example turns BuildBuddy on locally.
 try-import %workspace%/user.bazelrc
