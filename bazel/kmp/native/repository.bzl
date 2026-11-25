@@ -154,6 +154,39 @@ kotlin_native_stale_toolchain(
 )
 """
 
+# Replaces every link under a directory with a copy of what it points at.
+_MATERIALIZE_PS = """
+$ErrorActionPreference = 'Stop'
+Get-ChildItem -LiteralPath '{dir}' -Recurse -Force -Attributes ReparsePoint |
+  Sort-Object {{ $_.FullName.Length }} -Descending |
+  ForEach-Object {{
+    $link = $_.FullName
+    $target = @($_.Target)[0]
+    if (-not [System.IO.Path]::IsPathRooted($target)) {{ $target = Join-Path (Split-Path $link) $target }}
+    $isDir = Test-Path -LiteralPath $target -PathType Container
+    if ($_.PSIsContainer) {{ [System.IO.Directory]::Delete($link) }} else {{ [System.IO.File]::Delete($link) }}
+    Copy-Item -LiteralPath $target -Destination $link -Recurse:$isDir
+    Write-Output "copied $target -> $link"
+  }}
+"""
+
+def _materialize_links(rctx, path):
+    """Turns the links a Windows extraction left into copies, for another host's toolchain (`rbe-windows`).
+
+    Bazel extracts a symlink whose target is a file as a copy, but one pointing at another symlink (LLVM's
+    `clang++ -> clang -> clang-21`) as a directory junction, which a remote executor can't run: konan's link
+    then fails with `clang++` missing.
+    """
+    result = rctx.execute([
+        "powershell.exe",
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        _MATERIALIZE_PS.format(dir = str(rctx.path(path)).replace("'", "''")),
+    ])
+    if result.return_code != 0:
+        fail("Couldn't replace the links under %s with copies:\n%s%s" % (path, result.stdout, result.stderr))
+
 def _impl(rctx):
     host = rctx.attr.host
     version = rctx.attr.version
@@ -191,6 +224,9 @@ def _impl(rctx):
             output = "data/dependencies",
             sha256 = rctx.attr.dependency_sha256[name],
         )
+
+    if host != "mingw_x64" and rctx.os.name.lower().startswith("windows"):
+        _materialize_links(rctx, "data/dependencies")
 
     # konan's record of what it has unpacked. With every name listed, it never downloads.
     rctx.file("data/dependencies/.extracted", "\n".join(names) + "\n")
