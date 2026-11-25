@@ -11,7 +11,8 @@ import java.util.Map;
 
 /**
  * The JUnit XML report Bazel reads from {@code $XML_OUTPUT_FILE}: one testsuite per class, in the order the
- * cases were first seen. Shared by the JVM and the Kotlin/Native test runners, so both report the same way.
+ * cases were first seen. The Kotlin/Native test launcher (//bazel/kmp/testing/launcher, JUnitXml.kt) writes the same
+ * report for the native and browser tests: keep the two in step.
  */
 final class JUnitXml {
   static final class Case {

@@ -19,21 +19,6 @@ java_library(
     ],
 )
 
-# Runs a kmp_test's Kotlin/Native test executable and writes its JUnit XML (see defs.bzl).
-java_library(
-    name = "native_launcher_lib",
-    srcs = ["src/com/moneymanager/bazel/kmp/testing/KnTestLauncher.java"],
-    deps = [":junit_xml"],
-)
-
-# The same launcher outside Bazel: CI runs the cross-linked linuxArm64 and mingwX64 test binaries through its deploy
-# jar on their own runners, so they report JUnit XML too.
-java_binary(
-    name = "native_launcher",
-    main_class = "com.moneymanager.bazel.kmp.testing.KnTestLauncher",
-    runtime_deps = [":native_launcher_lib"],
-)
-
 # Coverage: `--config=coverage` (`--define=coverage=intellij`) runs the JVM and Android host tests under the IntelliJ
 # coverage engine (see defs.bzl's _jvm_test, and coverage.sh for the report).
 config_setting(
