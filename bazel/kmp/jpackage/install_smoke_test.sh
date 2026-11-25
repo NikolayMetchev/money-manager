@@ -1,9 +1,3 @@
-  # under them before (the timing tool then fails with "Can't connect to X11 window server");
-  # the supervisor restarts it, and its log shows why it stopped.
-  if [ "$(uname -s)" = Linux ]; then
-    echo "Xvfb log:" >&2
-    cat "$work/xvfb.log" >&2 || true
-  fi
 #!/usr/bin/env bash
 # Installs the desktop installer `//app/main/jvm:installer` built (deb, dmg or msi, by host) and checks the
 # installed app: `mm-jvm version` and the bundled native `mm version` print the version, `mm-jvm pdf-lines` reads a
@@ -113,12 +107,14 @@ grep -Eq '"text": "Jan 2 +PAYMENT RECEIVED - THANK YOU {2,}[^"]*2,609.36"' <<<"$
 # must finish before the app does. Xvfb is kept running by a supervisor loop: the server has died
 # between the first launch and the minutes of startup timings (the next desktop launch then fails
 # with "Can't connect to X11 window server"), so a death is logged and the server comes straight back.
-# Xvfb's own log is appended to, so every server that dies is explained.
+# Xvfb's own log is appended to, so every server that dies is explained. -noreset: by default Xvfb resets
+# whenever its last client disconnects, which every desktop launch of the startup timings does, and a launch
+# that connects during the reset fails the same way.
 start_xvfb() {
   rm -f /tmp/.X11-unix/X99 /tmp/.X99-lock
   (
     while true; do
-      Xvfb :99 -screen 0 1600x1000x24 >>"$work/xvfb.log" 2>&1 || true
+      Xvfb :99 -screen 0 1600x1000x24 -noreset >>"$work/xvfb.log" 2>&1 || true
       echo "Xvfb exited; restarting it" >>"$work/xvfb.log"
       rm -f /tmp/.X11-unix/X99 /tmp/.X99-lock
       sleep 0.2
@@ -175,9 +171,15 @@ if [ -n "${STARTUP_BENCH_DBS:-}" ]; then
   # as jlink strips the native commands.
   java=$(command -v java)
   native() { case "$(uname -s)" in MINGW* | MSYS*) cygpath -w "$1" ;; *) echo "$1" ;; esac; }
-  "$java" -jar "$(native "$STARTUP_BENCH_DBS/repo-scripts-tool_deploy.jar")" startup-bench \
+  if ! "$java" -jar "$(native "$STARTUP_BENCH_DBS/repo-scripts-tool_deploy.jar")" startup-bench \
     --bench-db "$(native "$STARTUP_BENCH_DBS/bench.db")" --empty-db "$(native "$STARTUP_BENCH_DBS/empty.db")" \
     --desktop "$(native "$app")" --mm-jvm "$(native "$mm_jvm")" --mm "$(native "$mm")" \
     --runs "${STARTUP_BENCH_RUNS:-10}" --label "${STARTUP_BENCH_LABEL:-}" \
-    --commit-date "$(git log -1 --format=%cI 2>/dev/null || true)" --out "$(native "$STARTUP_BENCH_OUT")"
+    --commit-date "$(git log -1 --format=%cI 2>/dev/null || true)" --out "$(native "$STARTUP_BENCH_OUT")"; then
+    if [ "$(uname -s)" = Linux ]; then
+      echo "Xvfb log:" >&2
+      cat "$work/xvfb.log" >&2 || true
+    fi
+    exit 1
+  fi
 fi
