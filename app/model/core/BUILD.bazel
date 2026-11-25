@@ -48,6 +48,7 @@ kmp_test(
     android = True,
     associate = ":core",
     common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    jvm_srcs = glob(["src/jvmTest/kotlin/**/*.kt"]),
     native_targets = [
         "linuxArm64",
         "linuxX64",
