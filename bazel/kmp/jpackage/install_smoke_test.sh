@@ -36,6 +36,17 @@ case "$(uname -s)" in
     root=$work/MoneyManager.app/Contents
     app=$root/MacOS/MoneyManager
     mm_jvm=$root/MacOS/mm-jvm
+    # log4j looks the machine's name up on its first start (LoggerContext's ${hostName}), and some GitHub macOS
+    # runners have a name that doesn't resolve: the lookup then waits ~35 s for mDNS to time out, in every JVM
+    # launch that logs, which is most of the startup timings. A Mac's own name resolves, so make the runner's
+    # resolve too (only on CI: it's the machine's setting).
+    if [ -n "${GITHUB_ACTIONS:-}" ]; then
+      host=$(hostname)
+      if ! grep -qw "$host" /etc/hosts; then
+        printf '127.0.0.1 %s\n::1 %s\n' "$host" "$host" | sudo tee -a /etc/hosts >/dev/null
+      fi
+      echo "Host name: $host"
+    fi
     ;;
   MINGW* | MSYS*)
     msi=$(cygpath -w "$(realpath "$dir"/*.msi)")
