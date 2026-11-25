@@ -5,6 +5,14 @@ package(default_visibility = ["//visibility:public"])
 
 toolchain_type(name = "toolchain_type")
 
+# `--define=native_optimize=false` makes `kmp_native_executable`s debug links against the compiler caches, as
+# `proguard_optimize=false` skips ProGuard's optimizer: the optimised, uncached link is most of a CI job that links `mm`,
+# and CI only needs it to link and start. Releases leave it out.
+config_setting(
+    name = "no_optimize",
+    define_values = {"native_optimize": "false"},
+)
+
 # One toolchain per exec host Kotlin/Native runs on, each over that host's distribution
 # (@kotlin_native_<host>), which is only fetched once a native target selects its toolchain.
 [

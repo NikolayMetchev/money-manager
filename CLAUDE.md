@@ -92,6 +92,10 @@ Flags and configs:
 - `--stamp` writes the git commit into the release APK (`META-INF/version-control-info.textproto`); releases pass it.
 - `--define=proguard_optimize=false` skips ProGuard's optimizer in `//app/main/jvm:release` (shrinking alone checks
   the keep rules, and the optimizer is most of ProGuard's ~15 minutes); CI's Build and Test passes it.
+- `--define=native_optimize=false` links the native executables (`mm`) as debug links against the compiler caches
+  (`-g`, no `-opt`): ~15 seconds where the optimised, uncached link is ~8 minutes on BuildBuddy and ~14 on the macOS
+  runner. Only the host's own target has caches, so the Windows `mm.exe` link is just unoptimised. CI passes it wherever
+  it links `mm`, releases don't.
 - `--define=bundle_native_cli=true` puts the host's native `mm` into the desktop installer
   (`//app/main/jvm:installer`: a deb, dmg or msi on its own OS only).
 - `:<name>_linuxArm64_cross` and `:<name>_mingwX64_cross` (manual) are a module's test binary built for Linux arm64 or

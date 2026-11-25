@@ -129,8 +129,10 @@ jobs:
       # The JVM and Android host tests run under the coverage agent, which Coverage reads.
       # A pull request also skips training the installer's AOT caches (the app starts under Xvfb on the runner, and
       # that step is most of the installer's build); main, releases and the macOS and Windows jobs on main keep them.
+      # `native_optimize=false` makes the native mm a debug link against the compiler caches the test binaries build:
+      # seconds, where the optimised, uncached link is ~8 minutes. CI only needs it to link and start; releases optimize.
       BAZEL_FLAGS: >-
-        --define=proguard_optimize=false --config=coverage
+        --define=proguard_optimize=false --define=native_optimize=false --config=coverage
         ${{ needs.changes.outputs.native == 'true' && needs.changes.outputs.installer == 'true' && '--define=bundle_native_cli=true' || '' }}
         ${{ github.event_name == 'pull_request' && '--define=aot=false' || '' }}
     # `shell: bash` runs with pipefail; the default shell doesn't, so `bazel … | tee` would take tee's exit code and
@@ -448,13 +450,15 @@ jobs:
       # own JDK, missing the cache (the Android release's R8 alone took ~10 minutes). Main also links `mm` (its
       # macosArm64 binary is `manual`); a PR leaves it out. Its optimised, uncached link is ~17 of a PR's ~25 minutes
       # on the 3-core runner, and the cli and tui test binaries already link the same closure for macosArm64.
+      # Both commands pass `native_optimize=false` (one analysis cache): main's mm is a debug link against the compiler
+      # caches the test binaries build, as Build and Test's is.
       - name: Build
         env:
           MM: ${{ github.event_name == 'pull_request' && ' ' || '//app/main/cli:mm' }}
-        run: bazel build --config=native $(bazel query 'attr(name, "_macosArm64", //...) except attr(tags, manual, //...)') $MM 2>&1 | tee build.log
+        run: bazel build --config=native --define=native_optimize=false $(bazel query 'attr(name, "_macosArm64", //...) except attr(tags, manual, //...)') $MM 2>&1 | tee build.log
 
       - name: Test
-        run: bazel test --config=native $(bazel query 'attr(name, "_macosArm64$", tests(//...))') 2>&1 | tee test.log
+        run: bazel test --config=native --define=native_optimize=false $(bazel query 'attr(name, "_macosArm64$", tests(//...))') 2>&1 | tee test.log
 
       - name: Build results
         if: always()
@@ -629,7 +633,7 @@ jobs:
             flags=(--define=aot=false)
             targets=()
           fi
-          bazel build --define=proguard_optimize=false "${flags[@]}" //app/main/jvm:installer "${targets[@]}" \
+          bazel build --define=proguard_optimize=false --define=native_optimize=false "${flags[@]}" //app/main/jvm:installer "${targets[@]}" \
             2>&1 | tee build.log
 
       # This job builds here, not on a BuildBuddy runner, so the installer is in bazel-bin (not ci-out).
