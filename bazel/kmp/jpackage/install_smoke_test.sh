@@ -1,3 +1,9 @@
+  # under them before (the timing tool then fails with "Can't connect to X11 window server");
+  # the supervisor restarts it, and its log shows why it stopped.
+  if [ "$(uname -s)" = Linux ]; then
+    echo "Xvfb log:" >&2
+    cat "$work/xvfb.log" >&2 || true
+  fi
 #!/usr/bin/env bash
 # Installs the desktop installer `//app/main/jvm:installer` built (deb, dmg or msi, by host) and checks the
 # installed app: `mm-jvm version` and the bundled native `mm version` print the version, `mm-jvm pdf-lines` reads a
@@ -104,11 +110,22 @@ grep -q '"text": "Statement Date 19/01/13"' <<<"$out"
 grep -Eq '"text": "Jan 2 +PAYMENT RECEIVED - THANK YOU {2,}[^"]*2,609.36"' <<<"$out"
 
 # Starts Xvfb :99 and waits for its socket. The app connects as soon as it starts, so this
-# must finish before the app does. Xvfb's own log is kept, so a server that dies is explained.
+# must finish before the app does. Xvfb is kept running by a supervisor loop: the server has died
+# between the first launch and the minutes of startup timings (the next desktop launch then fails
+# with "Can't connect to X11 window server"), so a death is logged and the server comes straight back.
+# Xvfb's own log is appended to, so every server that dies is explained.
 start_xvfb() {
   rm -f /tmp/.X11-unix/X99 /tmp/.X99-lock
-  Xvfb :99 -screen 0 1600x1000x24 >"$work/xvfb.log" 2>&1 &
+  (
+    while true; do
+      Xvfb :99 -screen 0 1600x1000x24 >>"$work/xvfb.log" 2>&1 || true
+      echo "Xvfb exited; restarting it" >>"$work/xvfb.log"
+      rm -f /tmp/.X11-unix/X99 /tmp/.X99-lock
+      sleep 0.2
+    done
+  ) &
   xvfb=$!
+  trap 'kill "$xvfb" 2>/dev/null; pkill -x Xvfb 2>/dev/null' EXIT
   for _ in $(seq 50); do
     [ -S /tmp/.X11-unix/X99 ] && break
     sleep 0.2
