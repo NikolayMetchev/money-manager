@@ -12,7 +12,6 @@ import com.moneymanager.importengineapi.createAccountMapping
 import com.moneymanager.importengineapi.createAccountMappings
 import com.moneymanager.importengineapi.createAccounts
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.first
 import kotlin.time.Clock
 
 private val logger = Logger.withTag("CsvAccountCreation")

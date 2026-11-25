@@ -1,7 +1,6 @@
 package com.moneymanager.csvimporter
 
 import com.moneymanager.domain.model.CsvImportId
-import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.importengineapi.CsvImportMutation
 import com.moneymanager.importengineapi.ImportEngine
