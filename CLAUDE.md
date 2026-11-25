@@ -783,6 +783,7 @@ set of writes.
 ### Code Style
 
 - **Split a file that passes 1000 lines.** Break it along its real seams into cohesive files (one concept each, named for it, in the same package) rather than letting it grow; a file already over the limit is split before more is added to it
+- **No redundant prefix on a name.** A file or class whose package already carries a prefix in some form drops it: in `com.moneymanager.csvimporter` write `LegLinking.kt`, not `CsvLegLinking.kt`; the package says it's CSV. Rename an offender when you touch it
 - **No Python in the repo** (#1264): write a script as a subcommand of `tools/repo-scripts` (Kotlin), Starlark or small shell. Don't commit `.py` files or call `python`; `bazel test //bazel/checks:no_python_test` fails on it. The test reads the working tree, so it runs locally even with `--config=rbe`
 - Run `bazel run //:format` before committing
 - Import types explicitly, never use fully qualified names in code

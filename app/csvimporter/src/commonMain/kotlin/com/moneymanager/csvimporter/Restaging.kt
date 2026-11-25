@@ -10,7 +10,7 @@ import com.moneymanager.importengineapi.applyCsvImportMutations
 import com.moneymanager.xlsx.createXlsxParser
 import kotlinx.coroutines.flow.first
 
-private val logger = Logger.withTag("CsvRestaging")
+private val logger = Logger.withTag("Restaging")
 
 /**
  * [csvImport] staged as [strategy] reads it (see [restageXlsxForStrategy] and [restagePdfForStrategy]): reloaded

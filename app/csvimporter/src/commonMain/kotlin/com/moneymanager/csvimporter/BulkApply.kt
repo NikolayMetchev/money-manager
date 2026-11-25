@@ -20,7 +20,7 @@ import com.moneymanager.tasks.WeightedProgress
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 
-private val logger = Logger.withTag("CsvBulkApply")
+private val logger = Logger.withTag("BulkApply")
 
 /**
  * Applies the matching strategy to every [imports] file. Each file's strategy is auto-matched from its

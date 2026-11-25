@@ -14,7 +14,7 @@ import com.moneymanager.importengineapi.createAccounts
 import kotlinx.coroutines.CancellationException
 import kotlin.time.Clock
 
-private val logger = Logger.withTag("CsvAccountCreation")
+private val logger = Logger.withTag("AccountCreation")
 
 /**
  * Saves [mappings] in a single batch, falling back to per-mapping saves if the atomic batch fails so
