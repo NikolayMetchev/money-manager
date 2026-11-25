@@ -37,11 +37,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Single deploy job since we're just deploying
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -72,6 +68,17 @@ jobs:
         uses: actions/upload-pages-artifact@v5
         with:
           path: 'site'
+
+  # Its own job, as GitHub's Pages template has it: deploy-pages looks the run's github-pages artifact up once and
+  # doesn't retry, and a step right after the upload ran before GitHub listed it ("No artifacts named github-pages
+  # were found", 2026-11-25). A re-run doesn't help either: it uploads a second artifact of that name into the run.
+  deploy:
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
