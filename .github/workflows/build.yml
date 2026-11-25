@@ -643,12 +643,15 @@ jobs:
           retention-days: 7
 
   # Appends main's startup times to startup.jsonl on the perf-data branch, which webpage/performance.html graphs
-  # (#1254). Whatever the OSes measured is kept, so one failed installer job only leaves a gap.
+  # (#1254). Whatever the OSes measured is kept, so one failed installer job only leaves a gap. A push that changes no
+  # code (a workflow or docs change) skips both measuring jobs, so there is nothing to record and this skips too.
   perf-record:
     name: Record startup times
     runs-on: ubuntu-latest
     needs: [ build, desktop-installer ]
-    if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    if: >-
+      !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      (needs.build.result != 'skipped' || needs.desktop-installer.result != 'skipped')
     permissions:
       contents: write
     concurrency:
