@@ -36,16 +36,19 @@ case "$(uname -s)" in
     root=$work/MoneyManager.app/Contents
     app=$root/MacOS/MoneyManager
     mm_jvm=$root/MacOS/mm-jvm
-    # log4j looks the machine's name up on its first start (LoggerContext's ${hostName}), and some GitHub macOS
-    # runners have a name that doesn't resolve: the lookup then waits ~35 s for mDNS to time out, in every JVM
-    # launch that logs, which is most of the startup timings. A Mac's own name resolves, so make the runner's
-    # resolve too (only on CI: it's the machine's setting).
+    # log4j looks the machine's name up on its first start (LoggerContext's ${hostName}, InetAddress.getLocalHost()).
+    # GitHub's macOS runners are named `<…>.local`, which macOS resolves over multicast DNS, and there only the
+    # runner's first lookup is answered: every later JVM launch that logs waits ~35 s for it to time out, which is
+    # every launch of the startup timings. Neither an /etc/hosts entry for that name nor flushing the DNS cache helps
+    # (probed on 4 runners, 2026-11-25); a name outside .local, in /etc/hosts, resolves at once. A Mac's own name
+    # resolves, so this is the runner's setting, changed only on CI.
     if [ -n "${GITHUB_ACTIONS:-}" ]; then
-      host=$(hostname)
-      if ! grep -qw "$host" /etc/hosts; then
-        printf '127.0.0.1 %s\n::1 %s\n' "$host" "$host" | sudo tee -a /etc/hosts >/dev/null
-      fi
-      echo "Host name: $host"
+      echo "Host name was $(hostname)"
+      sudo scutil --set HostName mm-ci-runner
+      printf '127.0.0.1 mm-ci-runner\n::1 mm-ci-runner\n' | sudo tee -a /etc/hosts >/dev/null
+      sudo dscacheutil -flushcache
+      sudo killall -HUP mDNSResponder || true
+      echo "Host name now $(hostname)"
     fi
     ;;
   MINGW* | MSYS*)
