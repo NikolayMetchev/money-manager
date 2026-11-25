@@ -12,6 +12,7 @@ load(
     "KONAN_TARGETS",
     "KonanCacheInfo",
     "TOOLCHAIN_TYPE",
+    "exec_path_separator",
     "kotlin_native_toolchain_info",
     "run_konan",
     "static_cache_args",
@@ -69,7 +70,7 @@ def _compile_klib(ctx, kgp_target, out, chain, fragment_suffix, deps, friends, m
     args.add_all(transitive, before_each = "-library")
     friend_klibs = [f[KlibInfo].klib for f in friends if f[KlibInfo].klib]
     if friend_klibs:
-        args.add_joined("-friend-modules", friend_klibs, join_with = ctx.configuration.host_path_separator)
+        args.add_joined("-friend-modules", friend_klibs, join_with = exec_path_separator(kotlin_native_toolchain_info(ctx)))
     run_konan(
         ctx,
         tool = "konanc",
