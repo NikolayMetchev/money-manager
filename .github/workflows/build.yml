@@ -562,7 +562,7 @@ jobs:
             config: rbe-mac
           - name: Windows
             os: windows-latest
-            config: cache
+            config: rbe-windows
     defaults:
       run:
         shell: bash

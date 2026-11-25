@@ -921,6 +921,9 @@ def kmp_native_executable(name, library, entry_point, base_name, native_targets,
             base_name = base_name,
             target = target,
             tags = ["manual"],
+            # Every host links a Windows executable (the cross-linked test binaries do), so `rbe-windows` links it on
+            # BuildBuddy's executors, where the Windows runner's 5 minutes become a cache hit.
+            exec_compatible_with = ["//bazel/platforms:compiles_klibs"] if target == "mingwX64" else [],
             target_compatible_with = BUILDS_ON.get(target, []) + NATIVE_ONLY,
             visibility = visibility,
         )
