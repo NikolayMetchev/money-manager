@@ -20,17 +20,26 @@ actual fun getDeviceInfo(): DeviceInfo =
  * name doesn't resolve (GitHub's macOS runners, often) that blocks for ~35 s on every JVM start that opens a database.
  * `hostname` just reads it (what the native targets' `gethostname` does), and exists on Linux, macOS and Windows.
  */
-private fun machineHostname(): String? =
-    System.getenv("COMPUTERNAME")?.takeIf { it.isNotBlank() }
-        ?: runCatching {
-            val process = ProcessBuilder("hostname").redirectErrorStream(true).start()
-            process.outputStream.close()
-            val output = process.inputStream.bufferedReader().use { it.readText() }
-            if (process.waitFor(HOSTNAME_TIMEOUT_SECONDS, TimeUnit.SECONDS) && process.exitValue() == 0) {
-                output.trim().takeIf { it.isNotEmpty() }
-            } else {
-                process.destroyForcibly()
-                null
-            }
-        }.getOrNull()
-        ?: System.getenv("HOSTNAME")?.takeIf { it.isNotBlank() }
+private fun machineHostname(): String? = machineHostname(System::getenv, ::runHostnameCommand)
+
+internal fun machineHostname(
+    env: (String) -> String?,
+    runHostname: () -> String?,
+): String? =
+    env("COMPUTERNAME").nonBlank()
+        ?: runCatching(runHostname).getOrNull().nonBlank()
+        ?: env("HOSTNAME").nonBlank()
+
+private fun String?.nonBlank(): String? = this?.trim()?.takeIf { it.isNotEmpty() }
+
+private fun runHostnameCommand(): String? {
+    val process = ProcessBuilder("hostname").redirectErrorStream(true).start()
+    process.outputStream.close()
+    val output = process.inputStream.bufferedReader().use { it.readText() }
+    return if (process.waitFor(HOSTNAME_TIMEOUT_SECONDS, TimeUnit.SECONDS) && process.exitValue() == 0) {
+        output
+    } else {
+        process.destroyForcibly()
+        null
+    }
+}
