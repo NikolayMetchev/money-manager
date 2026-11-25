@@ -104,6 +104,10 @@ KONAN_TARGETS = {
     "mingwX64": "mingw_x64",
 }
 
+def exec_path_separator(kn):
+    """The path separator where konan runs. Not the host's: `rbe-windows` runs it on Linux executors."""
+    return ";" if kn.host == "mingw_x64" else ":"
+
 def kotlin_native_toolchain_info(ctx):
     return ctx.toolchains[TOOLCHAIN_TYPE].kotlin_native
 
@@ -186,7 +190,7 @@ def _launch(ctx, kn, tool, arguments, inputs, tool_inputs, outputs, mnemonic, pr
         "-Dkonan.home=" + kn.dist_dir,
         "-Dkonan.data.dir=" + kn.data_dir,
         "-cp",
-        ctx.configuration.host_path_separator.join([
+        exec_path_separator(kn).join([
             kn.launcher.path,
             kn.dist_dir + "/konan/lib/kotlin-native-compiler-embeddable.jar",
         ]),
