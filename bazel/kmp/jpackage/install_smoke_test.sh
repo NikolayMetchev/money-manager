@@ -9,13 +9,6 @@
 # without the native mm (#1273): INSTALLER_AOT=false drops AOTMode=on, INSTALLER_NATIVE_CLI=false skips checking mm.
 # Both default to true, so main and releases check everything.
 #
-# With STARTUP_BENCH_DBS (a directory holding //tools/bench-db's bench.db and empty.db, and the tool that times them,
-# repo-scripts-tool_deploy.jar) and STARTUP_BENCH_OUT (a file), it then times the installed launchers' startup with the tool,
-# on the runner's java (the JDK of MODULE.bazel), and appends the results
-# there (#1254): perf.yml does this on main, so its commits' startup is recorded on the perf-data branch.
-# STARTUP_BENCH_MM times that native mm instead of the bundled one: CI's installers bundle a debug link
-# (`--define=native_optimize=false`), so perf.yml builds an optimised one. The commit recorded is the checkout's HEAD.
-#
 # Usage: install_smoke_test.sh <installer directory> <expected version>
 set -euo pipefail
 
@@ -38,20 +31,7 @@ case "$(uname -s)" in
     root=$work/MoneyManager.app/Contents
     app=$root/MacOS/MoneyManager
     mm_jvm=$root/MacOS/mm-jvm
-    # log4j looks the machine's name up on its first start (LoggerContext's ${hostName}, InetAddress.getLocalHost()).
-    # GitHub's macOS runners are named `<…>.local`, which macOS resolves over multicast DNS, and there only the
-    # runner's first lookup is answered: every later JVM launch that logs waits ~35 s for it to time out, which is
-    # every launch of the startup timings. Neither an /etc/hosts entry for that name nor flushing the DNS cache helps
-    # (probed on 4 runners, 2026-11-25); a name outside .local, in /etc/hosts, resolves at once. A Mac's own name
-    # resolves, so this is the runner's setting, changed only on CI.
-    if [ -n "${GITHUB_ACTIONS:-}" ]; then
-      echo "Host name was $(hostname)"
-      sudo scutil --set HostName mm-ci-runner
-      printf '127.0.0.1 mm-ci-runner\n::1 mm-ci-runner\n' | sudo tee -a /etc/hosts >/dev/null
-      sudo dscacheutil -flushcache
-      sudo killall -HUP mDNSResponder || true
-      echo "Host name now $(hostname)"
-    fi
+    "$(dirname "$0")/../../ci/macos_runner_hostname.sh"
     ;;
   MINGW* | MSYS*)
     msi=$(cygpath -w "$(realpath "$dir"/*.msi)")
@@ -120,12 +100,7 @@ grep -q '"text": "Statement Date 19/01/13"' <<<"$out"
 grep -Eq '"text": "Jan 2 +PAYMENT RECEIVED - THANK YOU {2,}[^"]*2,609.36"' <<<"$out"
 
 # Starts Xvfb :99 and waits for its socket. The app connects as soon as it starts, so this
-# must finish before the app does. Xvfb is kept running by a supervisor loop: the server has died
-# between the first launch and the minutes of startup timings (the next desktop launch then fails
-# with "Can't connect to X11 window server"), so a death is logged and the server comes straight back.
-# Xvfb's own log is appended to, so every server that dies is explained. -noreset: by default Xvfb resets
-# whenever its last client disconnects, which every desktop launch of the startup timings does, and a launch
-# that connects during the reset fails the same way.
+# must finish before the app does.
 start_xvfb() {
   rm -f /tmp/.X11-unix/X99 /tmp/.X99-lock
   (
@@ -172,31 +147,3 @@ if [ -z "$started" ] || [ -z "$alive" ]; then
   exit 1
 fi
 echo "The desktop app started and stayed up."
-
-if [ -n "${STARTUP_BENCH_DBS:-}" ]; then
-  unset JAVA_TOOL_OPTIONS
-  # The startup timings run for minutes after the first launch. The display server has died
-  # under them before (the timing tool then fails with "Can't connect to X11 window server"),
-  # so bring it back up and show why it stopped.
-  if [ "$(uname -s)" = Linux ] && ! kill -0 "$xvfb" 2>/dev/null; then
-    echo "Xvfb stopped during the startup run; restarting it. Its log:" >&2
-    cat "$work/xvfb.log" >&2 || true
-    start_xvfb
-  fi
-  # The runner's JDK (the workflow sets up MODULE.bazel's) runs the timing tool: the installed runtime has no java,
-  # as jlink strips the native commands.
-  java=$(command -v java)
-  native() { case "$(uname -s)" in MINGW* | MSYS*) cygpath -w "$1" ;; *) echo "$1" ;; esac; }
-  if ! "$java" -jar "$(native "$STARTUP_BENCH_DBS/repo-scripts-tool_deploy.jar")" startup-bench \
-    --bench-db "$(native "$STARTUP_BENCH_DBS/bench.db")" --empty-db "$(native "$STARTUP_BENCH_DBS/empty.db")" \
-    --desktop "$(native "$app")" --mm-jvm "$(native "$mm_jvm")" --mm "$(native "${STARTUP_BENCH_MM:-$mm}")" \
-    --runs "${STARTUP_BENCH_RUNS:-10}" --label "${STARTUP_BENCH_LABEL:-}" \
-    --sha "$(git rev-parse HEAD 2>/dev/null || true)" \
-    --commit-date "$(git log -1 --format=%cI 2>/dev/null || true)" --out "$(native "$STARTUP_BENCH_OUT")"; then
-    if [ "$(uname -s)" = Linux ]; then
-      echo "Xvfb log:" >&2
-      cat "$work/xvfb.log" >&2 || true
-    fi
-    exit 1
-  fi
-fi

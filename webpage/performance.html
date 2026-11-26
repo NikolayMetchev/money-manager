@@ -110,9 +110,9 @@
 </header>
 <main>
   <p>
-    After CI finishes a push to main, a workflow of its own installs the desktop installers CI built on Linux, macOS
-    and Windows (with an optimised native <code>mm</code> in place of CI's debug build) and times the
-    installed app opening a benchmark database (3 people, 50 accounts, 20,000 transfers) and an empty one, with
+    After a push to main, a workflow of its own builds that commit's release desktop app and native <code>mm</code> on
+    Linux, macOS and Windows and times them opening a benchmark database (3 people, 50 accounts, 20,000 transfers)
+    and an empty one, with
     <code>repo-scripts startup-bench</code>. Every figure is the median of 10 runs from a clean home directory, in
     milliseconds from process start. <strong>AOT cache</strong> is the app as shipped; <strong>no cache</strong> is
     the same app with <code>-XX:AOTMode=off</code>. GitHub's runners are shared machines, so expect noise of

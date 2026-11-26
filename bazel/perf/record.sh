@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Appends the startup benchmark's results (tools/repo-scripts) to startup.jsonl on the perf-data branch, which webpage/performance.html reads
 # (#1254). The branch has no history in common with main and holds only that file; the first run creates it. perf.yml's
-# record job runs this on main, in a checkout that can push, with PERF_SHA the measured commit. Another run may push in between, so a rejected
+# record job runs this on main, in a checkout that can push. Another run may push in between, so a rejected
 # push starts again from the new tip.
 #
 # Usage: bazel/perf/record.sh <directory of *.jsonl results> [branch]
 set -euo pipefail
 results=$(cd "$1" && pwd)
 branch=${2:-perf-data}
-message="startup: ${PERF_SHA:-${GITHUB_SHA:-$(git rev-parse HEAD)}}"
+message="startup: ${GITHUB_SHA:-$(git rev-parse HEAD)}"
 
 shopt -s nullglob
 files=("$results"/*.jsonl)

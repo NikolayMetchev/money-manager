@@ -1,102 +1,65 @@
-# Startup performance (#1254): once CI (build.yml) finishes a push to main, installs the desktop installers it built
-# on Linux, macOS and Windows, times the installed launchers with `repo-scripts startup-bench` on //tools/bench-db's
-# databases (with and without the AOT cache), and appends the results to startup.jsonl on the perf-data branch, which
-# webpage/performance.html reads (the Pages site fetches it live, so recording is publishing).
+# Startup performance (#1254): after a push to main, builds the release desktop app and the release native mm on
+# Linux, macOS and Windows, times them with `repo-scripts startup-bench` on //tools/bench-db's databases (the desktop
+# app and mm-jvm with and without the AOT cache), and appends the results to startup.jsonl on the perf-data branch,
+# which webpage/performance.html reads (the Pages site fetches it live, so recording is publishing).
 #
-# It is its own workflow so it is off the release's critical path: a release never waits for it. Nothing requires it,
-# and a failure only leaves a gap in the graphs.
+# It is its own workflow so it is off the release's critical path: CI (build.yml) builds and smoke-tests the
+# installers, and a release never waits for this. Nothing requires it, and a failure only leaves a gap in the graphs.
 #
-# It reuses CI's installers rather than building its own, with one exception: the native mm. CI links the mm it
-# bundles as a debug link against the compiler caches (`native_optimize=false`, #1598), which reads the benchmark
-# database 13-19x slower on Linux and macOS than the optimised link a release ships, so timing it would measure the
-# debug link rather than the app. This builds the optimised mm and times that one instead (STARTUP_BENCH_MM).
+# No installer: it times `//app/main/jvm:app_image_aot`, the app image the installer packages, and `//app/main/cli:mm`,
+# both built as a release builds them (ProGuard's optimizer on, mm an optimised link), not with CI's time-saving
+# defines. CI's mm is a debug link against the compiler caches (`native_optimize=false`, #1598), which reads the
+# benchmark database 13-19x slower on Linux and macOS, so timing CI's build would measure the debug link, not the app.
 name: Startup Performance
 
 on:
-  workflow_run:
-    workflows: [ CI ]
-    types: [ completed ]
-    branches: [ main ]
-  # Measures an earlier CI run's installers, e.g. to fill a gap. Its artifacts last 7 days.
   workflow_dispatch:
-    inputs:
-      ci_run_id:
-        description: 'The id of a CI run on main (Actions → CI → the run; the number in its URL)'
-        required: true
+  push:
+    branches: [ main ]
+    # The same files CI (build.yml's `changes`) ignores: a push that changes none of the app has nothing new to time.
+    paths-ignore:
+      - 'docs/**'
+      - 'webpage/**'
+      - '**/*.md'
+      - '.github/workflows/static.yml'
+      - '.github/workflows/dependency-submission.yml'
 
-# One measurement at a time. A CI run finishing while one runs waits, and a newer one replaces the waiting one, so a
-# burst of merges skips commits in between rather than piling up.
+# One measurement at a time. A push while one runs waits, and a newer push replaces the waiting one, so a burst of
+# merges skips commits in between rather than piling up.
 concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: false
 
 permissions:
   contents: read
-  actions: read  # the CI run's artifacts
-
-env:
-  CI_RUN_ID: ${{ github.event.workflow_run.id || inputs.ci_run_id }}
 
 jobs:
-  # Which installers the CI run built: a push that changed no code builds none, and a failed installer job uploads
-  # none, so only the OSes with an installer are measured.
-  plan:
-    name: Find the installers
-    runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.event == 'push'
-    outputs:
-      matrix: ${{ steps.find.outputs.matrix }}
-      sha: ${{ steps.find.outputs.sha }}
-    steps:
-      - name: List the CI run's installers
-        id: find
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          run=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CI_RUN_ID")
-          if [ "$(jq -r .head_branch <<<"$run")" != main ]; then
-            echo "::error::CI run $CI_RUN_ID is not on main"
-            exit 1
-          fi
-          echo "sha=$(jq -r .head_sha <<<"$run")" >> "$GITHUB_OUTPUT"
-          names=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$CI_RUN_ID/artifacts" \
-            -q '.artifacts[] | select(.expired | not) | .name' | sed -n 's/^installer-//p')
-          echo "Installers: ${names:-none}"
-          matrix=$(jq -cn --arg names "$names" '
-            {Linux: {os: "ubuntu-latest", config: "rbe"},
-             macOS: {os: "macos-latest", config: "rbe-mac"},
-             Windows: {os: "windows-latest", config: "rbe-windows"}} as $os
-            | [$names | split("\n")[] | select($os[.]) | {name: .} + $os[.]]')
-          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
-
   measure:
     name: Time startup (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
-    needs: plan
-    if: needs.plan.outputs.matrix != '[]'
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(needs.plan.outputs.matrix) }}
+        include:
+          - name: Linux
+            os: ubuntu-latest
+            config: rbe
+          # `rbe-mac`, as Native Tests (macosArm64) runs: mm's klib compiles go to BuildBuddy.
+          - name: macOS
+            os: macos-latest
+            config: rbe-mac
+          - name: Windows
+            os: windows-latest
+            config: rbe-windows
     defaults:
       run:
         shell: bash
 
     steps:
-      # The measured commit, not main's tip: the timings are recorded against it.
       - name: Checkout code
         uses: actions/checkout@v7
         with:
-          ref: ${{ needs.plan.outputs.sha }}
           persist-credentials: false  # read-only job, no git push
-
-      - name: Download CI's installer
-        uses: actions/download-artifact@v8
-        with:
-          name: installer-${{ matrix.name }}
-          path: installer
-          run-id: ${{ env.CI_RUN_ID }}
-          github-token: ${{ github.token }}
 
       - name: Set up Bazel
         uses: ./.github/actions/bazel-setup
@@ -105,12 +68,12 @@ jobs:
           config: ${{ matrix.config }}
           cache-name: perf-${{ matrix.name }}
 
-      # The installed app's display.
+      # The desktop app's display.
       - name: Install Xvfb
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y xvfb
 
-      # The timing tool is compiled for MODULE.bazel's JDK, and the installed runtime has no java.
+      # The timing tool is compiled for MODULE.bazel's JDK, and the app image's runtime has no java.
       - name: Read the JDK version
         id: jdk
         run: echo "version=$(sed -n 's/^JDK = "\([0-9]*\)\..*/\1/p' MODULE.bazel)" >> "$GITHUB_OUTPUT"
@@ -120,22 +83,20 @@ jobs:
           distribution: zulu
           java-version: ${{ steps.jdk.outputs.version }}
 
-      # The host's mm as a release links it (optimised, the default), the benchmark's databases and the timing tool.
-      - name: Build the optimised mm and the benchmark
+      # The release defaults: no `proguard_optimize=false` or `native_optimize=false`.
+      - name: Build the release app and mm
         run: |
-          targets=(//app/main/cli:mm //tools/bench-db:bench_db //tools/bench-db:empty_db //tools/repo-scripts:repo-scripts-tool_deploy.jar)
+          targets=(//app/main/jvm:app_image_aot //app/main/cli:mm //tools/bench-db:bench_db //tools/bench-db:empty_db
+            //tools/repo-scripts:repo-scripts-tool_deploy.jar)
           bazel build --config=native --remote_download_outputs=toplevel "${targets[@]}" 2>&1 | tee build.log
-          mkdir bench-dbs
-          cp $(bazel cquery --config=native --output=files 'set(//tools/bench-db:bench_db //tools/bench-db:empty_db //tools/repo-scripts:repo-scripts-tool_deploy.jar)') bench-dbs/
-          mkdir mm && cp $(bazel cquery --config=native --output=files //app/main/cli:mm) mm/
-          ls -la bench-dbs mm
+          files() { bazel cquery --config=native --output=files "$1"; }
+          mkdir bench
+          cp $(files 'set(//tools/bench-db:bench_db //tools/bench-db:empty_db //tools/repo-scripts:repo-scripts-tool_deploy.jar)') bench/
+          echo "IMAGE=$(files //app/main/jvm:app_image_aot)" >> "$GITHUB_ENV"
+          echo "MM=$(files //app/main/cli:mm)" >> "$GITHUB_ENV"
 
-      - name: Install it and time its startup
-        run: |
-          export STARTUP_BENCH_DBS=$PWD/bench-dbs STARTUP_BENCH_OUT=$PWD/startup-${{ matrix.name }}.jsonl
-          export STARTUP_BENCH_MM=$(ls "$PWD"/mm/mm*)
-          export STARTUP_BENCH_LABEL="$ImageOS $ImageVersion"
-          bazel/kmp/jpackage/install_smoke_test.sh installer "$(cat VERSION)"
+      - name: Time startup
+        run: STARTUP_BENCH_LABEL="$ImageOS $ImageVersion" bazel/perf/startup_bench.sh "$IMAGE" "$MM" bench "startup-${{ matrix.name }}.jsonl"
 
       - name: Upload the startup times
         uses: actions/upload-artifact@v7
@@ -145,12 +106,13 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  # Whatever the OSes measured is kept, so one failed job only leaves a gap.
+  # Whatever the OSes measured is kept, so one failed job only leaves a gap. A manual run on another branch measures
+  # but records nothing: perf-data is main's history.
   record:
     name: Record startup times
     runs-on: ubuntu-latest
-    needs: [ plan, measure ]
-    if: ${{ !cancelled() && needs.measure.result != 'skipped' }}
+    needs: measure
+    if: ${{ !cancelled() && github.ref == 'refs/heads/main' }}
     permissions:
       contents: write
     concurrency:
@@ -168,6 +130,4 @@ jobs:
           merge-multiple: true
 
       - name: Record them on perf-data
-        env:
-          PERF_SHA: ${{ needs.plan.outputs.sha }}
         run: bazel/perf/record.sh startup
