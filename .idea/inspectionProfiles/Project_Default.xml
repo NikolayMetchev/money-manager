@@ -8,5 +8,6 @@
     <inspection_tool class="MultiplatformPreviewMultipleParameterProviders" enabled="true" level="ERROR" enabled_by_default="true">
       <option name="composableFile" value="true" />
     </inspection_tool>
+    <inspection_tool class="PackageDirectoryMismatch" enabled="false" level="INFORMATION" enabled_by_default="false" />
   </profile>
 </component>
