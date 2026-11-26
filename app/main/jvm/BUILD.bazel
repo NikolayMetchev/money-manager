@@ -125,7 +125,7 @@ java_test(
     size = "small",
     args = ["$(rootpaths :release_jars)"],
     data = [":release_jars"],
-    main_class = "com.moneymanager.bazel.kmp.r8.ServiceProviderCheck",
+    main_class = "com.moneymanager.bazel.kmp.r8.ServiceProviderCheckKt",
     tags = ["manual"],
     use_testrunner = False,
     runtime_deps = ["//bazel/kmp/r8:service_provider_check"],
