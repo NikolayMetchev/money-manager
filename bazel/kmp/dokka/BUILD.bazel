@@ -10,7 +10,7 @@ java_binary(
 )
 
 # The external documentation's package lists the KDoc links against (dokka.bzl's _EXTERNAL_LINKS);
-# package-lists/update.sh refreshes them.
+# package-lists/update.sh refreshes them (CI's Auto-format PR job runs it).
 filegroup(
     name = "package_lists",
     srcs = glob(["package-lists/*-list"]),
