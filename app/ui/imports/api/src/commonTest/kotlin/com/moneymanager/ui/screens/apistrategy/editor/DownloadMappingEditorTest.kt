@@ -27,7 +27,7 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalTestApi::class)
 class DownloadMappingEditorTest {
     @Test
-    fun `build trading pairs from downloaded assets and fixed quote currencies`() =
+    fun `build trading pairs from downloaded assets and fixed quote currencies`() {
         runMoneyManagerComposeUiTest {
             val fanOut = mutableStateOf<ApiFanOut?>(null)
             setContent {
@@ -90,9 +90,10 @@ class DownloadMappingEditorTest {
             onNodeWithContentDescription("Remove").performScrollTo().performClick()
             runOnIdle { assertFalse(assertNotNull(fanOut.value).isValidForSave()) }
         }
+    }
 
     @Test
-    fun `changing transaction timestamp format clears an obsolete custom pattern`() =
+    fun `changing transaction timestamp format clears an obsolete custom pattern`() {
         runMoneyManagerComposeUiTest {
             val mappings = mutableStateOf(ApiTransactionMappings())
             setContent {
@@ -116,4 +117,5 @@ class DownloadMappingEditorTest {
                 assertNull(mappings.value.timestampPattern)
             }
         }
+    }
 }
