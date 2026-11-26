@@ -13,13 +13,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -32,11 +36,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
+import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.Person
-import com.moneymanager.domain.model.PersonAccountOwnership
 import com.moneymanager.domain.model.PersonAlias
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.PersonMerge
+import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.AttributeTypeReadRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipReadRepository
 import com.moneymanager.domain.repository.PersonAttributeReadRepository
@@ -44,6 +49,8 @@ import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.components.DeletePersonConfirmationDialog
 import com.moneymanager.ui.components.EditPersonDialog
+import com.moneymanager.ui.foundation.rememberPersistedState
+import kotlinx.serialization.builtins.serializer
 
 @Composable
 fun PeopleScreen(
@@ -51,12 +58,18 @@ fun PeopleScreen(
     personAttributeRepository: PersonAttributeReadRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipReadRepository,
     attributeTypeRepository: AttributeTypeReadRepository,
+    accountRepository: AccountReadRepository,
     scrollToPersonId: PersonId? = null,
     onAuditClick: (Person) -> Unit = {},
+    onAccountClick: (Account) -> Unit = {},
 ) {
     val people by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
         personRepository.getAllPeople()
     }
+    var nameFilter by rememberPersistedState("people.nameFilter", String.serializer()) { "" }
+    var accountFilter by rememberPersistedState("people.accountFilter", String.serializer()) { "" }
+    var scrollTarget by remember(scrollToPersonId) { mutableStateOf(scrollToPersonId) }
+    var personForAccounts by remember { mutableStateOf<Person?>(null) }
     var showCreateDialog by remember { mutableStateOf(false) }
     var personToEdit by remember { mutableStateOf<Person?>(null) }
     var personToDelete by remember { mutableStateOf<Person?>(null) }
@@ -69,6 +82,34 @@ fun PeopleScreen(
     val reversibleMerges by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
         personRepository.getReversibleMerges()
     }
+
+    val accounts by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        accountRepository.getAllAccounts()
+    }
+    val ownerships by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+        personAccountOwnershipRepository.getAllOwnerships()
+    }
+    val accountsByPerson =
+        remember(accounts, ownerships) {
+            val accountsById = accounts.associateBy { it.id }
+            ownerships.groupBy { it.personId }.mapValues { (_, links) ->
+                links.mapNotNull { accountsById[it.accountId] }.sortedBy { it.name.lowercase() }
+            }
+        }
+    val aliasesByPerson = remember(allAliases) { allAliases.groupBy { it.personId } }
+    val visiblePeople =
+        remember(people, accountsByPerson, aliasesByPerson, nameFilter, accountFilter, scrollTarget) {
+            val name = nameFilter.trim()
+            val account = accountFilter.trim()
+            people.filter { person ->
+                val matchesName =
+                    person.fullName.contains(name, ignoreCase = true) ||
+                        aliasesByPerson[person.id].orEmpty().any { it.alias.contains(name, ignoreCase = true) }
+                val matchesAccount =
+                    account.isEmpty() || accountsByPerson[person.id].orEmpty().any { it.name.contains(account, ignoreCase = true) }
+                person.id == scrollTarget || (matchesName && matchesAccount)
+            }
+        }
 
     Column(
         modifier =
@@ -91,21 +132,45 @@ fun PeopleScreen(
         }
         Spacer(modifier = Modifier.height(16.dp))
 
-        if (people.isEmpty()) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = nameFilter,
+                onValueChange = {
+                    scrollTarget = null
+                    nameFilter = it
+                },
+                modifier = Modifier.weight(1f),
+                label = { Text("Name") },
+                singleLine = true,
+            )
+            OutlinedTextField(
+                value = accountFilter,
+                onValueChange = {
+                    scrollTarget = null
+                    accountFilter = it
+                },
+                modifier = Modifier.weight(1f),
+                label = { Text("Account") },
+                singleLine = true,
+            )
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+
+        if (visiblePeople.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = "No people yet. Add your first person!",
+                    text = if (people.isEmpty()) "No people yet. Add your first person!" else "No people match these filters.",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         } else {
             val lazyListState = rememberLazyListState()
-            LaunchedEffect(scrollToPersonId, people) {
-                val targetIndex = scrollToPersonId?.let { targetId -> people.indexOfFirst { it.id == targetId } } ?: -1
+            LaunchedEffect(scrollTarget, visiblePeople) {
+                val targetIndex = scrollTarget?.let { targetId -> visiblePeople.indexOfFirst { it.id == targetId } } ?: -1
                 if (targetIndex >= 0) {
                     lazyListState.animateScrollToItem(targetIndex)
                 }
@@ -115,18 +180,13 @@ fun PeopleScreen(
                     state = lazyListState,
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    items(people) { person ->
-                        val ownerships by rememberFlowAsStateWithSchemaErrorHandling(
-                            person.id,
-                            initial = emptyList(),
-                        ) {
-                            personAccountOwnershipRepository.getOwnershipsByPerson(person.id)
-                        }
+                    items(visiblePeople, key = { it.id.id }) { person ->
                         PersonCard(
                             person = person,
-                            ownerships = ownerships,
-                            aliases = allAliases.filter { it.personId == person.id },
+                            accountCount = accountsByPerson[person.id].orEmpty().size,
+                            aliases = aliasesByPerson[person.id].orEmpty(),
                             merges = reversibleMerges.filter { it.survivingPersonId == person.id },
+                            onShowAccounts = { personForAccounts = person },
                             onEdit = { personToEdit = person },
                             onMerge = { personToMerge = person },
                             onAliases = { personForAliases = person },
@@ -163,6 +223,31 @@ fun PeopleScreen(
         )
     }
 
+    personForAccounts?.let { person ->
+        AlertDialog(
+            onDismissRequest = { personForAccounts = null },
+            title = { Text("Accounts owned by ${person.fullName}") },
+            text = {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    accountsByPerson[person.id].orEmpty().forEach { account ->
+                        TextButton(
+                            onClick = {
+                                personForAccounts = null
+                                onAccountClick(account)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(account.name, modifier = Modifier.fillMaxWidth())
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { personForAccounts = null }) { Text("Close") }
+            },
+        )
+    }
+
     personToMerge?.let { MergePersonDialog(it, people) { personToMerge = null } }
     mergeToUndo?.let { UnmergePersonDialog(it) { mergeToUndo = null } }
     personForAliases?.let { target ->
@@ -171,15 +256,9 @@ fun PeopleScreen(
 
     val currentPersonToDelete = personToDelete
     if (currentPersonToDelete != null) {
-        val ownerships by rememberFlowAsStateWithSchemaErrorHandling(
-            currentPersonToDelete.id,
-            initial = emptyList(),
-        ) {
-            personAccountOwnershipRepository.getOwnershipsByPerson(currentPersonToDelete.id)
-        }
         DeletePersonConfirmationDialog(
             person = currentPersonToDelete,
-            accountCount = ownerships.size,
+            accountCount = accountsByPerson[currentPersonToDelete.id].orEmpty().size,
             onDismiss = { personToDelete = null },
         )
     }
@@ -188,9 +267,10 @@ fun PeopleScreen(
 @Composable
 private fun PersonCard(
     person: Person,
-    ownerships: List<PersonAccountOwnership>,
+    accountCount: Int,
     aliases: List<PersonAlias>,
     merges: List<PersonMerge>,
+    onShowAccounts: () -> Unit,
     onEdit: () -> Unit,
     onMerge: () -> Unit,
     onAliases: () -> Unit,
@@ -227,12 +307,10 @@ private fun PersonCard(
                 merges.forEach { merge ->
                     TextButton(onClick = { onUndoMerge(merge) }) { Text("Undo merge of ${merge.deletedName}") }
                 }
-                if (ownerships.isNotEmpty()) {
-                    Text(
-                        text = "${ownerships.size} account${if (ownerships.size != 1) "s" else ""}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                if (accountCount > 0) {
+                    TextButton(onClick = onShowAccounts) {
+                        Text("$accountCount account${if (accountCount == 1) "" else "s"}")
+                    }
                 }
             }
             Row {

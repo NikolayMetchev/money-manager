@@ -539,10 +539,14 @@ fun MoneyManagerApp(
                                             resetViewedIds()
                                             PeopleScreen(
                                                 personRepository = services.people.personRepository,
+                                                accountRepository = services.accounts.accountRepository,
                                                 personAttributeRepository = services.people.personAttributeRepository,
                                                 personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
                                                 attributeTypeRepository = services.transactions.attributeTypeRepository,
                                                 scrollToPersonId = scrollToPersonId,
+                                                onAccountClick = { account ->
+                                                    navigationHistory.navigateTo(Screen.AccountTransactions(account.id, account.name))
+                                                },
                                                 onAuditClick = { person ->
                                                     navigationHistory.navigateTo(Screen.PersonAuditHistory(person.id, person.fullName))
                                                 },
