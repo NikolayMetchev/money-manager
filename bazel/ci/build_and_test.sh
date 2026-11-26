@@ -61,12 +61,12 @@ bazel fetch "${hubs[@]}"
 #   would otherwise surface only when a release ran. It shrinks the desktop app and checks every ServiceLoader
 #   provider survived.
 # - the Linux desktop installer.
-# - the linuxArm64 and mingwX64 test binaries (`:<name>_<target>_cross`) and the launcher that turns their output
-#   into JUnit XML, for Native Tests to run on their own runners.
+# - the linuxArm64 and mingwX64 test binaries (`:<name>_<target>_cross`) and the Kotlin/Native launcher that turns
+#   their output into JUnit XML, built for each, for Native Tests to run on their own runners with no JDK.
 extra=()
 if [ "$NATIVE" = true ]; then
   cross=$(bazel query "${flags[@]}" 'attr(name, "_(linuxArm64|mingwX64)_cross$", //...)') || exit 1
-  extra+=(//bazel/kmp/testing:native_launcher_deploy.jar $cross)
+  extra+=(//bazel/kmp/testing/launcher:launcher_linuxArm64 //bazel/kmp/testing/launcher:launcher_mingwX64 $cross)
 fi
 if [ "$INSTALLER" = true ]; then
   extra+=(//app/main/jvm:release_service_providers_test //app/main/jvm:installer //tools/repo-scripts:repo-scripts-tool_deploy.jar)
@@ -101,7 +101,8 @@ if [ "$status" -eq 0 ]; then
         dir="native-tests/$target/$(dirname "${binary#bazel-out/*/bin/}")"
         mkdir -p "$dir" && cp "$binary" "$dir/"
       done
-      cp bazel-bin/bazel/kmp/testing/native_launcher_deploy.jar "native-tests/$target/"
+      launcher=$(bazel cquery "${flags[@]}" --output=files "//bazel/kmp/testing/launcher:launcher_$target")
+      cp "$launcher" "native-tests/$target/test-launcher.${launcher##*.}"
     done
     # 1.6 GB as they are, a quarter of that compressed.
     tar --zstd -cf "$out/native-tests.tar.zst" native-tests && rm -rf native-tests

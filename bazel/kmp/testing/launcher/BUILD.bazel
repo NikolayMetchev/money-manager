@@ -1,0 +1,84 @@
+load("@bazel_skylib//lib:selects.bzl", "selects")
+load("//bazel/kmp:native.bzl", "BUILDS_ON", "kt_native_executable", "kt_native_klib")
+load("//bazel/kmp/lint:lint.bzl", "kmp_lint")
+
+package(default_visibility = ["//visibility:public"])
+
+# The native and browser tests' runner (Main.kt), a Kotlin/Native program: `kmp_launcher_test` (launcher.bzl) makes
+# it the test's executable, and CI runs the cross-linked test binaries through `:launcher_linuxArm64` and
+# `:launcher_mingwX64` on their own runners, with no JDK. Written by hand rather than by Gazelle: a `kmp_library`
+# is native-only, and the browser tests need it too, so it builds whenever either platform is on.
+
+_TARGETS = [
+    "linuxArm64",
+    "linuxX64",
+    "macosArm64",
+    "mingwX64",
+]
+
+_LINUX_SRCS = glob(["src/linuxMain/kotlin/**/*.kt"])
+
+# Each target's family sources (linuxMain, appleMain, mingwMain).
+_FAMILY_SRCS = {
+    "linuxArm64": _LINUX_SRCS,
+    "linuxX64": _LINUX_SRCS,
+    "macosArm64": glob(["src/appleMain/kotlin/**/*.kt"]),
+    "mingwX64": glob(["src/mingwMain/kotlin/**/*.kt"]),
+}
+
+selects.config_setting_group(
+    name = "native_or_web",
+    match_any = [
+        "//bazel/kmp/platforms:native_enabled",
+        "//bazel/kmp/platforms:web_enabled",
+    ],
+    visibility = ["//visibility:private"],
+)
+
+_NATIVE_OR_WEB = select({
+    ":native_or_web": [],
+    "//conditions:default": ["@platforms//:incompatible"],
+})
+
+kmp_lint(
+    name = "launcher_lib",
+    srcs = glob(["src/*/kotlin/**/*.kt"]),
+)
+
+[
+    kt_native_klib(
+        name = "launcher_lib_" + target,
+        exec_compatible_with = ["//bazel/platforms:compiles_klibs"],
+        family_srcs = _FAMILY_SRCS[target],
+        module = "launcher",
+        native_srcs = glob(["src/nativeMain/kotlin/**/*.kt"]),
+        target = target,
+        target_compatible_with = BUILDS_ON.get(target, []) + _NATIVE_OR_WEB,
+        visibility = ["//visibility:private"],
+    )
+    for target in _TARGETS
+]
+
+[
+    kt_native_executable(
+        name = "launcher_" + target,
+        base_name = "launcher",
+        entry_point = "com.moneymanager.bazel.kmp.testing.launcher.main",
+        # As kmp_native_executable: every host links the Windows one, so `rbe-windows` links it remotely.
+        exec_compatible_with = ["//bazel/platforms:compiles_klibs"] if target == "mingwX64" else [],
+        library = ":launcher_lib_" + target,
+        tags = ["manual"],
+        target = target,
+        target_compatible_with = BUILDS_ON.get(target, []) + _NATIVE_OR_WEB,
+    )
+    for target in _TARGETS
+]
+
+# The launcher for the platform the tests run on.
+alias(
+    name = "launcher",
+    actual = select(
+        {"//bazel/kmp/native:is_" + target: ":launcher_" + target for target in _TARGETS},
+        no_match_error = "No Kotlin/Native test launcher for this platform",
+    ),
+)

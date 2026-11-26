@@ -29,6 +29,7 @@ load("@bazel_skylib//lib:structs.bzl", "structs")
 load("//bazel/kmp/dokka:dokka.bzl", "dokka_module")
 load("//bazel/kmp/checks:checks.bzl", "kmp_forbidden_deps", "kmp_reference_check", "kmp_unused_deps")
 load("//bazel/kmp/lint:lint.bzl", "kmp_lint")
+load("//bazel/kmp/testing/launcher:launcher.bzl", "kmp_launcher_test")
 load(":optional.bzl", "ANDROID_ONLY", "JVM_ONLY", "NATIVE_ONLY", "WEB_ONLY")
 load(":resources.bzl", "kmp_resource_jar")
 load(":web.bzl", "kt_web_klib", "kt_web_test_program")
@@ -561,7 +562,7 @@ def kmp_test(
     `testAndroidHostTest`) are `commonTest ← jvmAndroidTest ← androidHostTest` compiled against the module's
     Android compile, run the same way on a JVM with AGP's mockable android.jar
     (`//bazel/kmp/android:mockable_android_jar`), which returns default values as the Android convention asks. Native tests are linked with konan's
-    test runner and run by `//bazel/kmp/testing:native_launcher`; a target's tests only run where its
+    test runner and run by `//bazel/kmp/testing/launcher` (a Kotlin/Native program); a target's tests only run where its
     executables do (`RUNS_ON`), so on Linux x64 only `_linuxX64` runs. Browser tests (`_wasmJs`, `_js`) are linked
     into an ES module and run on every host, in the pinned Node by `//bazel/kmp/testing/web:runner.mjs`, which
     reports to the same launcher.
@@ -702,15 +703,12 @@ def kmp_test(
             plugins = plugin_labels(plugins, "native"),
             target_compatible_with = RUNS_ON[target] + NATIVE_ONLY,
         )
-        java_test(
+        kmp_launcher_test(
             name = "%s_%s" % (name, target),
             size = size,
-            main_class = "com.moneymanager.bazel.kmp.testing.KnTestLauncher",
-            use_testrunner = False,
             args = ["$(rootpath :%s)" % binary],
             data = [":" + binary] + data,
             target_compatible_with = RUNS_ON[target] + NATIVE_ONLY,
-            runtime_deps = [Label("//bazel/kmp/testing:native_launcher_lib")],
         )
         if target in CROSS_PLATFORMS:
             kt_native_cross_test_binary(
@@ -736,11 +734,9 @@ def kmp_test(
             plugins = plugin_labels(plugins, "native"),
             target_compatible_with = WEB_ONLY,
         )
-        java_test(
+        kmp_launcher_test(
             name = "%s_%s" % (name, target),
             size = size,
-            main_class = "com.moneymanager.bazel.kmp.testing.KnTestLauncher",
-            use_testrunner = False,
             args = [
                 "--node",
                 "$(rootpath %s)" % Label("//bazel/kmp/testing/web:node"),
@@ -752,7 +748,6 @@ def kmp_test(
                 Label("//bazel/kmp/testing/web:node"),
                 Label("//bazel/kmp/testing/web:runner.mjs"),
             ] + data,
-            runtime_deps = [Label("//bazel/kmp/testing:native_launcher_lib")],
             target_compatible_with = WEB_ONLY,
         )
 
