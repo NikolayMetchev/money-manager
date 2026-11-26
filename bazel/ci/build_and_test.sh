@@ -6,7 +6,7 @@
 #
 # What the job's later steps read goes into $BUILDBUDDY_ARTIFACTS_DIRECTORY (the runner uploads it; build.yml
 # downloads it): the logs, coverage.xml, the test reports (testlogs.tar), the Linux installer (installer/) and the
-# cross-linked native test binaries (native-tests.tar), and the startup benchmark (bench-dbs/: its databases and the tool that times it). The exit code is the build's and tests'.
+# cross-linked native test binaries (native-tests.tar). The exit code is the build's and tests'.
 #
 # Usage: bazel/ci/build_and_test.sh <bazel flags>
 set -uo pipefail
@@ -54,9 +54,9 @@ for lock in bazel/maven/*_install.json; do
 done
 bazel fetch "${hubs[@]}"
 
-# The rest are manual, so `//...` skips them. A pull request without the `installer` label leaves out the first two
-# (and the tool that times the installer): the installer is built from the ProGuard jars, so the check costs nothing
-# once it is built, and without it ProGuard is minutes of the run.
+# The rest are manual, so `//...` skips them. A pull request without the `installer` label leaves out the first two:
+# the installer is built from the ProGuard jars, so the check costs nothing once it is built, and without it ProGuard
+# is minutes of the run.
 # - the desktop ProGuard check: `//...` never runs ProGuard, so a new dependency that needs keep/dontwarn rules
 #   would otherwise surface only when a release ran. It shrinks the desktop app and checks every ServiceLoader
 #   provider survived.
@@ -69,7 +69,7 @@ if [ "$NATIVE" = true ]; then
   extra+=(//bazel/kmp/testing/launcher:launcher_linuxArm64 //bazel/kmp/testing/launcher:launcher_mingwX64 $cross)
 fi
 if [ "$INSTALLER" = true ]; then
-  extra+=(//app/main/jvm:release_service_providers_test //app/main/jvm:installer //tools/repo-scripts:repo-scripts-tool_deploy.jar)
+  extra+=(//app/main/jvm:release_service_providers_test //app/main/jvm:installer)
 fi
 # The build event file names the tests this invocation ran (a skipped one has no testSummary), so the reports below
 # leave out what bazel-testlogs keeps from earlier runs: a remote runner resumes a snapshot with its output tree.
@@ -92,8 +92,6 @@ rm -f "$bep"
 if [ "$status" -eq 0 ]; then
   if [ "$INSTALLER" = true ]; then
     mkdir -p "$out/installer" && cp bazel-bin/app/main/jvm/installer/* "$out/installer/"
-    mkdir -p "$out/bench-dbs" && cp bazel-bin/tools/bench-db/bench.db bazel-bin/tools/bench-db/empty.db \
-      bazel-bin/tools/repo-scripts/repo-scripts-tool_deploy.jar "$out/bench-dbs/"
   fi
   if [ "$NATIVE" = true ]; then
     for target in linuxArm64 mingwX64; do
