@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Appends the startup benchmark's results (tools/repo-scripts) to startup.jsonl on the perf-data branch, which webpage/performance.html reads
-# (#1254). The branch has no history in common with main and holds only that file; the first run creates it. perf.yml's
+# (#1254). The branch has no history in common with main and holds only that file; the first run creates it. build.yml's
 # record job runs this on main, in a checkout that can push. Another run may push in between, so a rejected
 # push starts again from the new tip.
 #

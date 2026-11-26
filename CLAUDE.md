@@ -91,12 +91,12 @@ Flags and configs:
   `rbe-image.yml`, its digest pinned in `//bazel/platforms:rbe_linux_x64`), so the Compose UI tests run remotely too.
 - `--stamp` writes the git commit into the release APK (`META-INF/version-control-info.textproto`); releases pass it.
 - `--define=r8_optimize=false` skips R8's optimizer in `//app/main/jvm:release` (shrinking alone checks the keep
-  rules, and the optimizer is most of R8's ~3 minutes); CI's Build and Test passes it. The desktop app is shrunk by
+  rules, and the optimizer is most of R8's ~3 minutes); CI's PR installer builds pass it. The desktop app is shrunk by
   R8 in class-file mode; its keep rules work around two R8 bugs in that output (see `app/main/jvm/r8-rules.pro`).
 - `--define=native_optimize=false` links the native executables (`mm`) as debug links against the compiler caches
   (`-g`, no `-opt`): ~15 seconds where the optimised, uncached link is ~8 minutes on BuildBuddy and ~14 on the macOS
-  runner. Only the host's own target has caches, so the Windows `mm.exe` link is just unoptimised. CI passes it wherever
-  it links `mm`, releases don't.
+  runner. Only the host's own target has caches, so the Windows `mm.exe` link is just unoptimised. CI passes it for
+  debug links and leaves it off in the production matrix.
 - `--define=bundle_native_cli=true` puts the host's native `mm` into the desktop installer
   (`//app/main/jvm:installer`: a deb, dmg or msi on its own OS only).
 - `:<name>_linuxArm64_cross` and `:<name>_mingwX64_cross` (manual) are a module's test binary built for Linux arm64 or
@@ -107,17 +107,16 @@ The desktop installer packages `:app_image_aot`, the app image with a JDK AOT ca
 each on the benchmark database (`//tools/bench-db:bench_db`); see `bazel/README.md`, "AOT caches". A cache is only
 valid while the installed jars keep their pinned modification times.
 
-On pull requests the installer jobs pass `--define=aot=false` (Build and Test's Linux deb too, and its smoke test sets
-`INSTALLER_AOT=false`), and the macOS and Windows ones also leave out `bundle_native_cli` (the native `mm` link and the AOT
-training are most of their ~18 minutes); main and releases keep both.
+On code pushes to main and on manual runs, `build.yml` builds the optimized native `mm` release assets
+for Linux x64, Linux arm64, macOS arm64 and Windows x64 in one matrix. A second matrix builds the
+optimized, AOT-trained JVM app image for each desktop OS. The installer matrix downloads both artifacts,
+packages them with `--define=prebuilt_desktop=true`, and smoke-tests the deb, dmg or msi. Release publishes
+those installers and the standalone native assets.
 
-**Startup tracking** (`perf.yml`, its own workflow so a release never waits for it): on every push to main that changes
-code it builds the release desktop app image (`//app/main/jvm:app_image_aot`, R8's optimizer on, AOT caches
-trained) and the release `mm` (an optimised link; CI's debug-linked `mm` reads the benchmark database 13-19x slower) on
-Linux, macOS and Windows, and `bazel/perf/startup_bench.sh` times them with `repo-scripts startup-bench` on
-`//tools/bench-db`'s databases, with and without the AOT cache. No installer is built or installed. The `record` job
-appends the results (`bazel/perf/record.sh`) to `startup.jsonl` on the orphan `perf-data` branch, which
-`webpage/performance.html` reads live. A push while it runs waits, and a newer one replaces it.
+**Startup tracking**: the Time startup matrix consumes the same production artifacts and the shared benchmark
+databases and driver built on Linux. It runs `bazel/perf/startup_bench.sh` on Linux, macOS and Windows,
+with and without the JVM AOT caches. The record job appends main's results to `startup.jsonl` on the
+`perf-data` branch for `webpage/performance.html`. Release can proceed while the benchmarks run.
 
 Releases: `//app/main/android:release` (R8, unsigned), `//app/main/jvm:installer`, and `//app/main/cli:mm-linux-x64`,
 `:mm-linux-arm64`, `:mm-windows-x64`, `:mm-macos-arm64` (the Apple one only on macOS). The release smoke test,
@@ -126,20 +125,20 @@ Releases: `//app/main/android:release` (R8, unsigned), `//app/main/jvm:installer
 
 **CI**: every workflow sets Bazel up through `.github/actions/bazel-setup` (on RBE without the disk cache, which
 BuildBuddy's cache already holds). `build.yml`'s Build and Test, on Linux (RBE), is `bazel/ci/build_and_test.sh`:
-`bazel test //...` (plus the desktop R8 check, the cross-linked linuxArm64 and mingwX64 test binaries and the
-Linux desktop installer) with `--config=coverage`, then the Kotlin JVM and Android tests' merged coverage
-(`coverage.sh`). It runs on a BuildBuddy runner (`bb remote`, Remote Bazel) resumed from a snapshot of an earlier run,
+`bazel test //...` (plus the cross-linked linuxArm64 and mingwX64 test binaries) with `--config=coverage`, then the Kotlin
+JVM and Android tests' merged coverage (`coverage.sh`). It runs on a BuildBuddy runner (`bb remote`, Remote Bazel) resumed from a snapshot of an earlier run,
 warm Bazel server and all, and the job fetches its outputs (`bazel/ci/fetch_artifacts.sh`); a fork's PR runs it on the
-GitHub runner. The job then installs the deb and starts the app, `mm-jvm` and `mm`. Native Tests run
-the cross-linked binaries on an arm64 and a Windows runner, and build and test macOS on its own runner (with the
-cache); Android Instrumented Tests (an API 36 emulator) and Desktop Installer (macOS and Windows, smoke-tested the same
-way) are their own jobs. Auto-format PR runs `//:format` on every PR and pushes the fixes, so a stale BUILD file is
-regenerated, not reported. Dependency submission reads the lockfiles (`repo-scripts dependency-snapshot`), and
+GitHub runner. Native Tests run the cross-linked binaries on arm64 and Windows and build and test macOS on its
+own runner. Android Instrumented Tests use an API 36 emulator. Desktop Installer runs on Linux, macOS and Windows.
+Auto-format PR runs `//:format` on every PR and pushes the fixes, so a stale BUILD file is regenerated, not reported. Dependency submission reads the lockfiles (`repo-scripts dependency-snapshot`), and
 `renovate-pins.yml` re-pins Renovate's PRs.
 
 **Native**: on a pull request every Kotlin/Native job and Bazel target (the `_linuxX64`, `_linuxArm64`, `_mingwX64`, `_macosArm64` compiles and tests, the native `mm`, `bundle_native_cli`) is skipped: `bazel/ci/build_and_test.sh` leaves the native flag off (`NATIVE=false`). Label the PR `native` to run them; main and manual runs always do. Another label's event skips every job.
 
-**Installer**: likewise on a pull request no desktop installer is built: not Build and Test's deb (and its smoke test and the startup tool, and the desktop R8 check, `//app/main/jvm:release_service_providers_test`, which shrinks the same jars the installer is built from; `INSTALLER=false` in `bazel/ci/build_and_test.sh`) and not the Desktop Installer jobs (dmg, msi). Label the PR `installer` to run them; main and manual runs always do. The same flag decides Build and Test's apt install of Xvfb and fakeroot, which only the installer needs and which is minutes of every run. Another label's event skips every job.
+**Installer**: label a PR `installer` to package and smoke-test all three desktop installers. PRs skip AOT training
+and R8 optimization, and only bundle the native CLI on Linux when the PR also carries the `native` label.
+The Linux installer job checks that ServiceLoader providers survive shrinking. On main and manual runs the
+Linux production JVM build runs that check on the optimized jars.
 
 **Android**: likewise on a pull request no Android target is built or tested: the `_android` compiles and host tests, the device tests' APKs, the app, its lint and the smoke test (`ANDROID=false` in `bazel/ci/build_and_test.sh` leaves the android flag off, and `coverage.sh` leaves them out too) and not the Android Instrumented Tests job. Label the PR `android` to run them; main and manual runs always do. Another label's event skips every job.
 

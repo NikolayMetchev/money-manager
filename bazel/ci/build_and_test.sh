@@ -5,8 +5,8 @@
 # caches. On a fork's PR (no BuildBuddy key) the job runs this script on its own runner instead.
 #
 # What the job's later steps read goes into $BUILDBUDDY_ARTIFACTS_DIRECTORY (the runner uploads it; build.yml
-# downloads it): the logs, coverage.xml, the test reports (testlogs.tar), the Linux installer (installer/) and the
-# cross-linked native test binaries (native-tests.tar). The exit code is the build's and tests'.
+# downloads it): the logs, coverage.xml, the test reports (testlogs.tar), and the cross-linked native test binaries
+# (native-tests.tar.zst). The exit code is the build's and tests'.
 #
 # Usage: bazel/ci/build_and_test.sh <bazel flags>
 set -uo pipefail
@@ -18,9 +18,9 @@ flags=("$@")
 # On a remote runner: what the GitHub job's setup (bazel-setup, the packaging tools) provides. The snapshot keeps
 # both, so only a new runner installs them.
 if [ -n "${BUILDBUDDY_CI_RUNNER_ROOT_DIR:-}" ]; then
-  # jpackage's deb needs fakeroot, and the native test binaries zstd.
-  command -v fakeroot > /dev/null && command -v zstd > /dev/null ||
-    { sudo apt-get update -q && sudo apt-get install -yq fakeroot zstd; } || exit 1
+  # The native test binaries are transferred with zstd.
+  command -v zstd > /dev/null ||
+    { sudo apt-get update -q && sudo apt-get install -yq zstd; } || exit 1
 
   bazel/ci/accept_android_license.sh || exit 1
 
@@ -40,7 +40,6 @@ fi
 NATIVE=${NATIVE:-true}
 ANDROID=${ANDROID:-true}
 WEB=${WEB:-true}
-INSTALLER=${INSTALLER:-true}
 flags+=("--//bazel/kmp/platforms:native=$NATIVE" "--//bazel/kmp/platforms:android=$ANDROID" "--//bazel/kmp/platforms:web=$WEB")
 
 # Every tool hub's lockfile (bazel/maven/<hub>_install.json) is checked whatever the flags: rules_jvm_external only
@@ -54,22 +53,13 @@ for lock in bazel/maven/*_install.json; do
 done
 bazel fetch "${hubs[@]}"
 
-# The rest are manual, so `//...` skips them. A pull request without the `installer` label leaves out the first two:
-# the installer is built from the R8 jars, so the check costs nothing once it is built, and without it R8
-# is minutes of the run.
-# - the desktop R8 check: `//...` never runs R8, so a new dependency that needs keep/dontwarn rules
-#   would otherwise surface only when a release ran. It shrinks the desktop app and checks every ServiceLoader
-#   provider survived.
-# - the Linux desktop installer.
-# - the linuxArm64 and mingwX64 test binaries (`:<name>_<target>_cross`) and the Kotlin/Native launcher that turns
-#   their output into JUnit XML, built for each, for Native Tests to run on their own runners with no JDK.
+# The manual cross-linked test binaries and their JUnit launchers run on the native test runners.
 extra=()
 if [ "$NATIVE" = true ]; then
   cross=$(bazel query "${flags[@]}" 'attr(name, "_(linuxArm64|mingwX64)_cross$", //...)') || exit 1
+  # The production matrix or a PR installer already links mm. A native-only PR still checks the link here.
+  if [ "${LINK_MM:-true}" = false ]; then extra+=(-//app/main/cli:mm); fi
   extra+=(//bazel/kmp/testing/launcher:launcher_linuxArm64 //bazel/kmp/testing/launcher:launcher_mingwX64 $cross)
-fi
-if [ "$INSTALLER" = true ]; then
-  extra+=(//app/main/jvm:release_service_providers_test //app/main/jvm:installer)
 fi
 # The build event file names the tests this invocation ran (a skipped one has no testSummary), so the reports below
 # leave out what bazel-testlogs keeps from earlier runs: a remote runner resumes a snapshot with its output tree.
@@ -90,9 +80,6 @@ grep -o '"testSummary":{"label":"[^"]*"' "$bep" | sed 's/.*"label":"//; s/"$//' 
 rm -f "$bep"
 
 if [ "$status" -eq 0 ]; then
-  if [ "$INSTALLER" = true ]; then
-    mkdir -p "$out/installer" && cp bazel-bin/app/main/jvm/installer/* "$out/installer/"
-  fi
   if [ "$NATIVE" = true ]; then
     for target in linuxArm64 mingwX64; do
       for binary in $(bazel cquery "${flags[@]}" --output=files "attr(name, \"_${target}_cross\$\", //...)"); do

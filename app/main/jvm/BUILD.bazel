@@ -133,7 +133,7 @@ java_test(
 
 # Compose's native distributions (#1020): `:runtime` is createRuntimeImage, `:app_image` createReleaseDistributable,
 # `:installer` packageReleaseDeb/Dmg/Msi, for the host (jpackage packages only for its own OS). The release
-# workflow passes `--define=bundle_native_cli=true` (Gradle's -PbundleNativeCli=true) to bundle the native mm.
+# workflow packages the prebuilt JVM image and mm. For local builds, --define=bundle_native_cli=true bundles mm.
 jlink_runtime(
     name = "runtime",
     # Compose's defaults plus `modules(…)`: java.sql, and jdk.unsupported for mm-jvm's Ctrl-C handler (sun.misc.Signal).
@@ -198,6 +198,18 @@ aot_app_image(
     },
 )
 
+# CI downloads the two production artifacts into ci-inputs before selecting this configuration.
+config_setting(
+    name = "prebuilt_desktop",
+    define_values = {"prebuilt_desktop": "true"},
+)
+
+config_setting(
+    name = "prebuilt_desktop_windows",
+    constraint_values = ["@platforms//os:windows"],
+    define_values = {"prebuilt_desktop": "true"},
+)
+
 jpackage_installer(
     name = "installer",
     app_image = select({
@@ -217,6 +229,15 @@ jpackage_installer(
             "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
         ],
         "//conditions:default": [],
+    }),
+    image_archive = select({
+        ":prebuilt_desktop": "ci-inputs/image.tar",
+        "//conditions:default": None,
+    }),
+    native_cli = select({
+        ":prebuilt_desktop_windows": "ci-inputs/mm.exe",
+        ":prebuilt_desktop": "ci-inputs/mm",
+        "//conditions:default": None,
     }),
     tags = ["manual"],
     type = select({
