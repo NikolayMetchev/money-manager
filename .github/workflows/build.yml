@@ -484,145 +484,67 @@ jobs:
             bazel-testlogs/**/test.xml
           retention-days: 7
 
-  # Linux cross-links Linux arm64 and Windows. The Apple binary needs a macOS host.
-  production-mm:
-    name: Production mm (${{ matrix.platform }})
-    runs-on: ${{ matrix.os }}
+  binaries-linux:
+    name: Linux
     needs: changes
-    if: needs.changes.outputs.code == 'true' && github.event_name != 'pull_request'
-    strategy:
-      matrix:
-        include:
-          - platform: Linux
-            os: ubuntu-latest
-            config: rbe
-            asset: mm-linux-x64
-          - platform: Linux arm64
-            os: ubuntu-latest
-            config: rbe
-            asset: mm-linux-arm64
-          - platform: Windows
-            os: ubuntu-latest
-            config: rbe
-            asset: mm-windows-x64
-          - platform: macOS
-            os: macos-latest
-            config: rbe-mac
-            asset: mm-macos-arm64
-
-    env:
+    if: &production needs.changes.outputs.code == 'true' && github.event_name != 'pull_request'
+    uses: ./.github/workflows/desktop-binaries.yml
+    with: { platform: Linux, os: ubuntu-latest, config: rbe, asset: mm-linux-x64 }
+    secrets: &production-secrets
+      BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
       GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
       GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-        with:
-          persist-credentials: false  # read-only job, no git push
 
-      - name: Set up Bazel
-        uses: ./.github/actions/bazel-setup
-        with:
-          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
-          config: ${{ matrix.config }}
-          cache-name: ${{ matrix.asset }}
-
-      - name: Link mm
-        run: |
-          bazel build --config=native --remote_download_outputs=toplevel //app/main/cli:${{ matrix.asset }}
-
-      - name: Upload mm (${{ matrix.platform }})
-        uses: actions/upload-artifact@v7
-        with:
-          name: release-mm-${{ matrix.platform }}
-          path: bazel-bin/app/main/cli/${{ matrix.asset }}.${{ matrix.platform == 'Windows' && 'exe' || 'tar.gz' }}
-          if-no-files-found: error
-          retention-days: 7
-
-  production-jvm:
-    name: Production JVM (${{ matrix.name }})
+  binaries-macos:
+    name: macOS
     needs: changes
-    if: needs.changes.outputs.code == 'true' && github.event_name != 'pull_request'
-    env:
-      GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
-      GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix: &desktop-platforms
-        include:
-          - name: Linux
-            os: ubuntu-latest
-            config: rbe
-          - name: macOS
-            os: macos-latest
-            config: rbe-mac
-          - name: Windows
-            os: windows-latest
-            config: rbe-windows
-    defaults:
-      run:
-        shell: bash
+    if: *production
+    uses: ./.github/workflows/desktop-binaries.yml
+    with: { platform: macOS, os: macos-latest, config: rbe-mac, asset: mm-macos-arm64 }
+    secrets: *production-secrets
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-        with:
-          persist-credentials: false  # read-only job, no git push
+  binaries-windows:
+    name: Windows
+    needs: changes
+    if: *production
+    uses: ./.github/workflows/desktop-binaries.yml
+    with: { platform: Windows, os: windows-latest, config: rbe-windows, asset: mm-windows-x64 }
+    secrets: *production-secrets
 
-      - name: Set up Bazel
-        uses: ./.github/actions/bazel-setup
-        with:
-          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
-          config: ${{ matrix.config }}
-          cache-name: jvm-${{ matrix.name }}
+  binaries-linux-arm64:
+    name: Linux arm64
+    needs: changes
+    if: *production
+    uses: ./.github/workflows/desktop-binaries.yml
+    with: { platform: Linux arm64, os: ubuntu-latest, config: rbe, asset: mm-linux-arm64 }
+    secrets: *production-secrets
 
-      - name: Check the optimized jars
-        if: runner.os == 'Linux'
-        run: bazel test --stamp //app/main/jvm:release_service_providers_test
-
-      - name: Build and archive the optimized app image
-        run: |
-          bazel build --stamp --remote_download_outputs=toplevel //app/main/jvm:app_image_aot
-          tar -chf image.tar -C bazel-bin/app/main/jvm/app_image_aot .
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: jvm-${{ matrix.name }}
-          path: image.tar
-          if-no-files-found: error
-          retention-days: 7
-
-  desktop-installer:
-    name: Desktop Installer (${{ matrix.name }})
-    needs: [changes, production-jvm, production-mm]
-    # Installer-labelled PRs use a quick build and skip both production matrices.
+  installer-linux:
+    name: Desktop Installer (Linux)
+    needs: [changes, binaries-linux]
     if: >-
-      !cancelled() && needs.changes.outputs.code == 'true' && needs.changes.outputs.installer == 'true' &&
-      (github.event_name == 'pull_request' ||
-       (needs.production-jvm.result == 'success' && needs.production-mm.result == 'success'))
-    env:
+      !cancelled() && needs.changes.outputs.installer == 'true' && needs.changes.outputs.code == 'true' &&
+      (github.event_name == 'pull_request' || needs.binaries-linux.result == 'success')
+    runs-on: ubuntu-latest
+    env: &installer-env
       GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
       GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix: *desktop-platforms
-    defaults:
+    defaults: &desktop-defaults
       run:
         shell: bash
-    steps:
+    steps: &installer-steps
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - uses: ./.github/actions/download-desktop
         if: github.event_name != 'pull_request'
         with:
-          platform: ${{ matrix.name }}
+          platform: ${{ runner.os }}
       - uses: ./.github/actions/bazel-setup
         with:
           buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
-          config: ${{ matrix.config }}
-          cache-name: installer-${{ matrix.name }}
+          config: ${{ runner.os == 'Linux' && 'rbe' || runner.os == 'macOS' && 'rbe-mac' || 'rbe-windows' }}
+          cache-name: installer-${{ runner.os }}
 
       - name: Install Linux packaging and smoke-test tools
         if: runner.os == 'Linux'
@@ -649,10 +571,32 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: github.event_name != 'pull_request'
         with:
-          name: installer-${{ matrix.name }}
+          name: installer-${{ runner.os }}
           path: bazel-bin/app/main/jvm/installer/*
           if-no-files-found: error
           retention-days: 7
+
+  installer-macos:
+    name: Desktop Installer (macOS)
+    needs: [changes, binaries-macos]
+    if: >-
+      !cancelled() && needs.changes.outputs.installer == 'true' && needs.changes.outputs.code == 'true' &&
+      (github.event_name == 'pull_request' || needs.binaries-macos.result == 'success')
+    runs-on: macos-latest
+    env: *installer-env
+    defaults: *desktop-defaults
+    steps: *installer-steps
+
+  installer-windows:
+    name: Desktop Installer (Windows)
+    needs: [changes, binaries-windows]
+    if: >-
+      !cancelled() && needs.changes.outputs.installer == 'true' && needs.changes.outputs.code == 'true' &&
+      (github.event_name == 'pull_request' || needs.binaries-windows.result == 'success')
+    runs-on: windows-latest
+    env: *installer-env
+    defaults: *desktop-defaults
+    steps: *installer-steps
 
   benchmark-inputs:
     name: Startup benchmark inputs
@@ -681,23 +625,18 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  measure:
-    name: Time startup (${{ matrix.name }})
-    needs: [production-jvm, production-mm, benchmark-inputs]
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix: *desktop-platforms
-    defaults:
-      run:
-        shell: bash
-    steps:
+  measure-linux:
+    name: Time startup (Linux)
+    needs: [binaries-linux, benchmark-inputs]
+    runs-on: ubuntu-latest
+    defaults: *desktop-defaults
+    steps: &measure-steps
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - uses: ./.github/actions/download-desktop
         with:
-          platform: ${{ matrix.name }}
+          platform: ${{ runner.os }}
       - uses: actions/download-artifact@v8
         with:
           name: benchmark-inputs
@@ -724,23 +663,37 @@ jobs:
       - name: Time startup
         env:
           MM_SUFFIX: ${{ runner.os == 'Windows' && '.exe' || '' }}
-        run: STARTUP_BENCH_LABEL="$ImageOS $ImageVersion" bazel/perf/startup_bench.sh image "app/main/jvm/ci-inputs/mm${MM_SUFFIX}" bench "startup-${{ matrix.name }}.jsonl"
+        run: STARTUP_BENCH_LABEL="$ImageOS $ImageVersion" bazel/perf/startup_bench.sh image "app/main/jvm/ci-inputs/mm${MM_SUFFIX}" bench "startup-${{ runner.os }}.jsonl"
 
       - name: Upload the startup times
         uses: actions/upload-artifact@v7
         with:
-          name: startup-${{ matrix.name }}
-          path: startup-${{ matrix.name }}.jsonl
+          name: startup-${{ runner.os }}
+          path: startup-${{ runner.os }}.jsonl
           if-no-files-found: error
           retention-days: 7
+
+  measure-macos:
+    name: Time startup (macOS)
+    needs: [binaries-macos, benchmark-inputs]
+    runs-on: macos-latest
+    defaults: *desktop-defaults
+    steps: *measure-steps
+
+  measure-windows:
+    name: Time startup (Windows)
+    needs: [binaries-windows, benchmark-inputs]
+    runs-on: windows-latest
+    defaults: *desktop-defaults
+    steps: *measure-steps
 
   # Whatever the OSes measured is kept, so one failed job only leaves a gap. A manual run on another branch measures
   # but records nothing: perf-data is main's history.
   record:
     name: Record startup times
     runs-on: ubuntu-latest
-    needs: measure
-    if: ${{ !cancelled() && needs.measure.result != 'skipped' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+    needs: [measure-linux, measure-macos, measure-windows]
+    if: ${{ !cancelled() && (contains(needs.*.result, 'success') || contains(needs.*.result, 'failure')) && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
     permissions:
       contents: write
     concurrency:
@@ -810,10 +763,11 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    needs: [ changes, ci-passed, desktop-installer, android-release ]
+    needs: [ changes, ci-passed, installer-linux, installer-macos, installer-windows, android-release ]
     if: >-
       ${{ always() && needs.changes.outputs.release != '' && needs.changes.result == 'success' &&
-      needs.ci-passed.result == 'success' && needs.desktop-installer.result == 'success' &&
+      needs.ci-passed.result == 'success' && needs.installer-linux.result == 'success' &&
+      needs.installer-macos.result == 'success' && needs.installer-windows.result == 'success' &&
       needs.android-release.result == 'success' }}
     permissions:
       contents: write  # creates the tag and the release
@@ -937,7 +891,7 @@ jobs:
   ci-passed:
     name: CI Passed
     runs-on: ubuntu-latest
-    needs: [ changes, build, native-cross, native-macos, lint-format, android-test, production-jvm, production-mm, desktop-installer ]
+    needs: [ changes, build, native-cross, native-macos, lint-format, android-test, binaries-linux, binaries-macos, binaries-windows, binaries-linux-arm64, installer-linux, installer-macos, installer-windows ]
     if: always() && needs.changes.outputs.noise != 'true'
     permissions:
       checks: read
