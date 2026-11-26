@@ -52,7 +52,6 @@ internal object PayPalApiStrategy {
                                     idField = "currency",
                                     descriptionField = "currency",
                                     ownersArrayField = null,
-                                    currencyField = "currency",
                                     rules =
                                         listOf(
                                             rule(RuleAction.ExternalId(RuleValue.Template("paypal:{currency}"))),

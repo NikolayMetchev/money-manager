@@ -350,7 +350,6 @@ class BuiltInApiStrategyInstallTest : DbTest() {
             assertEquals(null, assertNotNull(feedEndpoint.pagination?.window).windowDays)
 
             assertEquals("accountUid", starlingAccounts.mappings.idField)
-            assertEquals("currency", starlingAccounts.mappings.currencyField)
             // Own bank details come from the per-account identifiers endpoint, not the /accounts response.
             assertEquals("bankIdentifier", starlingAccounts.mappings.sortCodeField)
             assertEquals("accountIdentifier", starlingAccounts.mappings.accountNumberField)
@@ -361,6 +360,7 @@ class BuiltInApiStrategyInstallTest : DbTest() {
 
             with(checkNotNull(starling.config.bankTransactions?.transactionMappings)) {
                 assertEquals("amount.minorUnits", amountField)
+                assertEquals("amount.currency", currencyField)
                 assertEquals(ApiAmountFormat.MINOR_UNITS_INTEGER, amountFormat)
                 assertEquals("feedItemUid", idField)
                 assertEquals("counterPartyUid", counterpartyIdField)

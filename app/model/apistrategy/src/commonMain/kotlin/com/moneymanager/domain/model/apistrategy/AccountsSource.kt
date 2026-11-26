@@ -73,7 +73,6 @@ data class ApiAccountMappings(
     val ownerNameFallbackField: String = "name",
     val sortCodeField: String = "sort_code",
     val accountNumberField: String = "account_number",
-    val currencyField: String? = null,
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val rules: List<StrategyRule> = emptyList(),
 )

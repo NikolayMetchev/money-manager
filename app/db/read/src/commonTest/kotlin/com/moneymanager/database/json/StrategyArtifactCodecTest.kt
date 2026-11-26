@@ -18,6 +18,7 @@ import com.moneymanager.domain.strategy.StrategyKind
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
+import kotlin.test.assertTrue
 
 class StrategyArtifactCodecTest {
     private val sourceMapping =
@@ -78,6 +79,29 @@ class StrategyArtifactCodecTest {
     @Test
     fun `csv hash ignores the version stamp`() {
         assertEquals(hash(csvExport()), hash(csvExport(version = "9.9.9")))
+    }
+
+    @Test
+    fun `legacy account currency mapping drops out of exports and their canonical hashes`() {
+        val legacy =
+            """
+            {
+                "version": "", "name": "Bank", "baseUrl": "https://example.com",
+                "accounts": {
+                    "type": "downloaded",
+                    "endpoint": {"path": "/accounts", "responseArrayKey": "accounts"},
+                    "mappings": {"currencyField": "balance.currency"}
+                }
+            }
+            """.trimIndent()
+        val current = legacy.replace("""{"currencyField": "balance.currency"}""", "{}")
+        val exported = ApiStrategyExportCodec.encode(ApiStrategyExportCodec.decode(legacy))
+
+        assertTrue("currencyField" !in exported)
+        assertEquals(
+            StrategyArtifactCodec.canonicalHash(StrategyKind.API, current),
+            StrategyArtifactCodec.canonicalHash(StrategyKind.API, legacy),
+        )
     }
 
     @Test
