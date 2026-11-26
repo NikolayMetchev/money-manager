@@ -1,0 +1,27 @@
+name: Download desktop binaries
+description: Fetch the production app image and standalone mm for this runner.
+inputs:
+  platform:
+    description: Desktop matrix platform
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: actions/download-artifact@v8
+      with:
+        name: jvm-${{ inputs.platform }}
+        path: app/main/jvm/ci-inputs
+
+    - uses: actions/download-artifact@v8
+      with:
+        name: release-mm-${{ inputs.platform }}
+        path: cli-dist
+
+    - shell: bash
+      run: |
+        dir=app/main/jvm/ci-inputs
+        if [ "$RUNNER_OS" = Windows ]; then
+          mv cli-dist/mm-windows-x64.exe "$dir/mm.exe"
+        else
+          tar -xzf cli-dist/*.tar.gz -C "$dir"
+        fi

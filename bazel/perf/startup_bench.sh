@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Times a release build's startup (#1254) with `repo-scripts startup-bench`: the desktop app and mm-jvm from
 # `//app/main/jvm:app_image_aot` (the app image the installer packages, AOT caches included) and the native
-# `//app/main/cli:mm`, each on //tools/bench-db's databases, and appends the results to <out>. perf.yml runs it on
+# `//app/main/cli:mm`, each on //tools/bench-db's databases, and appends the results to <out>. build.yml runs it on
 # main with everything built as a release builds it; bazel/perf/record.sh then keeps the results.
 #
 # The image runs where it is copied to, not installed: the AOT caches were trained against one fixed modification

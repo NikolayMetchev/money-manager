@@ -45,7 +45,7 @@ jobs:
       # Kotlin/Native (the native compiles and tests, the native mm) runs on main, manual runs and a PR labelled
       # `native`; any other PR skips it, in the jobs below and in the Bazel commands they share.
       native: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'native') }}
-      # The desktop installers (Build and Test's deb, Desktop Installer's dmg and msi) run on main, manual runs and a PR
+      # The desktop installers (deb, dmg and msi) run on main, manual runs and a PR
       # labelled `installer`; any other PR leaves them out of the jobs and the shared Bazel commands.
       installer: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'installer') }}
       # Android (its compiles, host tests, the app and lint in Build and Test, and the instrumented tests on an emulator)
@@ -85,7 +85,6 @@ jobs:
               - '!webpage/**'
               - '!**/*.md'
               - '!.github/workflows/static.yml'
-              - '!.github/workflows/perf.yml'
               - '!.github/workflows/dependency-submission.yml'
       # Every push to main that changes code checks, not only one that edits VERSION: the push payload's file lists can't
       # be relied on (head_commit.modified missed the bumps to 1.0.14, 1.0.15 and 1.0.16, none of which released). A VERSION that
@@ -124,21 +123,10 @@ jobs:
       GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
       GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
       NATIVE: ${{ needs.changes.outputs.native }}
-      INSTALLER: ${{ needs.changes.outputs.installer }}
+      LINK_MM: ${{ github.event_name == 'pull_request' && needs.changes.outputs.installer != 'true' }}
       ANDROID: ${{ needs.changes.outputs.android }}
       WEB: ${{ needs.changes.outputs.web }}
-      # On every command, so they share one analysis cache; they only change R8, the installer and the JVM
-      # tests. Shrink only: the keep rules and ServiceLoader providers don't depend on R8's optimizer, which
-      # takes most of its time (release builds optimize). The installer bundles the native mm, as the release's does.
-      # The JVM and Android host tests run under the coverage agent, which Coverage reads.
-      # A pull request also skips training the installer's AOT caches (the app starts under Xvfb on the runner, and
-      # that step is most of the installer's build); main, releases and the macOS and Windows jobs on main keep them.
-      # `native_optimize=false` makes the native mm a debug link against the compiler caches the test binaries build:
-      # seconds, where the optimised, uncached link is ~8 minutes. CI only needs it to link and start; releases optimize.
-      BAZEL_FLAGS: >-
-        --define=r8_optimize=false --define=native_optimize=false --config=coverage
-        ${{ needs.changes.outputs.native == 'true' && needs.changes.outputs.installer == 'true' && '--define=bundle_native_cli=true' || '' }}
-        ${{ github.event_name == 'pull_request' && '--define=aot=false' || '' }}
+      BAZEL_FLAGS: --define=native_optimize=false --config=coverage
     # `shell: bash` runs with pipefail; the default shell doesn't, so `bazel … | tee` would take tee's exit code and
     # pass with failing tests.
     defaults:
@@ -167,15 +155,6 @@ jobs:
         uses: ./.github/actions/bazel-setup
         with:
           cache-name: linux
-
-      # The installer smoke test's display is Xvfb. jpackage's deb needs fakeroot where the build runs (a
-      # BuildBuddy runner installs its own). Nothing else here needs either, and the apt update and install is minutes of every
-      # run, so a run without the installer (every pull request that isn't labelled `installer`) leaves it out.
-      - name: Install packaging tools
-        if: needs.changes.outputs.installer == 'true'
-        run: >-
-          sudo apt-get update && sudo apt-get install -y xvfb
-          ${{ steps.where.outputs.remote == 'false' && 'fakeroot' || '' }}
 
       - name: Install the BuildBuddy CLI
         if: steps.where.outputs.remote == 'true'
@@ -207,7 +186,7 @@ jobs:
             --runner_exec_properties=remote-snapshot-save-policy=always \
             --run_from_branch="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}" --run_from_commit="$GITHUB_SHA" \
             --env=REPO_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
-            --env=NATIVE="$NATIVE" --env=ANDROID="$ANDROID" --env=WEB="$WEB" --env=INSTALLER="$INSTALLER" \
+            --env=LINK_MM="$LINK_MM" --env=NATIVE="$NATIVE" --env=ANDROID="$ANDROID" --env=WEB="$WEB" \
             --remote_run_header="x-buildbuddy-platform.secret-env-overrides=GOOGLE_OAUTH_CLIENT_ID=$GOOGLE_OAUTH_CLIENT_ID,GOOGLE_OAUTH_CLIENT_SECRET=$GOOGLE_OAUTH_CLIENT_SECRET" \
             --invocation_id_file=remote-run.id \
             --script="bazel/ci/build_and_test.sh $BAZEL_FLAGS"
@@ -241,24 +220,6 @@ jobs:
           files: ci-out/coverage.xml
           disable_search: true
           fail_ci_if_error: false
-
-      - name: Install and start the desktop installer
-        if: needs.changes.outputs.installer == 'true'
-        env:
-          AOT: ${{ github.event_name != 'pull_request' }}
-          NATIVE: ${{ needs.changes.outputs.native }}
-        run: |
-          [ "$AOT" = true ] || export INSTALLER_AOT=false
-          [ "$NATIVE" = true ] || export INSTALLER_NATIVE_CLI=false
-          bazel/kmp/jpackage/install_smoke_test.sh ci-out/installer "$(cat VERSION)"
-
-      - name: Upload the installer
-        if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v7
-        with:
-          name: installer-Linux
-          path: ci-out/installer/*
-          retention-days: 7
 
       - name: Unpack native test binaries
         if: needs.changes.outputs.native == 'true'
@@ -379,7 +340,7 @@ jobs:
           disable_search: true
           fail_ci_if_error: false
 
-  # macOS: the macosArm64 compiles, its `mm`, and its native tests. Everything else ran on Linux. `rbe-mac`
+  # macOS: the macosArm64 compiles and native tests. Everything else ran on Linux. `rbe-mac`
   # sends its Kotlin/Native klib compiles, macosArm64 included, to BuildBuddy's Linux executors (#1089);
   # everything else (cinterop, C, links, tests) runs on the runner.
   native-macos:
@@ -412,16 +373,8 @@ jobs:
           config: rbe-mac
           cache-name: macos
 
-      # Only the macosArm64 targets: Build and Test already builds the rest on Linux, and a Mac would redo it on its
-      # own JDK, missing the cache (the Android release's R8 alone took ~10 minutes). Main also links `mm` (its
-      # macosArm64 binary is `manual`); a PR leaves it out. Its optimised, uncached link is ~17 of a PR's ~25 minutes
-      # on the 3-core runner, and the cli and tui test binaries already link the same closure for macosArm64.
-      # Both commands pass `native_optimize=false` (one analysis cache): main's mm is a debug link against the compiler
-      # caches the test binaries build, as Build and Test's is.
       - name: Build
-        env:
-          MM: ${{ github.event_name == 'pull_request' && ' ' || '//app/main/cli:mm' }}
-        run: bazel build --config=native --define=native_optimize=false $(bazel query 'attr(name, "_macosArm64", //...) except attr(tags, manual, //...)') $MM 2>&1 | tee build.log
+        run: bazel build --config=native --define=native_optimize=false $(bazel query 'attr(name, "_macosArm64", //...) except attr(tags, manual, //...)') 2>&1 | tee build.log
 
       - name: Test
         run: bazel test --config=native --define=native_optimize=false $(bazel query 'attr(name, "_macosArm64$", tests(//...))') 2>&1 | tee test.log
@@ -531,24 +484,75 @@ jobs:
             bazel-testlogs/**/test.xml
           retention-days: 7
 
-  # jpackage packages only for its host, so each OS builds its own installer (#1020): a dmg or msi here (Build and
-  # Test builds the deb) with the native mm bundled, as Release Build builds them. Then it installs it and starts the
-  # app, mm-jvm and mm. R8's optimizer is off, as in Build and Test's R8 check.
-  desktop-installer:
-    name: Desktop Installer (${{ matrix.name }})
+  # Linux cross-links Linux arm64 and Windows. The Apple binary needs a macOS host.
+  production-mm:
+    name: Production mm (${{ matrix.platform }})
     runs-on: ${{ matrix.os }}
     needs: changes
-    if: >-
-      needs.changes.outputs.code == 'true' &&
-      needs.changes.outputs.installer == 'true' &&
-      (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' ||
-       (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+    if: needs.changes.outputs.code == 'true' && github.event_name != 'pull_request'
     strategy:
-      fail-fast: false
       matrix:
         include:
-          # `rbe-mac`, as Native Tests (macosArm64) runs: the bundled `mm`'s klib compiles go to BuildBuddy
-          # (and hit that job's cache) instead of compiling one by one on the runner.
+          - platform: Linux
+            os: ubuntu-latest
+            config: rbe
+            asset: mm-linux-x64
+          - platform: Linux arm64
+            os: ubuntu-latest
+            config: rbe
+            asset: mm-linux-arm64
+          - platform: Windows
+            os: ubuntu-latest
+            config: rbe
+            asset: mm-windows-x64
+          - platform: macOS
+            os: macos-latest
+            config: rbe-mac
+            asset: mm-macos-arm64
+
+    env:
+      GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false  # read-only job, no git push
+
+      - name: Set up Bazel
+        uses: ./.github/actions/bazel-setup
+        with:
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
+          config: ${{ matrix.config }}
+          cache-name: ${{ matrix.asset }}
+
+      - name: Link mm
+        run: |
+          bazel build --config=native --remote_download_outputs=toplevel //app/main/cli:${{ matrix.asset }}
+
+      - name: Upload mm (${{ matrix.platform }})
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-mm-${{ matrix.platform }}
+          path: bazel-bin/app/main/cli/${{ matrix.asset }}.${{ matrix.platform == 'Windows' && 'exe' || 'tar.gz' }}
+          if-no-files-found: error
+          retention-days: 7
+
+  production-jvm:
+    name: Production JVM (${{ matrix.name }})
+    needs: changes
+    if: needs.changes.outputs.code == 'true' && github.event_name != 'pull_request'
+    env:
+      GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix: &desktop-platforms
+        include:
+          - name: Linux
+            os: ubuntu-latest
+            config: rbe
           - name: macOS
             os: macos-latest
             config: rbe-mac
@@ -570,38 +574,191 @@ jobs:
         with:
           buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
           config: ${{ matrix.config }}
+          cache-name: jvm-${{ matrix.name }}
+
+      - name: Check the optimized jars
+        if: runner.os == 'Linux'
+        run: bazel test --stamp //app/main/jvm:release_service_providers_test
+
+      - name: Build and archive the optimized app image
+        run: |
+          bazel build --stamp --remote_download_outputs=toplevel //app/main/jvm:app_image_aot
+          tar -chf image.tar -C bazel-bin/app/main/jvm/app_image_aot .
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: jvm-${{ matrix.name }}
+          path: image.tar
+          if-no-files-found: error
+          retention-days: 7
+
+  desktop-installer:
+    name: Desktop Installer (${{ matrix.name }})
+    needs: [changes, production-jvm, production-mm]
+    # Installer-labelled PRs use a quick build and skip both production matrices.
+    if: >-
+      !cancelled() && needs.changes.outputs.code == 'true' && needs.changes.outputs.installer == 'true' &&
+      (github.event_name == 'pull_request' ||
+       (needs.production-jvm.result == 'success' && needs.production-mm.result == 'success'))
+    env:
+      GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix: *desktop-platforms
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/download-desktop
+        if: github.event_name != 'pull_request'
+        with:
+          platform: ${{ matrix.name }}
+      - uses: ./.github/actions/bazel-setup
+        with:
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
+          config: ${{ matrix.config }}
           cache-name: installer-${{ matrix.name }}
 
-      # A pull request skips what is slow here (#1273): the native mm's link (Build and Test and Native Tests cover it)
-      # and the AOT caches' training (main and releases have it). Startup is timed by perf.yml, not here.
-      - name: Build the installer
-        env:
-          FULL: ${{ github.event_name != 'pull_request' }}
-        run: |
-          if [ "$FULL" = true ]; then
-            flags=(--config=native --define=bundle_native_cli=true)
-          else
-            flags=(--define=aot=false)
-          fi
-          bazel build --define=r8_optimize=false --define=native_optimize=false "${flags[@]}" //app/main/jvm:installer \
-            2>&1 | tee build.log
+      - name: Install Linux packaging and smoke-test tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y xvfb fakeroot
 
-      # This job builds here, not on a BuildBuddy runner, so the installer is in bazel-bin (not ci-out).
-      - name: Install and start it
+      - name: Package and smoke-test the installer
         env:
-          FULL: ${{ github.event_name != 'pull_request' }}
+          PRODUCTION: ${{ github.event_name != 'pull_request' }}
+          INSTALLER_AOT: ${{ github.event_name != 'pull_request' }}
+          INSTALLER_NATIVE_CLI: ${{ github.event_name != 'pull_request' || (runner.os == 'Linux' && needs.changes.outputs.native == 'true') }}
         run: |
-          [ "$FULL" = true ] || export INSTALLER_AOT=false INSTALLER_NATIVE_CLI=false
+          if [ "$PRODUCTION" = true ]; then
+            flags=(--define=prebuilt_desktop=true)
+          else
+            flags=(--define=r8_optimize=false --define=native_optimize=false --define=aot=false)
+            if [ "$INSTALLER_NATIVE_CLI" = true ]; then flags+=(--config=native --define=bundle_native_cli=true); fi
+          fi
+          bazel build "${flags[@]}" --remote_download_outputs=toplevel //app/main/jvm:installer
+          if [ "$PRODUCTION" = false ] && [ "$RUNNER_OS" = Linux ]; then
+            bazel test "${flags[@]}" //app/main/jvm:release_service_providers_test
+          fi
           bazel/kmp/jpackage/install_smoke_test.sh bazel-bin/app/main/jvm/installer "$(cat VERSION)"
 
-      # Nothing downloads it, and a PR's is stripped (no AOT caches, no native mm), so only main and manual runs keep it.
-      - name: Upload the installer
+      - uses: actions/upload-artifact@v7
         if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v7
         with:
           name: installer-${{ matrix.name }}
           path: bazel-bin/app/main/jvm/installer/*
+          if-no-files-found: error
           retention-days: 7
+
+  benchmark-inputs:
+    name: Startup benchmark inputs
+    needs: changes
+    if: needs.changes.outputs.code == 'true' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/bazel-setup
+        with:
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
+          cache-name: benchmark-inputs
+      - name: Build the shared benchmark databases and driver
+        run: |
+          bazel build --stamp --remote_download_outputs=toplevel \
+            //tools/bench-db:bench_db //tools/bench-db:empty_db //tools/repo-scripts:repo-scripts-tool_deploy.jar
+          mkdir bench
+          cp bazel-bin/tools/bench-db/{bench,empty}.db bazel-bin/tools/repo-scripts/repo-scripts-tool_deploy.jar bench/
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: benchmark-inputs
+          path: bench/
+          if-no-files-found: error
+          retention-days: 7
+
+  measure:
+    name: Time startup (${{ matrix.name }})
+    needs: [production-jvm, production-mm, benchmark-inputs]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix: *desktop-platforms
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/download-desktop
+        with:
+          platform: ${{ matrix.name }}
+      - uses: actions/download-artifact@v8
+        with:
+          name: benchmark-inputs
+          path: bench
+
+      # The desktop app's display.
+      - name: Install Xvfb
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
+      # The timing tool is compiled for MODULE.bazel's JDK, and the app image's runtime has no java.
+      - name: Read the JDK version
+        id: jdk
+        run: echo "version=$(sed -n 's/^JDK = "\([0-9]*\)\..*/\1/p' MODULE.bazel)" >> "$GITHUB_OUTPUT"
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: zulu
+          java-version: ${{ steps.jdk.outputs.version }}
+
+      - name: Extract the app image
+        run: mkdir image && tar -xf app/main/jvm/ci-inputs/image.tar -C image
+
+      - name: Time startup
+        env:
+          MM_SUFFIX: ${{ runner.os == 'Windows' && '.exe' || '' }}
+        run: STARTUP_BENCH_LABEL="$ImageOS $ImageVersion" bazel/perf/startup_bench.sh image "app/main/jvm/ci-inputs/mm${MM_SUFFIX}" bench "startup-${{ matrix.name }}.jsonl"
+
+      - name: Upload the startup times
+        uses: actions/upload-artifact@v7
+        with:
+          name: startup-${{ matrix.name }}
+          path: startup-${{ matrix.name }}.jsonl
+          if-no-files-found: error
+          retention-days: 7
+
+  # Whatever the OSes measured is kept, so one failed job only leaves a gap. A manual run on another branch measures
+  # but records nothing: perf-data is main's history.
+  record:
+    name: Record startup times
+    runs-on: ubuntu-latest
+    needs: measure
+    if: ${{ !cancelled() && needs.measure.result != 'skipped' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+    permissions:
+      contents: write
+    concurrency:
+      group: perf-data
+      cancel-in-progress: false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Download the startup times
+        uses: actions/download-artifact@v8
+        with:
+          pattern: startup-*
+          path: startup
+          merge-multiple: true
+
+      - name: Record them on perf-data
+        run: bazel/perf/record.sh startup
 
   android-release:
     name: Android Release Build
@@ -645,119 +802,6 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  # A release's desktop installers, stamped (`--stamp`) and with R8's optimizer on, unlike Desktop Installer's
-  # and Build and Test's, which leave it off to save time. jpackage packages only for its host, so each builds on its OS.
-  # macOS and Windows use the configs perf.yml and Desktop Installer use (their Kotlin/Native work on BuildBuddy's Linux
-  # executors): under `cache` the klibs compile on the runner, so neither they nor the optimised `mm` link perf.yml
-  # already cached for this commit could hit, and the link alone takes ~14 minutes on the macOS runner.
-  release-installer:
-    name: Release Build (${{ matrix.platform }})
-    runs-on: ${{ matrix.os }}
-    needs: changes
-    if: needs.changes.outputs.release != ''
-    strategy:
-      matrix:
-        include:
-          - platform: Windows
-            os: windows-latest
-            config: rbe-windows
-          - platform: macOS
-            os: macos-latest
-            config: rbe-mac
-          - platform: Linux
-            os: ubuntu-latest
-            config: rbe
-            # jpackage's deb needs fakeroot.
-            packages: fakeroot
-    defaults:
-      run:
-        shell: bash
-    env:
-      GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
-      GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-        with:
-          persist-credentials: false  # read-only job, no git push
-
-      - name: Set up Bazel
-        uses: ./.github/actions/bazel-setup
-        with:
-          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
-          config: ${{ matrix.config }}
-          cache-name: release-${{ matrix.platform }}
-
-      - name: Install packaging tools
-        if: matrix.packages
-        run: sudo apt-get update && sudo apt-get install -y ${{ matrix.packages }}
-
-      - name: Build the installer
-        run: >-
-          bazel build --config=all-platforms --stamp --remote_download_outputs=toplevel
-          --define=bundle_native_cli=true //app/main/jvm:installer
-
-      - name: Upload the installer
-        uses: actions/upload-artifact@v7
-        with:
-          name: release-${{ matrix.platform }}
-          path: |
-            bazel-bin/app/main/jvm/installer/*.msi
-            bazel-bin/app/main/jvm/installer/*.dmg
-            bazel-bin/app/main/jvm/installer/*.deb
-          if-no-files-found: error
-          retention-days: 7
-
-  # A release's standalone `mm` (app/main/cli), one native binary per target, as `mm-<os>-<arch>`
-  # (kmp_native_executable's release_assets: a tarball keeping the exec bit on Unix, the .exe on Windows). Linux links
-  # linuxX64, linuxArm64 (there is no Kotlin/Native compiler for Linux arm64 hosts) and mingwX64; macosArm64 only
-  # links on a Mac.
-  release-cli:
-    name: Release Build (mm ${{ matrix.platform }})
-    runs-on: ${{ matrix.os }}
-    needs: changes
-    if: needs.changes.outputs.release != ''
-    strategy:
-      matrix:
-        include:
-          - platform: Linux
-            os: ubuntu-latest
-            config: rbe
-            targets: //app/main/cli:mm-linux-x64 //app/main/cli:mm-linux-arm64 //app/main/cli:mm-windows-x64
-          - platform: macOS
-            os: macos-latest
-            config: rbe-mac
-            targets: //app/main/cli:mm-macos-arm64
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-        with:
-          persist-credentials: false  # read-only job, no git push
-
-      - name: Set up Bazel
-        uses: ./.github/actions/bazel-setup
-        with:
-          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
-          config: ${{ matrix.config }}
-          cache-name: release-cli-${{ matrix.platform }}
-
-      - name: Link mm
-        run: |
-          bazel build --config=native --remote_download_outputs=toplevel ${{ matrix.targets }}
-          mkdir -p cli-dist
-          cp $(bazel cquery --config=native --output=files 'set(${{ matrix.targets }})') cli-dist/
-          ls -la cli-dist
-
-      - name: Upload mm (${{ matrix.platform }})
-        uses: actions/upload-artifact@v7
-        with:
-          name: release-mm-${{ matrix.platform }}
-          path: cli-dist/*
-          if-no-files-found: error
-          retention-days: 7
-
   # Publishes the release once everything CI checks on this commit passed (CI Passed) and every release build
   # finished. The release creates its tag, `v<VERSION>`, on this commit. A failed or cancelled job it needs skips it, so
   # re-running the failed jobs retries the release. Auto-format PR, which CI Passed needs, is always skipped on a push,
@@ -766,12 +810,11 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    needs: [ changes, ci-passed, desktop-installer, android-release, release-installer, release-cli ]
+    needs: [ changes, ci-passed, desktop-installer, android-release ]
     if: >-
       ${{ always() && needs.changes.outputs.release != '' && needs.changes.result == 'success' &&
       needs.ci-passed.result == 'success' && needs.desktop-installer.result == 'success' &&
-      needs.android-release.result == 'success' && needs.release-installer.result == 'success' &&
-      needs.release-cli.result == 'success' }}
+      needs.android-release.result == 'success' }}
     permissions:
       contents: write  # creates the tag and the release
     steps:
@@ -788,7 +831,15 @@ jobs:
             echo "release=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Download the release builds
+      - name: Download the smoke-tested desktop installers
+        if: steps.unreleased.outputs.release == 'true'
+        uses: actions/download-artifact@v8
+        with:
+          pattern: installer-*
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: Download the standalone CLI binaries and Android APK
         if: steps.unreleased.outputs.release == 'true'
         uses: actions/download-artifact@v8
         with:
@@ -886,7 +937,7 @@ jobs:
   ci-passed:
     name: CI Passed
     runs-on: ubuntu-latest
-    needs: [ changes, build, native-cross, native-macos, lint-format, android-test ]
+    needs: [ changes, build, native-cross, native-macos, lint-format, android-test, production-jvm, production-mm, desktop-installer ]
     if: always() && needs.changes.outputs.noise != 'true'
     permissions:
       checks: read

@@ -211,13 +211,16 @@ aot_app_image = rule(
 def _installer_impl(ctx):
     out = ctx.actions.declare_directory(ctx.label.name)
     info = ctx.attr.app_image[JPackageInfo]
-    image = ctx.file.app_image
-    options = info.options + ["--app-image", image.path]
+    image = ctx.file.image_archive or ctx.file.app_image
+    image_option = "--app-image-archive" if ctx.file.image_archive else "--app-image"
+    options = info.options + [image_option, image.path]
+    if ctx.file.native_cli:
+        options += ["--installer-cli", ctx.file.native_cli.path]
     wix = ctx.files.wix
     if wix:
         candle = [f for f in wix if f.basename == "candle.exe"]
         options += ["--wix", candle[0].dirname]
-    # The image already holds the launchers and content, and jpackage rejects `--add-launcher` with `--app-image`.
+    # jpackage rejects `--add-launcher` with `--app-image`; the image already holds the launchers.
     lines = options + ["--", "--resource-dir", "{resources}", "--type", ctx.attr.type]
     lines += info.tail + ctx.attr.args
     _run(
@@ -225,7 +228,7 @@ def _installer_impl(ctx):
         "installer",
         out,
         lines,
-        depset([image] + wix, transitive = [info.inputs]),
+        depset([image] + ctx.files.native_cli + wix, transitive = [info.inputs]),
         "JPackageInstaller",
         "Packaging the %s installer %%{label}" % ctx.attr.type,
         # dpkg-deb and fakeroot, hdiutil, WiX: the installer tools are the host's own, and they run outside the
@@ -246,6 +249,8 @@ jpackage_installer = rule(
             doc = "A `jpackage_app_image`.",
         ),
         "args": attr.string_list(doc = "More jpackage arguments (the installer type's own options)."),
+        "image_archive": attr.label(allow_single_file = True, doc = "Package this prebuilt tar archive of the app image."),
+        "native_cli": attr.label(allow_single_file = True, doc = "Standalone native executable to add to the installer."),
         "type": attr.string(mandatory = True, values = ["deb", "rpm", "dmg", "pkg", "msi", "exe"]),
         "wix": attr.label(allow_files = True, doc = "Windows: the WiX toolset jpackage runs (Compose's `wix311`)."),
         "_runner": attr.label(default = "//bazel/kmp/jpackage:runner", executable = True, cfg = "exec"),

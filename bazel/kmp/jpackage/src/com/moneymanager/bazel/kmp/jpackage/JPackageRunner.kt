@@ -141,14 +141,8 @@ private fun jpackage(
             command += listOf("--mac-package-identifier", bundleId(options))
             command += listOf("--mac-entitlements", values.getValue("{entitlements}"))
         }
-        if ("--app-image" in options) {
-            // jpackage packages a copy: Bazel's outputs are read-only (codesign then can't re-sign the bundle) and,
-            // outside the sandbox, may be symlinks into its cache, which the package would carry as they are.
-            val image = work.resolve("app-image")
-            copyWritable(Path.of(options.one("--app-image")).absolute(), image)
-            val name = options.one("--name")
-            // jpackage 18+ wants the .app bundle itself on macOS (Compose passes it the same way).
-            val bundle = if (HOST_OS == OS.MAC) image.resolve("$name.app") else image.resolve(name)
+        if (mode == "installer") {
+            val bundle = prepareInstallerBundle(work, options, Path.of(values.getValue("{entitlements}")))
             command += listOf("--app-image", bundle.toString())
         }
         command += listOf("--dest", out.toString())
@@ -175,6 +169,45 @@ private fun jpackage(
     } finally {
         deleteQuietly(work)
     }
+}
+
+private fun prepareInstallerBundle(
+    work: Path,
+    options: Map<String, List<String>>,
+    entitlements: Path,
+): Path {
+    // jpackage packages a copy: Bazel's outputs are read-only (codesign then can't re-sign the bundle) and,
+    // outside the sandbox, may be symlinks into its cache, which the package would carry as they are.
+    val image = work.resolve("app-image")
+    if ("--app-image-archive" in options) {
+        Files.createDirectories(image)
+        val archive = Path.of(options.one("--app-image-archive")).absolute()
+        // A drive letter in tar's archive argument is interpreted as a remote host by GNU tar.
+        val tar =
+            ProcessBuilder("tar", "-xf", archive.name, "-C", image.toString())
+                .directory(archive.parent.toFile())
+                .inheritIO()
+        check(tar.start().use { it.waitFor() } == 0) { "Could not extract $archive" }
+        Files.walk(image).use { paths -> paths.forEach(::makeWritable) }
+    } else {
+        copyWritable(Path.of(options.one("--app-image")).absolute(), image)
+    }
+    val name = options.one("--name")
+    // jpackage 18+ wants the .app bundle itself on macOS (Compose passes it the same way).
+    val bundle = if (HOST_OS == OS.MAC) image.resolve("$name.app") else image.resolve(name)
+    options["--installer-cli"]?.let { cli ->
+        val content =
+            when (HOST_OS) {
+                OS.LINUX -> bundle.resolve("lib")
+                OS.MAC -> bundle.resolve("Contents")
+                OS.WINDOWS -> bundle
+            }
+        layOutCli(content.resolve("cli"), cli)
+        if (HOST_OS == OS.MAC) {
+            adHocSign(bundle, entitlements)
+        }
+    }
+    return bundle
 }
 
 /**
