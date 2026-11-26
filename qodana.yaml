@@ -496,6 +496,7 @@ exclude:
       - app/model/core/src/commonMain
       # [2][5] — the same scan: API-import helpers the API screens
       # (app/ui/imports/api) call; the crypto catalog's refresher (the entry points) and its `size` (its test); ArchiveCodec.pack (the sync and the vault).
+      - app/apiimport/src/commonMain/kotlin/com/moneymanager/apiimport/ApiConnectionsSnapshot.kt
       - app/apiimport/src/commonMain/kotlin/com/moneymanager/apiimport/ApiCredentialVaultSupport.kt
       - app/apiimport/src/commonMain/kotlin/com/moneymanager/apiimport/ApiImportTaskKeys.kt
       - app/apiimport/src/commonMain/kotlin/com/moneymanager/apiimport/ApiSessionPlanning.kt

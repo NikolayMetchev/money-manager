@@ -386,7 +386,7 @@ private fun pointConfigAtCache(
     lines.addAll(
         at,
         listOf(
-            "java-options=-XX:AOTCache=\$APPDIR/$launcher.aot",
+            $$"java-options=-XX:AOTCache=$APPDIR/$$launcher.aot",
             "java-options=-Xlog:disable",
             "java-options=-Xlog:all=warning:stderr",
         ),
@@ -473,7 +473,7 @@ private fun writeMainWxs(target: Path) {
     val command =
         "&quot;[System64Folder]WindowsPowerShell\\v1.0\\powershell.exe&quot; -NoProfile -NonInteractive" +
             " -WindowStyle Hidden -Command &quot;Get-ChildItem -LiteralPath app -Filter *.jar | ForEach-Object {" +
-            " \$_.LastWriteTimeUtc = (Get-Date '" + PINNED_MTIME.toInstant() + "').ToUniversalTime() }&quot;"
+            $$" $_.LastWriteTimeUtc = (Get-Date '" + PINNED_MTIME.toInstant() + "').ToUniversalTime() }&quot;"
     wxs =
         insertBefore(
             wxs,

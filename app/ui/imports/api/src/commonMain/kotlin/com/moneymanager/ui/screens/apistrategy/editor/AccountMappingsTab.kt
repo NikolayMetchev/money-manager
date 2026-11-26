@@ -89,13 +89,5 @@ internal fun AccountMappingsTab(
             onRequestPick,
             enabled,
         )
-        PathFieldRow(
-            "Currency field (optional)",
-            mappings.currencyField.orEmpty(),
-            { value -> state.updateAccountMappings { copy(currencyField = value.ifBlank { null }) } },
-            accountJsonPaths,
-            onRequestPick,
-            enabled,
-        )
     }
 }

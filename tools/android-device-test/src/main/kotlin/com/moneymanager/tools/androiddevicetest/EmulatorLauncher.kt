@@ -59,7 +59,7 @@ internal fun hypervisorHint(osName: String): String =
         }
 
         else -> {
-            "Give your user access to /dev/kvm (`sudo usermod -aG kvm \$USER`, then log in again) and enable " +
+            $$"Give your user access to /dev/kvm (`sudo usermod -aG kvm $USER`, then log in again) and enable " +
                 "virtualization in the firmware, or connect a device."
         }
     }

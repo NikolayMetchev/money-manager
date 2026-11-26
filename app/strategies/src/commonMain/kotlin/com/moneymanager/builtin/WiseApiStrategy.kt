@@ -52,7 +52,6 @@ internal object WiseApiStrategy {
                                     // Wise CSV strategy books every currency to one "Wise" account instead.)
                                     descriptionField = "currency",
                                     ownersArrayField = null,
-                                    currencyField = "currency",
                                 ),
                             ancestorEndpoints =
                                 listOf(

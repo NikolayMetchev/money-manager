@@ -54,7 +54,6 @@ internal object StarlingApiStrategy {
                                 ApiAccountMappings(
                                     idField = "accountUid",
                                     descriptionField = "name",
-                                    currencyField = "currency",
                                     ownersArrayField = null,
                                     rules = listOf(accounts(AccountSide.OWN, fixedNaming("accountUid", "Starling"))),
                                     // Starling's /accounts response omits bank details; they come from the
