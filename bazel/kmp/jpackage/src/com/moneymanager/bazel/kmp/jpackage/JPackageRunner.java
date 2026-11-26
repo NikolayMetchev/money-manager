@@ -758,15 +758,13 @@ public final class JPackageRunner {
   }
 
   private enum OS {
-    LINUX("linux", "linux.png"),
-    MAC("macos", "mac.icns"),
-    WINDOWS("windows", "windows.ico");
+    LINUX("linux.png"),
+    MAC("mac.icns"),
+    WINDOWS("windows.ico");
 
-    final String id;
     final String iconSuffix;
 
-    OS(String id, String iconSuffix) {
-      this.id = id;
+    OS(String iconSuffix) {
       this.iconSuffix = iconSuffix;
     }
 
