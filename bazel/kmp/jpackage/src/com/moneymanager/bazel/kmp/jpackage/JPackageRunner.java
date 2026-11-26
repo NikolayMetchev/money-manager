@@ -474,19 +474,48 @@ public final class JPackageRunner {
         pinMtimes(app);
       }
     } finally {
-      run(List.of("hdiutil", "detach", mount.toString()));
+      detach(mount);
     }
     Files.delete(dmg);
     run(List.of("hdiutil", "convert", writable.toString(), "-format", "UDZO", "-o", dmg.toString()));
     Files.delete(writable);
   }
 
-  private static void run(List<String> command) throws Exception {
-    try (Process process = new ProcessBuilder(command).inheritIO().start()) {
-      int code = process.waitFor();
-      if (code != 0) {
-        throw new IllegalStateException(String.join(" ", command) + " exited with " + code);
+  private static final int DETACH_ATTEMPTS = 10;
+  private static final long DETACH_RETRY_MILLIS = 3_000;
+
+  /**
+   * Unmounts the dmg, retrying while it is busy: right after the volume is mounted and written, macOS (Spotlight,
+   * diskarbitrationd) can still hold it open, and {@code hdiutil detach} then fails with "Resource busy" (16). Not
+   * {@code -force}: the volume must be cleanly unmounted before it is converted back.
+   */
+  private static void detach(Path mount) throws Exception {
+    List<String> command = List.of("hdiutil", "detach", mount.toString());
+    for (int attempt = 1; ; attempt++) {
+      int code = exitCode(command);
+      if (code == 0) {
+        return;
       }
+      if (attempt == DETACH_ATTEMPTS) {
+        throw new IllegalStateException(
+            String.join(" ", command) + " exited with " + code + " on all " + DETACH_ATTEMPTS + " attempts");
+      }
+      System.err.println(String.join(" ", command) + " exited with " + code + "; retrying (" + attempt + "/"
+          + DETACH_ATTEMPTS + ")");
+      Thread.sleep(DETACH_RETRY_MILLIS);
+    }
+  }
+
+  private static void run(List<String> command) throws Exception {
+    int code = exitCode(command);
+    if (code != 0) {
+      throw new IllegalStateException(String.join(" ", command) + " exited with " + code);
+    }
+  }
+
+  private static int exitCode(List<String> command) throws Exception {
+    try (Process process = new ProcessBuilder(command).inheritIO().start()) {
+      return process.waitFor();
     }
   }
 
