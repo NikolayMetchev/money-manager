@@ -647,6 +647,9 @@ jobs:
 
   # A release's desktop installers, stamped (`--stamp`) and with ProGuard's optimizer on, unlike Desktop Installer's
   # and Build and Test's, which leave it off to save time. jpackage packages only for its host, so each builds on its OS.
+  # macOS and Windows use the configs perf.yml and Desktop Installer use (their Kotlin/Native work on BuildBuddy's Linux
+  # executors): under `cache` the klibs compile on the runner, so neither they nor the optimised `mm` link perf.yml
+  # already cached for this commit could hit, and the link alone takes ~14 minutes on the macOS runner.
   release-installer:
     name: Release Build (${{ matrix.platform }})
     runs-on: ${{ matrix.os }}
@@ -657,10 +660,10 @@ jobs:
         include:
           - platform: Windows
             os: windows-latest
-            config: cache
+            config: rbe-windows
           - platform: macOS
             os: macos-latest
-            config: cache
+            config: rbe-mac
           - platform: Linux
             os: ubuntu-latest
             config: rbe
@@ -724,7 +727,7 @@ jobs:
             targets: //app/main/cli:mm-linux-x64 //app/main/cli:mm-linux-arm64 //app/main/cli:mm-windows-x64
           - platform: macOS
             os: macos-latest
-            config: cache
+            config: rbe-mac
             targets: //app/main/cli:mm-macos-arm64
 
     steps:
