@@ -5,6 +5,8 @@
 directories:
   .
   -.bazelbsp
+  # Agent worktrees (git-ignored) hold second copies of every package; the IDE would index them as the same code.
+  -.claude
 
 derive_targets_from_directories: true
 
