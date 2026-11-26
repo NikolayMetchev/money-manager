@@ -110,12 +110,15 @@
 </header>
 <main>
   <p>
-    After each push to main, CI installs that commit's desktop installer on Linux, macOS and Windows and times the
+    After a push to main, a workflow of its own builds that commit's desktop installer on Linux, macOS and Windows as
+    a release builds it, installs it, and times the
     installed app opening a benchmark database (3 people, 50 accounts, 20,000 transfers) and an empty one, with
     <code>repo-scripts startup-bench</code>. Every figure is the median of 10 runs from a clean home directory, in
     milliseconds from process start. <strong>AOT cache</strong> is the app as shipped; <strong>no cache</strong> is
     the same app with <code>-XX:AOTMode=off</code>. GitHub's runners are shared machines, so expect noise of
-    10–20%: look for steps that persist, not single points. The data is
+    10–20%: look for steps that persist, not single points. When main moves faster than a measurement, the commits
+    in between are skipped. The native <code>mm</code> figures from commit 0a3258d (25 November 2026) until the
+    measurement moved to its own workflow are a debug build, not a regression in the app. The data is
     <a href="https://github.com/NikolayMetchev/money-manager/blob/perf-data/startup.jsonl">startup.jsonl</a> on the
     <code>perf-data</code> branch.
   </p>

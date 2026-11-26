@@ -110,10 +110,12 @@ On pull requests the installer jobs pass `--define=aot=false` (Build and Test's 
 `INSTALLER_AOT=false`), and the macOS and Windows ones also leave out `bundle_native_cli` (the native `mm` link and the AOT
 training are most of their ~18 minutes); main and releases keep both.
 
-**Startup tracking**: on every push to main, the installer smoke tests (Build and Test's deb, Desktop Installer's dmg
-and msi) also time the installed launchers with `repo-scripts startup-bench` on `//tools/bench-db`'s databases, with
-and without the AOT cache, and the `perf-record` job appends the results (`bazel/perf/record.sh`) to `startup.jsonl`
-on the orphan `perf-data` branch, which `webpage/performance.html` graphs. Pull requests don't measure.
+**Startup tracking** (`perf.yml`, its own workflow so a release never waits for it): on every push to main that changes
+code it builds the installer on Linux, macOS and Windows as a release does (ProGuard's optimizer on, the native `mm`
+optimised; CI's debug-linked `mm` reads the benchmark database 13-19x slower), installs it, times the launchers with
+`repo-scripts startup-bench` on `//tools/bench-db`'s databases, with and without the AOT cache, and appends the results
+(`bazel/perf/record.sh`) to `startup.jsonl` on the orphan `perf-data` branch, which `webpage/performance.html` reads live.
+A push while it runs waits, and a newer one replaces it. CI's installer jobs only build and smoke-test the installers.
 
 Releases: `//app/main/android:release` (R8, unsigned), `//app/main/jvm:installer`, and `//app/main/cli:mm-linux-x64`,
 `:mm-linux-arm64`, `:mm-windows-x64`, `:mm-macos-arm64` (the Apple one only on macOS). The release smoke test,

@@ -83,6 +83,7 @@ jobs:
               - '!webpage/**'
               - '!**/*.md'
               - '!.github/workflows/static.yml'
+              - '!.github/workflows/perf.yml'
               - '!.github/workflows/dependency-submission.yml'
       # head_commit lists the files the pushed commit changed (main takes squash merges, one commit a push), the same
       # test the concurrency group makes. A VERSION edit that leaves an already-released version releases nothing.
@@ -238,43 +239,15 @@ jobs:
           disable_search: true
           fail_ci_if_error: false
 
-      # The startup timing tool (main only) is compiled for MODULE.bazel's JDK, and the installed runtime has no java.
-      - name: Read the JDK version
-        if: github.event_name != 'pull_request'
-        id: jdk
-        shell: bash
-        run: echo "version=$(sed -n 's/^JDK = "\([0-9]*\)\..*/\1/p' MODULE.bazel)" >> "$GITHUB_OUTPUT"
-      - name: Set up Java
-        if: github.event_name != 'pull_request'
-        uses: actions/setup-java@v6
-        with:
-          distribution: zulu
-          java-version: ${{ steps.jdk.outputs.version }}
-
-      # On main (and manual runs) it also times the installed app's startup, which perf-record keeps (#1254).
       - name: Install and start the desktop installer
         if: needs.changes.outputs.installer == 'true'
         env:
-          MEASURE: ${{ github.event_name != 'pull_request' }}
+          AOT: ${{ github.event_name != 'pull_request' }}
           NATIVE: ${{ needs.changes.outputs.native }}
         run: |
-          if [ "$MEASURE" = true ]; then
-            export STARTUP_BENCH_DBS=ci-out/bench-dbs STARTUP_BENCH_OUT=$PWD/startup-Linux.jsonl
-            export STARTUP_BENCH_LABEL="$ImageOS $ImageVersion"
-          else
-            export INSTALLER_AOT=false
-          fi
+          [ "$AOT" = true ] || export INSTALLER_AOT=false
           [ "$NATIVE" = true ] || export INSTALLER_NATIVE_CLI=false
           bazel/kmp/jpackage/install_smoke_test.sh ci-out/installer "$(cat VERSION)"
-
-      - name: Upload the startup times
-        if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v7
-        with:
-          name: startup-Linux
-          path: startup-Linux.jsonl
-          if-no-files-found: error
-          retention-days: 7
 
       - name: Upload the installer
         if: github.event_name != 'pull_request'
@@ -596,58 +569,27 @@ jobs:
           config: ${{ matrix.config }}
           cache-name: installer-${{ matrix.name }}
 
-      # The startup timing tool (main only) is compiled for MODULE.bazel's JDK, and the installed runtime has no java.
-      - name: Read the JDK version
-        if: github.event_name != 'pull_request'
-        id: jdk
-        shell: bash
-        run: echo "version=$(sed -n 's/^JDK = "\([0-9]*\)\..*/\1/p' MODULE.bazel)" >> "$GITHUB_OUTPUT"
-      - name: Set up Java
-        if: github.event_name != 'pull_request'
-        uses: actions/setup-java@v6
-        with:
-          distribution: zulu
-          java-version: ${{ steps.jdk.outputs.version }}
-
-      # On main (and manual runs) it also builds the startup benchmark's databases and times the installed app's
-      # startup, which perf-record keeps (#1254). A pull request skips what is slow here (#1273): the native mm's link
-      # (Build and Test and Native Tests cover it) and the AOT caches' training (main and releases have it).
+      # A pull request skips what is slow here (#1273): the native mm's link (Build and Test and Native Tests cover it)
+      # and the AOT caches' training (main and releases have it). Startup is timed by perf.yml, not here.
       - name: Build the installer
         env:
-          MEASURE: ${{ github.event_name != 'pull_request' }}
+          FULL: ${{ github.event_name != 'pull_request' }}
         run: |
-          if [ "$MEASURE" = true ]; then
+          if [ "$FULL" = true ]; then
             flags=(--config=native --define=bundle_native_cli=true)
-            targets=(//tools/bench-db:bench_db //tools/bench-db:empty_db //tools/repo-scripts:repo-scripts-tool_deploy.jar)
           else
             flags=(--define=aot=false)
-            targets=()
           fi
-          bazel build --define=proguard_optimize=false --define=native_optimize=false "${flags[@]}" //app/main/jvm:installer "${targets[@]}" \
+          bazel build --define=proguard_optimize=false --define=native_optimize=false "${flags[@]}" //app/main/jvm:installer \
             2>&1 | tee build.log
 
       # This job builds here, not on a BuildBuddy runner, so the installer is in bazel-bin (not ci-out).
       - name: Install and start it
         env:
-          MEASURE: ${{ github.event_name != 'pull_request' }}
+          FULL: ${{ github.event_name != 'pull_request' }}
         run: |
-          if [ "$MEASURE" = true ]; then
-            mkdir bench-dbs && cp bazel-bin/tools/bench-db/bench.db bazel-bin/tools/bench-db/empty.db bazel-bin/tools/repo-scripts/repo-scripts-tool_deploy.jar bench-dbs/
-            export STARTUP_BENCH_DBS=$PWD/bench-dbs STARTUP_BENCH_OUT=$PWD/startup-${{ matrix.name }}.jsonl
-            export STARTUP_BENCH_LABEL="$ImageOS $ImageVersion"
-          else
-            export INSTALLER_AOT=false INSTALLER_NATIVE_CLI=false
-          fi
+          [ "$FULL" = true ] || export INSTALLER_AOT=false INSTALLER_NATIVE_CLI=false
           bazel/kmp/jpackage/install_smoke_test.sh bazel-bin/app/main/jvm/installer "$(cat VERSION)"
-
-      - name: Upload the startup times
-        if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v7
-        with:
-          name: startup-${{ matrix.name }}
-          path: startup-${{ matrix.name }}.jsonl
-          if-no-files-found: error
-          retention-days: 7
 
       # Nothing downloads it, and a PR's is stripped (no AOT caches, no native mm), so only main and manual runs keep it.
       - name: Upload the installer
@@ -657,35 +599,6 @@ jobs:
           name: installer-${{ matrix.name }}
           path: bazel-bin/app/main/jvm/installer/*
           retention-days: 7
-
-  # Appends main's startup times to startup.jsonl on the perf-data branch, which webpage/performance.html graphs
-  # (#1254). Whatever the OSes measured is kept, so one failed installer job only leaves a gap. A push that changes no
-  # code (a workflow or docs change) skips both measuring jobs, so there is nothing to record and this skips too.
-  perf-record:
-    name: Record startup times
-    runs-on: ubuntu-latest
-    needs: [ build, desktop-installer ]
-    if: >-
-      !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' &&
-      (needs.build.result != 'skipped' || needs.desktop-installer.result != 'skipped')
-    permissions:
-      contents: write
-    concurrency:
-      group: perf-data
-      cancel-in-progress: false
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-
-      - name: Download the startup times
-        uses: actions/download-artifact@v8
-        with:
-          pattern: startup-*
-          path: startup
-          merge-multiple: true
-
-      - name: Record them on perf-data
-        run: bazel/perf/record.sh startup
 
   android-release:
     name: Android Release Build

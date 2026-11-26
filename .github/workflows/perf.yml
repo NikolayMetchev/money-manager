@@ -1,0 +1,134 @@
+# Startup performance (#1254): after a push to main, builds the desktop installer on Linux, macOS and Windows, installs
+# it, times the installed launchers with `repo-scripts startup-bench` on //tools/bench-db's databases (with and without
+# the AOT cache), and appends the results to startup.jsonl on the perf-data branch, which webpage/performance.html reads
+# (the Pages site fetches it live, so recording is publishing).
+#
+# It is its own workflow so it is off the release's critical path: CI (build.yml) still builds and smoke-tests the
+# installers, and a release never waits for this. Nothing requires it, and a failure only leaves a gap in the graphs.
+#
+# It measures what ships: the installer is built as a release builds it (ProGuard's optimizer on, the native mm an
+# optimised link, the AOT caches trained), not with CI's time-saving defines. CI's mm is a debug link against the
+# compiler caches (`native_optimize=false`, #1598), which reads the benchmark database 13-19x slower on Linux and
+# macOS, so timing CI's build would measure the debug link rather than the app.
+name: Startup Performance
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    # The same files CI (build.yml's `changes`) ignores: a push that changes none of the app has nothing new to time.
+    paths-ignore:
+      - 'docs/**'
+      - 'webpage/**'
+      - '**/*.md'
+      - '.github/workflows/static.yml'
+      - '.github/workflows/dependency-submission.yml'
+
+# One measurement at a time. A push while one runs waits, and a newer push replaces the waiting one, so a burst of
+# merges skips commits in between rather than piling up (each run is a release-sized build on three OSes).
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  measure:
+    name: Time startup (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux
+            os: ubuntu-latest
+            config: rbe
+            # jpackage's deb needs fakeroot, and the installed app's display is Xvfb.
+            packages: fakeroot xvfb
+          # `rbe-mac`, as Native Tests (macosArm64) runs: the bundled `mm`'s klib compiles go to BuildBuddy.
+          - name: macOS
+            os: macos-latest
+            config: rbe-mac
+          - name: Windows
+            os: windows-latest
+            config: rbe-windows
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false  # read-only job, no git push
+
+      - name: Set up Bazel
+        uses: ./.github/actions/bazel-setup
+        with:
+          buildbuddy-api-key: ${{ secrets.BUILDBUDDY_API_KEY }}
+          config: ${{ matrix.config }}
+          cache-name: perf-${{ matrix.name }}
+
+      - name: Install packaging tools
+        if: matrix.packages
+        run: sudo apt-get update && sudo apt-get install -y ${{ matrix.packages }}
+
+      # The timing tool is compiled for MODULE.bazel's JDK, and the installed runtime has no java.
+      - name: Read the JDK version
+        id: jdk
+        run: echo "version=$(sed -n 's/^JDK = "\([0-9]*\)\..*/\1/p' MODULE.bazel)" >> "$GITHUB_OUTPUT"
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: zulu
+          java-version: ${{ steps.jdk.outputs.version }}
+
+      - name: Build the installer and the benchmark
+        run: |
+          bazel build --config=native --define=bundle_native_cli=true --remote_download_outputs=toplevel \
+            //app/main/jvm:installer //tools/bench-db:bench_db //tools/bench-db:empty_db \
+            //tools/repo-scripts:repo-scripts-tool_deploy.jar 2>&1 | tee build.log
+
+      - name: Install it and time its startup
+        run: |
+          mkdir bench-dbs
+          cp bazel-bin/tools/bench-db/bench.db bazel-bin/tools/bench-db/empty.db \
+            bazel-bin/tools/repo-scripts/repo-scripts-tool_deploy.jar bench-dbs/
+          export STARTUP_BENCH_DBS=$PWD/bench-dbs STARTUP_BENCH_OUT=$PWD/startup-${{ matrix.name }}.jsonl
+          export STARTUP_BENCH_LABEL="$ImageOS $ImageVersion"
+          bazel/kmp/jpackage/install_smoke_test.sh bazel-bin/app/main/jvm/installer "$(cat VERSION)"
+
+      - name: Upload the startup times
+        uses: actions/upload-artifact@v7
+        with:
+          name: startup-${{ matrix.name }}
+          path: startup-${{ matrix.name }}.jsonl
+          if-no-files-found: error
+          retention-days: 7
+
+  # Whatever the OSes measured is kept, so one failed job only leaves a gap. A manual run on another branch measures
+  # but records nothing: perf-data is main's history.
+  record:
+    name: Record startup times
+    runs-on: ubuntu-latest
+    needs: measure
+    if: ${{ !cancelled() && github.ref == 'refs/heads/main' }}
+    permissions:
+      contents: write
+    concurrency:
+      group: perf-data
+      cancel-in-progress: false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Download the startup times
+        uses: actions/download-artifact@v8
+        with:
+          pattern: startup-*
+          path: startup
+          merge-multiple: true
+
+      - name: Record them on perf-data
+        run: bazel/perf/record.sh startup

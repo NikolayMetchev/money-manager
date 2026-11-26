@@ -12,7 +12,7 @@
 # With STARTUP_BENCH_DBS (a directory holding //tools/bench-db's bench.db and empty.db, and the tool that times them,
 # repo-scripts-tool_deploy.jar) and STARTUP_BENCH_OUT (a file), it then times the installed launchers' startup with the tool,
 # on the runner's java (the JDK of MODULE.bazel), and appends the results
-# there (#1254): CI does this on main, so every commit's startup is recorded on the perf-data branch.
+# there (#1254): perf.yml does this on main, so its commits' startup is recorded on the perf-data branch.
 #
 # Usage: install_smoke_test.sh <installer directory> <expected version>
 set -euo pipefail
