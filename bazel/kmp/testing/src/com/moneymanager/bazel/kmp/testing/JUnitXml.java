@@ -37,10 +37,6 @@ final class JUnitXml {
     return suites.computeIfAbsent(className, k -> new LinkedHashMap<>()).computeIfAbsent(method, Case::new);
   }
 
-  int count() {
-    return suites.values().stream().mapToInt(Map::size).sum();
-  }
-
   void write(Path path) throws IOException {
     StringWriter out = new StringWriter();
     out.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<testsuites>\n");
