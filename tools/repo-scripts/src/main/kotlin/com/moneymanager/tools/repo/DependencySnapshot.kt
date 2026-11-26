@@ -21,7 +21,7 @@ private val prettyJson =
  * Bazel's resolution is the lockfiles `bazel run @<hub>//:pin` writes. Each becomes a manifest: every library it
  * resolved, with its dependencies. The app's own libraries (the `maven_kmp` lockfile, at each version some platform
  * resolved them to, direct when the install names it in `libraries`) are runtime dependencies. The build tools'
- * (ktlint, detekt, ProGuard, …: rules_jvm_external's `bazel/maven/<name>_install.json`, direct when its MODULE.bazel
+ * (ktlint, detekt, R8, …: rules_jvm_external's `bazel/maven/<name>_install.json`, direct when its MODULE.bazel
  * `maven.install` lists it above the transitive pins) are development ones. Usage, with the job's `GITHUB_SHA`,
  * `GITHUB_REF`, `GITHUB_RUN_ID`, `GITHUB_JOB` and `GITHUB_WORKFLOW` set:
  *

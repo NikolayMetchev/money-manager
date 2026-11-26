@@ -84,7 +84,7 @@ _DESKTOP_JDK = {
     "windows_x64": "jdk_windows_x86_64",
 }
 
-# The target's JDK modules: ProGuard's library jars (#1019) and what jlink bundles. The runtime toolchain leaves
+# The target's JDK modules: what jlink bundles (#1020). The runtime toolchain leaves
 # them out.
 alias(
     name = "jdk_jmods",

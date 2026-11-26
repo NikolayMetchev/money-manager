@@ -127,8 +127,8 @@ jobs:
       INSTALLER: ${{ needs.changes.outputs.installer }}
       ANDROID: ${{ needs.changes.outputs.android }}
       WEB: ${{ needs.changes.outputs.web }}
-      # On every command, so they share one analysis cache; they only change ProGuard, the installer and the JVM
-      # tests. Shrink only: the keep rules and ServiceLoader providers don't depend on ProGuard's optimizer, which
+      # On every command, so they share one analysis cache; they only change R8, the installer and the JVM
+      # tests. Shrink only: the keep rules and ServiceLoader providers don't depend on R8's optimizer, which
       # takes most of its time (release builds optimize). The installer bundles the native mm, as the release's does.
       # The JVM and Android host tests run under the coverage agent, which Coverage reads.
       # A pull request also skips training the installer's AOT caches (the app starts under Xvfb on the runner, and
@@ -136,7 +136,7 @@ jobs:
       # `native_optimize=false` makes the native mm a debug link against the compiler caches the test binaries build:
       # seconds, where the optimised, uncached link is ~8 minutes. CI only needs it to link and start; releases optimize.
       BAZEL_FLAGS: >-
-        --define=proguard_optimize=false --define=native_optimize=false --config=coverage
+        --define=r8_optimize=false --define=native_optimize=false --config=coverage
         ${{ needs.changes.outputs.native == 'true' && needs.changes.outputs.installer == 'true' && '--define=bundle_native_cli=true' || '' }}
         ${{ github.event_name == 'pull_request' && '--define=aot=false' || '' }}
     # `shell: bash` runs with pipefail; the default shell doesn't, so `bazel … | tee` would take tee's exit code and
@@ -533,7 +533,7 @@ jobs:
 
   # jpackage packages only for its host, so each OS builds its own installer (#1020): a dmg or msi here (Build and
   # Test builds the deb) with the native mm bundled, as Release Build builds them. Then it installs it and starts the
-  # app, mm-jvm and mm. ProGuard's optimizer is off, as in Build and Test's ProGuard check.
+  # app, mm-jvm and mm. R8's optimizer is off, as in Build and Test's R8 check.
   desktop-installer:
     name: Desktop Installer (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
@@ -583,7 +583,7 @@ jobs:
           else
             flags=(--define=aot=false)
           fi
-          bazel build --define=proguard_optimize=false --define=native_optimize=false "${flags[@]}" //app/main/jvm:installer \
+          bazel build --define=r8_optimize=false --define=native_optimize=false "${flags[@]}" //app/main/jvm:installer \
             2>&1 | tee build.log
 
       # This job builds here, not on a BuildBuddy runner, so the installer is in bazel-bin (not ci-out).
@@ -645,7 +645,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  # A release's desktop installers, stamped (`--stamp`) and with ProGuard's optimizer on, unlike Desktop Installer's
+  # A release's desktop installers, stamped (`--stamp`) and with R8's optimizer on, unlike Desktop Installer's
   # and Build and Test's, which leave it off to save time. jpackage packages only for its host, so each builds on its OS.
   # macOS and Windows use the configs perf.yml and Desktop Installer use (their Kotlin/Native work on BuildBuddy's Linux
   # executors): under `cache` the klibs compile on the runner, so neither they nor the optimised `mm` link perf.yml

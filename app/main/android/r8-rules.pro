@@ -1,4 +1,4 @@
-# ProGuard rules for MoneyManager Android application
+# R8 rules for MoneyManager Android application
 
 # Keep Android entry point
 -keep class com.moneymanager.android.MainActivity { *; }

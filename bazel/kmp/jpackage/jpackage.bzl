@@ -3,7 +3,7 @@
 
 `jlink_runtime` is `createRuntimeImage` (the target JDK's modules, Compose's flags), `jpackage_app_image` is
 `createReleaseDistributable` and `jpackage_installer` is `package<Format>` over that image. The arguments are the
-ones Compose passes (captured from Gradle's `*.args.txt`); `JPackageRunner.java` lays out jpackage's input as
+ones Compose passes (captured from Gradle's `*.args.txt`); `JPackageRunner.kt` lays out jpackage's input as
 Compose's `prepareWorkingDir` does and fills in the platform's details (skiko's natives, macOS's `Info.plist`,
 ad-hoc signing). jpackage only packages for the host, so the image and installer are the build machine's own.
 """
@@ -146,7 +146,7 @@ jpackage_app_image = rule(
         "args": attr.string_list(doc = "More jpackage arguments (the platform's own options)."),
         "bundle_id": attr.string(doc = "macOS: `CFBundleIdentifier` and `--mac-package-identifier`."),
         "description": attr.string(mandatory = True),
-        "jars": attr.label(mandatory = True, providers = [JavaInfo], doc = "The app's jars (`proguard_jars`)."),
+        "jars": attr.label(mandatory = True, providers = [JavaInfo], doc = "The app's jars (`r8_jars`)."),
         "java_options": attr.string_list(doc = "The launcher's JVM options (Compose's `jvmArgs`)."),
         "launchers": attr.label_keyed_string_dict(
             allow_files = [".properties"],
@@ -189,7 +189,7 @@ aot_app_image = rule(
     doc = """A `jpackage_app_image` with an AOT cache (JEP 483/514/515) per launcher (#1254), trained by running each
     launcher on `database` in a home of its own, and checked to load. Its inputs are the image (runtime and jars),
     so a JDK or classpath change retrains it. Every file in it has one fixed modification time, which the caches
-    are trained against: an installer must install them at that time (see `JPackageRunner.PINNED_MTIME`).""",
+    are trained against: an installer must install them at that time (see `PINNED_MTIME` in `JPackageRunner.kt`).""",
     attrs = {
         "app_image": attr.label(
             mandatory = True,

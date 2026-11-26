@@ -55,9 +55,9 @@ done
 bazel fetch "${hubs[@]}"
 
 # The rest are manual, so `//...` skips them. A pull request without the `installer` label leaves out the first two:
-# the installer is built from the ProGuard jars, so the check costs nothing once it is built, and without it ProGuard
+# the installer is built from the R8 jars, so the check costs nothing once it is built, and without it R8
 # is minutes of the run.
-# - the desktop ProGuard check: `//...` never runs ProGuard, so a new dependency that needs keep/dontwarn rules
+# - the desktop R8 check: `//...` never runs R8, so a new dependency that needs keep/dontwarn rules
 #   would otherwise surface only when a release ran. It shrinks the desktop app and checks every ServiceLoader
 #   provider survived.
 # - the Linux desktop installer.

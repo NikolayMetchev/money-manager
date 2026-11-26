@@ -7,7 +7,7 @@
 # installers, and a release never waits for this. Nothing requires it, and a failure only leaves a gap in the graphs.
 #
 # No installer: it times `//app/main/jvm:app_image_aot`, the app image the installer packages, and `//app/main/cli:mm`,
-# both built as a release builds them (ProGuard's optimizer on, mm an optimised link), not with CI's time-saving
+# both built as a release builds them (R8's optimizer on, mm an optimised link), not with CI's time-saving
 # defines. CI's mm is a debug link against the compiler caches (`native_optimize=false`, #1598), which reads the
 # benchmark database 13-19x slower on Linux and macOS, so timing CI's build would measure the debug link, not the app.
 name: Startup Performance
@@ -83,7 +83,7 @@ jobs:
           distribution: zulu
           java-version: ${{ steps.jdk.outputs.version }}
 
-      # The release defaults: no `proguard_optimize=false` or `native_optimize=false`.
+      # The release defaults: no `r8_optimize=false` or `native_optimize=false`.
       - name: Build the release app and mm
         run: |
           targets=(//app/main/jvm:app_image_aot //app/main/cli:mm //tools/bench-db:bench_db //tools/bench-db:empty_db

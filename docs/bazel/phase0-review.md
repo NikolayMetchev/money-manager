@@ -85,7 +85,7 @@ the same pattern repeated, plus rules nobody has written for KMP yet:
 | Phase | Issues | Estimate | Main risk |
 |---|---|---|---|
 | 1. CLI closure on JVM + native | #1007–#1017 | 2 weeks | bundled SQLite (cinterop rule), the `mm` executables, ktlint/detekt |
-| 2. Desktop app | #1018–#1020 | 2 weeks | Compose resources, ProGuard and jpackage rules (none exist upstream for KMP) |
+| 2. Desktop app | #1018–#1020 | 2 weeks | Compose resources, shrinking and jpackage rules (none exist upstream for KMP) |
 | 3. Android | #1021–#1025 | 3 weeks | rules_android + KMP: AGP's manifest merge, R8, managed-device tests |
 | 4. Cutover | #1026–#1031 | 1 week | coverage parity, Pages tooling, CI timing with the remote cache |
 

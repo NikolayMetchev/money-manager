@@ -90,8 +90,9 @@ Flags and configs:
   BuildBuddy, anonymously. The executors run our image (`bazel/platforms/rbe/Dockerfile`, published by
   `rbe-image.yml`, its digest pinned in `//bazel/platforms:rbe_linux_x64`), so the Compose UI tests run remotely too.
 - `--stamp` writes the git commit into the release APK (`META-INF/version-control-info.textproto`); releases pass it.
-- `--define=proguard_optimize=false` skips ProGuard's optimizer in `//app/main/jvm:release` (shrinking alone checks
-  the keep rules, and the optimizer is most of ProGuard's ~15 minutes); CI's Build and Test passes it.
+- `--define=r8_optimize=false` skips R8's optimizer in `//app/main/jvm:release` (shrinking alone checks the keep
+  rules, and the optimizer is most of R8's ~3 minutes); CI's Build and Test passes it. The desktop app is shrunk by
+  R8 in class-file mode; its keep rules work around two R8 bugs in that output (see `app/main/jvm/r8-rules.pro`).
 - `--define=native_optimize=false` links the native executables (`mm`) as debug links against the compiler caches
   (`-g`, no `-opt`): ~15 seconds where the optimised, uncached link is ~8 minutes on BuildBuddy and ~14 on the macOS
   runner. Only the host's own target has caches, so the Windows `mm.exe` link is just unoptimised. CI passes it wherever
@@ -111,7 +112,7 @@ On pull requests the installer jobs pass `--define=aot=false` (Build and Test's 
 training are most of their ~18 minutes); main and releases keep both.
 
 **Startup tracking** (`perf.yml`, its own workflow so a release never waits for it): on every push to main that changes
-code it builds the release desktop app image (`//app/main/jvm:app_image_aot`, ProGuard's optimizer on, AOT caches
+code it builds the release desktop app image (`//app/main/jvm:app_image_aot`, R8's optimizer on, AOT caches
 trained) and the release `mm` (an optimised link; CI's debug-linked `mm` reads the benchmark database 13-19x slower) on
 Linux, macOS and Windows, and `bazel/perf/startup_bench.sh` times them with `repo-scripts startup-bench` on
 `//tools/bench-db`'s databases, with and without the AOT cache. No installer is built or installed. The `record` job
@@ -125,7 +126,7 @@ Releases: `//app/main/android:release` (R8, unsigned), `//app/main/jvm:installer
 
 **CI**: every workflow sets Bazel up through `.github/actions/bazel-setup` (on RBE without the disk cache, which
 BuildBuddy's cache already holds). `build.yml`'s Build and Test, on Linux (RBE), is `bazel/ci/build_and_test.sh`:
-`bazel test //...` (plus the desktop ProGuard check, the cross-linked linuxArm64 and mingwX64 test binaries and the
+`bazel test //...` (plus the desktop R8 check, the cross-linked linuxArm64 and mingwX64 test binaries and the
 Linux desktop installer) with `--config=coverage`, then the Kotlin JVM and Android tests' merged coverage
 (`coverage.sh`). It runs on a BuildBuddy runner (`bb remote`, Remote Bazel) resumed from a snapshot of an earlier run,
 warm Bazel server and all, and the job fetches its outputs (`bazel/ci/fetch_artifacts.sh`); a fork's PR runs it on the
@@ -138,7 +139,7 @@ regenerated, not reported. Dependency submission reads the lockfiles (`repo-scri
 
 **Native**: on a pull request every Kotlin/Native job and Bazel target (the `_linuxX64`, `_linuxArm64`, `_mingwX64`, `_macosArm64` compiles and tests, the native `mm`, `bundle_native_cli`) is skipped: `bazel/ci/build_and_test.sh` leaves the native flag off (`NATIVE=false`). Label the PR `native` to run them; main and manual runs always do. Another label's event skips every job.
 
-**Installer**: likewise on a pull request no desktop installer is built: not Build and Test's deb (and its smoke test and the startup tool, and the desktop ProGuard check, `//app/main/jvm:release_service_providers_test`, which shrinks the same jars the installer is built from; `INSTALLER=false` in `bazel/ci/build_and_test.sh`) and not the Desktop Installer jobs (dmg, msi). Label the PR `installer` to run them; main and manual runs always do. The same flag decides Build and Test's apt install of Xvfb and fakeroot, which only the installer needs and which is minutes of every run. Another label's event skips every job.
+**Installer**: likewise on a pull request no desktop installer is built: not Build and Test's deb (and its smoke test and the startup tool, and the desktop R8 check, `//app/main/jvm:release_service_providers_test`, which shrinks the same jars the installer is built from; `INSTALLER=false` in `bazel/ci/build_and_test.sh`) and not the Desktop Installer jobs (dmg, msi). Label the PR `installer` to run them; main and manual runs always do. The same flag decides Build and Test's apt install of Xvfb and fakeroot, which only the installer needs and which is minutes of every run. Another label's event skips every job.
 
 **Android**: likewise on a pull request no Android target is built or tested: the `_android` compiles and host tests, the device tests' APKs, the app, its lint and the smoke test (`ANDROID=false` in `bazel/ci/build_and_test.sh` leaves the android flag off, and `coverage.sh` leaves them out too) and not the Android Instrumented Tests job. Label the PR `android` to run them; main and manual runs always do. Another label's event skips every job.
 
@@ -173,7 +174,7 @@ workflow because label events start it: any other label's run skips, without can
 | `utils/parsers/{csv,qif,ofx,xlsx}/` | File-format parsers. `ofx` reads OFX 1.x (SGML, closing tags optional) and 2.x (XML) with its own small tokenizer, honouring a declared Windows-1252 character set |
 | `utils/parsers/pdf/` | PDF text extraction: pdfium (bblanchon's prebuilt libraries, pinned in `MODULE.bazel`), whose calls one `Pdfium` walk makes over a per-platform binding: FFM on the JVM; on native `pdfium_loader.c` (`kmp_static_library`), which `.incbin`s the target's shared library (bblanchon ships no static one) and dlopens it once `PdfiumLibraryFile` has written it, with its license notices, under `~/.moneymanager/native/`, so `mm` stays one file; in the browser pdfium's WebAssembly build (the npm `@embedpdf/pdfium`, loaded on first use, so `extract` suspends); on Android JNA (`AndroidPdfium`) over bblanchon's Android builds, which the module's `:pdfium_android` packages as AAR parts (`jni/`, notices, keep rules; JNA itself is an `android_aars` AAR). `PdfLineBuilder` rebuilds layout lines from glyph positions (columns stay two or more spaces apart). `PdfiumTextExtractorTest` (commonTest) reads the same fixture on every platform, Android on a device (`:test_device`) |
 | `utils/rest/` | Shared Ktor `ApiClient`, request signing, SCA challenge signing (`ScaCrypto`: RSA keys + SHA256withRSA on cryptography-kotlin, so native too; suspending, as WebCrypto has no blocking calls) and API traffic recording |
-| `utils/httpclient/` | The one place the Ktor engine is chosen: `platformHttpClient()` runs on Ktor's `ktor-client-engine-defaults` (OkHttp on JVM/Android, Curl on Linux, Darwin on macOS, WinHttp on Windows; native TLS comes from the OS or the statically linked libcurl), found by engine discovery. Build every production `HttpClient` with it, never with a named engine. ProGuard keeps `OkHttpEngineContainer` for the ServiceLoader lookup |
+| `utils/httpclient/` | The one place the Ktor engine is chosen: `platformHttpClient()` runs on Ktor's `ktor-client-engine-defaults` (OkHttp on JVM/Android, Curl on Linux, Darwin on macOS, WinHttp on Windows; native TLS comes from the OS or the statically linked libcurl), found by engine discovery. Build every production `HttpClient` with it, never with a named engine. R8 keeps `OkHttpEngineContainer` for the ServiceLoader lookup |
 | `utils/compose/{filePicker,scrollbar}/` | Platform file/folder pickers and scrollbar widgets. In the browser a picker is an `<input type=file>`, a save is a download, and folders are unsupported |
 | `app/model/core/` | The flat `domain.model` package: entities, ids, `Money`, audit entries. Depends on nothing but `utils/bigdecimal` and `utils/files` (and, in the browser, the zone database `@js-joda/timezone`) |
 | `app/model/calendar/` | Locations: `HolidayCalendar` (Strata's shape: a code like `GBLO`, zone, weekend days, explicit holidays and weekend working days), `CombinedCalendar` (a day is open only if every calendar is), `WeekendOnlyCalendar`. The app bundles no calendars: the catalog publishes OpenGamma Strata's, rendered 1950–2099 when it is published |
@@ -780,7 +781,7 @@ set of writes.
   `# renovate: <group:artifact>` comment (libraries released together share one), then `bazel run @maven_kmp//:pin`.
   An npm package the browser code imports is a `maven_kmp.install(npm = …)` entry, its version a constant with a
   `# renovate-npm: <package>` comment (see `bazel/README.md`)
-- The build's JVM tools (detekt, ktlint, Dokka, SchemaSpy, ProGuard, AGP's tools, Android lint) are plain Maven
+- The build's JVM tools (detekt, ktlint, Dokka, SchemaSpy, R8, AGP's tools, Android lint) are plain Maven
   artifacts: rules_jvm_external `maven.install`s in `MODULE.bazel`, with their versions written there and locks in
   `bazel/maven/`. After changing one, `REPIN=1 bazel run @<name>//:pin` (see `bazel/README.md`, "Maven tools")
 - Don't write `deps` by hand: import the type and run `bazel run //:gazelle`, which resolves each import to a module
@@ -859,7 +860,7 @@ set of writes.
 ### Common Issues
 
 1. **Java**: everything runs on, and the desktop app bundles, `MODULE.bazel`'s `JDK` (Azul Zulu 27, which Bazel
-   downloads; Zulu because it ships the `jmods/` jlink and ProGuard read, which Temurin dropped in 24). Renovate bumps
+   downloads; Zulu because it ships the `jmods/` jlink reads, which Temurin dropped in 24). Renovate bumps
    it to every release, LTS or not, and `repin.sh` (`repo-scripts repin jdk`) rewrites the archives and `.bazelrc`'s
    `remotejdk_<n>`, and `.tool-versions` (for asdf/mise) to the Linux x64 Zulu build. `JDK` keeps the full Java
    version, including security build components. Each platform pins its newest available build up to that version

@@ -6,7 +6,7 @@ package(default_visibility = ["//visibility:public"])
 toolchain_type(name = "toolchain_type")
 
 # `--define=native_optimize=false` makes `kmp_native_executable`s debug links against the compiler caches, as
-# `proguard_optimize=false` skips ProGuard's optimizer: the optimised, uncached link is most of a CI job that links `mm`,
+# `r8_optimize=false` skips R8's optimizer: the optimised, uncached link is most of a CI job that links `mm`,
 # and CI only needs it to link and start. Releases leave it out.
 config_setting(
     name = "no_optimize",

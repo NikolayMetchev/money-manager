@@ -1,8 +1,20 @@
 load("@rules_java//java:java_binary.bzl", "java_binary")
 load("@rules_java//java:java_import.bzl", "java_import")
 load("@rules_java//java:java_library.bzl", "java_library")
+load("@rules_kotlin//kotlin:core.bzl", "kt_kotlinc_options")
+load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_binary")
 load("//bazel/kmp:optional.bzl", "ANDROID_ONLY")
 load(":apk.bzl", "stamp_setting")
+
+# The Kotlin tools below run on AGP's classpath, whose Kotlin stdlib (2.2) comes before the toolchain's: they are
+# compiled for that stdlib's API, so code using anything newer fails to compile rather than at runtime. The
+# rest is //bazel/kmp:kotlinc_options, which a target's own options replace.
+kt_kotlinc_options(
+    name = "agp_kotlinc_options",
+    api_version = "2.2",
+    warn = "error",
+    x_lambdas = "indy",
+)
 
 # The SDK's android.jar, which every Android compile has on its classpath (neverlink): extensions.bzl.
 alias(
@@ -12,10 +24,11 @@ alias(
     visibility = ["//visibility:public"],
 )
 
-java_binary(
+kt_jvm_binary(
     name = "mockable_jar",
-    srcs = ["src/com/moneymanager/bazel/kmp/android/MockableJar.java"],
-    main_class = "com.moneymanager.bazel.kmp.android.MockableJar",
+    srcs = ["src/com/moneymanager/bazel/kmp/android/MockableJar.kt"],
+    kotlinc_opts = ":agp_kotlinc_options",
+    main_class = "com.moneymanager.bazel.kmp.android.MockableJarKt",
     target_compatible_with = ANDROID_ONLY,
     deps = ["@android_tools//:com_android_tools_build_builder"],
 )
@@ -40,10 +53,11 @@ java_import(
 )
 
 # The steps of an APK build AGP does with its own classes (apk.bzl).
-java_binary(
+kt_jvm_binary(
     name = "android_app",
-    srcs = ["src/com/moneymanager/bazel/kmp/android/AndroidApp.java"],
-    main_class = "com.moneymanager.bazel.kmp.android.AndroidApp",
+    srcs = ["src/com/moneymanager/bazel/kmp/android/AndroidApp.kt"],
+    kotlinc_opts = ":agp_kotlinc_options",
+    main_class = "com.moneymanager.bazel.kmp.android.AndroidAppKt",
     target_compatible_with = ANDROID_ONLY,
     visibility = ["//visibility:public"],
     deps = [
@@ -83,6 +97,8 @@ stamp_setting(
 
 # The lint AGP runs (#1025), on the classpath AGP resolves for it (`com.android.tools.lint:lint-gradle`).
 
+# Java, not Kotlin: it joins lint's own classpath ahead of lint, where a Kotlin target would put the toolchain's
+# stdlib before the one lint was built with, and lint's analysis then fails.
 java_library(
     name = "lint_runner",
     testonly = True,

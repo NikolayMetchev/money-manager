@@ -11,8 +11,8 @@ APK, in AGP's steps:
   overlaid first so the earlier one wins, and the R.jar AGP writes: one non-transitive R class per AAR, with the
   app's final ids (`AndroidApp rjar`).
 - dexing: D8 over the runtime jars in a debug build. A release build is `minifyReleaseWithR8` instead, AGP's own
-  `runR8` (`AndroidApp r8`): AGP's `proguard-android-optimize.txt`, the app's rules and each library's (an AAR's
-  `proguard.txt`, a jar's embedded rules), in classpath order. R8 also takes the merged Java resources (renaming the
+  `runR8` (`AndroidApp r8`): AGP's default optimizing rules, the app's rules and each library's (an AAR's own, a
+  jar's embedded ones), in classpath order. R8 also takes the merged Java resources (renaming the
   service files as it renames their classes), the AARs' baseline profiles with their wildcards expanded (which it
   rewrites), and the proto-format link, whose unused resources it drops (optimized resource shrinking). aapt2
   then converts those to binary and shortens their paths, and profgen compiles the profile to
@@ -92,24 +92,24 @@ def _release(ctx, aars, program, linked, dex, files):
     args = ctx.actions.args()
     args.add("--name", "proguard-android-optimize.txt")
     args.add("--out", defaults)
-    _run_tool(ctx, "proguard-defaults", args, [], [defaults], "ProguardDefaults")
+    _run_tool(ctx, "default-rules", args, [], [defaults], "DefaultRules")
 
     # aapt2's keep rules are left out: optimized resource shrinking doesn't need them, and AGP drops them.
     library_rules = ctx.actions.declare_file(name + "/library_rules.pro")
-    aar_rules = [a for a in aars if a.proguard]
+    aar_rules = [a for a in aars if a.keep_rules]
     args = ctx.actions.args()
     args.add_all(runtime_jars, before_each = "--jar")
-    args.add_all(["%s=%s" % (a.jar.path, a.proguard.path) for a in aar_rules], before_each = "--aar-rules")
+    args.add_all(["%s=%s" % (a.jar.path, a.keep_rules.path) for a in aar_rules], before_each = "--aar-rules")
     args.add("--out", library_rules)
     _run_tool(
         ctx,
         "embedded-rules",
         args,
-        runtime_jars + [a.proguard for a in aar_rules],
+        runtime_jars + [a.keep_rules for a in aar_rules],
         [library_rules],
         "EmbeddedRules",
     )
-    specs = [defaults] + ctx.files.proguard_specs + [library_rules]
+    specs = [defaults] + ctx.files.keep_rules + [library_rules]
 
     java_res_in = ctx.actions.declare_file(name + "/java_res.jar")
     args = ctx.actions.args()
@@ -135,7 +135,7 @@ def _release(ctx, aars, program, linked, dex, files):
     args = ctx.actions.args()
     args.add("--min-sdk", ctx.attr.min_sdk)
     args.add("--lib", ctx.file._android_jar)
-    args.add_all(specs, before_each = "--pg-conf")
+    args.add_all(specs, before_each = "--keep-rules")
     args.add_all(program, before_each = "--program")
     args.add("--java-res", java_res_in)
     args.add("--java-res-out", java_res)
@@ -371,7 +371,7 @@ android_apk = rule(
         ),
         "min_sdk": attr.int(mandatory = True),
         "namespace": attr.string(mandatory = True),
-        "proguard_specs": attr.label_list(allow_files = True, doc = "The app's keep rules (release only)."),
+        "keep_rules": attr.label_list(allow_files = True, doc = "The app's keep rules (release only)."),
         "release": attr.bool(doc = "R8 (minified) instead of D8, and not debuggable."),
         "signed": attr.bool(default = True, doc = "Sign with the debug key (v2, as AGP signs minSdk 24+)."),
         "target_sdk": attr.int(mandatory = True),

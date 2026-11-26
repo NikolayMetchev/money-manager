@@ -1,0 +1,25 @@
+load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_binary", "kt_jvm_library")
+
+# `--define=r8_optimize=false` skips R8's optimizer.
+config_setting(
+    name = "no_optimize",
+    define_values = {"r8_optimize": "false"},
+    visibility = ["//visibility:public"],
+)
+
+# R8, with the Compose Gradle plugin's jar for its default rules (see R8Runner.kt).
+kt_jvm_binary(
+    name = "runner",
+    srcs = ["src/com/moneymanager/bazel/kmp/r8/R8Runner.kt"],
+    main_class = "com.moneymanager.bazel.kmp.r8.R8RunnerKt",
+    visibility = ["//visibility:public"],
+    runtime_deps = ["@r8//:org_jetbrains_compose_compose_gradle_plugin"],
+    deps = ["@r8//:com_android_tools_r8"],
+)
+
+# The service provider check: a java_test's main class (use_testrunner = False) over an r8_jars target's jars.
+kt_jvm_library(
+    name = "service_provider_check",
+    srcs = ["src/com/moneymanager/bazel/kmp/r8/ServiceProviderCheck.kt"],
+    visibility = ["//visibility:public"],
+)

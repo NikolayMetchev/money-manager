@@ -77,7 +77,7 @@ if [ "${INSTALLER_NATIVE_CLI:-true}" = true ]; then
   clis+=("$mm")
 fi
 
-# The AOT caches were trained against these modification times (JPackageRunner.PINNED_MTIME).
+# The AOT caches were trained against these modification times (PINNED_MTIME in JPackageRunner.kt).
 find "$root" \( -name 'app-main-jvm.jar' -o -name '*.aot' \) -exec ls -l {} +
 
 # AOTMode=on: a JVM launcher whose AOT cache doesn't load fails instead of starting without it.
