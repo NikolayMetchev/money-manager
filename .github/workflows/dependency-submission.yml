@@ -39,5 +39,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          snapshot="$RUNNER_TEMP/dependency-snapshot.json"
           bazel run //tools/repo-scripts:repo-scripts-tool -- dependency-snapshot bazel/kmp/deps/maven_kmp.lock.json bazel/maven/*_install.json \
-            | gh api "repos/${GITHUB_REPOSITORY}/dependency-graph/snapshots" --input -
+            > "$snapshot"
+          gh api "repos/${GITHUB_REPOSITORY}/dependency-graph/snapshots" --input "$snapshot"
