@@ -33,29 +33,36 @@ internal class RowAccounts(
     private val usePersistedTarget: Boolean
 
     init {
-        var own =
+        val initialOwn =
             sourceOverride ?: accounts.parseAccount(
                 sourceMapping ?: error("No source account selected. Please choose a source account before importing."),
                 source,
             )
-        var other = if (wholeFee) OWN_FEE_ACCOUNT_ID else accounts.parseAccount(targetMapping, target)
+        val initialOther = if (wholeFee) OWN_FEE_ACCOUNT_ID else accounts.parseAccount(targetMapping, target)
         group = detectGroupLeg(config, accounts, rules, outcome, values)
         val intermediate = group?.throughAccountName
-        if (intermediate != null) other = accounts.resolveExistingAccountId(intermediate) ?: UNRESOLVED_ACCOUNT_ID
+        val other = if (intermediate == null) initialOther else accounts.resolveExistingAccountId(intermediate) ?: UNRESOLVED_ACCOUNT_ID
 
         // A persisted mapping can claim both sides when they read the same column. Retry the own
         // side first, then the counterparty. Trades may exchange assets within one account.
-        usePersistedSource = isTrade || sourceOverride != null || own != other || own == UNRESOLVED_ACCOUNT_ID
-        if (!usePersistedSource) own = accounts.parseAccount(checkNotNull(sourceMapping), source, applyPersistedMappings = false)
-        usePersistedTarget = isTrade || intermediate != null || own != other || own == UNRESOLVED_ACCOUNT_ID
-        if (!usePersistedTarget) {
-            other = accounts.parseAccount(targetMapping, target, applyPersistedMappings = false)
-            if (other == UNRESOLVED_ACCOUNT_ID && targetMapping is AccountFromRulesMapping && target.accountName.isBlank()) {
-                error("Failed to resolve target account")
+        usePersistedSource = isTrade || sourceOverride != null || initialOwn != other || initialOwn == UNRESOLVED_ACCOUNT_ID
+        ownId =
+            if (usePersistedSource) {
+                initialOwn
+            } else {
+                accounts.parseAccount(checkNotNull(sourceMapping), source, applyPersistedMappings = false)
             }
-        }
-        ownId = own
-        counterpartyId = other
+        usePersistedTarget = isTrade || intermediate != null || ownId != other || ownId == UNRESOLVED_ACCOUNT_ID
+        counterpartyId =
+            if (usePersistedTarget) {
+                other
+            } else {
+                val fallback = accounts.parseAccount(targetMapping, target, applyPersistedMappings = false)
+                if (fallback == UNRESOLVED_ACCOUNT_ID && targetMapping is AccountFromRulesMapping && target.accountName.isBlank()) {
+                    error("Failed to resolve target account")
+                }
+                fallback
+            }
     }
 
     val counterpartyName get() = target.accountName

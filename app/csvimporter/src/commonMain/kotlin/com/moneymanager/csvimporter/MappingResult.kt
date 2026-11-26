@@ -6,7 +6,6 @@ import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
-import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.importengineapi.ImportConversion
 import kotlin.time.Instant
 

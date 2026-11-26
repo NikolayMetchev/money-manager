@@ -2,8 +2,6 @@ package com.moneymanager.csvimporter
 
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.Asset
-import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CryptoAsset
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
@@ -14,17 +12,13 @@ import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
-import com.moneymanager.domain.model.csvstrategy.AccountFromRulesMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
-import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.resolveAssetCode
-import com.moneymanager.domain.model.rules.AccountSide
 import com.moneymanager.domain.model.rules.ColumnRecord
 import com.moneymanager.domain.model.rules.EXCLUDED_ATTRIBUTE_TYPE_NAME
-import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.RuleEngine
 import com.moneymanager.importengineapi.ImportConversion
 import com.moneymanager.importengineapi.IncludedFee

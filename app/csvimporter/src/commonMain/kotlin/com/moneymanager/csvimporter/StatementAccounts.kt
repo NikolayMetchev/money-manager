@@ -98,7 +98,7 @@ internal class StatementAccounts(
      * renamed accounts. [applyPersistedMappings] can be set false to bypass them when re-resolving a leg
      * a persisted mapping turned into a self-transfer: the **source** when a merchant mapping matched it
      * too (both legs read the same column), or the **counterparty** when a mapping sent it onto the
-     * source's own account; see [mapRow].
+     * source's own account; see [RowAccounts].
      */
     fun parseAccount(
         mapping: FieldMapping,
