@@ -32,7 +32,7 @@ fun buildPendingAccountMappings(
         .filter { discoveredMapping -> discoveredMapping.targetAccountName in accountSelections }
         .mapNotNull { discoveredMapping ->
             val selectedAccountId = accountSelections.getValue(discoveredMapping.targetAccountName)
-            // Case-sensitive on purpose: current-name resolution (CsvTransferMapper.resolveExistingAccountId)
+            // Case-sensitive on purpose: current-name resolution (TransferMapper.resolveExistingAccountId)
             // matches by exact key, so a case-only difference is NOT redundant and must be persisted.
             val isRedundantExactMatch =
                 discoveredMapping.matchedPattern == null &&

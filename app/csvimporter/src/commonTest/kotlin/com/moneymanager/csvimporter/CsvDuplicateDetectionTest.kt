@@ -152,7 +152,7 @@ class CsvDuplicateDetectionTest {
             )
 
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columns,
                 existingAccounts = emptyMap(),
@@ -207,7 +207,7 @@ class CsvDuplicateDetectionTest {
             )
 
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columns,
                 existingAccounts = emptyMap(),
@@ -266,7 +266,7 @@ class CsvDuplicateDetectionTest {
             )
 
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columns,
                 existingAccounts = emptyMap(),
@@ -322,7 +322,7 @@ class CsvDuplicateDetectionTest {
             )
 
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columns,
                 existingAccounts = emptyMap(),
@@ -364,7 +364,7 @@ class CsvDuplicateDetectionTest {
             )
 
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columns,
                 existingAccounts = emptyMap(),
@@ -405,7 +405,7 @@ class CsvDuplicateDetectionTest {
             )
 
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columns,
                 existingAccounts = emptyMap(),
@@ -446,7 +446,7 @@ class CsvDuplicateDetectionTest {
             )
 
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columns,
                 existingAccounts = emptyMap(),
@@ -567,7 +567,7 @@ class CsvDuplicateDetectionTest {
             )
 
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columnsWithExtra,
                 existingAccounts = emptyMap(),
@@ -611,7 +611,7 @@ class CsvDuplicateDetectionTest {
             )
 
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columns,
                 existingAccounts = emptyMap(),
@@ -646,7 +646,7 @@ class CsvDuplicateDetectionTest {
             )
 
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columns,
                 existingAccounts = emptyMap(),
@@ -688,7 +688,7 @@ class CsvDuplicateDetectionTest {
             )
 
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columns,
                 existingAccounts = emptyMap(),

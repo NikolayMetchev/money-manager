@@ -10,7 +10,6 @@ import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ImportTransfer
-import com.moneymanager.importengineapi.StringSimilarity
 import kotlin.time.Instant
 
 /**
@@ -328,7 +327,14 @@ class ImportDeduper(
                     existing.transferId !in matchedExistingIds &&
                         isFreeForThisRow(existing.transferId) &&
                         (existing.transferId !in existingExcludedLegs || existing.transferId in ownSourceLegs) &&
-                        isFuzzyDuplicate(transfer, existing.transfer, policy)
+                        policy.matches(
+                            existing.transfer,
+                            transfer.fromAccount.requireId(),
+                            transfer.toAccount.requireId(),
+                            amount,
+                            timestamp,
+                            transfer.description,
+                        )
                 }?.minByOrNull { (it.transfer.timestamp - timestamp).absoluteValue }
                 ?.let { existing ->
                     matchedExistingIds += existing.transferId
@@ -365,22 +371,6 @@ class ImportDeduper(
         val newAttrs = transfer.attributes.filter { it.typeId != ignore }.associate { it.typeId to it.value }
         val existingAttrs = if (ignore == null) existing.attributes else existing.attributes.filterKeys { it != ignore }
         return newAttrs == existingAttrs
-    }
-
-    private fun isFuzzyDuplicate(
-        transfer: ImportTransfer,
-        existing: Transfer,
-        policy: DedupePolicy.FuzzyAllFields,
-    ): Boolean {
-        if (transfer.amount != existing.amount) return false
-        val sharesAccount =
-            transfer.fromAccount.requireId() == existing.sourceAccountId ||
-                transfer.toAccount.requireId() == existing.targetAccountId
-        if (!sharesAccount) return false
-        val withinDateTolerance =
-            (requireNotNull(transfer.timestamp) - existing.timestamp).absoluteValue <= policy.dateTolerance
-        return withinDateTolerance &&
-            StringSimilarity.similarity(transfer.description, existing.description) >= policy.similarityThreshold
     }
 
     // Dedupe runs on resolved CREATE transfers, whose fields are present; null indicates a builder error.

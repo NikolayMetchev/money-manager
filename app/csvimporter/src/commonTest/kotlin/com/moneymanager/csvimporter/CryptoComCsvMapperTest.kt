@@ -70,8 +70,8 @@ class CryptoComCsvMapperTest {
         strategy: CsvImportStrategy,
         cryptoWalletExists: Boolean = false,
         assetAliases: Map<String, String> = emptyMap(),
-    ): CsvTransferMapper =
-        CsvTransferMapper(
+    ): TransferMapper =
+        TransferMapper(
             assetAliases = assetAliases,
             strategy = strategy,
             columns = columns,

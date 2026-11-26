@@ -2,10 +2,10 @@ package com.moneymanager.database.csv
 
 import com.moneymanager.bigdecimal.BigInteger
 import com.moneymanager.builtin.WiseStrategies
-import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.ExistingTransferInfo
 import com.moneymanager.csvimporter.MappingResult
 import com.moneymanager.csvimporter.NewAccount
+import com.moneymanager.csvimporter.TransferMapper
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
@@ -127,8 +127,8 @@ class WiseCsvMapperTest {
         accounts: Map<String, Account> = defaultAccounts,
         existingTransfers: List<ExistingTransferInfo> = emptyList(),
         accountMappings: List<AccountMapping> = emptyList(),
-    ): CsvTransferMapper =
-        CsvTransferMapper(
+    ): TransferMapper =
+        TransferMapper(
             strategy = strategy,
             columns = columns,
             existingAccounts = accounts,

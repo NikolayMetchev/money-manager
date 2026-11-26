@@ -26,7 +26,7 @@ import kotlinx.coroutines.flow.first
 private const val PLACEHOLDER_ENTRY_PROMPT = "enter the currency and amount of the other side"
 
 /** The asset code the leg's rule books an unpaired leg against, or null when the rule makes it wait instead. */
-fun CsvImportStrategy.unpairedAssetOf(leg: CsvTransferWithAttributes): String? =
+fun CsvImportStrategy.unpairedAssetOf(leg: MappingResult.Success): String? =
     (config.legGroups.getOrNull(leg.groupLeg?.ruleIndex ?: return null)?.assembly as? LegAssembly.Trade)?.unpairedAsset
 
 /**
@@ -36,7 +36,7 @@ fun CsvImportStrategy.unpairedAssetOf(leg: CsvTransferWithAttributes): String? =
  * ([supersededPlaceholders]).
  */
 suspend fun unpairedLegTrades(
-    legs: List<CsvTransferWithAttributes>,
+    legs: List<MappingResult.Success>,
     strategy: CsvImportStrategy,
     csvImportId: CsvImportId,
     importEngine: ImportEngine,
@@ -106,7 +106,7 @@ suspend fun supersededPlaceholders(
     }
 }
 
-private fun Trade.standsInFor(leg: CsvTransferWithAttributes): Boolean {
+private fun Trade.standsInFor(leg: MappingResult.Success): Boolean {
     val moved = leg.transfer.amount
     // A placeholder takes its leg's own instant, so only the very instant is its: two like legs apart never swap.
     val sameInstant = timestamp == leg.transfer.timestamp

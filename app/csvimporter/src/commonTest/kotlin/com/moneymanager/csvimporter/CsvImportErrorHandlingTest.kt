@@ -62,7 +62,7 @@ class CsvImportErrorHandlingTest {
     fun `mapRow with empty Name and no fallback should still succeed with placeholder account ID`() {
         val strategy = createStrategy(fallbackColumns = emptyList())
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columns,
                 existingAccounts = emptyMap(),
@@ -86,7 +86,7 @@ class CsvImportErrorHandlingTest {
     fun `mapRow with empty Name but with fallback should use fallback column`() {
         val strategy = createStrategy(fallbackColumns = listOf("Description"))
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columns,
                 existingAccounts = emptyMap(),
@@ -105,7 +105,7 @@ class CsvImportErrorHandlingTest {
     }
 
     @Test
-    fun `prepareImport should correctly populate rowIndex in CsvTransferWithAttributes`() {
+    fun `prepareImport preserves the row index of each mapped transfer`() {
         val strategy = createStrategy(fallbackColumns = emptyList())
         val targetAccount =
             Account(
@@ -114,7 +114,7 @@ class CsvImportErrorHandlingTest {
                 openingDate = Clock.System.now(),
             )
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columns,
                 existingAccounts = mapOf("Test Payee" to targetAccount),

@@ -94,11 +94,11 @@ internal fun collapsePassThroughChain(
  * The row's own account: a fee comes out of it, so a fee on money coming in isn't charged to whoever sent it, and a
  * balance the row reports is that account's.
  */
-private fun CsvTransferWithAttributes.feePayerId(): AccountId =
+private fun MappingResult.Success.feePayerId(): AccountId =
     statementAccountId?.takeIf { it != UNRESOLVED_ACCOUNT_ID } ?: transfer.sourceAccountId
 
 /** The account whose fee account the row names on its other side ([OWN_FEE_ACCOUNT_ID]), or null. */
-private fun CsvTransferWithAttributes.ownerOfFeeAccountSide(): AccountId? =
+private fun MappingResult.Success.ownerOfFeeAccountSide(): AccountId? =
     when (OWN_FEE_ACCOUNT_ID) {
         transfer.targetAccountId -> transfer.sourceAccountId
         transfer.sourceAccountId -> transfer.targetAccountId
@@ -106,7 +106,7 @@ private fun CsvTransferWithAttributes.ownerOfFeeAccountSide(): AccountId? =
     }
 
 /** The row with [OWN_FEE_ACCOUNT_ID] replaced by its owner's fee account from [feeAccountOf]. */
-private fun CsvTransferWithAttributes.withOwnFeeAccount(feeAccountOf: Map<AccountId, AccountId>): CsvTransferWithAttributes {
+private fun MappingResult.Success.withOwnFeeAccount(feeAccountOf: Map<AccountId, AccountId>): MappingResult.Success {
     val owner = ownerOfFeeAccountSide() ?: return this
     val feeAccount = checkNotNull(feeAccountOf[owner]) { "No fee account for $owner" }
 
@@ -337,8 +337,8 @@ fun buildCsvMapper(
     assetAliases: Map<String, String> = emptyMap(),
     fileName: String? = null,
     accountOwnerNames: Map<AccountId, List<String>> = emptyMap(),
-): CsvTransferMapper =
-    CsvTransferMapper(
+): TransferMapper =
+    TransferMapper(
         strategy = strategy,
         columns = columns,
         existingAccounts = accounts.associateBy { it.name },
@@ -450,7 +450,7 @@ suspend fun runCsvImport(
     val reusePreparation = visibleAccounts != null && accountsToCreate.isEmpty() && selectedMappingsToPersist.isEmpty()
     val updatedAccounts = if (accountsToCreate.isEmpty()) knownAccounts else accountRepository.accountsVisibleTo(strategy)
     val accountsByName = updatedAccounts.associateBy { it.name }
-    val mapperFor: ((String) -> CsvTransferMapper)? =
+    val mapperFor: ((String) -> TransferMapper)? =
         if (reusePreparation && foreignFiles.isEmpty()) {
             null
         } else {
@@ -458,7 +458,7 @@ suspend fun runCsvImport(
             val historicalAccountNames = accountRepository.getPreviousAccountNames()
             val accountOwnerNames = accountRepository.getAccountOwnerNames()
             // Rules see the name of the file each row came from, including rows from other staged files.
-            val forFile: (String) -> CsvTransferMapper = { fileName ->
+            val forFile: (String) -> TransferMapper = { fileName ->
                 buildCsvMapper(
                     strategy,
                     columns,
@@ -491,7 +491,7 @@ suspend fun runCsvImport(
         )
     val finalPrep = mappedPrep.copy(validTransfers = mappedPrep.validTransfers.map { it.withOwnFeeAccount(feeAccountOf) })
     // The other staged files' legs of a cross-file trade group, mapped with the accounts this file just resolved.
-    val foreignLegs: List<CsvTransferWithAttributes> =
+    val foreignLegs: List<MappingResult.Success> =
         if (foreignFiles.isEmpty()) {
             emptyList()
         } else {

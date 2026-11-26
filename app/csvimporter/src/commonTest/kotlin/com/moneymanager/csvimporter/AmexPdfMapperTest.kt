@@ -42,7 +42,7 @@ class AmexPdfMapperTest {
         val staged = PdfRowAssembler(checkNotNull(strategy.config.pdfLines)).assemble(lines(*texts))
         val columns = staged.headers.mapIndexed { index, name -> CsvColumn(CsvColumnId(Uuid.random()), index, name) }
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columns,
                 existingAccounts = mapOf(amex.name to amex),

@@ -5,7 +5,7 @@ package com.moneymanager.csvimporter
  *
  * Candidates are tried in priority order and the first one that parses **every** non-blank sample is
  * returned, so the UI can pre-fill the format field instead of making the user hand-write a Unicode
- * pattern. Parsing goes through the very same [DateFormats] the importer uses ([CsvTransferMapper]),
+ * pattern. Parsing goes through the very same [DateFormats] the importer uses ([TransferMapper]),
  * so a detected format is guaranteed to parse at import time.
  *
  * Ambiguous numeric layouts (e.g. `05/06/2026`) resolve to the higher-priority candidate; this app

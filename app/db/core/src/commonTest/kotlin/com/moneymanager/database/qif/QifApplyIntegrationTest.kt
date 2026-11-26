@@ -1,6 +1,6 @@
 package com.moneymanager.database.qif
-import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.ExistingTransferInfo
+import com.moneymanager.csvimporter.TransferMapper
 import com.moneymanager.csvimporter.parseQifAsCsv
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
@@ -35,7 +35,7 @@ import kotlin.uuid.Uuid
 
 /**
  * Verifies that QIF imports reuse the CSV strategy engine end-to-end: QIF text is staged as fixed-column
- * rows ([parseQifAsCsv]) and mapped by [CsvTransferMapper], with split records expanding to one row, and so
+ * rows ([parseQifAsCsv]) and mapped by [TransferMapper], with split records expanding to one row, and so
  * one transfer, per split.
  */
 class QifApplyIntegrationTest : DbTest() {
@@ -102,7 +102,7 @@ class QifApplyIntegrationTest : DbTest() {
             assertEquals(3, rows.size)
 
             val mapper =
-                CsvTransferMapper(
+                TransferMapper(
                     strategy = strategy(currency, source, target),
                     columns = columns,
                     existingAccounts = mapOf(source.name to source, target.name to target),
@@ -133,7 +133,7 @@ class QifApplyIntegrationTest : DbTest() {
 
             // First import produces three new transfers.
             val first =
-                CsvTransferMapper(strat, columns, accountsByName, byId, byCode).prepareImport(rows)
+                TransferMapper(strat, columns, accountsByName, byId, byCode).prepareImport(rows)
             val existing =
                 first.validTransfers.mapIndexed { index, v ->
                     ExistingTransferInfo(
@@ -147,7 +147,7 @@ class QifApplyIntegrationTest : DbTest() {
             // Re-importing the same records with those transfers present marks them all as duplicates
             // (matched on date + accounts + amount + description; QIF has no transaction id).
             val second =
-                CsvTransferMapper(strat, columns, accountsByName, byId, byCode, existingTransfers = existing)
+                TransferMapper(strat, columns, accountsByName, byId, byCode, existingTransfers = existing)
                     .prepareImport(rows)
 
             assertEquals(3, second.validTransfers.size)
@@ -171,7 +171,7 @@ class QifApplyIntegrationTest : DbTest() {
         records: String,
         existing: List<ExistingTransferInfo> = emptyList(),
     ): List<ImportStatus> =
-        CsvTransferMapper(
+        TransferMapper(
             strategy = strategy(currency, source, target),
             columns = columns,
             existingAccounts = mapOf(source.name to source, target.name to target),
@@ -188,7 +188,7 @@ class QifApplyIntegrationTest : DbTest() {
         target: Account,
         records: String,
     ): List<ExistingTransferInfo> =
-        CsvTransferMapper(
+        TransferMapper(
             strategy = strategy(currency, source, target),
             columns = columns,
             existingAccounts = mapOf(source.name to source, target.name to target),

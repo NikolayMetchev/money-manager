@@ -15,10 +15,9 @@ import com.moneymanager.domain.model.rules.AccountNaming
 import com.moneymanager.domain.model.rules.AccountSide
 import com.moneymanager.domain.model.rules.Record
 import com.moneymanager.domain.model.rules.RuleEngine
-import com.moneymanager.domain.model.rules.RuleOutcome
 import com.moneymanager.domain.model.rules.ValueExpr
-import com.moneymanager.domain.model.rules.excludedAttributeValue
 import com.moneymanager.domain.repository.ApiSessionReadRepository
+import com.moneymanager.importengineapi.IncludedFee
 import com.moneymanager.importengineapi.ObservationSlot
 import com.moneymanager.tasks.PhasedProgress
 import kotlinx.serialization.json.JsonObject
@@ -98,9 +97,6 @@ internal fun parseEnrichment(
         txid = tm.txidField?.let { obj.resolveJsonPath(it) }?.takeIf { it.isNotBlank() },
     )
 }
-
-/** The `excluded` attribute value these rules give the record, or null when they leave it counted. */
-internal fun RuleOutcome.excludedValue(): String? = if (excluded) excludedAttributeValue(excludeReason) else null
 
 internal fun parseOrder(
     obj: JsonObject,
@@ -215,7 +211,7 @@ internal fun parseTrade(
         orderId = tm.orderIdField?.let { item.text(it) },
         requestId = requestId,
         jsonPath = jsonPath,
-        excludedValue = outcome.excludedValue(),
+        excludedValue = outcome.excludedValue,
         ruleAttributes = outcome.attributes,
     )
 }
@@ -281,13 +277,11 @@ internal fun parseExchangeTransfer(
             ?.let { runCatching { BigDecimal(it) }.getOrNull() }
     val feeCurrency = fee?.currency?.let { rules.resolve(it, item) }?.takeIf { it.isNotBlank() } ?: currency
     // A fee included in the amount that is all of it: the item is itself a fee, booked to the own account's fee account.
-    val wholeFee =
-        fee?.includedInAmount == true &&
-            rawAmount != null &&
-            rawFeeAmount != null &&
-            rawAmount.compareTo(BigDecimal.ZERO) != 0 &&
-            feeCurrency.equals(currency, ignoreCase = true) &&
-            rawFeeAmount.abs().compareTo(rawAmount.abs()) == 0
+    val includedFee =
+        rawAmount?.let { amount ->
+            IncludedFee(amount, rawFeeAmount?.takeIf { fee.includedInAmount && feeCurrency.equals(currency, ignoreCase = true) })
+        }
+    val wholeFee = includedFee?.isWhole == true
 
     outcome.balance?.let { balance ->
         val amount =
@@ -333,19 +327,14 @@ internal fun parseExchangeTransfer(
                     fundingAccountName = ledgerTrades.unpairedFundingAccountName,
                 )
         }
-    } else if (rawAmount != null) {
+    } else if (includedFee != null) {
         // Unclaimed, the endpoint's own direction. Some exchanges (Kraken) book a failed/cancelled deposit
         // or withdrawal as a second ledger entry sharing the same id with the opposite sign of the original,
         // netting to zero, so their rules take the direction from the amount's sign instead; an endpoint
         // listing both directions with unsigned amounts (Bybit Earn's Stake/Redeem orders) names it in a field.
         val resolvedDirection = outcome.incoming?.let { if (it) TransferDirection.IN else TransferDirection.OUT } ?: direction
         // A gross amount already includes its fee: carve a same-asset fee out so the two sum back to it.
-        val amount =
-            if (!wholeFee && fee?.includedInAmount == true && rawFeeAmount != null && feeCurrency.equals(currency, ignoreCase = true)) {
-                (rawAmount.abs() - rawFeeAmount.abs()).let { if (it < BigDecimal.ZERO) BigDecimal.ZERO else it }
-            } else {
-                rawAmount.abs()
-            }
+        val amount = includedFee.netMagnitude
         val description =
             item.text(tm.descriptionField)?.takeIf { it.isNotBlank() }
                 ?: if (resolvedDirection == TransferDirection.IN) "Deposit $currency" else "Withdraw $currency"
@@ -367,7 +356,7 @@ internal fun parseExchangeTransfer(
                 joinKey = tm.joinKeyField?.let { item.text(it) },
                 isFeeOnly = wholeFee,
                 approximateUntil = approximateUntil,
-                excludedValue = outcome.excludedValue(),
+                excludedValue = outcome.excludedValue,
                 ruleAttributes = outcome.attributes,
             )
     }
@@ -402,7 +391,7 @@ internal fun parseExchangeTransfer(
                 isFeeOnly = true,
                 approximateUntil = approximateUntil,
                 // A fee charged for an excluded movement is excluded with it.
-                excludedValue = outcome.excludedValue(),
+                excludedValue = outcome.excludedValue,
                 observationSlot = ObservationSlot.FEE,
             )
     }

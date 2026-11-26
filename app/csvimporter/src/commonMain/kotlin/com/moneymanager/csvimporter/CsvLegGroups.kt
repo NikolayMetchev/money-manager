@@ -39,10 +39,10 @@ fun isOwnRow(rowIndex: Long): Boolean = rowIndex < FOREIGN_ROW_INDEX_BASE
  * only rows the mapper flagged as legs of the rule; fee rows are deliberately not part of it.
  */
 data class TradeGroup(
-    val debits: List<CsvTransferWithAttributes>,
-    val credits: List<CsvTransferWithAttributes>,
+    val debits: List<MappingResult.Success>,
+    val credits: List<MappingResult.Success>,
 ) {
-    val rows: List<CsvTransferWithAttributes> get() = debits + credits
+    val rows: List<MappingResult.Success> get() = debits + credits
 
     /** Row indexes of every leg, for writing the assembled trade's outcome back to all of them. */
     val rowIndexes: List<Long> get() = rows.map { it.rowIndex }
@@ -112,17 +112,17 @@ fun AssembledTrade.groupKey(strategy: CsvImportStrategy): ImportGroupKey {
  * the caller still imports them as ordinary transfers.
  */
 fun chainGroupLegs(
-    rows: List<CsvTransferWithAttributes>,
+    rows: List<MappingResult.Success>,
     ruleIndex: Int,
     window: Duration,
-): List<List<CsvTransferWithAttributes>> =
+): List<List<MappingResult.Success>> =
     rows
         .filter { it.groupLeg?.ruleIndex == ruleIndex }
         .groupBy { it.groupLeg!!.key }
         .values
         .flatMap { legsOfKey ->
             val legs = legsOfKey.sortedWith(compareBy({ it.transfer.timestamp }, { it.rowIndex }))
-            val events = mutableListOf<MutableList<CsvTransferWithAttributes>>()
+            val events = mutableListOf<MutableList<MappingResult.Success>>()
             for (leg in legs) {
                 val current = events.lastOrNull()
                 if (current != null && leg.transfer.timestamp - current.last().transfer.timestamp <= window) {
@@ -136,7 +136,7 @@ fun chainGroupLegs(
 
 /** The trade groups of rule [ruleIndex]: its events split into debit and credit legs. */
 fun groupTradeLegs(
-    rows: List<CsvTransferWithAttributes>,
+    rows: List<MappingResult.Success>,
     ruleIndex: Int,
     rule: LegGroupRule,
 ): List<TradeGroup> =
@@ -150,7 +150,7 @@ fun groupTradeLegs(
 /** The trades whose group includes at least one leg in the file being processed. */
 internal fun assembleCsvTradeGroups(
     strategy: CsvImportStrategy,
-    rows: List<CsvTransferWithAttributes>,
+    rows: List<MappingResult.Success>,
 ): List<AssembledTrade> =
     strategy.config.legGroups.withIndex().flatMap { (index, rule) ->
         val assembly = rule.assembly as? LegAssembly.Trade ?: return@flatMap emptyList()
@@ -249,11 +249,11 @@ suspend fun crossFileLegRows(
  * unique-identifier attributes ([uniqueIdentifierNames]) where it has any, else its instant, accounts, amount and side.
  * Legs of this file ([own]) are never dropped, as they never were.
  */
-fun List<CsvTransferWithAttributes>.distinctForeignLegs(
-    own: List<CsvTransferWithAttributes>,
+fun List<MappingResult.Success>.distinctForeignLegs(
+    own: List<MappingResult.Success>,
     uniqueIdentifierNames: Set<String>,
-): List<CsvTransferWithAttributes> {
-    fun CsvTransferWithAttributes.identity(): List<Any?> =
+): List<MappingResult.Success> {
+    fun MappingResult.Success.identity(): List<Any?> =
         if (uniqueIdentifierNames.isEmpty()) {
             val transfer = transfer
             listOf(transfer.timestamp, transfer.sourceAccountId, transfer.targetAccountId, transfer.amount, groupLeg?.side)

@@ -526,7 +526,7 @@ never a candidate.
 
 A person-named counterparty (an `Account` naming with `person`) who owns the row's own account is a placeholder too: a statement
 saying only "FROM <the holder>" moved money between two of the holder's accounts without saying which
-(`CsvTransferMapper.isOwnHolder`, from `AccountReadRepository.getAccountOwnerNames`). So a Santander receipt "FROM <holder>",
+(`StatementAccounts.isOwnHolder`, from `AccountReadRepository.getAccountOwnerNames`). So a Santander receipt "FROM <holder>",
 on the holder's own account, reconciles against Marcus's "Withdrawal to <number>". A persisted mapping of the name still wins.
 
 **Still separate, on purpose:** `TradeReconciler`, `ConversionTradeReconciler` and `ConversionGroupReconciler`

@@ -34,7 +34,7 @@ import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 /**
- * Tests for CsvAccountMapping integration with CsvTransferMapper.
+ * Tests for CsvAccountMapping integration with TransferMapper.
  *
  * These tests verify that persisted account mappings are applied BEFORE
  * the standard name-based account lookup, enabling:
@@ -126,8 +126,8 @@ class CsvAccountMappingTest {
     private fun mapperWith(
         accountMappings: List<AccountMapping>,
         existingAccounts: Map<String, Account> = emptyMap(),
-    ): CsvTransferMapper =
-        CsvTransferMapper(
+    ): TransferMapper =
+        TransferMapper(
             strategy = createStrategy(),
             columns = columns,
             existingAccounts = existingAccounts,
@@ -199,7 +199,7 @@ class CsvAccountMappingTest {
             )
 
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = createStrategy(),
                 columns = columns,
                 existingAccounts = mapOf("Monzo Joint Account" to renamedAccount),
@@ -238,7 +238,7 @@ class CsvAccountMappingTest {
             )
 
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = createStrategy(),
                 columns = columns,
                 existingAccounts = mapOf("Monzo Joint Account" to renamedAccount),
@@ -286,7 +286,7 @@ class CsvAccountMappingTest {
             )
 
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = createStrategy(),
                 columns = columns,
                 existingAccounts = mapOf("Paxos" to paxosAccount),
@@ -326,7 +326,7 @@ class CsvAccountMappingTest {
             )
 
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = createStrategy(),
                 columns = columns,
                 existingAccounts = mapOf("Paxos" to paxosAccount),
@@ -382,7 +382,7 @@ class CsvAccountMappingTest {
             )
 
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = createStrategy(),
                 columns = columns,
                 existingAccounts =
@@ -428,7 +428,7 @@ class CsvAccountMappingTest {
             )
 
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = createStrategy(),
                 columns = columns,
                 existingAccounts = mapOf("Amazon UK" to existingAccount),
@@ -453,7 +453,7 @@ class CsvAccountMappingTest {
     fun `identifies new account when no persisted mapping and no existing account`() {
         // No mappings, no existing account with this name
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = createStrategy(),
                 columns = columns,
                 existingAccounts = emptyMap(),
@@ -498,7 +498,7 @@ class CsvAccountMappingTest {
             )
 
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = createStrategy(),
                 columns = columns,
                 existingAccounts = mapOf("Consolidated Payments" to targetAccount),
@@ -556,7 +556,7 @@ class CsvAccountMappingTest {
             )
 
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = createStrategy(),
                 columns = columns,
                 existingAccounts =
@@ -672,7 +672,7 @@ class CsvAccountMappingTest {
             )
 
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = createStrategyWithRegex(),
                 columns = columnsWithType,
                 existingAccounts = mapOf("Specific Vendor" to specificAccount),
@@ -728,7 +728,7 @@ class CsvAccountMappingTest {
         // A persisted mapping the user created for the merchant "Amazon" — it matches the row's
         // Description, which BOTH the source (always-match) and target legs read.
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = createStrategySharingDescriptionColumn(),
                 columns = columnsWithType,
                 existingAccounts = mapOf("My Card" to card, "Vendor" to vendor),
@@ -751,7 +751,7 @@ class CsvAccountMappingTest {
         // for creation despite the persisted counterparty mapping that hijacked (and still matches) the row.
         val vendor = Account(id = AccountId(71), name = "Vendor", openingDate = Clock.System.now())
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = createStrategySharingDescriptionColumn(),
                 columns = columnsWithType,
                 existingAccounts = mapOf("Vendor" to vendor),
@@ -773,7 +773,7 @@ class CsvAccountMappingTest {
         // The strategy's own rules name the card on both legs, so with or without persisted mappings
         // there is no distinct counterparty — the row can't be a transfer and must error, not crash.
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = createStrategySharingDescriptionColumn(),
                 columns = columnsWithType,
                 existingAccounts = mapOf("My Card" to card),
@@ -815,7 +815,7 @@ class CsvAccountMappingTest {
                     ),
             )
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columnsWithType,
                 existingAccounts = mapOf("My Card" to card, "Card Adjustments" to adjustments),
@@ -860,7 +860,7 @@ class CsvAccountMappingTest {
 
         // This strategy reads the target account from the "Payee" column
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = createStrategy(),
                 columns = columns,
                 existingAccounts = emptyMap(),
@@ -895,7 +895,7 @@ class CsvAccountMappingTest {
             )
 
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = createStrategyWithRegex(),
                 columns = columnsWithType,
                 existingAccounts = emptyMap(),
@@ -929,7 +929,7 @@ class CsvAccountMappingTest {
         // This allows auto-capture to create a single mapping using the regex pattern,
         // not multiple exact-match mappings for each CSV value.
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = createStrategyWithRegex(),
                 columns = columnsWithType,
                 existingAccounts = emptyMap(),
@@ -964,7 +964,7 @@ class CsvAccountMappingTest {
         // For AccountLookupMapping, the csvValue equals the account name,
         // and matchedPattern should be null (exact match should be used for auto-capture)
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = createStrategy(),
                 columns = columns,
                 existingAccounts = emptyMap(),
@@ -997,7 +997,7 @@ class CsvAccountMappingTest {
         // The fallback logic uses the first non-blank value from allColumns
         // (primary column + fallback columns).
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = createStrategyWithRegex(),
                 columns = columnsWithType,
                 existingAccounts = emptyMap(),
@@ -1033,7 +1033,7 @@ class CsvAccountMappingTest {
         // the discovered mapping should capture the FALLBACK column's value,
         // not the primary column's.
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = createStrategyWithRegex(),
                 columns = columnsWithType,
                 existingAccounts = emptyMap(),
@@ -1089,7 +1089,7 @@ class CsvAccountMappingTest {
             )
 
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = createStrategyWithRegex(),
                 columns = columnsWithType,
                 existingAccounts = mapOf("Credit Card Payments" to renamedAccount),

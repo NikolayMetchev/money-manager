@@ -69,7 +69,7 @@ class CryptoComCardXlsxMapperTest {
         )
 
     private val mapper =
-        CsvTransferMapper(
+        TransferMapper(
             strategy = strategy,
             columns = columns,
             existingAccounts = mapOf(card.name to card, cash.name to cash),

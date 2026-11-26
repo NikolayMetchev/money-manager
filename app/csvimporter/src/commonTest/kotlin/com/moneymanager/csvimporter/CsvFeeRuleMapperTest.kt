@@ -100,7 +100,7 @@ class CsvFeeRuleMapperTest {
         kind: String = "",
     ): MappingResult.Success {
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy(fee),
                 columns = columns,
                 existingAccounts = mapOf(wallet.name to wallet, shop.name to shop),
