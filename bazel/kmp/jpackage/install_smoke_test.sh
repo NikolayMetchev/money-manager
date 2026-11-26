@@ -13,6 +13,8 @@
 # repo-scripts-tool_deploy.jar) and STARTUP_BENCH_OUT (a file), it then times the installed launchers' startup with the tool,
 # on the runner's java (the JDK of MODULE.bazel), and appends the results
 # there (#1254): perf.yml does this on main, so its commits' startup is recorded on the perf-data branch.
+# STARTUP_BENCH_MM times that native mm instead of the bundled one: CI's installers bundle a debug link
+# (`--define=native_optimize=false`), so perf.yml builds an optimised one. The commit recorded is the checkout's HEAD.
 #
 # Usage: install_smoke_test.sh <installer directory> <expected version>
 set -euo pipefail
@@ -187,8 +189,9 @@ if [ -n "${STARTUP_BENCH_DBS:-}" ]; then
   native() { case "$(uname -s)" in MINGW* | MSYS*) cygpath -w "$1" ;; *) echo "$1" ;; esac; }
   if ! "$java" -jar "$(native "$STARTUP_BENCH_DBS/repo-scripts-tool_deploy.jar")" startup-bench \
     --bench-db "$(native "$STARTUP_BENCH_DBS/bench.db")" --empty-db "$(native "$STARTUP_BENCH_DBS/empty.db")" \
-    --desktop "$(native "$app")" --mm-jvm "$(native "$mm_jvm")" --mm "$(native "$mm")" \
+    --desktop "$(native "$app")" --mm-jvm "$(native "$mm_jvm")" --mm "$(native "${STARTUP_BENCH_MM:-$mm}")" \
     --runs "${STARTUP_BENCH_RUNS:-10}" --label "${STARTUP_BENCH_LABEL:-}" \
+    --sha "$(git rev-parse HEAD 2>/dev/null || true)" \
     --commit-date "$(git log -1 --format=%cI 2>/dev/null || true)" --out "$(native "$STARTUP_BENCH_OUT")"; then
     if [ "$(uname -s)" = Linux ]; then
       echo "Xvfb log:" >&2
