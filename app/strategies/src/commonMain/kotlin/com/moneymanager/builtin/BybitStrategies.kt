@@ -40,7 +40,7 @@ object BybitStrategies {
      */
     private const val BYBIT_ACCOUNT = "Bybit"
 
-    /** Placeholder counterparty for a deposit or withdrawal, as [BINANCE_FUNDING_ACCOUNT]. */
+    /** Placeholder counterparty for a deposit or withdrawal, as `BINANCE_FUNDING_ACCOUNT`. */
     private const val BYBIT_FUNDING_ACCOUNT = "Bybit Funding"
     private const val BYBIT_DERIVATIVES_ACCOUNT = "Bybit Derivatives"
 
@@ -51,7 +51,7 @@ object BybitStrategies {
      */
     private const val BYBIT_INTERNAL_TRANSFERS_ACCOUNT = "Bybit Internal Transfers"
 
-    /** Suspense for a row the strategies do not model; the role of [BINANCE_TRADING_ACCOUNT]. */
+    /** Suspense for a row the strategies do not model; the role of `BINANCE_TRADING_ACCOUNT`. */
     private const val BYBIT_TRADING_ACCOUNT = "Bybit Trading"
 
     /** The `excluded` value a wallet-to-wallet move carries; a re-import only lifts this value. */
@@ -60,11 +60,11 @@ object BybitStrategies {
     /**
      * Transfer reconciliation window against the Bybit API. The two sources stamp a withdrawal a couple
      * of seconds apart (`createTime` vs the ledger's booking); an hour leaves room for settlement lag the
-     * way [BINANCE_RECONCILE_WINDOW_SECONDS] does, without reaching a different day's movement.
+     * way `BINANCE_RECONCILE_WINDOW_SECONDS` does, without reaching a different day's movement.
      */
     private const val BYBIT_RECONCILE_WINDOW_SECONDS = 3600L
 
-    /** Trade reconciliation window; see [BINANCE_TRADE_RECONCILE_WINDOW_SECONDS] for why it is tight. */
+    /** Trade reconciliation window; see `BINANCE_TRADE_RECONCILE_WINDOW_SECONDS` for why it is tight. */
     private const val BYBIT_TRADE_RECONCILE_WINDOW_SECONDS = 5L
 
     /** Every Bybit ledger names a row's kind in this column. */

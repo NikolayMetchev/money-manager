@@ -58,7 +58,7 @@ object PayPalStrategies {
 
     /**
      * Suspense counterparty for a currency-conversion leg whose pair did not assemble into a trade. As with
-     * [BINANCE_TRADING_ACCOUNT], an empty one is the healthy state.
+     * `BINANCE_TRADING_ACCOUNT`, an empty one is the healthy state.
      */
     private const val PAYPAL_CONVERSIONS_ACCOUNT = "PayPal Conversions"
 

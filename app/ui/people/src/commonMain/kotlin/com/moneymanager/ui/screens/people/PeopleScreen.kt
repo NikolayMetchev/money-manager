@@ -63,10 +63,10 @@ fun PeopleScreen(
     var personToMerge by remember { mutableStateOf<Person?>(null) }
     var personForAliases by remember { mutableStateOf<Person?>(null) }
     var mergeToUndo by remember { mutableStateOf<PersonMerge?>(null) }
-    val allAliases by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList<PersonAlias>()) {
+    val allAliases by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
         personRepository.getAllAliases()
     }
-    val reversibleMerges by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList<PersonMerge>()) {
+    val reversibleMerges by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
         personRepository.getReversibleMerges()
     }
 

@@ -68,7 +68,7 @@ object BinanceStrategies {
      * Counterparty for Binance's small-assets (dust) sweeps, which arrive as several debited rows and
      * several credited BNB rows that no column attributes to each other. Routing every leg through one
      * account keeps each asset balance exact and isolates the mixed-asset residual, exactly as
-     * [CRYPTO_COM_CONVERSIONS_ACCOUNT] does. See [LegAssembly.ThroughAccount].
+     * `CRYPTO_COM_CONVERSIONS_ACCOUNT` does. See [LegAssembly.ThroughAccount].
      */
     private const val BINANCE_CONVERSIONS_ACCOUNT = "Binance Conversions"
 
