@@ -5,7 +5,6 @@ import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.apistrategy.ApiDataEndpoint
 import com.moneymanager.domain.model.apistrategy.ApiLedgerTrades
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
-import com.moneymanager.domain.model.apistrategy.TransferDirection
 import com.moneymanager.domain.model.rules.RuleAttribute
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.ObservationSlot
@@ -29,6 +28,11 @@ internal data class ParsedTrade(
     /** The attributes the rules tag this trade with. */
     val ruleAttributes: List<RuleAttribute> = emptyList(),
 )
+
+internal enum class TransferDirection {
+    IN,
+    OUT,
+}
 
 internal data class ParsedExchangeTransfer(
     val id: String,

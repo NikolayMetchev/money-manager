@@ -369,15 +369,11 @@ internal fun resolveValueSet(
         }
 
         is ApiValueSet.FromValueEndpoint -> {
-            valueItemsByPath[valueSet.endpointPath].orEmpty().flatMap { item ->
-                valueSet.fields.mapNotNull { field -> item.resolveJsonPath(field) }
-            }
+            valueItemsByPath[valueSet.endpointPath].orEmpty().fieldValues(valueSet.fields)
         }
 
         is ApiValueSet.FromDataEndpoint -> {
-            dataItemsByPath[valueSet.endpointPath].orEmpty().flatMap { item ->
-                valueSet.fields.mapNotNull { field -> item.resolveJsonPath(field) }
-            }
+            dataItemsByPath[valueSet.endpointPath].orEmpty().fieldValues(valueSet.fields)
         }
 
         is ApiValueSet.Union -> {
@@ -390,6 +386,9 @@ internal fun resolveValueSet(
             lefts.flatMap { l -> rights.map { r -> valueSet.template.replace("{left}", l).replace("{right}", r) } }
         }
     }.filter { it.isNotBlank() }.map { if (preserveCase) it else it.uppercase() }
+
+private fun List<JsonObject>.fieldValues(fields: List<String>): List<String> =
+    flatMap { item -> fields.mapNotNull { field -> item.resolveJsonPath(field) } }
 
 /** The `{fanOut}` placeholder an [ApiEndpointConfig.path] may carry, replaced by each fan-out value. */
 private const val FAN_OUT_PATH_PLACEHOLDER = "{fanOut}"

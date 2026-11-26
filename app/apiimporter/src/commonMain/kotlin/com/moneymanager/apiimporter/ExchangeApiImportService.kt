@@ -15,7 +15,6 @@ import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.apistrategy.ApiAccountsSource
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
-import com.moneymanager.domain.model.apistrategy.TransferDirection
 import com.moneymanager.domain.model.codesByName
 import com.moneymanager.domain.model.observation.ImportRecordKey
 import com.moneymanager.domain.model.resolveAssetCode
