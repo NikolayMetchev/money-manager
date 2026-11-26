@@ -11,6 +11,7 @@ import com.moneymanager.domain.model.apistrategy.ApiEndpointKind
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
+import com.moneymanager.domain.model.apistrategy.TimestampFormat
 import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.model.rules.ValueExpr
@@ -67,6 +68,21 @@ class TransactionParsingTest {
         assertEquals(1234L, parsed.amountMinorUnits)
         assertEquals("GBP", parsed.currencyCode)
         assertEquals("Coffee", parsed.description)
+    }
+
+    @Test
+    fun `bank transaction and balance timestamps use the configured pattern`() {
+        val balance = RuleAction.Balance(amount = ValueExpr.of("amount"), at = ValueExpr.of("reported"))
+        val mappings =
+            ApiTransactionMappings(
+                timestampFormat = TimestampFormat.PATTERN,
+                timestampPattern = "yyyy-MM-dd HH:mm:ss",
+                rules = listOf(StrategyRule(actions = listOf(balance))),
+            )
+        val record = """{"amount":12,"currency":"GBP","created":"2025-03-01 10:00:00","reported":"2025-03-01 11:00:00"}"""
+        val result = parse("""{"transactions":[$record]}""", strategy(mappings)).single()
+        assertEquals(Instant.parse("2025-03-01T10:00:00Z"), result.created)
+        assertEquals(Instant.parse("2025-03-01T11:00:00Z"), result.balanceAt)
     }
 
     @Test

@@ -16,6 +16,7 @@ import com.moneymanager.domain.model.apistrategy.ApiPersonImportConfig
 import com.moneymanager.domain.model.apistrategy.ApiQueryParam
 import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
+import com.moneymanager.domain.model.apistrategy.TimestampFormat
 import com.moneymanager.ui.components.rules.isComplete
 import kotlin.time.Instant
 
@@ -72,8 +73,7 @@ internal val ApiStrategyConfig.editedTransactionMappings: ApiTransactionMappings
  * from [strategy] when editing, or from defaults when creating.
  *
  * [config] is the domain [ApiStrategyConfig] itself rather than a field-for-field mirror of it, so
- * the tabs edit it with `copy` and a config field that no tab knows about — a newly added one, or
- * `valueEndpoints` — keeps its persisted value instead of silently resetting on the next save.
+ * the tabs edit it with `copy`. Saving therefore preserves settings outside the edited fields.
  * The only projected state is [name], trimmed on save.
  */
 internal class ApiStrategyEditorState(
@@ -117,6 +117,7 @@ internal class ApiStrategyEditorState(
                             ?.isBlank() != false
                 }
             } ||
+                !config.valueEndpoints.all { it.isValidForSave() } ||
                 !config.dataEndpoints.filter { it.kind != ApiEndpointKind.BANK_TRANSACTIONS }.isValidForSave()
 
     val advancedHasError: Boolean
@@ -138,6 +139,7 @@ internal class ApiStrategyEditorState(
                 config.editedTransactionMappings.let { mappings ->
                     mappings.amountField.isBlank() ||
                         mappings.timestampField.isBlank() ||
+                        (mappings.timestampFormat == TimestampFormat.PATTERN && mappings.timestampPattern.isNullOrBlank()) ||
                         mappings.currencyField.isBlank() ||
                         mappings.descriptionField.isBlank() ||
                         mappings.idField.isBlank()

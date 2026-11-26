@@ -78,6 +78,15 @@ internal fun EndpointsTab(
 
         Spacer(Modifier.padding(top = 4.dp))
         HorizontalDivider()
+        SectionHeader("Value endpoints")
+        EndpointListEditor(
+            endpoints = state.config.valueEndpoints,
+            label = "value",
+            exchangeDownload = true,
+            onChange = { v -> state.updateConfig { copy(valueEndpoints = v) } },
+            enabled = enabled,
+        )
+        SectionHeader("Data endpoints")
         val bankFeed = state.config.dataEndpoints.filter { it.kind == ApiEndpointKind.BANK_TRANSACTIONS }
         DataEndpointsEditor(
             endpoints = state.config.dataEndpoints.filter { it.kind != ApiEndpointKind.BANK_TRANSACTIONS },
@@ -178,28 +187,40 @@ private fun DownloadedAccountsEditor(
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-    accounts.ancestorEndpoints.forEachIndexed { index, endpoint ->
+    EndpointListEditor(accounts.ancestorEndpoints, "ancestor", { update { copy(ancestorEndpoints = it) } }, enabled)
+}
+
+@Composable
+private fun EndpointListEditor(
+    endpoints: List<ApiEndpointConfig>,
+    label: String,
+    onChange: (List<ApiEndpointConfig>) -> Unit,
+    enabled: Boolean,
+    exchangeDownload: Boolean = false,
+) {
+    endpoints.forEachIndexed { index, endpoint ->
         Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), colors = CardDefaults.cardColors()) {
             Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 EditorCardHeader(
-                    title = "ancestor[$index]",
-                    onRemove = { update { copy(ancestorEndpoints = ancestorEndpoints.minusAt(index)) } },
+                    title = "$label[$index]",
+                    onRemove = { onChange(endpoints.minusAt(index)) },
                     enabled = enabled,
                 )
                 EndpointEditor(
                     endpoint = endpoint,
-                    onChange = { updated -> update { copy(ancestorEndpoints = ancestorEndpoints.replacingAt(index, updated)) } },
+                    onChange = { updated -> onChange(endpoints.replacingAt(index, updated)) },
+                    exchangeDownload = exchangeDownload,
                     enabled = enabled,
                 )
             }
         }
     }
     TextButton(
-        onClick = { update { copy(ancestorEndpoints = ancestorEndpoints + ApiEndpointConfig(path = "", responseArrayKey = "")) } },
+        onClick = { onChange(endpoints + ApiEndpointConfig(path = "", responseArrayKey = "")) },
         enabled = enabled,
     ) {
         Icon(Icons.Default.Add, contentDescription = null)
         Spacer(Modifier.width(4.dp))
-        Text("Add ancestor endpoint")
+        Text("Add $label endpoint")
     }
 }

@@ -12,6 +12,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import com.moneymanager.builtin.BuiltInApiStrategies
+import com.moneymanager.database.json.ApiStrategyExportCodec
+import com.moneymanager.database.json.ApiStrategyJsonCodec
 import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.apistrategy.ApiAccountBridge
 import com.moneymanager.domain.model.apistrategy.ApiAccountsSource
@@ -41,6 +43,7 @@ import com.moneymanager.domain.model.apistrategy.SigPart
 import com.moneymanager.domain.model.apistrategy.SignatureEncoding
 import com.moneymanager.domain.model.apistrategy.SigningAlgorithm
 import com.moneymanager.domain.model.apistrategy.WindowBoundFormat
+import com.moneymanager.domain.model.apistrategy.export.ApiStrategyExportMapper
 import com.moneymanager.domain.model.rules.AssetCodeRules
 import com.moneymanager.domain.model.rules.Condition
 import com.moneymanager.domain.model.rules.ConditionOp
@@ -97,6 +100,121 @@ class ApiStrategyEditorStateTest {
             onNodeWithText(previousPath).performScrollTo().performTextReplacement("/older/{account.id}")
             runOnIdle { assertEquals("/older/{account.id}", endpoint().historicalPaths.first()) }
         }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `author a Coinbase wallet fan-out and reopen its canonical export`() =
+        runMoneyManagerComposeUiTest {
+            val original = BuiltInApiStrategies.coinbase(now)
+            val data = original.config.dataEndpoints.single()
+            val state = ApiStrategyEditorState(null)
+            state.name = original.name
+            state.config = original.config.copy(dataEndpoints = listOf(data.copy(endpoint = data.endpoint.copy(fanOut = null))))
+            setContent {
+                MaterialTheme {
+                    Column(Modifier.verticalScroll(rememberScrollState())) {
+                        EndpointsTab(state, enabled = true)
+                    }
+                }
+            }
+            onNodeWithContentDescription("Download once per value").performScrollTo().performClick()
+            onNodeWithContentDescription("Preserve value case").performScrollTo().performClick()
+            onNodeWithText("Download values").performScrollTo().performClick()
+            onNodeWithText("Value endpoint").performClick()
+            onNodeWithText("Source endpoint path").performScrollTo().performTextReplacement("v2/accounts")
+            onNodeWithText("Add field").performScrollTo().performClick()
+            onNodeWithText("Field 1").performScrollTo().performTextReplacement("id")
+            runOnIdle { assertCanonicalRoundTrip(original, state) }
+        }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `author Bybit server time and static header then reopen the strategy`() =
+        runMoneyManagerComposeUiTest {
+            val original = BuiltInApiStrategies.bybit(now)
+            val signing = checkNotNull(original.config.requestSigning)
+            val state = ApiStrategyEditorState(original)
+            state.updateConfig { copy(requestSigning = signing.copy(staticHeaders = emptyMap(), serverTimeSync = null)) }
+            setContent {
+                MaterialTheme {
+                    Column(Modifier.verticalScroll(rememberScrollState())) {
+                        RequestSigningEditor(state.config.requestSigning, { s -> state.updateConfig { copy(requestSigning = s) } }, true)
+                    }
+                }
+            }
+            onNodeWithContentDescription("Synchronize nonce with server time").performScrollTo().performClick()
+            onNodeWithText("Server time endpoint path").performScrollTo().performTextReplacement("v5/market/time")
+            onNodeWithText("Server time field (epoch milliseconds)").performScrollTo().performTextReplacement("time")
+            onNodeWithText("Add entry").performScrollTo().performClick()
+            val header = signing.staticHeaders.entries.single()
+            onNodeWithText("Header name").performScrollTo().performTextReplacement(header.key)
+            onNodeWithText("Value").performScrollTo().performTextReplacement(header.value)
+            runOnIdle { assertCanonicalRoundTrip(original, state) }
+        }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `author Binance signed parameter while preserving nested fan-out and window settings`() =
+        runMoneyManagerComposeUiTest {
+            val original = BuiltInApiStrategies.binance(now)
+            val signing = checkNotNull(original.config.requestSigning)
+            val state = ApiStrategyEditorState(original)
+            state.updateConfig { copy(requestSigning = signing.copy(signedParams = emptyList())) }
+            setContent {
+                MaterialTheme {
+                    Column(Modifier.verticalScroll(rememberScrollState())) {
+                        RequestSigningEditor(state.config.requestSigning, { s -> state.updateConfig { copy(requestSigning = s) } }, true)
+                    }
+                }
+            }
+            onNodeWithText("Add Parameter").performScrollTo().performClick()
+            onNodeWithText("Name").performScrollTo().performTextReplacement("recvWindow")
+            onNodeWithText("Signed value").performScrollTo().performTextReplacement("60000")
+            runOnIdle { assertCanonicalRoundTrip(original, state) }
+        }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `create the Binance public symbol endpoint without storing responses`() =
+        runMoneyManagerComposeUiTest {
+            val original = BuiltInApiStrategies.binance(now)
+            val expected = original.config.valueEndpoints.single { it.unsigned }
+            val state = ApiStrategyEditorState(null)
+            state.name = original.name
+            state.config = original.config.copy(dataEndpoints = emptyList(), valueEndpoints = emptyList())
+            setContent {
+                MaterialTheme {
+                    Column(Modifier.verticalScroll(rememberScrollState())) {
+                        EndpointsTab(state, enabled = true)
+                    }
+                }
+            }
+            onNodeWithText("Add value endpoint").performScrollTo().performClick()
+            onNodeWithText("Path").performScrollTo().performTextReplacement(expected.path)
+            onNodeWithText("Response array key").performScrollTo().performTextReplacement(expected.responseArrayKey)
+            onNodeWithContentDescription("Send unsigned request").performScrollTo().performClick()
+            onNodeWithContentDescription("Store response").performScrollTo().performClick()
+            runOnIdle {
+                assertCanonicalRoundTrip(
+                    original.copy(config = original.config.copy(dataEndpoints = emptyList(), valueEndpoints = listOf(expected))),
+                    state,
+                )
+            }
+        }
+
+    private fun assertCanonicalRoundTrip(
+        original: ApiImportStrategy,
+        state: ApiStrategyEditorState,
+    ) {
+        assertTrue(state.isValid)
+        val saved = state.buildStrategy(original.id, now, now)
+        val reopened = ApiStrategyEditorState(saved.copy(config = ApiStrategyJsonCodec.decode(ApiStrategyJsonCodec.encode(saved.config))))
+        val expected = ApiStrategyExportCodec.encode(ApiStrategyExportMapper.toExport(original, "test"))
+        assertEquals(
+            expected,
+            ApiStrategyExportCodec.encode(ApiStrategyExportMapper.toExport(reopened.buildStrategy(original.id, now, now), "test")),
+        )
+    }
 
     private val now = Instant.fromEpochMilliseconds(1_000)
 

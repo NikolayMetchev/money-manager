@@ -30,7 +30,10 @@ internal fun parseTransactionsWithPath(
             val obj = element as? JsonObject ?: return@mapIndexedNotNull null
             val outcome = engine.evaluate(mappings.rules, JsonRecord(obj))
             if (outcome.skipped) return@mapIndexedNotNull null
-            val created = obj.resolveJsonPath(mappings.timestampField)?.let { parseApiTimestamp(it, mappings.timestampFormat) }
+            val created =
+                obj.resolveJsonPath(mappings.timestampField)?.let {
+                    parseApiTimestamp(it, mappings.timestampFormat, mappings.timestampPattern)
+                }
             val amount = parseAmount(obj, mappings, outcome.incoming)
             val currency = obj.resolveJsonPath(mappings.currencyField)
             val foreignAmount = outcome.foreignAmount?.let { parseMagnitude(obj, it.amount, mappings.amountFormat) }
@@ -58,7 +61,8 @@ internal fun parseTransactionsWithPath(
                     ?.takeIf { it.isNotBlank() }
             val balanceAt =
                 outcome.balance?.at?.let { obj.resolve(it) }?.takeIf { it.isNotBlank() }?.let { raw ->
-                    parseApiTimestamp(raw, mappings.timestampFormat) ?: error("Failed to parse balance time: $raw")
+                    parseApiTimestamp(raw, mappings.timestampFormat, mappings.timestampPattern)
+                        ?: error("Failed to parse balance time: $raw")
                 }
             if (created != null && amount != null && currency != null) {
                 ApiTransactionPageItem(
