@@ -757,16 +757,18 @@ jobs:
 
   # Publishes the release once everything CI checks on this commit passed (CI Passed) and every release build
   # finished. The release creates its tag, `v<VERSION>`, on this commit. A failed or cancelled job it needs skips it, so
-  # re-running the failed jobs retries the release. Its status check is explicit: the implied success() also looks at
-  # CI Passed's own needs, and Auto-format PR is always skipped on a push, which would skip this too.
+  # re-running the failed jobs retries the release. Auto-format PR, which CI Passed needs, is always skipped on a push,
+  # and `!cancelled()` still skipped this job for it (1.0.16's run, where every job it needs succeeded): `always()`,
+  # as CI Passed uses, with each job it needs checked by name, is what runs it.
   release:
     name: Release
     runs-on: ubuntu-latest
     needs: [ changes, ci-passed, desktop-installer, android-release, release-installer, release-cli ]
     if: >-
-      !cancelled() && needs.changes.outputs.release != '' &&
-      !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') &&
-      !contains(needs.*.result, 'skipped')
+      ${{ always() && needs.changes.outputs.release != '' && needs.changes.result == 'success' &&
+      needs.ci-passed.result == 'success' && needs.desktop-installer.result == 'success' &&
+      needs.android-release.result == 'success' && needs.release-installer.result == 'success' &&
+      needs.release-cli.result == 'success' }}
     permissions:
       contents: write  # creates the tag and the release
     steps:
