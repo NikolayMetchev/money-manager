@@ -94,6 +94,7 @@ kmp_test(
         "@maven_kmp//:compose_ui",
         "@maven_kmp//:androidx_compose_runtime",
         "//app/tasks",
+        "//app/db/read",
     ],
     device_manifest = "src/androidDeviceTest/AndroidManifest.xml",
     device_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
@@ -109,6 +110,7 @@ kmp_test(
     ],
     plugins = ["compose"],
     deps = [
+        "//app/db/read",
         "//app/model/apistrategy",
         "//app/model/core",
         "//app/model/rules",

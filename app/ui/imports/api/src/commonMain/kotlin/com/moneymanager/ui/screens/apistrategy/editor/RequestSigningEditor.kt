@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.apistrategy.ApiRequestSigningConfig
+import com.moneymanager.domain.model.apistrategy.ApiServerTimeSync
 import com.moneymanager.domain.model.apistrategy.BodyFormat
 import com.moneymanager.domain.model.apistrategy.FieldPlacement
 import com.moneymanager.domain.model.apistrategy.JwtAlgorithm
@@ -306,6 +307,20 @@ internal fun RequestSigningEditor(
         onCheckedChange = { on -> onChange(c.copy(jwt = if (on) JwtSigningConfig() else null)) },
         enabled = enabled,
     )
+    QueryParamsEditor(c.signedParams, { onChange(c.copy(signedParams = it)) }, enabled, signed = true)
+    ToggleRow("Synchronize nonce with server time", c.serverTimeSync != null, {
+        onChange(c.copy(serverTimeSync = if (it) ApiServerTimeSync("", "") else null))
+    }, enabled)
+    c.serverTimeSync?.let { sync ->
+        TextFieldRow("Server time endpoint path", sync.path, { onChange(c.copy(serverTimeSync = sync.copy(path = it))) }, enabled)
+        TextFieldRow(
+            "Server time field (epoch milliseconds)",
+            sync.field,
+            { onChange(c.copy(serverTimeSync = sync.copy(field = it))) },
+            enabled,
+        )
+    }
+
     c.jwt?.let { jwt ->
         Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             JwtSigningEditor(jwt, { onChange(c.copy(jwt = it)) }, enabled)
@@ -344,6 +359,10 @@ internal fun RequestSigningEditor(
             optionLabel = { it.name },
             enabled = enabled,
         )
+
+        StringMapEditor("Static request headers", c.staticHeaders, {
+            onChange(c.copy(staticHeaders = it))
+        }, keyLabel = "Header name", enabled = enabled)
 
         Text("Signed message parts", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         SigPartListEditor(parts = c.message, onChange = { onChange(c.copy(message = it)) }, enabled = enabled)
@@ -459,6 +478,8 @@ private fun SigPart.isValidForSave(): Boolean =
 
 /** Whether a request-signing config has every required (and enabled-conditional) field set. */
 internal fun ApiRequestSigningConfig.isValidForSave(): Boolean {
+    if (signedParams.any { it.name.isBlank() || it.value == null }) return false
+    if (serverTimeSync?.let { it.path.isBlank() || it.field.isBlank() } == true) return false
     jwt?.let { return it.isValidForSave() }
     return message.isNotEmpty() &&
         message.all { it.isValidForSave() } &&

@@ -409,6 +409,7 @@ internal fun StringListEditor(
     items: List<String>,
     onChange: (List<String>) -> Unit,
     enabled: Boolean = true,
+    itemLabel: String = "step",
 ) {
     Text(text = label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     items.forEachIndexed { index, item ->
@@ -416,19 +417,19 @@ internal fun StringListEditor(
             OutlinedTextField(
                 value = item,
                 onValueChange = { updated -> onChange(items.toMutableList().also { it[index] = updated }) },
-                label = { Text("Step ${index + 1}") },
+                label = { Text("${itemLabel.replaceFirstChar { it.uppercase() }} ${index + 1}") },
                 modifier = Modifier.weight(1f),
                 enabled = enabled,
             )
             IconButton(onClick = { onChange(items.filterIndexed { i, _ -> i != index }) }, enabled = enabled) {
-                Icon(Icons.Default.Close, contentDescription = "Remove step", tint = MaterialTheme.colorScheme.error)
+                Icon(Icons.Default.Close, contentDescription = "Remove $itemLabel", tint = MaterialTheme.colorScheme.error)
             }
         }
     }
     TextButton(onClick = { onChange(items + "") }, enabled = enabled) {
         Icon(Icons.Default.Add, contentDescription = null)
         Spacer(Modifier.width(4.dp))
-        Text("Add step")
+        Text("Add $itemLabel")
     }
 }
 
@@ -593,9 +594,10 @@ internal fun QueryParamsEditor(
     params: List<ApiQueryParam>,
     onChange: (List<ApiQueryParam>) -> Unit,
     enabled: Boolean = true,
+    signed: Boolean = false,
 ) {
     Text(
-        text = "Query Parameters",
+        text = if (signed) "Extra signed parameters" else "Query Parameters",
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(top = 4.dp),
@@ -617,21 +619,23 @@ internal fun QueryParamsEditor(
                     enabled = enabled,
                 )
                 TextFieldRow(
-                    label = "Static value (optional)",
+                    label = if (signed) "Signed value" else "Static value (optional)",
                     value = param.value.orEmpty(),
                     onValueChange = { updated ->
                         onChange(params.toMutableList().also { it[index] = param.copy(value = updated.ifBlank { null }) })
                     },
                     enabled = enabled,
                 )
-                TextFieldRow(
-                    label = "Dynamic source (optional, e.g. account.id)",
-                    value = param.dynamicSource.orEmpty(),
-                    onValueChange = { updated ->
-                        onChange(params.toMutableList().also { it[index] = param.copy(dynamicSource = updated.ifBlank { null }) })
-                    },
-                    enabled = enabled,
-                )
+                if (!signed) {
+                    TextFieldRow(
+                        label = "Dynamic source (optional, e.g. account.id)",
+                        value = param.dynamicSource.orEmpty(),
+                        onValueChange = { updated ->
+                            onChange(params.toMutableList().also { it[index] = param.copy(dynamicSource = updated.ifBlank { null }) })
+                        },
+                        enabled = enabled,
+                    )
+                }
             }
         }
     }
@@ -669,7 +673,8 @@ private val ApiPaging.kind: PagingKind
 internal fun PaginationEditor(
     pagination: ApiPaginationConfig?,
     onChange: (ApiPaginationConfig?) -> Unit,
-    enabled: Boolean = true,
+    enabled: Boolean,
+    exchangeDownload: Boolean,
 ) {
     ToggleRow(
         label = "Enable pagination",
@@ -703,6 +708,11 @@ internal fun PaginationEditor(
             enabled = enabled,
         )
         w.windowDays?.let { days -> IntFieldRow("Window days", days, { window(w.copy(windowDays = it)) }, enabled) }
+        if (exchangeDownload) {
+            StringListEditor("Skip windows containing these error messages", w.rangeErrorSubstrings, {
+                window(w.copy(rangeErrorSubstrings = it))
+            }, enabled, "substring")
+        }
         IntFieldRow("Lookback days", w.lookbackDays, { window(w.copy(lookbackDays = it)) }, enabled)
         QueryParamsEditor(params = config.extraParams, onChange = { onChange(config.copy(extraParams = it)) }, enabled = enabled)
     }
@@ -798,6 +808,7 @@ internal fun EndpointEditor(
     onChange: (ApiEndpointConfig) -> Unit,
     enabled: Boolean = true,
     pathRequired: Boolean = true,
+    exchangeDownload: Boolean = false,
 ) {
     TextFieldRow(
         label = "Path",
@@ -869,6 +880,10 @@ internal fun EndpointEditor(
         onValueChange = { onChange(endpoint.copy(requestCostWeight = it.coerceAtLeast(1))) },
         enabled = enabled,
     )
+    if (exchangeDownload) {
+        ToggleRow("Send unsigned request", endpoint.unsigned, { onChange(endpoint.copy(unsigned = it)) }, enabled)
+        ToggleRow("Store response", endpoint.storeResponse, { onChange(endpoint.copy(storeResponse = it)) }, enabled)
+    }
     QueryParamsEditor(
         params = endpoint.queryParams,
         onChange = { onChange(endpoint.copy(queryParams = it)) },
@@ -876,6 +891,7 @@ internal fun EndpointEditor(
     )
     PaginationEditor(
         pagination = endpoint.pagination,
+        exchangeDownload = exchangeDownload,
         onChange = { onChange(endpoint.copy(pagination = it)) },
         enabled = enabled,
     )

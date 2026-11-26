@@ -126,10 +126,12 @@ private fun DataEndpointEditor(
     )
     EndpointEditor(
         endpoint = dataEndpoint.endpoint,
+        exchangeDownload = true,
         onChange = { onChange(dataEndpoint.copy(endpoint = it)) },
         enabled = enabled,
     )
 
+    FanOutEditor(dataEndpoint.endpoint.fanOut, { onChange(dataEndpoint.copy(endpoint = dataEndpoint.endpoint.copy(fanOut = it))) }, enabled)
     if (dataEndpoint.kind in TRADE_KINDS) {
         Text("Trade mappings", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         TradeMappingsEditor(
@@ -208,13 +210,11 @@ internal fun TransactionMappingsFields(
             optionLabel = { it.name },
             enabled = enabled,
         )
-        EnumDropdown(
-            label = "Timestamp format",
-            options = TimestampFormat.entries,
-            selected = mappings.timestampFormat,
-            onSelect = { onChange(mappings.copy(timestampFormat = it)) },
-            optionLabel = { it.name },
-            enabled = enabled,
+        TimestampEditor(
+            mappings.timestampFormat,
+            mappings.timestampPattern,
+            { format, pattern -> onChange(mappings.copy(timestampFormat = format, timestampPattern = pattern)) },
+            enabled,
         )
         TextFieldRow(
             "Txid field (optional)",
@@ -347,13 +347,11 @@ internal fun TradeMappingsEditor(
             enabled,
             isError = mappings.timestampField.isBlank(),
         )
-        EnumDropdown(
-            label = "Timestamp format",
-            options = TimestampFormat.entries,
-            selected = mappings.timestampFormat,
-            onSelect = { onChange(mappings.copy(timestampFormat = it)) },
-            optionLabel = { it.name },
-            enabled = enabled,
+        TimestampEditor(
+            mappings.timestampFormat,
+            mappings.timestampPattern,
+            { format, pattern -> onChange(mappings.copy(timestampFormat = format, timestampPattern = pattern)) },
+            enabled,
         )
         TextFieldRow(
             "Trade ID field",
@@ -507,6 +505,7 @@ private fun ApiTradeMappings.isValidForSave(): Boolean =
     (splitMode == InstrumentSplitMode.EXPLICIT_FIELDS || !instrumentField.isNullOrBlank()) &&
         baseQuantityField.isNotBlank() &&
         timestampField.isNotBlank() &&
+        (timestampFormat != TimestampFormat.PATTERN || !timestampPattern.isNullOrBlank()) &&
         idField.isNotBlank() &&
         // The base×price / explicit-quote-quantity derivation needs at least one of these.
         (!priceField.isNullOrBlank() || !quoteQuantityField.isNullOrBlank()) &&
@@ -527,15 +526,22 @@ private fun ApiTradeMappings.isValidForSave(): Boolean =
 private fun ApiTransactionMappings.isValidForSave(): Boolean =
     amountField.isNotBlank() &&
         timestampField.isNotBlank() &&
+        (timestampFormat != TimestampFormat.PATTERN || !timestampPattern.isNullOrBlank()) &&
         currencyField.isNotBlank() &&
         descriptionField.isNotBlank() &&
         // A row with no id of its own (Binance Simple Earn rewards) is identified by an external id rule instead.
         (idField.isNotBlank() || rules.any { rule -> rule.actions.any { it is RuleAction.ExternalId } })
 
 /** Whether an [ApiEndpointConfig] is complete enough to save, independent of what kind of record it produces. */
-private fun ApiEndpointConfig.isValidForSave(): Boolean {
+internal fun ApiEndpointConfig.isValidForSave(): Boolean {
     val pagination = pagination
     return path.isNotBlank() &&
+        (fanOut?.isValidForSave() != false) &&
+        pagination
+            ?.window
+            ?.rangeErrorSubstrings
+            .orEmpty()
+            .none { it.isBlank() } &&
         (successCodeField == null || !successCodeOkValue.isNullOrBlank()) &&
         // A non-positive limitValue would never advance the offset, looping on the same page forever.
         (pagination?.paging !is ApiPaging.Offset || pagination.limitValue > 0) &&
