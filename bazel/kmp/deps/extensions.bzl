@@ -139,7 +139,7 @@ aar_import(
     r_txt = glob(["R.txt"], allow_empty = True),
     assets = glob(["assets/**"], allow_empty = True),
     jni = glob(["jni/**"], allow_empty = True),
-    proguard = glob(["proguard.txt"], allow_empty = True),
+    keep_rules = glob(["proguard.txt"], allow_empty = True),
     art_profile = glob(["baseline-prof.txt"], allow_empty = True),
     lint_jar = glob(["lint.jar"], allow_empty = True),
     public_txt = glob(["public.txt"], allow_empty = True),

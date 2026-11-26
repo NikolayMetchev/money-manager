@@ -1,4 +1,4 @@
-package com.moneymanager.bazel.kmp.proguard;
+package com.moneymanager.bazel.kmp.r8;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -14,9 +14,9 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 /**
- * Gradle's {@code verifyProguardServiceProviders}, as a test over {@code proguard_jars}' output: ProGuard doesn't
- * follow {@code META-INF/services}, so it silently strips classes only reached through ServiceLoader (the SQLite
- * JDBC driver, the crypto provider, …), and the release app then fails at runtime while the build passes.
+ * A test over {@code r8_jars}' output: a service file whose provider class the shrinker removed (one reached only
+ * through a ServiceLoader lookup it can't follow: the SQLite JDBC driver, the crypto provider, …) makes the release
+ * app fail at runtime while the build passes.
  *
  * <p>The arguments are the shrunk jars. The report ({@code ok}/{@code MISSING} per provider) goes to the test's
  * undeclared outputs.
@@ -70,7 +70,7 @@ public final class ServiceProviderCheck {
     }
     if (!missing.isEmpty()) {
       System.err.println(
-          "ProGuard removed ServiceLoader providers; add -keep rules to proguard-rules.pro:\n"
+          "R8 removed ServiceLoader providers; add -keep rules to r8-rules.pro:\n"
               + String.join("\n", missing));
       System.exit(1);
     }

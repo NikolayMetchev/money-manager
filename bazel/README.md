@@ -18,7 +18,7 @@ read what the upstream plugin passes, then pass the same.
 | `kmp/sqldelight/`, `kmp/constants/`, `kmp/sqlite/` | SQLDelight, generated Kotlin constants, the bundled SQLite |
 | `kmp/checks/`, `kmp/lint/` | The module checks, unused deps, ktlint and detekt |
 | `kmp/android/` | The Android SDK, library compiles, host tests, APKs, device tests and lint |
-| `kmp/proguard/`, `kmp/jpackage/` | The shrunk desktop jars and the desktop installers |
+| `kmp/r8/`, `kmp/jpackage/` | The shrunk desktop jars and the desktop installers |
 | `kmp/dokka/`, `pages/` | KDoc and the GitHub Pages site |
 | `gazelle/kmp/` | The Gazelle extension (Go) that writes every module's `BUILD.bazel` |
 | `third_party/rules_kotlin/` | The patch that gives rules_kotlin KMP fragments |
@@ -204,7 +204,7 @@ Gradle Module Metadata (the `.module` files Maven Central carries) to its per-pl
 
 The JVM tools the build runs are plain Maven artifacts, so they need no variant resolution: each is a
 rules_jvm_external `maven.install` in `MODULE.bazel` (`@detekt_cli`, `@ktlint_cli`, `@dokka`, `@schemaspy`,
-`@proguard`, `@android_tools`, `@android_lint`), its own resolution and hub, with the versions written right there and
+`@r8`, `@android_tools`, `@android_lint`), its own resolution and hub, with the versions written right there and
 bumped by Renovate. Targets are rules_jvm_external's names (`@ktlint_cli//:com_pinterest_ktlint_ktlint_cli`).
 
 - Each pins into `bazel/maven/<name>_install.json`. After changing an install run `REPIN=1 bazel run @<name>//:pin`
@@ -307,16 +307,17 @@ it is relative, so it runs under any prefix.
   `compose.desktop.currentOs` is `//bazel/kmp/deps:compose_desktop_current_os`, a `select` on the
   target OS and CPU, kept on jvmTest with `kmp_keep_dep`. Test JVMs set `skiko.data.path` under `TEST_TMPDIR`, since
   the sandbox keeps `~/.skiko` read-only.
-- **The app and ProGuard** (`kmp/proguard`): `//app/main/jvm:app` is a hand-written `java_binary` adding the runtime-only
-  deps (the CLI, `currentOs`, log4j). `proguard_jars` shrinks each runtime jar into its own (`-injars`/`-outjars` per
-  jar), with the target JDK's jmods (`//bazel/kmp/deps:jdk_jmods`) as library jars, Compose's
-  `default-compose-desktop-rules.pro` (read from the Compose Gradle plugin jar, the `@proguard` install), then
-  `proguard-rules.pro`. `jar_filters` drops sqlite-jdbc's other platforms' natives. `:release` runs the shrunk app and
-  `:release_service_providers_test` checks its `META-INF/services`; both are `manual`, and
-  `--define=proguard_optimize=false` skips the optimizer.
+- **The app and R8** (`kmp/r8`): `//app/main/jvm:app` is a hand-written `java_binary` adding the runtime-only deps
+  (the CLI, `currentOs`, log4j). `r8_jars` shrinks the whole runtime classpath into one jar (`app-main-jvm.jar`) with
+  R8 in class-file mode and compatibility mode (`R8Runner`, the `@r8` install), with the JDK the build runs
+  on as the library (R8 reads a JDK home, not jmods), Compose's `default-compose-desktop-rules.pro` (read from the
+  Compose Gradle plugin jar, also in `@r8`), then `r8-rules.pro`. R8's class-file output has two bugs the keep rules
+  work around (both described there). `jar_filters` drops sqlite-jdbc's other platforms' natives. `:release`
+  runs the shrunk app and `:release_service_providers_test` checks its `META-INF/services`; both are `manual`, and
+  `--define=r8_optimize=false` skips the optimizer.
 - **Installers** (`kmp/jpackage`): `jlink_runtime`, `jpackage_app_image` and `jpackage_installer`, with the arguments
   Compose's packaging passes. `JPackageRunner` lays out jpackage's input as Compose does (skiko's natives unpacked
-  next to the jars, macOS's `Info.plist` and ad-hoc signing on Apple Silicon) and reads Compose's default icons and
+  from whichever jar holds them next to the jars, macOS's `Info.plist` and ad-hoc signing on Apple Silicon) and reads Compose's default icons and
   entitlements from the plugin jar. jpackage packages only for its host: `//app/main/jvm:installer` is a deb, dmg or
   msi by OS (WiX 3.11 is `@wix`), and its action runs locally (dpkg-deb/fakeroot, hdiutil, WiX).
   `--define=bundle_native_cli=true` adds the host's native `mm` under `lib/cli`. `install_smoke_test.sh` installs it

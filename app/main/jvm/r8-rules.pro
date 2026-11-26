@@ -1,10 +1,14 @@
-# ProGuard rules for MoneyManager Desktop application
+# R8 rules for MoneyManager Desktop application (R8 runs in compatibility mode)
 
-# Parameter type specialization narrows a parameter to the one type every caller passes, but leaves a caller's
-# checkcast to the wider type in place, which the verifier rejects: navigation3's rememberNavBackStack casts its
-# NavBackStackSerializer to KSerializer before calling the narrowed rememberSerializable, and the app failed with a
-# VerifyError on startup (the v1.0.15 release's AOT training). CI builds without the optimizer, so only a release saw it.
--optimizations !method/specialization/parametertype
+# Two R8 bugs in its class-file output, which Android's DEX output never sees:
+# - R8 removes an interface it considers unused but leaves a Java 9+ string concatenation (invokedynamic
+#   makeConcatWithConstants) whose type still names it: NoClassDefFoundError at runtime (our SettingsText,
+#   Compose's ContentScale). Keeping every interface type (not its members) stops it.
+-keep interface **
+# - R8 inlines an accessor of Placeable's protected members into a class of another package, which ART allows and
+#   the JVM's verifier rejects (VerifyError in LayoutModifierNodeCoordinator.performDraw, a blank window). Pinning
+#   the layout nodes' members keeps them out of inlining.
+-keepclassmembers,allowshrinking class androidx.compose.ui.node.** { *; }
 
 # Keep main entry point
 -keep class com.moneymanager.MainKt { *; }
@@ -20,7 +24,7 @@
 -dontwarn org.graalvm.**
 -dontwarn com.oracle.svm.**
 -dontwarn com.github.ajalt.mordant.terminal.terminalinterface.nativeimage.**
-# ProGuard can't resolve the FFM backend's signature-polymorphic MethodHandle/VarHandle calls
+# R8 can't resolve the FFM backend's signature-polymorphic MethodHandle/VarHandle calls
 -dontwarn com.github.ajalt.mordant.terminal.terminalinterface.ffm.**
 
 # Ignore warnings for optional log4j dependencies that aren't used
@@ -48,13 +52,13 @@
 -dontwarn org.jetbrains.skiko.**
 
 # Apache POI + XMLBeans (utils/parsers/xlsx) only ever read .xlsx. Everything reached from our code
-# is kept by ordinary shrinking; these rules cover what they load by name, which ProGuard can't see.
+# is kept by ordinary shrinking; these rules cover what they load by name, which R8 can't see.
 # Anything else in them (HSSF, slideshows, Word, charts, signatures, the XMLBeans compiler) is dropped.
 
 # WorkbookFactory finds XSSFWorkbookFactory (and the HSSF one) through ServiceLoader
 -keep class * implements org.apache.poi.ss.usermodel.WorkbookProvider { *; }
 # POI's other service providers (text extraction, slideshows, image rendering) are never looked up.
-# Their no-arg constructors keep verifyProguardServiceProviders happy without keeping those features.
+# Their no-arg constructors keep the service provider check happy without keeping those features.
 -keep class * implements org.apache.poi.extractor.ExtractorProvider { public <init>(); }
 -keep class * implements org.apache.poi.sl.draw.ImageRenderer { public <init>(); }
 -keep class * implements org.apache.poi.sl.usermodel.MetroShapeProvider { public <init>(); }
@@ -66,9 +70,10 @@
 -keep class **.TypeSystemHolder { *; }
 
 # XMLBeans instantiates the implementation of each schema type it parses by name, through its
-# (SchemaType[, boolean]) constructor: <package>.<Name> -> <package>.impl.<Name>Impl, and nested
-# <Outer>$<Inner> -> <Outer>Impl$<Inner>Impl. Keep those constructors for every schema interface our
-# code reaches; the impl methods it calls through the interface are then kept by ordinary shrinking.
+# (SchemaType[, boolean]) constructor (both spelled out: R8 doesn't match `...` after another argument):
+# <package>.<Name> -> <package>.impl.<Name>Impl, and nested <Outer>$<Inner> -> <Outer>Impl$<Inner>Impl.
+# Keep those constructors for every schema interface our code reaches; the impl methods it calls through the
+# interface are then kept by ordinary shrinking.
 # Keeping whole classes instead would pull in every type their accessors mention (Word, slides...).
 # A type nothing references (which is how poi-ooxml-lite itself works) parses as a generic XmlObject.
 # Also by reflection: string-enum values from <Type>$Enum's static `table` field, and a type's
@@ -76,25 +81,25 @@
 -keepclassmembers class * extends org.apache.xmlbeans.StringEnumAbstractBase { *; }
 -keepclassmembers interface * extends org.apache.xmlbeans.XmlObject { public static final org.apache.xmlbeans.SchemaType type; }
 -if interface org.apache.poi.schemas.**.*
--keep class org.apache.poi.schemas.<1>.impl.<2>Impl, org.apache.poi.schemas.<1>.impl.<2>Impl$** { <init>(org.apache.xmlbeans.SchemaType, ...); }
+-keep class org.apache.poi.schemas.<1>.impl.<2>Impl, org.apache.poi.schemas.<1>.impl.<2>Impl$** { <init>(org.apache.xmlbeans.SchemaType); <init>(org.apache.xmlbeans.SchemaType, boolean); }
 -if interface org.apache.poi.schemas.**.*$*
--keep class org.apache.poi.schemas.<1>.impl.<2>Impl, org.apache.poi.schemas.<1>.impl.<2>Impl$** { <init>(org.apache.xmlbeans.SchemaType, ...); }
+-keep class org.apache.poi.schemas.<1>.impl.<2>Impl, org.apache.poi.schemas.<1>.impl.<2>Impl$** { <init>(org.apache.xmlbeans.SchemaType); <init>(org.apache.xmlbeans.SchemaType, boolean); }
 -if interface org.openxmlformats.schemas.**.*
--keep class org.openxmlformats.schemas.<1>.impl.<2>Impl, org.openxmlformats.schemas.<1>.impl.<2>Impl$** { <init>(org.apache.xmlbeans.SchemaType, ...); }
+-keep class org.openxmlformats.schemas.<1>.impl.<2>Impl, org.openxmlformats.schemas.<1>.impl.<2>Impl$** { <init>(org.apache.xmlbeans.SchemaType); <init>(org.apache.xmlbeans.SchemaType, boolean); }
 -if interface org.openxmlformats.schemas.**.*$*
--keep class org.openxmlformats.schemas.<1>.impl.<2>Impl, org.openxmlformats.schemas.<1>.impl.<2>Impl$** { <init>(org.apache.xmlbeans.SchemaType, ...); }
+-keep class org.openxmlformats.schemas.<1>.impl.<2>Impl, org.openxmlformats.schemas.<1>.impl.<2>Impl$** { <init>(org.apache.xmlbeans.SchemaType); <init>(org.apache.xmlbeans.SchemaType, boolean); }
 -if interface com.microsoft.schemas.**.*
--keep class com.microsoft.schemas.<1>.impl.<2>Impl, com.microsoft.schemas.<1>.impl.<2>Impl$** { <init>(org.apache.xmlbeans.SchemaType, ...); }
+-keep class com.microsoft.schemas.<1>.impl.<2>Impl, com.microsoft.schemas.<1>.impl.<2>Impl$** { <init>(org.apache.xmlbeans.SchemaType); <init>(org.apache.xmlbeans.SchemaType, boolean); }
 -if interface com.microsoft.schemas.**.*$*
--keep class com.microsoft.schemas.<1>.impl.<2>Impl, com.microsoft.schemas.<1>.impl.<2>Impl$** { <init>(org.apache.xmlbeans.SchemaType, ...); }
+-keep class com.microsoft.schemas.<1>.impl.<2>Impl, com.microsoft.schemas.<1>.impl.<2>Impl$** { <init>(org.apache.xmlbeans.SchemaType); <init>(org.apache.xmlbeans.SchemaType, boolean); }
 -if interface org.etsi.uri.**.*
--keep class org.etsi.uri.<1>.impl.<2>Impl, org.etsi.uri.<1>.impl.<2>Impl$** { <init>(org.apache.xmlbeans.SchemaType, ...); }
+-keep class org.etsi.uri.<1>.impl.<2>Impl, org.etsi.uri.<1>.impl.<2>Impl$** { <init>(org.apache.xmlbeans.SchemaType); <init>(org.apache.xmlbeans.SchemaType, boolean); }
 -if interface org.etsi.uri.**.*$*
--keep class org.etsi.uri.<1>.impl.<2>Impl, org.etsi.uri.<1>.impl.<2>Impl$** { <init>(org.apache.xmlbeans.SchemaType, ...); }
+-keep class org.etsi.uri.<1>.impl.<2>Impl, org.etsi.uri.<1>.impl.<2>Impl$** { <init>(org.apache.xmlbeans.SchemaType); <init>(org.apache.xmlbeans.SchemaType, boolean); }
 -if interface org.w3.x2000.**.*
--keep class org.w3.x2000.<1>.impl.<2>Impl, org.w3.x2000.<1>.impl.<2>Impl$** { <init>(org.apache.xmlbeans.SchemaType, ...); }
+-keep class org.w3.x2000.<1>.impl.<2>Impl, org.w3.x2000.<1>.impl.<2>Impl$** { <init>(org.apache.xmlbeans.SchemaType); <init>(org.apache.xmlbeans.SchemaType, boolean); }
 -if interface org.w3.x2000.**.*$*
--keep class org.w3.x2000.<1>.impl.<2>Impl, org.w3.x2000.<1>.impl.<2>Impl$** { <init>(org.apache.xmlbeans.SchemaType, ...); }
+-keep class org.w3.x2000.<1>.impl.<2>Impl, org.w3.x2000.<1>.impl.<2>Impl$** { <init>(org.apache.xmlbeans.SchemaType); <init>(org.apache.xmlbeans.SchemaType, boolean); }
 
 # poi-ooxml-lite ships only the schema types POI itself uses, so the rest of each schema's
 # references dangle by design
@@ -128,8 +133,8 @@
 -dontwarn org.conscrypt.**
 -dontwarn org.openjsse.**
 
-# Libraries found at runtime through META-INF/services (java.util.ServiceLoader), which ProGuard
-# doesn't follow: shrinking removes the provider classes and the lookup then fails. sqlite-jdbc is
+# Libraries found at runtime through META-INF/services (java.util.ServiceLoader) through a lookup R8 can't follow:
+# shrinking removes the provider classes and the lookup then fails. sqlite-jdbc is
 # also bound to its native library over JNI.
 -keep class org.sqlite.** { *; }
 -keep class dev.whyoleg.cryptography.** { *; }
@@ -144,6 +149,6 @@
 # async loggers, and the OSGi/CLI tooling. A descriptor entry whose class was removed is skipped with
 # an INFO-level status message; a config naming one would fail loudly at startup.
 -keep class !org.apache.logging.log4j.core.appender.db.**,!org.apache.logging.log4j.core.appender.mom.**,!org.apache.logging.log4j.core.appender.nosql.**,!org.apache.logging.log4j.core.appender.routing.**,!org.apache.logging.log4j.core.appender.rewrite.**,!org.apache.logging.log4j.core.appender.AsyncAppender*,!org.apache.logging.log4j.core.appender.Failover*,!org.apache.logging.log4j.core.appender.Http*,!org.apache.logging.log4j.core.appender.MemoryMapped*,!org.apache.logging.log4j.core.appender.RandomAccessFile*,!org.apache.logging.log4j.core.appender.RollingRandomAccessFile*,!org.apache.logging.log4j.core.appender.ScriptAppenderSelector*,!org.apache.logging.log4j.core.appender.SmtpAppender*,!org.apache.logging.log4j.core.appender.SocketAppender*,!org.apache.logging.log4j.core.appender.SyslogAppender*,!org.apache.logging.log4j.core.appender.TlsSyslogFrame*,!org.apache.logging.log4j.core.appender.CountingNoOpAppender*,!org.apache.logging.log4j.core.layout.*Csv*,!org.apache.logging.log4j.core.layout.*Jackson*,!org.apache.logging.log4j.core.layout.GelfLayout*,!org.apache.logging.log4j.core.layout.HtmlLayout*,!org.apache.logging.log4j.core.layout.JsonLayout*,!org.apache.logging.log4j.core.layout.LoggerFields*,!org.apache.logging.log4j.core.layout.MessageLayout*,!org.apache.logging.log4j.core.layout.Rfc5424Layout*,!org.apache.logging.log4j.core.layout.ScriptPatternSelector*,!org.apache.logging.log4j.core.layout.SerializedLayout*,!org.apache.logging.log4j.core.layout.SyslogLayout*,!org.apache.logging.log4j.core.layout.XmlLayout*,!org.apache.logging.log4j.core.layout.YamlLayout*,!org.apache.logging.log4j.core.jackson.**,!org.apache.logging.log4j.core.filter.**,!org.apache.logging.log4j.core.async.**,!org.apache.logging.log4j.core.net.**,!org.apache.logging.log4j.core.script.**,!org.apache.logging.log4j.core.config.json.**,!org.apache.logging.log4j.core.config.yaml.**,!org.apache.logging.log4j.core.config.properties.**,!org.apache.logging.log4j.core.config.plugins.processor.**,!org.apache.logging.log4j.core.osgi.**,!org.apache.logging.log4j.core.tools.**,org.apache.logging.log4j.core.** { *; }
-# The excluded classes are still kept when something reaches them, but left unoptimized as before:
-# ProGuard's optimizer can't analyse the Jackson modules, whose superclasses (Jackson) aren't bundled.
+# The excluded classes are still kept when something reaches them, but left unoptimized: the Jackson modules'
+# superclasses (Jackson) aren't bundled.
 -keep,allowshrinking class org.apache.logging.log4j.core.** { *; }

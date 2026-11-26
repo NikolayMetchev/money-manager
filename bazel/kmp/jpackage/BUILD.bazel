@@ -22,5 +22,5 @@ java_binary(
     srcs = ["src/com/moneymanager/bazel/kmp/jpackage/JPackageRunner.java"],
     main_class = "com.moneymanager.bazel.kmp.jpackage.JPackageRunner",
     visibility = ["//visibility:public"],
-    runtime_deps = ["@proguard//:org_jetbrains_compose_compose_gradle_plugin"],
+    runtime_deps = ["@r8//:org_jetbrains_compose_compose_gradle_plugin"],
 )

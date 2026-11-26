@@ -33,7 +33,7 @@
       "groupName": "android gradle plugin"
     },
     {
-      "description": "@proguard applies the Compose Gradle plugin's default ProGuard rules for the Compose libraries maven_kmp resolves, so the plugin moves with them",
+      "description": "@r8 applies the Compose Gradle plugin's default keep rules for the Compose libraries maven_kmp resolves, so the plugin moves with them",
       "matchPackageNames": ["/^org\\.jetbrains\\.compose[.:]/"],
       "groupName": "compose multiplatform"
     },

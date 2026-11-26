@@ -40,7 +40,7 @@ single_version_override(
 register_toolchains("//bazel/kmp:kotlin_toolchain")
 
 # The JDK every Java and Kotlin action runs on (.bazelrc's java_runtime_version), whose jmods each desktop OS's build
-# bundles (//bazel/kmp/deps:jdk_jmods: jlink and ProGuard read them). Azul Zulu, because it ships jmods/: Temurin
+# bundles (//bazel/kmp/deps:jdk_jmods: jlink reads them). Azul Zulu, because it ships jmods/: Temurin
 # hasn't since 24. rules_java only knows the LTS releases it was built with, so each platform's archive is listed here.
 # Renovate bumps JDK to every release, LTS or not; bazel/renovate/repin.sh then rewrites the archives, their SHA-256s
 # and .bazelrc's runtime version (repo-scripts repin jdk). Each platform uses its newest available build
@@ -684,20 +684,19 @@ maven.install(
     version_conflict_policy = "pinned",
 )
 
-# The desktop app's ProGuard (#1019), with the Compose Gradle plugin for the default rules it applies.
+# The desktop app's shrinker, R8 (#1019), with the Compose Gradle plugin for the default rules it applies (and the
+# default icons and entitlements jpackage uses).
 maven.install(
-    name = "proguard",
+    name = "r8",
     artifacts = [
-        "com.guardsquare:proguard-base:7.10.0",
+        "com.android.tools:r8:9.5.33",
         "org.jetbrains.compose:compose-gradle-plugin:1.12.2",
-        # Transitive versions held at the newest (see version_conflict_policy).
-        "com.google.code.gson:gson:2.15.0",
-        "com.google.errorprone:error_prone_annotations:2.53.0",
     ],
     # Optional in the plugin's POM, and Gradle-only.
     excluded_artifacts = ["org.jetbrains.compose.hot-reload:hot-reload-gradle-plugin"],
-    lock_file = "//bazel/maven:proguard_install.json",
+    lock_file = "//bazel/maven:r8_install.json",
     repositories = [
+        "https://maven.google.com",
         "https://repo1.maven.org/maven2",
         "https://plugins.gradle.org/m2",
     ],
@@ -775,7 +774,7 @@ maven.amend_artifact(
     coordinates = "com.android.tools.build:gradle-api",
     exclusions = ["com.android.tools.build:gradle"],
 )
-use_repo(maven, "android_lint", "android_tools", "detekt_cli", "dokka", "kover", "ktlint_cli", "proguard", "schemaspy")
+use_repo(maven, "android_lint", "android_tools", "detekt_cli", "dokka", "kover", "ktlint_cli", "r8", "schemaspy")
 
 use_repo(maven_kmp, "maven_kmp")
 

@@ -26,6 +26,7 @@ import java.util.regex.Pattern;
 import java.util.spi.ToolProvider;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
@@ -546,19 +547,19 @@ public final class JPackageRunner {
   }
 
   /**
-   * Compose's {@code prepareWorkingDir}: every jar copied as is, except the host's skiko runtime jar, whose native
-   * library (and its {@code .sha256}) is unpacked next to the jars (skiko finds it through {@code
+   * Compose's {@code prepareWorkingDir}: every jar copied as is, except the one holding the host's skiko natives
+   * (skiko's runtime jar, or the one jar R8 shrinks the app into), whose native library (and its {@code .sha256})
+   * is unpacked next to the jars (skiko finds it through {@code
    * skiko.library.path=$APPDIR}). On macOS, dylibs inside jars are ad-hoc signed first, as Compose's unsigned
    * build does on Apple Silicon.
    */
   private static Path layOutLibs(Path libs, List<String> jars, Path work) throws Exception {
     Files.createDirectories(libs.resolve("resources"));
-    String skikoJar = "skiko-awt-runtime-" + HOST_OS.id + "-" + HOST_ARCH;
     Set<String> skikoNatives = HOST_OS.skikoNatives();
     for (String jar : jars) {
       Path source = Path.of(jar);
       Path target = libs.resolve(source.getFileName().toString());
-      boolean skiko = target.getFileName().toString().startsWith(skikoJar);
+      boolean skiko = holdsAny(source, skikoNatives);
       boolean signDylibs = HOST_OS == OS.MAC && HOST_ARCH.equals("arm64");
       if (!skiko && !signDylibs) {
         Files.copy(source, target);
@@ -696,6 +697,15 @@ public final class JPackageRunner {
         System.err.write(output);
         throw new IllegalStateException("codesign failed: " + String.join(" ", command));
       }
+    }
+  }
+
+  /** Whether the jar has an entry whose file name is one of {@code leaves}. */
+  private static boolean holdsAny(Path jar, Set<String> leaves) throws IOException {
+    try (ZipFile zip = new ZipFile(jar.toFile())) {
+      return zip.stream()
+          .map(ZipEntry::getName)
+          .anyMatch(name -> leaves.contains(name.substring(name.lastIndexOf('/') + 1)));
     }
   }
 

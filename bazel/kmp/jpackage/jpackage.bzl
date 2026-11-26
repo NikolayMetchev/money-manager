@@ -146,7 +146,7 @@ jpackage_app_image = rule(
         "args": attr.string_list(doc = "More jpackage arguments (the platform's own options)."),
         "bundle_id": attr.string(doc = "macOS: `CFBundleIdentifier` and `--mac-package-identifier`."),
         "description": attr.string(mandatory = True),
-        "jars": attr.label(mandatory = True, providers = [JavaInfo], doc = "The app's jars (`proguard_jars`)."),
+        "jars": attr.label(mandatory = True, providers = [JavaInfo], doc = "The app's jars (`r8_jars`)."),
         "java_options": attr.string_list(doc = "The launcher's JVM options (Compose's `jvmArgs`)."),
         "launchers": attr.label_keyed_string_dict(
             allow_files = [".properties"],

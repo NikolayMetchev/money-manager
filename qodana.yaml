@@ -326,7 +326,7 @@ exclude:
       - bazel/kmp/deps/extensions.bzl
       # The desktop BUILD loads and calls these packaging rules.
       - bazel/kmp/jpackage/jpackage.bzl
-      - bazel/kmp/proguard/proguard.bzl
+      - bazel/kmp/r8/r8.bzl
       - bazel/kmp/metadata.bzl
       - bazel/kmp/native.bzl
       - bazel/kmp/native/extensions.bzl

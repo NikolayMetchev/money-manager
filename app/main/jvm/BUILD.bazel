@@ -2,7 +2,7 @@ load("@rules_java//java:java_binary.bzl", "java_binary")
 load("@rules_java//java:java_test.bzl", "java_test")
 load("//bazel/kmp:defs.bzl", "kmp_library")
 load("//bazel/kmp/jpackage:jpackage.bzl", "aot_app_image", "jlink_runtime", "jpackage_app_image", "jpackage_installer")
-load("//bazel/kmp/proguard:proguard.bzl", "proguard_jars")
+load("//bazel/kmp/r8:r8.bzl", "r8_jars")
 
 # gazelle:kmp_generate true
 
@@ -87,10 +87,11 @@ java_binary(
     runtime_deps = _RUNTIME,
 )
 
-# Compose's proguardReleaseJars: not part of `bazel build //...`, as it isn't of Gradle's `build`.
-# `--define=proguard_optimize=false` skips the optimizer, as CI's Build and Test does.
-proguard_jars(
+# The release jars, shrunk by R8: not part of `bazel build //...`.
+# `--define=r8_optimize=false` skips the optimizer, as CI's Build and Test does.
+r8_jars(
     name = "release_jars",
+    out = "app-main-jvm.jar",
     # sqlite-jdbc carries its JNI library for ~24 OS/CPU pairs; the app only ever runs on its own.
     jar_filters = select({
         "//bazel/kmp/deps:desktop_linux_arm64": {"sqlite-jdbc-": "org/sqlite/native/Linux/aarch64/**,!org/sqlite/native/**"},
@@ -101,10 +102,10 @@ proguard_jars(
     }),
     main_class = _MAIN_CLASS,
     optimize = select({
-        "//bazel/kmp/proguard:no_optimize": False,
+        "//bazel/kmp/r8:no_optimize": False,
         "//conditions:default": True,
     }),
-    rules = ["proguard-rules.pro"],
+    rules = ["r8-rules.pro"],
     tags = ["manual"],
     deps = _RELEASE_RUNTIME,
 )
@@ -118,16 +119,16 @@ java_binary(
     runtime_deps = [":release_jars"],
 )
 
-# Gradle's verifyProguardServiceProviders.
+# Every ServiceLoader provider the release jars name survived shrinking.
 java_test(
     name = "release_service_providers_test",
     size = "small",
     args = ["$(rootpaths :release_jars)"],
     data = [":release_jars"],
-    main_class = "com.moneymanager.bazel.kmp.proguard.ServiceProviderCheck",
+    main_class = "com.moneymanager.bazel.kmp.r8.ServiceProviderCheck",
     tags = ["manual"],
     use_testrunner = False,
-    runtime_deps = ["//bazel/kmp/proguard:service_provider_check"],
+    runtime_deps = ["//bazel/kmp/r8:service_provider_check"],
 )
 
 # Compose's native distributions (#1020): `:runtime` is createRuntimeImage, `:app_image` createReleaseDistributable,

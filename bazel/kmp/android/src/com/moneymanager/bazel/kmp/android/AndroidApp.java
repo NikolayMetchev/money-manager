@@ -77,7 +77,7 @@ import javax.xml.parsers.DocumentBuilderFactory;
  * The steps of AGP's APK build that aren't a tool of their own (aapt2, D8, R8), done with AGP's own classes:
  * {@code manifest} is {@code processDebugManifest}, {@code test-manifest} a test APK's
  * {@code processAndroidDeviceTestManifest}, {@code rjar} the R.jar {@code processDebugResources} writes,
- * {@code proguard-defaults} {@code getDefaultProguardFile}, {@code embedded-rules} the keep rules AGP extracts from
+ * {@code default-rules} AGP's default optimizing rules file, {@code embedded-rules} the keep rules AGP extracts from
  * library jars, {@code debug-keystore} the key AGP makes when ~/.android has none, and {@code package}
  * {@code packageDebug}: the APK through AGP's {@code ApkFlinger}, with AGP's
  * default Java-resource excludes and merges, its no-compress rules and 16 KB page alignment, v2-signed. A release
@@ -93,7 +93,7 @@ public final class AndroidApp {
       case "manifest" -> manifest(flags);
       case "test-manifest" -> testManifest(flags);
       case "rjar" -> rJar(flags);
-      case "proguard-defaults" -> ProguardFiles.createProguardFile(one(flags, "name"), new File(one(flags, "out")));
+      case "default-rules" -> ProguardFiles.createProguardFile(one(flags, "name"), new File(one(flags, "out")));
       case "embedded-rules" -> embeddedRules(flags);
       case "java-res" -> javaRes(flags);
       case "art-profile" -> artProfile(flags);
@@ -290,8 +290,8 @@ public final class AndroidApp {
 
   /**
    * The keep rules library jars carry, as AGP extracts them for R8: a jar's {@code META-INF/com.android.tools/r8*}
-   * rules when it has any (the directory whose version range takes R8's), else its {@code META-INF/proguard} ones,
-   * after an AAR's own {@code proguard.txt} ({@code --aar-rules <jar>=<proguard.txt>}): one library at a time, in
+   * rules when it has any (the directory whose version range takes R8's), else its older generic ones, after an
+   * AAR's own ({@code --aar-rules <jar>=<rules file>}): one library at a time, in
    * classpath order, as AGP hands R8 the runtime classpath's rules.
    */
   private static void embeddedRules(Map<String, List<String>> flags) throws IOException {
@@ -308,7 +308,7 @@ public final class AndroidApp {
       }
       try (ZipFile zip = new ZipFile(jar)) {
         List<ZipEntry> r8 = new ArrayList<>();
-        List<ZipEntry> proguard = new ArrayList<>();
+        List<ZipEntry> generic = new ArrayList<>();
         for (ZipEntry e : zip.stream().sorted(Comparator.comparing(ZipEntry::getName)).toList()) {
           String name = e.getName();
           if (e.isDirectory()) {
@@ -317,11 +317,11 @@ public final class AndroidApp {
           if (name.startsWith("META-INF/com.android.tools/") && r8Applies(name)) {
             r8.add(e);
           } else if (name.startsWith("META-INF/proguard/")) {
-            proguard.add(e);
+            generic.add(e);
           }
         }
         boolean hasR8Dir = zip.stream().anyMatch(e -> e.getName().startsWith("META-INF/com.android.tools/r8"));
-        for (ZipEntry e : hasR8Dir ? r8 : proguard) {
+        for (ZipEntry e : hasR8Dir ? r8 : generic) {
           out.append("# ").append(e.getName()).append('\n');
           try (InputStream in = zip.getInputStream(e)) {
             out.append(new String(in.readAllBytes(), StandardCharsets.UTF_8)).append('\n');
@@ -541,7 +541,7 @@ public final class AndroidApp {
   private static void r8(Map<String, List<String>> flags) throws Exception {
     Path scratch = Files.createTempDirectory("r8");
     List<KeepRuleFile> rules = new ArrayList<>();
-    for (String rule : all(flags, "pg-conf")) {
+    for (String rule : all(flags, "keep-rules")) {
       rules.add(new KeepRuleFile.WithoutOrigin(rule));
     }
     ProguardOutputFiles outputs = new ProguardOutputFiles(
@@ -551,7 +551,7 @@ public final class AndroidApp {
         scratch.resolve("usage.txt"),
         Path.of(one(flags, "configuration")),
         scratch.resolve("missing_rules.txt"));
-    ProguardConfig proguard = new ProguardConfig(rules, null, List.of(), outputs, null);
+    ProguardConfig keepConfig = new ProguardConfig(rules, null, List.of(), outputs, null);
     int minSdk = Integer.parseInt(one(flags, "min-sdk"));
     ToolConfig tool = new ToolConfig(minSdk, false, false, false, false, true, true, null, R8OutputType.DEX, true);
     List<File> rawRes = all(flags, "raw-res").stream().map(File::new).toList();
@@ -581,7 +581,7 @@ public final class AndroidApp {
           List.of(Path.of(one(flags, "lib"))),
           List.of(),
           tool,
-          proguard,
+          keepConfig,
           new MainDexListConfig(),
           shrinking,
           messages,

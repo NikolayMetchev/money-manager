@@ -101,7 +101,7 @@ genrule(
 
 genrule(
     name = "pdfium_android_keep",
-    outs = ["pdfium_android/proguard.txt"],
+    outs = ["pdfium_android/keep_rules.txt"],
     # JNA finds a library's functions by the interface's method names, and reads its own classes reflectively.
     cmd = "printf '%s\\n' " + " ".join([
         "'-dontwarn java.awt.**'",
@@ -124,8 +124,8 @@ aar_import(
     assets = [":pdfium_android_licenses"],
     jar = ":pdfium_android_classes",
     jni = [":pdfium_android_" + abi.replace("-", "_") for abi, _ in ANDROID_PDFIUM],
+    keep_rules = [":pdfium_android_keep"],
     manifest = ":pdfium_android_manifest",
-    proguard = [":pdfium_android_keep"],
     target_compatible_with = ANDROID_ONLY,
 )
 
