@@ -3,7 +3,6 @@ package com.moneymanager.apiimporter
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.model.apistrategy.ApiLedgerTrades
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
-import com.moneymanager.domain.model.apistrategy.TransferDirection
 
 /**
  * Reconciles parsed trades against their authoritative ledger legs (see

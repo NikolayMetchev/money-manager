@@ -33,3 +33,9 @@ object SortedValueEndpointListSerializer : SortedByListSerializer<ApiEndpointCon
     ApiEndpointConfig.serializer(),
     compareBy { it.path },
 )
+
+/** Bridges match accounts independently, so their order carries no meaning. */
+object SortedAccountBridgeListSerializer : SortedByListSerializer<ApiAccountBridge>(
+    ApiAccountBridge.serializer(),
+    compareBy { it.otherAccountName },
+)
