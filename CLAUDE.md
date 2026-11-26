@@ -96,7 +96,7 @@ Flags and configs:
 - `--define=native_optimize=false` links the native executables (`mm`) as debug links against the compiler caches
   (`-g`, no `-opt`): ~15 seconds where the optimised, uncached link is ~8 minutes on BuildBuddy and ~14 on the macOS
   runner. Only the host's own target has caches, so the Windows `mm.exe` link is just unoptimised. CI passes it for
-  debug links and leaves it off in the production matrix.
+  debug links and leaves it off in production builds.
 - `--define=bundle_native_cli=true` puts the host's native `mm` into the desktop installer
   (`//app/main/jvm:installer`: a deb, dmg or msi on its own OS only).
 - `:<name>_linuxArm64_cross` and `:<name>_mingwX64_cross` (manual) are a module's test binary built for Linux arm64 or
@@ -108,12 +108,12 @@ each on the benchmark database (`//tools/bench-db:bench_db`); see `bazel/README.
 valid while the installed jars keep their pinned modification times.
 
 On code pushes to main and on manual runs, `build.yml` builds the optimized native `mm` release assets
-for Linux x64, Linux arm64, macOS arm64 and Windows x64 in one matrix. A second matrix builds the
-optimized, AOT-trained JVM app image for each desktop OS. The installer matrix downloads both artifacts,
+for Linux x64, Linux arm64, macOS arm64 and Windows x64. Each desktop OS builds its optimized, AOT-trained
+JVM app image in parallel with its native CLI. Once both are ready, that OS's installer job downloads them,
 packages them with `--define=prebuilt_desktop=true`, and smoke-tests the deb, dmg or msi. Release publishes
 those installers and the standalone native assets.
 
-**Startup tracking**: the Time startup matrix consumes the same production artifacts and the shared benchmark
+**Startup tracking**: each Time startup job waits for its own platform’s binaries and the shared benchmark
 databases and driver built on Linux. It runs `bazel/perf/startup_bench.sh` on Linux, macOS and Windows,
 with and without the JVM AOT caches. The record job appends main's results to `startup.jsonl` on the
 `perf-data` branch for `webpage/performance.html`. Release can proceed while the benchmarks run.

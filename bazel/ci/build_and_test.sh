@@ -57,7 +57,7 @@ bazel fetch "${hubs[@]}"
 extra=()
 if [ "$NATIVE" = true ]; then
   cross=$(bazel query "${flags[@]}" 'attr(name, "_(linuxArm64|mingwX64)_cross$", //...)') || exit 1
-  # The production matrix or a PR installer already links mm. A native-only PR still checks the link here.
+  # The production job or a PR installer already links mm. A native-only PR still checks the link here.
   if [ "${LINK_MM:-true}" = false ]; then extra+=(-//app/main/cli:mm); fi
   extra+=(//bazel/kmp/testing/launcher:launcher_linuxArm64 //bazel/kmp/testing/launcher:launcher_mingwX64 $cross)
 fi
