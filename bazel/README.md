@@ -331,7 +331,7 @@ it is relative, so it runs under any prefix.
   and sends the JVM's warnings to stderr, and a run with `-XX:AOTMode=on` fails the action unless the cache loads. On
   Linux it trains on the executors under its own Xvfb (`--action_env=DISPLAY=…` uses that display instead), on macOS
   and Windows on the host. A cache only loads when the jars keep the modification times it was trained against, so
-  every file is pinned to `JPackageRunner.PINNED_MTIME`: the deb keeps it through `SOURCE_DATE_EPOCH`, the dmg is
+  every file is pinned to `PINNED_MTIME` in `JPackageRunner.kt`: the deb keeps it through `SOURCE_DATE_EPOCH`, the dmg is
   rewritten with it, and the msi resets the jars to it after `InstallFiles` (a custom action injected into jpackage's
   own `main.wxs`), since Windows Installer shifts a cabinet's file times by the machine's time zone. Only the classpath
   jars' times are checked. The smoke test runs with `-XX:AOTMode=on`. Its inputs are the image, so a JDK or classpath change

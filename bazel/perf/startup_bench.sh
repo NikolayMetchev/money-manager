@@ -5,7 +5,7 @@
 # main with everything built as a release builds it; bazel/perf/record.sh then keeps the results.
 #
 # The image runs where it is copied to, not installed: the AOT caches were trained against one fixed modification
-# time on every file (JPackageRunner.PINNED_MTIME), so the copy is set back to it, as an installer would. The timing
+# time on every file (PINNED_MTIME in JPackageRunner.kt), so the copy is set back to it, as an installer would. The timing
 # tool runs on the runner's java (MODULE.bazel's JDK): the image's runtime has no java, as jlink strips the commands.
 # On Linux it uses $DISPLAY, else starts Xvfb; on a GitHub macOS runner sudo (bazel/ci/macos_runner_hostname.sh).
 #
