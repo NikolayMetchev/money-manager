@@ -40,7 +40,7 @@ class BarclaycardCsvMapperTest {
                 .selectForCsv("Transactions - 2026-02-25T12_00_00.000Z.csv", columns, listOf(row))
         assertEquals("Barclaycard CSV", strategy?.name)
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = requireNotNull(strategy),
                 columns = columns,
                 existingAccounts = mapOf(barclaycard.name to barclaycard),

@@ -3,10 +3,13 @@ package com.moneymanager.importengineapi
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
+import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.RelationshipTypeId
+import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.rules.SettlementWindow
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
+import kotlin.time.Instant
 
 /**
  * Links this strategy's [exchangeAccountId] to an [appAccountId] the user also owns, where a transfer
@@ -107,6 +110,19 @@ sealed interface DedupePolicy {
         /** Window for [unidentifiedCounterpartyAttributeTypeId]; null: [dateTolerance], as clock time. */
         val unidentifiedCounterpartyWindow: SettlementWindow? = null,
     ) : DedupePolicy {
+        fun matches(
+            existing: Transfer,
+            source: AccountId,
+            target: AccountId,
+            amount: Money,
+            timestamp: Instant,
+            description: String,
+        ): Boolean =
+            amount == existing.amount &&
+                (source == existing.sourceAccountId || target == existing.targetAccountId) &&
+                (timestamp - existing.timestamp).absoluteValue <= dateTolerance &&
+                StringSimilarity.similarity(description, existing.description) >= similarityThreshold
+
         override fun windows(): List<SettlementWindow> =
             listOfNotNull(SettlementWindow.Elapsed(dateTolerance.inWholeSeconds), reconcileWindow, unidentifiedCounterpartyWindow)
     }

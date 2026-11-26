@@ -1,8 +1,8 @@
 package com.moneymanager.database.csv
 
 import com.moneymanager.builtin.RevolutStrategies
-import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.MappingResult
+import com.moneymanager.csvimporter.TransferMapper
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
@@ -34,7 +34,7 @@ class RevolutOwnHolderTest {
         )
 
     private fun map(description: String): MappingResult =
-        CsvTransferMapper(
+        TransferMapper(
             strategy = strategy,
             columns = columns,
             existingAccounts = listOf(revolut, holder, someoneElse).associateBy { it.name },

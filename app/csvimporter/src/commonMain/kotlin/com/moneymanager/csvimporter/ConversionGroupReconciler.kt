@@ -44,7 +44,7 @@ class ConversionGroupReconciler(
      * The trades this group duplicates, or null when it is not already recorded and must be imported.
      * On a match every trade involved is claimed, so two groups never both match the same one.
      */
-    fun match(debits: List<CsvTransferWithAttributes>): List<TradeId>? {
+    fun match(debits: List<MappingResult.Success>): List<TradeId>? {
         if (debits.isEmpty()) return null
         val matched = mutableListOf<TradeId>()
         val claimedHere = mutableSetOf<TradeId>()
@@ -81,7 +81,7 @@ class ConversionGroupReconciler(
  */
 suspend fun reconcileConversionGroups(
     strategy: CsvImportStrategy,
-    rows: List<CsvTransferWithAttributes>,
+    rows: List<MappingResult.Success>,
     tradeRepository: TradeReadRepository?,
 ): Map<Long, TradeId> {
     val repository = tradeRepository ?: return emptyMap()
@@ -95,7 +95,7 @@ suspend fun reconcileConversionGroups(
 }
 
 private suspend fun reconcileGroups(
-    groups: List<List<CsvTransferWithAttributes>>,
+    groups: List<List<MappingResult.Success>>,
     window: Duration,
     repository: TradeReadRepository,
 ): Map<Long, TradeId> {

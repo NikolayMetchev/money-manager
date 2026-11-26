@@ -141,7 +141,7 @@ class ConversionLegMapperTest {
         )
 
     private fun mapper() =
-        CsvTransferMapper(
+        TransferMapper(
             strategy = strategy,
             columns = columns,
             existingAccounts = mapOf(wallet.name to wallet),

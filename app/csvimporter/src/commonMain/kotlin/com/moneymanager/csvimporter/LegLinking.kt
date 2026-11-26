@@ -7,7 +7,7 @@ import kotlin.time.Duration
 
 /** Links each debit leg to the nearest credit leg of the same key within [window] (credits may be shared). */
 internal fun pairDebitsToCredits(
-    legs: List<CsvTransferWithAttributes>,
+    legs: List<MappingResult.Success>,
     window: Duration,
     relationshipTypeName: String,
 ): List<Pair<Long, BatchRelationship>> {
@@ -30,7 +30,7 @@ internal fun pairDebitsToCredits(
  * key (the row names no group) links to nothing, and an anchor never links to itself.
  */
 internal fun linkMembersToAnchors(
-    legs: List<CsvTransferWithAttributes>,
+    legs: List<MappingResult.Success>,
     relationshipTypeName: String,
 ): List<Pair<Long, BatchRelationship>> {
     val (anchors, members) = legs.filter { it.groupLeg!!.key.isNotBlank() }.partition { it.groupLeg!!.funding }
@@ -47,7 +47,7 @@ internal fun linkMembersToAnchors(
  * movement, so they pair with nothing.
  */
 internal fun pairFundingLegs(
-    legs: List<CsvTransferWithAttributes>,
+    legs: List<MappingResult.Success>,
     window: Duration,
     relationshipTypeName: String,
 ): List<Pair<Long, BatchRelationship>> {

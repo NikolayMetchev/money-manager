@@ -136,7 +136,7 @@ class CsvTransferMapperTest {
     fun `mapRow successfully maps valid row with existing account`() {
         val strategy = createStrategy()
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columns,
                 existingAccounts = mapOf("Payee Account" to testTargetAccount),
@@ -178,7 +178,7 @@ class CsvTransferMapperTest {
             )
         val grossColumns = columns.map { if (it.originalName == "Amount") it.copy(originalName = "Gross") else it }
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = grossColumns,
                 existingAccounts = mapOf("Payee Account" to testTargetAccount),
@@ -196,7 +196,7 @@ class CsvTransferMapperTest {
     fun `mapRow identifies new account when account not found`() {
         val strategy = createStrategy()
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columns,
                 existingAccounts = emptyMap(),
@@ -228,7 +228,7 @@ class CsvTransferMapperTest {
                     ),
             )
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columns,
                 existingAccounts = emptyMap(),
@@ -256,9 +256,9 @@ class CsvTransferMapperTest {
     private fun conduitMapper(
         conduit: StrategyRule,
         passThroughs: List<PassThroughAccount> = emptyList(),
-    ): CsvTransferMapper {
+    ): TransferMapper {
         val strategy = createStrategy()
-        return CsvTransferMapper(
+        return TransferMapper(
             strategy = strategy.copy(config = strategy.config.copy(rules = strategy.config.rules + conduit)),
             columns = columns,
             existingAccounts = emptyMap(),
@@ -337,7 +337,7 @@ class CsvTransferMapperTest {
         // the transfer failed the account foreign key on insert.
         val payPalAccount = Account(id = AccountId(48), name = "PAYPAL", openingDate = Clock.System.now())
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columns,
                 existingAccounts = mapOf(payPalAccount.name to payPalAccount),
@@ -386,7 +386,7 @@ class CsvTransferMapperTest {
                     ),
             )
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columns,
                 existingAccounts = emptyMap(),
@@ -428,7 +428,7 @@ class CsvTransferMapperTest {
         val curveAccountId = AccountId(5)
         val curveAccount = Account(id = curveAccountId, name = "Curve", openingDate = Clock.System.now())
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columns,
                 existingAccounts = mapOf("Curve" to curveAccount),
@@ -456,7 +456,7 @@ class CsvTransferMapperTest {
     fun `mapRow routes an outgoing Curve refund reversal through the conduit like an ordinary charge`() {
         val strategy = createStrategy(flipAccountsOnPositive = true)
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columns,
                 existingAccounts = emptyMap(),
@@ -484,7 +484,7 @@ class CsvTransferMapperTest {
     fun `mapRow returns error for invalid date format`() {
         val strategy = createStrategy()
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columns,
                 existingAccounts = mapOf("Payee Account" to testTargetAccount),
@@ -503,7 +503,7 @@ class CsvTransferMapperTest {
     fun `mapRow returns error when currency not found`() {
         val strategy = createStrategy()
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columns,
                 existingAccounts = mapOf("Payee Account" to testTargetAccount),
@@ -522,7 +522,7 @@ class CsvTransferMapperTest {
     fun `mapRow flips accounts when amount is positive and flipAccountsOnPositive is true`() {
         val strategy = createStrategy(flipAccountsOnPositive = true)
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columns,
                 existingAccounts = mapOf("Payee Account" to testTargetAccount),
@@ -542,7 +542,7 @@ class CsvTransferMapperTest {
     fun `mapRow does not flip accounts when amount is negative`() {
         val strategy = createStrategy(flipAccountsOnPositive = true)
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columns,
                 existingAccounts = mapOf("Payee Account" to testTargetAccount),
@@ -562,7 +562,7 @@ class CsvTransferMapperTest {
     fun `prepareImport collects valid transfers and errors`() {
         val strategy = createStrategy()
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columns,
                 existingAccounts = mapOf("Payee Account" to testTargetAccount),
@@ -590,7 +590,7 @@ class CsvTransferMapperTest {
         val skipPending =
             StrategyRule(conditions = listOf(Condition("Description", ConditionOp.EQUALS, "Pending")), actions = listOf(RuleAction.Skip))
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy.copy(config = strategy.config.copy(rules = listOf(skipPending) + strategy.config.rules)),
                 columns = columns,
                 existingAccounts = mapOf("Payee Account" to testTargetAccount),
@@ -615,7 +615,7 @@ class CsvTransferMapperTest {
     fun `prepareImport collects new accounts to create`() {
         val strategy = createStrategy()
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columns,
                 existingAccounts = mapOf("Existing Payee" to testTargetAccount),
@@ -643,7 +643,7 @@ class CsvTransferMapperTest {
     fun `mapRow handles amounts with currency symbols`() {
         val strategy = createStrategy()
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columns,
                 existingAccounts = mapOf("Payee Account" to testTargetAccount),
@@ -662,7 +662,7 @@ class CsvTransferMapperTest {
     fun `mapRow handles amounts with thousand separators`() {
         val strategy = createStrategy()
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columns,
                 existingAccounts = mapOf("Payee Account" to testTargetAccount),
@@ -732,7 +732,7 @@ class CsvTransferMapperTest {
             )
 
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategyWithCurrencyColumn,
                 columns = columnsWithCurrency,
                 existingAccounts = mapOf("Payee Account" to testTargetAccount),
@@ -805,7 +805,7 @@ class CsvTransferMapperTest {
             )
 
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategyWithCurrencyColumn,
                 columns = columnsWithCurrency,
                 existingAccounts = mapOf("Payee Account" to testTargetAccount),
@@ -876,7 +876,7 @@ class CsvTransferMapperTest {
             )
 
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategyWithTimezone,
                 columns = columns,
                 existingAccounts = mapOf("Payee Account" to testTargetAccount),
@@ -958,7 +958,7 @@ class CsvTransferMapperTest {
             )
 
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategyWithTimezoneColumn,
                 columns = columnsWithTimezone,
                 existingAccounts = mapOf("Payee Account" to testTargetAccount),
@@ -1036,7 +1036,7 @@ class CsvTransferMapperTest {
             )
 
         val utcMapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = createStrategyWithTimezone("UTC"),
                 columns = columns,
                 existingAccounts = mapOf("Payee Account" to testTargetAccount),
@@ -1045,7 +1045,7 @@ class CsvTransferMapperTest {
             )
 
         val londonMapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = createStrategyWithTimezone("Europe/London"),
                 columns = columns,
                 existingAccounts = mapOf("Payee Account" to testTargetAccount),
@@ -1164,7 +1164,7 @@ class CsvTransferMapperTest {
 
         val strategy = createStrategyWithFallback()
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columnsWithType,
                 existingAccounts = mapOf("Cheque" to chequeAccount),
@@ -1188,7 +1188,7 @@ class CsvTransferMapperTest {
     fun `mapRow uses primary column when it has value`() {
         val strategy = createStrategyWithFallback()
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columnsWithType,
                 existingAccounts = mapOf("Payee Account" to testTargetAccount),
@@ -1212,7 +1212,7 @@ class CsvTransferMapperTest {
     fun `mapRow identifies new account from fallback column when primary is empty`() {
         val strategy = createStrategyWithFallback()
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columnsWithType,
                 existingAccounts = emptyMap(),
@@ -1236,7 +1236,7 @@ class CsvTransferMapperTest {
     fun `mapRow returns empty account name when both primary and fallback are empty`() {
         val strategy = createStrategyWithFallback()
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columnsWithType,
                 existingAccounts = emptyMap(),
@@ -1268,7 +1268,7 @@ class CsvTransferMapperTest {
 
         val strategy = createStrategyWithFallback()
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columnsWithType,
                 existingAccounts =
@@ -1366,7 +1366,7 @@ class CsvTransferMapperTest {
     fun `mapRow with RegexAccountMapping uses matched account when pattern matches`() {
         val strategy = createStrategyWithRegex()
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columnsWithType,
                 existingAccounts = mapOf("Paxos" to paxosAccount),
@@ -1390,7 +1390,7 @@ class CsvTransferMapperTest {
     fun `mapRow with RegexAccountMapping is case insensitive`() {
         val strategy = createStrategyWithRegex()
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columnsWithType,
                 existingAccounts = mapOf("Paxos" to paxosAccount),
@@ -1414,7 +1414,7 @@ class CsvTransferMapperTest {
     fun `mapRow with RegexAccountMapping uses column value when no pattern matches`() {
         val strategy = createStrategyWithRegex()
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columnsWithType,
                 existingAccounts = mapOf("Amazon UK" to testTargetAccount),
@@ -1439,7 +1439,7 @@ class CsvTransferMapperTest {
         val strategy = createStrategyWithRegex()
         // Paxos account doesn't exist yet
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columnsWithType,
                 existingAccounts = emptyMap(),
@@ -1462,7 +1462,7 @@ class CsvTransferMapperTest {
     fun `mapRow with RegexAccountMapping identifies new account from fallback when primary empty and no match`() {
         val strategy = createStrategyWithRegex()
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columnsWithType,
                 existingAccounts = emptyMap(),
@@ -1499,7 +1499,7 @@ class CsvTransferMapperTest {
                 openingDate = Clock.System.now(),
             )
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columnsWithType,
                 existingAccounts =
@@ -1527,7 +1527,7 @@ class CsvTransferMapperTest {
     fun `prepareImport with RegexAccountMapping handles mix of matched and unmatched values`() {
         val strategy = createStrategyWithRegex()
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columnsWithType,
                 existingAccounts =
@@ -1579,7 +1579,7 @@ class CsvTransferMapperTest {
         existingAccounts: Map<String, Account>,
         accountMappings: List<AccountMapping> = emptyList(),
         historicalAccountNames: Map<String, AccountId> = emptyMap(),
-    ) = CsvTransferMapper(
+    ) = TransferMapper(
         strategy = strategy,
         columns = columns,
         existingAccounts = existingAccounts,
@@ -1741,7 +1741,7 @@ class CsvTransferMapperTest {
     @Test
     fun `AttributeMatchAccountMapping resolves the target account by attribute regex`() {
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = attributeMatchStrategy(),
                 columns = columns,
                 existingAccounts = mapOf("PayPal" to testTargetAccount.copy(name = "PayPal")),
@@ -1761,7 +1761,7 @@ class CsvTransferMapperTest {
     @Test
     fun `AttributeMatchAccountMapping falls back to name lookup when no attribute matches`() {
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = attributeMatchStrategy(),
                 columns = columns,
                 existingAccounts = emptyMap(),

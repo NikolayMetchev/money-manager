@@ -1,7 +1,7 @@
 package com.moneymanager.ui.screens
 
 import com.moneymanager.csvimporter.BulkReimportResult
-import com.moneymanager.csvimporter.CsvTransferMapper
+import com.moneymanager.csvimporter.TransferMapper
 import com.moneymanager.csvimporter.runCsvImport
 import com.moneymanager.database.di.DatabaseComponent
 import com.moneymanager.database.di.openDatabaseComponent
@@ -118,7 +118,7 @@ class CsvReimportE2ETest {
         val strategy = unsaved.copy(id = importEngine.createCsvStrategy(unsaved))
 
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = csvImport.columns,
                 existingAccounts =

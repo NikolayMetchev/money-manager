@@ -52,6 +52,8 @@ data class RuleOutcome(
     val rewrites: Map<String, String?> = emptyMap(),
     val capture: CaptureTarget? = null,
 ) {
+    val excludedValue: String? get() = if (excluded) excludedAttributeValue(excludeReason) else null
+
     /** The account candidates claimed for [side], in rule order. */
     fun accountsFor(side: AccountSide): List<AccountNaming> = accounts[side].orEmpty()
 }

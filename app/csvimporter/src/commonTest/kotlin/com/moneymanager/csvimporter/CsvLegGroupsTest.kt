@@ -68,10 +68,10 @@ class CsvLegGroupsTest {
         asset: Asset,
         at: String = "2022-11-14T20:32:54Z",
         owner: AccountId = binance,
-    ): CsvTransferWithAttributes {
+    ): MappingResult.Success {
         val amount = money(display, asset)
         val timestamp = Instant.parse(at)
-        return CsvTransferWithAttributes(
+        return MappingResult.Success(
             transfer =
                 Transfer(
                     id = TransferId(0),
@@ -88,7 +88,7 @@ class CsvLegGroupsTest {
     }
 
     /** A row the strategy did not flag as a trade leg (a fee, a deposit). */
-    private fun nonLeg(display: String = "0.001"): CsvTransferWithAttributes = leg(GroupLegSide.DEBIT, display, btc).copy(groupLeg = null)
+    private fun nonLeg(display: String = "0.001"): MappingResult.Success = leg(GroupLegSide.DEBIT, display, btc).copy(groupLeg = null)
 
     @Test
     fun oneFillPerSide_assemblesASingleTrade() {

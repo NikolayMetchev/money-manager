@@ -22,8 +22,8 @@ import androidx.compose.ui.unit.dp
 import co.touchlab.kermit.Logger
 import com.moneymanager.csvimporter.AttributeAccountMatcher
 import com.moneymanager.csvimporter.CsvImportResult
-import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.ImportPreparation
+import com.moneymanager.csvimporter.TransferMapper
 import com.moneymanager.csvimporter.buildCreatedAccountNameOverrides
 import com.moneymanager.csvimporter.buildPendingAccountMappings
 import com.moneymanager.csvimporter.crossFileLegRows
@@ -196,7 +196,7 @@ fun ApplyStrategyDialog(
                     val currenciesById = currencies.associateBy { it.id }
                     val currenciesByCode = currencies.associateBy { it.code.uppercase() }
                     val mapper =
-                        CsvTransferMapper(
+                        TransferMapper(
                             strategy = strategy,
                             columns = csvImport.columns,
                             fileName = csvImport.originalFileName,
@@ -264,7 +264,7 @@ fun ApplyStrategyDialog(
                             accountsById = accounts.associateBy { it.id },
                         )
                     val mapper =
-                        CsvTransferMapper(
+                        TransferMapper(
                             strategy = strategy,
                             columns = csvImport.columns,
                             fileName = csvImport.originalFileName,

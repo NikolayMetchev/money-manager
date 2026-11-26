@@ -21,7 +21,7 @@ internal class PersonIntents(
  * rules) become People with an ownership link to their counterparty account, in
  * addition to the account itself. The engine dedups people by name key and ownerships by
  * (person, account), so repeats across rows/files and re-imports collapse. Mirrors the QIF importer,
- * which reuses this same CsvTransferMapper-computed signal.
+ * which reuses this same TransferMapper-computed signal.
  *
  * The counterparty account id is read from the resolved transfer (the side that isn't the source
  * account) rather than by name lookup, so a counterparty that resolved to an existing account with
@@ -29,7 +29,7 @@ internal class PersonIntents(
  * row that referenced the person, so the person's audit source links back to that exact row.
  */
 internal fun personIntentsFor(
-    validTransfers: List<CsvTransferWithAttributes>,
+    validTransfers: List<MappingResult.Success>,
     selectedSourceAccountId: AccountId?,
     accountsByName: Map<String, Account>,
     csvImportId: CsvImportId,

@@ -229,8 +229,8 @@ class ApplyStrategyDialogTest {
         assertEquals(mapOf("Acme" to "Acme Renamed"), overrides)
     }
 
-    private fun transferWithDiscoveredMapping(discoveredMapping: DiscoveredAccountMapping): CsvTransferWithAttributes =
-        CsvTransferWithAttributes(
+    private fun transferWithDiscoveredMapping(discoveredMapping: DiscoveredAccountMapping): MappingResult.Success =
+        MappingResult.Success(
             transfer =
                 Transfer(
                     id = TransferId(0),

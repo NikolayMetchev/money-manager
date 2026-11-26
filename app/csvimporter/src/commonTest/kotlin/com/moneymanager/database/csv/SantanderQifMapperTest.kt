@@ -2,9 +2,9 @@ package com.moneymanager.database.csv
 
 import com.moneymanager.builtin.BuiltInCsvStrategies
 import com.moneymanager.builtin.SantanderQifStrategies
-import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.MappingResult
 import com.moneymanager.csvimporter.OWN_FEE_ACCOUNT_ID
+import com.moneymanager.csvimporter.TransferMapper
 import com.moneymanager.csvimporter.selectForCsv
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
@@ -39,8 +39,8 @@ class SantanderQifMapperTest {
         Currency(id = CurrencyId(1), code = "GBP", name = "British Pound", scaleFactor = CurrencyScaleFactors.DEFAULT_SCALE_FACTOR)
     private val santander = Account(id = AccountId(1), name = "Santander", openingDate = now)
 
-    private fun mapper(): CsvTransferMapper =
-        CsvTransferMapper(
+    private fun mapper(): TransferMapper =
+        TransferMapper(
             strategy = strategy,
             columns = qifColumns,
             existingAccounts = mapOf(santander.name to santander),
@@ -171,7 +171,7 @@ class SantanderQifMapperTest {
                 updatedAt = now,
             )
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = qifColumns,
                 existingAccounts = mapOf(santander.name to santander, mapped.name to mapped),
@@ -204,7 +204,7 @@ class SantanderQifMapperTest {
                 updatedAt = now,
             )
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = qifColumns,
                 existingAccounts = mapOf(santander.name to santander, revolut.name to revolut),

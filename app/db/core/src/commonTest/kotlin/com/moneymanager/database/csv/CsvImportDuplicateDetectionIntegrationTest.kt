@@ -1,7 +1,7 @@
 package com.moneymanager.database.csv
 import com.moneymanager.bigdecimal.BigDecimal
-import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.ExistingTransferInfo
+import com.moneymanager.csvimporter.TransferMapper
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportStrategyId
@@ -45,7 +45,7 @@ import kotlin.uuid.Uuid
  * Integration test that verifies the full CSV import flow with duplicate detection.
  * This test ensures that:
  * 1. Existing transfers are fetched from the repository
- * 2. They are properly passed to CsvTransferMapper
+ * 2. They are properly passed to TransferMapper
  * 3. Duplicate detection works end-to-end
  */
 class CsvImportDuplicateDetectionIntegrationTest : DbTest() {
@@ -253,7 +253,7 @@ class CsvImportDuplicateDetectionIntegrationTest : DbTest() {
             val currenciesByCode = mapOf("GBP" to testCurrency)
 
             val mapper =
-                CsvTransferMapper(
+                TransferMapper(
                     strategy = strategy,
                     columns = columns,
                     existingAccounts = accountsByName,
@@ -368,7 +368,7 @@ class CsvImportDuplicateDetectionIntegrationTest : DbTest() {
             val currenciesByCode = mapOf("GBP" to testCurrency)
 
             val mapper =
-                CsvTransferMapper(
+                TransferMapper(
                     strategy = strategyWithoutUniqueId,
                     columns = createTestColumns(),
                     existingAccounts = accountsByName,

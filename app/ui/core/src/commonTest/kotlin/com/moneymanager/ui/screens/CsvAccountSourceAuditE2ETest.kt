@@ -7,7 +7,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.compose.ui.test.waitUntilDoesNotExist
-import com.moneymanager.csvimporter.CsvTransferMapper
+import com.moneymanager.csvimporter.TransferMapper
 import com.moneymanager.csvimporter.runCsvImport
 import com.moneymanager.database.DatabaseManager
 import com.moneymanager.database.di.openDatabaseComponent
@@ -105,7 +105,7 @@ class CsvAccountSourceAuditE2ETest {
                 val strategy = createStrategy(sourceAccountId, gbp.id)
 
                 val mapper =
-                    CsvTransferMapper(
+                    TransferMapper(
                         strategy = strategy,
                         columns = columns,
                         existingAccounts =

@@ -20,7 +20,7 @@ class BuildFirstRowByAccountNameTest {
         rowIndex: Long,
         passThrough: CsvPassThrough? = null,
         discoveredMappings: List<DiscoveredAccountMapping> = emptyList(),
-    ) = CsvTransferWithAttributes(
+    ) = MappingResult.Success(
         transfer =
             Transfer(
                 id = TransferId(0),
@@ -36,7 +36,7 @@ class BuildFirstRowByAccountNameTest {
         discoveredMappings = discoveredMappings,
     )
 
-    private fun prep(rows: List<CsvTransferWithAttributes>) =
+    private fun prep(rows: List<MappingResult.Success>) =
         ImportPreparation(validTransfers = rows, errorRows = emptyList(), newAccounts = emptySet())
 
     @Test

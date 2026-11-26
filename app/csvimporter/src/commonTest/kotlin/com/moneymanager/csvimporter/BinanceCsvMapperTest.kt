@@ -47,7 +47,7 @@ class BinanceCsvMapperTest {
             .mapIndexed { index, name -> CsvColumn(CsvColumnId(Uuid.random()), index, name) }
 
     private fun mapper() =
-        CsvTransferMapper(
+        TransferMapper(
             strategy = strategy,
             columns = columns,
             existingAccounts = mapOf(binance.name to binance),

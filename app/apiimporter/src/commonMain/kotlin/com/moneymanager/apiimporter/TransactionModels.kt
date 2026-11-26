@@ -64,7 +64,7 @@ internal data class ApiTransactionPageItem(
     val hasFixedCounterparty: Boolean get() = builtInCounterparty != null || feeAccountCounterparty
 
     /** Why the item was declined (imported, but excluded from balances), or null when it wasn't. */
-    val declineReason: String? get() = if (outcome.excluded) outcome.excludeReason?.ifBlank { null } ?: "excluded" else null
+    val declineReason: String? get() = outcome.excludedValue
 
     val isPersonCounterparty: Boolean get() = outcome.counterpartyIsPerson
 }

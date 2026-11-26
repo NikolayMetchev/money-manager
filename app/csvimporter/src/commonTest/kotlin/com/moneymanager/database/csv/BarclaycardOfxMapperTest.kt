@@ -3,8 +3,8 @@ package com.moneymanager.database.csv
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.builtin.BarclaycardStrategies
 import com.moneymanager.builtin.BuiltInCsvStrategies
-import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.MappingResult
+import com.moneymanager.csvimporter.TransferMapper
 import com.moneymanager.csvimporter.needsSourceAccountOverride
 import com.moneymanager.csvimporter.parseOfxAsCsv
 import com.moneymanager.csvimporter.selectForCsv
@@ -113,7 +113,7 @@ class BarclaycardOfxMapperTest {
 
     private fun map(row: CsvRow): MappingResult.Success {
         val mapper =
-            CsvTransferMapper(
+            TransferMapper(
                 strategy = strategy,
                 columns = columns,
                 existingAccounts = mapOf(barclaycard.name to barclaycard),
