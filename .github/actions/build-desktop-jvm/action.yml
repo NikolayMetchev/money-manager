@@ -1,0 +1,22 @@
+name: Build production JVM image
+description: Check the optimized jars on Linux and upload this platform's AOT-trained app image.
+runs:
+  using: composite
+  steps:
+    - name: Check the optimized jars
+      if: runner.os == 'Linux'
+      shell: bash
+      run: bazel test --stamp //app/main/jvm:release_service_providers_test
+
+    - name: Build and archive the optimized app image
+      shell: bash
+      run: |
+        bazel build --stamp --remote_download_outputs=toplevel //app/main/jvm:app_image_aot
+        tar -chf image.tar -C bazel-bin/app/main/jvm/app_image_aot .
+
+    - uses: actions/upload-artifact@v7
+      with:
+        name: jvm-${{ runner.os }}
+        path: image.tar
+        if-no-files-found: error
+        retention-days: 7
