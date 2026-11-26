@@ -4,9 +4,11 @@
 # protection requires only `CI Passed` (the last job), which always runs and counts a skipped job as a pass (skipping at
 # the workflow level via `on.paths` would instead leave it pending forever and block the merge).
 #
-# Releases: a push to main that changes VERSION (to a version with no tag yet) is also the release's run. The release
-# builds run beside the tests, and Release tags the commit `v<VERSION>` and publishes them once CI Passed succeeds, so
-# nothing polls for another workflow. A failed release is retried with "Re-run failed jobs" on that run.
+# Releases: a push to main that changes code while VERSION has no tag yet (`v<VERSION>`) is also the release's run, as
+# the auto-tag workflow used to decide: no list of changed files is consulted, so a release a later push cancelled is
+# released by that push's run instead. The release builds run beside the tests, and Release tags the commit `v<VERSION>`
+# and publishes them once CI Passed succeeds, so nothing polls for another workflow. A failed release is retried with
+# "Re-run failed jobs" on that run.
 #
 # Linux jobs run their actions on BuildBuddy's executors (`--config=rbe`, #1017); macOS and Windows build on
 # their runners and share its remote cache (`--config=cache`). Build results stream to BuildBuddy, linked from
@@ -23,9 +25,9 @@ on:
     types: [ opened, synchronize, reopened, labeled, unlabeled ]
 
 concurrency:
-  # A run for another label is a no-op, so it gets its own group instead of cancelling the real run in progress. A push
-  # that changes VERSION may be a release, so it gets its own group too: a later push to main must not cancel it.
-  group: ${{ github.workflow }}-${{ github.ref }}${{ ((contains(fromJSON('["labeled", "unlabeled"]'), github.event.action) && !contains(fromJSON('["native", "installer", "android", "web"]'), github.event.label.name)) || (github.event_name == 'push' && contains(github.event.head_commit.modified, 'VERSION'))) && github.run_id || '' }}
+  # A run for another label is a no-op, so it gets its own group instead of cancelling the real run in progress. A later
+  # push to main may cancel a release's run: its own run then finds the tag still missing and releases instead.
+  group: ${{ github.workflow }}-${{ github.ref }}${{ (contains(fromJSON('["labeled", "unlabeled"]'), github.event.action) && !contains(fromJSON('["native", "installer", "android", "web"]'), github.event.label.name)) && github.run_id || '' }}
   cancel-in-progress: true
 
 permissions:
@@ -54,7 +56,7 @@ jobs:
       # labelled `web`; any other PR leaves them out of the shared Bazel commands.
       web: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'web') }}
       noise: ${{ steps.label.outputs.noise }}
-      # The tag to release (`v<VERSION>`) on a push to main that changes VERSION to a version not yet tagged; empty
+      # The tag to release (`v<VERSION>`) on a push to main that changes code while VERSION is not tagged yet; empty
       # otherwise. The release jobs run only when it is set.
       release: ${{ steps.release.outputs.tag }}
     steps:
@@ -85,11 +87,12 @@ jobs:
               - '!.github/workflows/static.yml'
               - '!.github/workflows/perf.yml'
               - '!.github/workflows/dependency-submission.yml'
-      # head_commit lists the files the pushed commit changed (main takes squash merges, one commit a push), the same
-      # test the concurrency group makes. A VERSION edit that leaves an already-released version releases nothing.
+      # Every push to main that changes code checks, not only one that edits VERSION: the push payload's file lists can't
+      # be relied on (head_commit.modified missed the bumps to 1.0.14, 1.0.15 and 1.0.16, none of which released). A VERSION that
+      # is already tagged releases nothing.
       - name: Is this a release?
         id: release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.modified, 'VERSION')
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.filter.outputs.code == 'true'
         run: |
           tag="v$(tr -d '[:space:]' < VERSION)"
           rc=0
@@ -767,7 +770,21 @@ jobs:
     permissions:
       contents: write  # creates the tag and the release
     steps:
+      # Another run on main may have released this VERSION since this run's check (two pushes in quick succession).
+      - name: Is it still unreleased?
+        id: unreleased
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.changes.outputs.release }}
+        run: |
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --silent 2>/dev/null; then
+            echo "$TAG was released by another run: nothing to do"
+          else
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Download the release builds
+        if: steps.unreleased.outputs.release == 'true'
         uses: actions/download-artifact@v8
         with:
           pattern: release-*
@@ -775,9 +792,11 @@ jobs:
           merge-multiple: true
 
       - name: List them
+        if: steps.unreleased.outputs.release == 'true'
         run: ls -la release-artifacts
 
       - name: Create the release
+        if: steps.unreleased.outputs.release == 'true'
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.changes.outputs.release }}

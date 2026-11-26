@@ -121,7 +121,7 @@ appends the results (`bazel/perf/record.sh`) to `startup.jsonl` on the orphan `p
 Releases: `//app/main/android:release` (R8, unsigned), `//app/main/jvm:installer`, and `//app/main/cli:mm-linux-x64`,
 `:mm-linux-arm64`, `:mm-windows-x64`, `:mm-macos-arm64` (the Apple one only on macOS). The release smoke test,
 `bazel test //app/main/android-smoketest:smoketest_test`, installs the debug-signed minified APK
-(`//app/main/android:release_debug_signed`) on a device and drives first run; CI runs it with the other device tests in Android Instrumented Tests, whenever the android flag is on. Cut a release by bumping `VERSION`: the push to main that changes it builds the release beside the usual CI, and once `CI Passed` succeeds the Release job tags the commit `v<VERSION>` and publishes it (`build.yml`; retry with "Re-run failed jobs").
+(`//app/main/android:release_debug_signed`) on a device and drives first run; CI runs it with the other device tests in Android Instrumented Tests, whenever the android flag is on. Cut a release by bumping `VERSION`: every push to main that changes code checks whether `v<VERSION>` is tagged, and if not builds the release beside the usual CI, and once `CI Passed` succeeds the Release job tags the commit `v<VERSION>` and publishes it (`build.yml`; retry with "Re-run failed jobs").
 
 **CI**: every workflow sets Bazel up through `.github/actions/bazel-setup` (on RBE without the disk cache, which
 BuildBuddy's cache already holds). `build.yml`'s Build and Test, on Linux (RBE), is `bazel/ci/build_and_test.sh`:
