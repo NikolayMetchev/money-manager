@@ -8,3 +8,11 @@ java_binary(
     visibility = ["//visibility:public"],
     runtime_deps = ["@dokka//:org_jetbrains_dokka_dokka_cli"],
 )
+
+# The external documentation's package lists the KDoc links against (dokka.bzl's _EXTERNAL_LINKS);
+# package-lists/update.sh refreshes them.
+filegroup(
+    name = "package_lists",
+    srcs = glob(["package-lists/*-list"]),
+    visibility = ["//visibility:public"],
+)

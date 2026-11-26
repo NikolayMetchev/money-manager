@@ -39,6 +39,9 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # A full rebuild (every module's KDoc after a VERSION bump) takes ~20 minutes. A hung run would otherwise hold
+    # the "pages" group, and so every later deployment, for GitHub's six hours.
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v7

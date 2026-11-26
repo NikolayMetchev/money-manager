@@ -30,15 +30,18 @@ _ROOT = "@ROOT@/"
 
 _SRC_ATTRS = ["android_srcs", "apple_srcs", "common_srcs", "jvm_android_srcs", "jvm_srcs", "linux_srcs", "mingw_srcs", "native_srcs"]
 
-_JDK_AND_KOTLIN_LINKS = [
-    {"url": "https://docs.oracle.com/en/java/javase/25/docs/api/", "packageListUrl": "https://docs.oracle.com/en/java/javase/25/docs/api/element-list"},
-    {"url": "https://kotlinlang.org/api/core/", "packageListUrl": "https://kotlinlang.org/api/core/package-list"},
-]
+# The external documentation the KDoc links to: each package list (checked in, `package-lists/update.sh` refreshes them)
+# and the documentation it describes. Dokka runs offline: a download that stalls on a remote executor would hang the
+# action, and the build would depend on those sites.
+_EXTERNAL_LINKS = {
+    "java.element-list": "https://docs.oracle.com/en/java/javase/25/docs/api/",
+    "kotlin.package-list": "https://kotlinlang.org/api/core/",
+}
 
-_ANDROID_LINKS = [
-    {"url": "https://developer.android.com/reference/kotlin/", "packageListUrl": "https://developer.android.com/reference/kotlin/package-list"},
-    {"url": "https://developer.android.com/reference/kotlin/", "packageListUrl": "https://developer.android.com/reference/kotlin/androidx/package-list"},
-]
+_ANDROID_EXTERNAL_LINKS = {
+    "android.package-list": "https://developer.android.com/reference/kotlin/",
+    "androidx.package-list": "https://developer.android.com/reference/kotlin/",
+}
 
 # The Gradle plugin's defaults, as its dokka-configuration.json carries them.
 _PLUGINS_CONFIGURATION = [
@@ -77,7 +80,7 @@ def _configuration(module_name, output, plugins, source_sets = [], modules = [],
         "moduleVersion": "@VERSION@",
         "outputDir": _ROOT + output.path,
         "cacheRoot": None,
-        "offlineMode": False,
+        "offlineMode": True,
         "sourceSets": source_sets,
         "pluginsClasspath": _paths(plugins),
         "pluginsConfiguration": _PLUGINS_CONFIGURATION,
@@ -90,7 +93,7 @@ def _configuration(module_name, output, plugins, source_sets = [], modules = [],
         "finalizeCoroutines": False,
     })
 
-def _source_set(scope, name, display, platform, refines, classpath, roots, suppressed, android = False):
+def _source_set(scope, name, display, platform, refines, classpath, roots, suppressed, links):
     return {
         "displayName": display,
         "sourceSetID": {"scopeId": scope, "sourceSetName": name},
@@ -106,11 +109,13 @@ def _source_set(scope, name, display, platform, refines, classpath, roots, suppr
         "jdkVersion": 25,
         "sourceLinks": [],
         "perPackageOptions": [],
-        "externalDocumentationLinks": (_ANDROID_LINKS if android else []) + _JDK_AND_KOTLIN_LINKS,
+        "externalDocumentationLinks": links,
         "languageVersion": None,
         "apiVersion": None,
-        "noStdlibLink": False,
-        "noJdkLink": False,
+        # Dokka's own links to these are downloaded: links has them instead.
+        "noStdlibLink": True,
+        "noJdkLink": True,
+        "noAndroidSdkLink": True,
         "suppressedFiles": suppressed,
         "analysisPlatform": platform,
         "documentedVisibilities": ["PUBLIC"],
@@ -140,9 +145,16 @@ def _module_impl(ctx):
     suppressed = _paths(generated)
     jvm_jars = _jars(ctx.attr.jvm_deps, ctx.files._jvm_stdlib)
     srcs = [f for a in _SRC_ATTRS for f in getattr(ctx.files, a)]
-    inputs = [jvm_jars, depset(srcs + generated)]
+    inputs = [jvm_jars, depset(srcs + generated + ctx.files._package_lists)]
     jvm_classpath = _paths(jvm_jars.to_list())
     native = bool(ctx.attr.native_deps or ctx.attr.native)
+    package_lists = {f.basename: f for f in ctx.files._package_lists}
+
+    def links(external):
+        return [{"url": url, "packageListUrl": "file://" + _ROOT + package_lists[name].path} for name, url in external.items()]
+
+    jvm_links = links(_EXTERNAL_LINKS)
+    android_links = links(_ANDROID_EXTERNAL_LINKS) + jvm_links
 
     def roots(attr):
         return _paths(getattr(ctx.files, attr))
@@ -154,16 +166,16 @@ def _module_impl(ctx):
         metadata = depset(transitive = [d[KtMetadataInfo].files for d in ctx.attr.metadata_deps])
         metadata_paths = depset(transitive = [d[KtMetadataInfo].classpath for d in ctx.attr.metadata_deps])
         inputs.append(metadata)
-        source_sets.append(_source_set(scope, "commonMain", "common", "common", [], [_ROOT + p for p in metadata_paths.to_list()], common_roots, suppressed))
+        source_sets.append(_source_set(scope, "commonMain", "common", "common", [], [_ROOT + p for p in metadata_paths.to_list()], common_roots, suppressed, jvm_links))
     else:
-        source_sets.append(_source_set(scope, "commonMain", "common", "jvm", [], jvm_classpath, common_roots, suppressed))
+        source_sets.append(_source_set(scope, "commonMain", "common", "jvm", [], jvm_classpath, common_roots, suppressed, jvm_links))
     if ctx.attr.jvm_android:
-        source_sets.append(_source_set(scope, "jvmAndroidMain", "jvmAndroid", "jvm", ["commonMain"], jvm_classpath, roots("jvm_android_srcs"), suppressed))
-    source_sets.append(_source_set(scope, "jvmMain", "jvm", "jvm", leaf_refines, jvm_classpath, roots("jvm_srcs"), suppressed))
+        source_sets.append(_source_set(scope, "jvmAndroidMain", "jvmAndroid", "jvm", ["commonMain"], jvm_classpath, roots("jvm_android_srcs"), suppressed, jvm_links))
+    source_sets.append(_source_set(scope, "jvmMain", "jvm", "jvm", leaf_refines, jvm_classpath, roots("jvm_srcs"), suppressed, jvm_links))
     if ctx.attr.android:
         android_jars = _jars(ctx.attr.android_deps, [ctx.file._android_jar] + ctx.files._jvm_stdlib)
         inputs.append(android_jars)
-        source_sets.append(_source_set(scope, "androidMain", "android", "jvm", leaf_refines, _paths(android_jars.to_list()), roots("android_srcs"), suppressed, android = True))
+        source_sets.append(_source_set(scope, "androidMain", "android", "jvm", leaf_refines, _paths(android_jars.to_list()), roots("android_srcs"), suppressed, android_links))
     if native:
         linux, linux_inputs = _native_classpath(ctx, "linuxX64", ctx.attr.native_deps)
         mingw, mingw_inputs = _native_classpath(ctx, "mingwX64", ctx.attr.mingw_deps)
@@ -179,7 +191,7 @@ def _module_impl(ctx):
             ("mingwMain", "mingw", "nativeMain", mingw, "mingw_srcs"),
             ("mingwX64Main", "mingwX64", "mingwMain", mingw, None),
         ]:
-            source_sets.append(_source_set(scope, name, display, "native", [refines], classpath, roots(attr) if attr else [], suppressed))
+            source_sets.append(_source_set(scope, name, display, "native", [refines], classpath, roots(attr) if attr else [], suppressed, jvm_links))
 
     # In the Gradle plugin's order: by source set name.
     source_sets = sorted(source_sets, key = lambda s: s["sourceSetID"]["sourceSetName"])
@@ -206,8 +218,6 @@ def _run(ctx, config, out, inputs, message):
         outputs = [out],
         mnemonic = "Dokka",
         progress_message = message,
-        # Dokka downloads the external documentation's package lists (the JDK's, Kotlin's, Android's).
-        execution_requirements = {"requires-network": "1"},
     )
 
 # The Kotlin analysis loads with the plugins, as on the Gradle plugin's one classpath: it reads the enum members'
@@ -244,6 +254,7 @@ dokka_module = rule(
         "_android_jar": attr.label(default = "@android_platform//:android.jar", allow_single_file = True),
         "_jvm_stdlib": attr.label(default = "@rules_kotlin//kotlin/compiler:kotlin-stdlib", allow_files = True),
         "_module_plugins": attr.label_list(default = _MODULE_PLUGINS, providers = [JavaInfo]),
+        "_package_lists": attr.label(default = "//bazel/kmp/dokka:package_lists"),
     },
     toolchains = [config_common.toolchain_type(TOOLCHAIN_TYPE, mandatory = False)],
 )
