@@ -9,7 +9,9 @@ import java.util.Properties
 
 private const val QUERY_TIMEOUT_SECONDS = 15
 
-internal actual fun querySqlite(
+internal actual val querySqlite: SqliteReader = ::querySnapshot
+
+private fun querySnapshot(
     bytes: ByteArray,
     queries: Map<String, String>,
 ): Pair<String, CsvParseResult>? =

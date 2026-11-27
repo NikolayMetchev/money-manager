@@ -40,11 +40,9 @@ internal suspend fun readSqliteImport(
     return SqliteProjection(strategy, result)
 }
 
-@Suppress("UNUSED_PARAMETER")
-internal expect fun querySqlite(
-    bytes: ByteArray,
-    queries: Map<String, String>,
-): Pair<String, CsvParseResult>?
+internal typealias SqliteReader = (bytes: ByteArray, queries: Map<String, String>) -> Pair<String, CsvParseResult>?
+
+internal expect val querySqlite: SqliteReader
 
 /** Finds the one projection whose SELECT can be prepared against the snapshot's schema. */
 internal fun matchSqliteProjection(
