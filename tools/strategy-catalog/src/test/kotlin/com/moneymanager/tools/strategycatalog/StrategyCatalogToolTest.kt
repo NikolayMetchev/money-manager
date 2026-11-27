@@ -61,6 +61,7 @@ class StrategyCatalogToolTest {
                 StrategyKind.OFX,
                 StrategyKind.XLSX,
                 StrategyKind.PDF,
+                StrategyKind.SQLITE,
                 StrategyKind.API,
                 StrategyKind.PASS_THROUGH,
                 StrategyKind.ASSET_LIST,
@@ -114,7 +115,16 @@ class StrategyCatalogToolTest {
     }
 
     private companion object {
-        val RULE_KINDS = setOf(StrategyKind.CSV, StrategyKind.QIF, StrategyKind.OFX, StrategyKind.XLSX, StrategyKind.PDF, StrategyKind.API)
+        val RULE_KINDS =
+            setOf(
+                StrategyKind.CSV,
+                StrategyKind.QIF,
+                StrategyKind.OFX,
+                StrategyKind.XLSX,
+                StrategyKind.PDF,
+                StrategyKind.SQLITE,
+                StrategyKind.API,
+            )
     }
 
     private fun createTempDir(): File =

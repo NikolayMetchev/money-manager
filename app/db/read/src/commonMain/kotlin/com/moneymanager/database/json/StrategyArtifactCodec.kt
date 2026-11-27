@@ -23,7 +23,7 @@ object StrategyArtifactCodec {
     ): String {
         val canonical =
             when (kind) {
-                StrategyKind.CSV, StrategyKind.QIF, StrategyKind.OFX, StrategyKind.XLSX, StrategyKind.PDF -> {
+                StrategyKind.CSV, StrategyKind.QIF, StrategyKind.OFX, StrategyKind.XLSX, StrategyKind.PDF, StrategyKind.SQLITE -> {
                     CsvStrategyExportCodec.encode(CsvStrategyExportCodec.decode(json).copy(version = ""))
                 }
 
@@ -59,7 +59,7 @@ object StrategyArtifactCodec {
         json: String,
     ): String =
         when (kind) {
-            StrategyKind.CSV, StrategyKind.QIF, StrategyKind.OFX, StrategyKind.XLSX, StrategyKind.PDF -> {
+            StrategyKind.CSV, StrategyKind.QIF, StrategyKind.OFX, StrategyKind.XLSX, StrategyKind.PDF, StrategyKind.SQLITE -> {
                 CsvStrategyExportCodec
                     .decode(
                         json,

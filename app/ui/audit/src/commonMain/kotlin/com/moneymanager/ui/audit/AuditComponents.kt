@@ -168,10 +168,11 @@ fun SourceInfoSection(
                 PlatformOriginRows("Sample Generator", deviceSuffix, source.deviceInfo, labelWidth)
             }
 
-            is Source.Csv -> {
+            is Source.File -> {
                 val rowIndex = origin.rowIndex
                 val fileName = source.fileName
-                FieldValueRow("Origin", "CSV Import$deviceSuffix", labelWidth = labelWidth)
+                val kind = if (origin is Source.Sqlite) "SQLite database" else "CSV Import"
+                FieldValueRow("Origin", "$kind$deviceSuffix", labelWidth = labelWidth)
                 if (onCsvSourceClick != null) {
                     // The File link always opens the import; entities derived from the import as a
                     // whole (e.g. a pass-through conduit/merchant account, which has no single
@@ -188,7 +189,7 @@ fun SourceInfoSection(
                     if (rowIndex != null) {
                         CsvSourceLinkRow(
                             label = "Row",
-                            value = rowIndex.toString(),
+                            value = (origin as? Source.Sqlite)?.records?.joinToString { it.label }?.ifEmpty { null } ?: rowIndex.toString(),
                             importId = origin.importId,
                             rowIndex = rowIndex,
                             onCsvSourceClick = onCsvSourceClick,

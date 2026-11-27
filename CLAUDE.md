@@ -482,6 +482,16 @@ What isn't a per-record decision stays structural config:
 | API ledger trades | `ApiLedgerTrades` (which rows join one is `LedgerTradeLeg`) | `reconcileTradeAmounts*`, `unpairedTradeLeg*` |
 | Transfer reconciliation | Decided over stored observations, never at import time: `MatchSync` (`app/importer`) runs the `ShapeMatcher` (records that disagree on shape: a conduit's statement, gross vs itemised, a split conduit movement, a fee row) and then the `ObservationMatcher`'s ordered `CrossSourceRules` (approximate twin, same accounts, bridge, unidentified counterparty, placeholder twin, other side), so either import order reaches the same result. Twins become one transaction with several observations (the named end wins the merge); a shape-changing match is an `ExclusionLink`, a `reconciled` relationship `Source.Reconciler` owns, whose primary is excluded and whose related ends can mark legs the conduit statement supersedes. An import only records what its own source says (`ImportDeduper` is left with same-source dedupe) | nine cross-source classifiers, `ImportDeduper.reconcile()` |
 
+**SQLite reconciliation files** are stored verbatim in `import_sqlite_file`. On desktop and Android, the file detail screen
+lists the original tables and reads their rows from a read-only snapshot. A SQLite strategy supplies a SELECT in
+`CsvStrategyConfig.sqliteQuery`. Its result feeds the ordinary mappings and rules, and its reconciliation source
+scopes all postings to shadow accounts. Return a `source_rows` column containing a JSON array such as
+`[{"schema":"main","table":"entries","key":{"id":"42"}}]`. Keys can be composite, and a joined transaction can
+reference several raw rows. Audit links resolve these references against the stored snapshot. Use
+`decimal_ratio(numerator || '/' || denominator)` to project integer units as decimal text at ledger precision.
+`sqlite_json_quote(value)` quotes raw row keys on Android versions without SQLite JSON functions.
+GnuCash and Money Manager define their schema-specific queries in the built-in strategy catalog.
+
 **PDF statements** are CSV strategies with `CsvStrategyConfig.pdfLines` (`PdfLineConfig`): one more rule list, run over
 the statement's text lines (`text`, `page`, `line`) by the same `RuleEngine`, whose `Capture` rules `PdfRowAssembler`
 (`app/csvimporter`) turns into the rows everything else reads. A PDF import is a CSV import whose original bytes and

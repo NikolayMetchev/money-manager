@@ -5,11 +5,14 @@ import com.moneymanager.csv.CsvParseResult
 import com.moneymanager.csv.CsvParser
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.ImportDirectoryId
+import com.moneymanager.domain.model.ImportFileKind
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.CsvRowLink
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csv.PdfImportSource
+import com.moneymanager.domain.model.csv.SqliteImportFile
+import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.importFileKind
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryFile
@@ -75,6 +78,7 @@ class CsvRedownload internal constructor(
     val plan: CsvRedownloadPlan,
     // A PDF's new copy and lines, staged as raw lines: a strategy assembles them again on the next import.
     val pdf: PdfImportSource? = null,
+    val sqlite: SqliteImportFile? = null,
     internal val source: TrackedSource,
 )
 
@@ -169,6 +173,7 @@ private suspend fun prepareFromSource(
     source: ImportFileSource,
     entries: List<ImportFileEntry>,
     csvImportRepository: CsvImportReadRepository,
+    sqliteStrategies: suspend () -> List<CsvImportStrategy>,
 ): CsvRedownload {
     val importId = staged.id
     val entry =
@@ -178,8 +183,18 @@ private suspend fun prepareFromSource(
     val blob = csvImportRepository.getXlsxBlob(importId)
     val stagedPdf = csvImportRepository.getPdfSource(importId)
     val pdf = stagedPdf?.let { readPdf(bytes) }
+    val sqlite =
+        if (importFileKind(staged.originalFileName) == ImportFileKind.SQLITE) {
+            readSqliteImport(staged.originalFileName, bytes, sqliteStrategies())
+        } else {
+            null
+        }
     val (parsed, checksum) =
         when {
+            sqlite != null -> {
+                sqlite.data to sha256Hex(bytes)
+            }
+
             blob != null -> {
                 createXlsxParser().parse(bytes, blob.worksheetName) to sha256Hex(bytes)
             }
@@ -223,6 +238,7 @@ private suspend fun prepareFromSource(
         xlsxBytes = bytes.takeIf { blob != null },
         plan = plan,
         pdf = pdf,
+        sqlite = sqlite?.let { SqliteImportFile(bytes, it.strategy?.config?.sqliteQuery) },
         source = TrackedSource(tracked.directoryId, tracked.fileRef, tracked.fileName, entry.remoteContentHash),
     )
 }
@@ -265,6 +281,7 @@ suspend fun redownloadImportDirectory(
     csvImportRepository: CsvImportReadRepository,
     importEngine: ImportEngine,
     unimport: (suspend (CsvImportId) -> Unit)? = null,
+    sqliteStrategies: suspend () -> List<CsvImportStrategy> = { emptyList() },
     onProgress: (done: Int, total: Int) -> Unit = { _, _ -> },
 ): DirectoryRedownloadResult {
     val tracked = importDirectoryRepository.getTrackedFiles(directory.id).first().filter { it.csvImportId != null }
@@ -273,7 +290,7 @@ suspend fun redownloadImportDirectory(
     val entries = fileSource.list()
     var result = DirectoryRedownloadResult()
     tracked.forEachIndexed { index, file ->
-        result += redownloadOne(file, fileSource, entries, csvImportRepository, importEngine, unimport)
+        result += redownloadOne(file, fileSource, entries, csvImportRepository, sqliteStrategies, importEngine, unimport)
         onProgress(index + 1, tracked.size)
     }
     return result
@@ -285,13 +302,14 @@ private suspend fun redownloadOne(
     fileSource: ImportFileSource,
     entries: List<ImportFileEntry>,
     csvImportRepository: CsvImportReadRepository,
+    sqliteStrategies: suspend () -> List<CsvImportStrategy>,
     importEngine: ImportEngine,
     unimport: (suspend (CsvImportId) -> Unit)?,
 ): DirectoryRedownloadResult {
     val name = file.fileName
     return try {
         val staged = csvImportRepository.getImport(checkNotNull(file.csvImportId)).first() ?: return DirectoryRedownloadResult()
-        val redownload = prepareFromSource(staged, file, fileSource, entries, csvImportRepository)
+        val redownload = prepareFromSource(staged, file, fileSource, entries, csvImportRepository, sqliteStrategies)
         when (val plan = redownload.plan) {
             CsvRedownloadPlan.Unchanged -> {
                 DirectoryRedownloadResult(unchanged = listOf(name))
@@ -316,6 +334,7 @@ private suspend fun redownloadOne(
                         fileSource,
                         entries,
                         csvImportRepository,
+                        sqliteStrategies,
                     )
                 executeCsvRedownload(fresh, importEngine)
                 DirectoryRedownloadResult(unimported = listOf(name))
@@ -356,6 +375,7 @@ suspend fun executeCsvRedownload(
                             rowIndexRemap = plan.rowIndexRemap,
                             xlsxBytes = redownload.xlsxBytes,
                             pdf = redownload.pdf,
+                            sqlite = redownload.sqlite,
                         ),
                     ),
             ),

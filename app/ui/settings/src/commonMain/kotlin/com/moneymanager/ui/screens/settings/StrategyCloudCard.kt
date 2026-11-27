@@ -509,6 +509,7 @@ private fun StrategyKey.displayLabel(): String =
         StrategyKind.QIF -> "$name (QIF)"
         StrategyKind.OFX -> "$name (OFX)"
         StrategyKind.XLSX -> "$name (Excel)"
+        StrategyKind.SQLITE -> "$name (SQLite)"
         StrategyKind.PDF -> "$name (PDF)"
         StrategyKind.API -> "$name (API)"
         StrategyKind.PASS_THROUGH -> "$name (Pass-through)"

@@ -30,14 +30,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.csvimporter.Reimports
+import com.moneymanager.csvimporter.restageForStrategy
 import com.moneymanager.csvimporter.selectForCsv
+import com.moneymanager.csvimporter.selectForImport
+import com.moneymanager.csvimporter.supportsFile
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.CsvImportId
+import com.moneymanager.domain.model.ImportFileKind
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.SqliteRowRef
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImportHistoryEvent
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.PdfTextLine
+import com.moneymanager.domain.model.csv.SqliteImportFile
+import com.moneymanager.domain.model.importFileKind
 import com.moneymanager.domain.repository.AccountAttributeReadRepository
 import com.moneymanager.domain.repository.AccountMappingReadRepository
 import com.moneymanager.domain.repository.AccountReadRepository
@@ -107,8 +114,18 @@ fun CsvImportDetailScreen(
     var importFailedRows by remember { mutableStateOf<List<String>>(emptyList()) }
     var failedRowIndexes by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var rowsRefreshTrigger by remember { mutableStateOf(0) }
+    var sqliteError by remember(importId) { mutableStateOf<String?>(null) }
     var hasMatchingStrategy by remember { mutableStateOf(false) }
     var pdfLines by remember { mutableStateOf<List<PdfTextLine>?>(null) }
+    var sqliteFile by remember(importId) { mutableStateOf<SqliteImportFile?>(null) }
+    var sqliteRefs by remember(importId, scrollToRowIndex) { mutableStateOf(emptyList<SqliteRowRef>()) }
+    var showTables by remember(importId, scrollToRowIndex) { mutableStateOf(true) }
+    LaunchedEffect(importId, import?.fileChecksum, scrollToRowIndex) {
+        if (importFileKind(import?.originalFileName.orEmpty()) == ImportFileKind.SQLITE) {
+            sqliteFile = csvImportRepository.getSqliteFile(importId)
+            sqliteRefs = scrollToRowIndex?.let { csvImportRepository.getSqliteRefs(importId, it) }.orEmpty()
+        }
+    }
     var showPdfText by remember { mutableStateOf(false) }
 
     // Observe strategies to re-check when new ones are added
@@ -116,11 +133,36 @@ fun CsvImportDetailScreen(
         csvImportStrategyRepository.getAllStrategies()
     }
 
+    val canApplyStrategy =
+        import?.let { file ->
+            if (importFileKind(file.originalFileName) == ImportFileKind.SQLITE) {
+                strategies.any { it.supportsFile(file.originalFileName) }
+            } else {
+                rows.isNotEmpty() && hasMatchingStrategy
+            }
+        } == true
+
     // Check if there's a matching strategy for this import (filename/content-aware selection).
     // Re-runs when the import, the strategies list, or the loaded rows change.
-    LaunchedEffect(import, strategies, rows) {
+    LaunchedEffect(import, strategies, rows, showApplyStrategyDialog) {
         import?.let { csvImport ->
-            val matchingStrategy = strategies.selectForCsv(csvImport.originalFileName, csvImport.columns, rows)
+            val matchingStrategy =
+                if (importFileKind(csvImport.originalFileName) == ImportFileKind.SQLITE) {
+                    if (showApplyStrategyDialog) return@LaunchedEffect
+                    try {
+                        sqliteError = null
+                        strategies.selectForImport(csvImport, csvImportRepository)?.also {
+                            restageForStrategy(csvImport, it, csvImportRepository, importEngine)
+                        }
+                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                        throw cancelled
+                    } catch (failure: IllegalArgumentException) {
+                        sqliteError = failure.message
+                        null
+                    }
+                } else {
+                    strategies.selectForCsv(csvImport.originalFileName, csvImport.columns, rows)
+                }
             hasMatchingStrategy = matchingStrategy != null
         }
     }
@@ -200,12 +242,12 @@ fun CsvImportDetailScreen(
                 Spacer(modifier = Modifier.width(8.dp))
                 TextButton(
                     onClick = { showApplyStrategyDialog = true },
-                    enabled = !isDeleting && import != null && rows.isNotEmpty() && hasMatchingStrategy,
+                    enabled = !isDeleting && canApplyStrategy,
                 ) {
                     Text(
                         text = "Apply Strategy",
                         color =
-                            if (hasMatchingStrategy) {
+                            if (canApplyStrategy) {
                                 MaterialTheme.colorScheme.primary
                             } else {
                                 MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
@@ -385,8 +427,18 @@ fun CsvImportDetailScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                 }
 
+                val snapshot = sqliteFile
+                sqliteError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                if (snapshot != null) {
+                    SecondaryTabRow(selectedTabIndex = if (showTables) 0 else 1) {
+                        Tab(selected = showTables, onClick = { showTables = true }, text = { Text("Database tables") })
+                        Tab(selected = !showTables, onClick = { showTables = false }, text = { Text("Strategy rows") })
+                    }
+                }
                 // Data table
-                if (lines != null && showPdfText) {
+                if (snapshot != null && showTables) {
+                    SqliteTables(snapshot.bytes, sqliteRefs)
+                } else if (lines != null && showPdfText) {
                     PdfLinesTable(lines = lines, modifier = Modifier.fillMaxSize())
                 } else if (isLoading) {
                     Box(
@@ -420,7 +472,7 @@ fun CsvImportDetailScreen(
                                 val csvSource =
                                     transferSourceRepository
                                         .getSourcesForTransaction(transferId)
-                                        .mapNotNull { record -> (record.source as? Source.Csv)?.let { record to it } }
+                                        .mapNotNull { record -> (record.source as? Source.File)?.let { record to it } }
                                         .minByOrNull { (record, _) -> record.revisionId }
                                         ?.second
                                 if (csvSource != null) {

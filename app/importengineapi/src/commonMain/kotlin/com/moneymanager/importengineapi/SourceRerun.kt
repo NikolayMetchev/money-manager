@@ -155,7 +155,7 @@ suspend fun <R> ImportEngine.executeRerun(
             reads.tradeRepository,
         )
     val resets =
-        files.mapNotNull { file -> (file.file as? Source.Csv)?.let { CsvImportMutation.Reserve(it.importId) } }
+        files.mapNotNull { file -> (file.file as? Source.File)?.let { CsvImportMutation.Reserve(it.importId) } }
     val apiResets =
         files.mapNotNullTo(linkedSetOf()) { file -> (file.file as? Source.Api)?.let { ApiSessionMutation.Reserve(it.sessionId) } }
 

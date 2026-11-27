@@ -26,6 +26,7 @@ import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.calendar.HolidayCalendar
 import com.moneymanager.domain.model.csv.PdfImportSource
+import com.moneymanager.domain.model.csv.SqliteImportFile
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.observation.ObservationId
@@ -350,11 +351,15 @@ suspend fun ImportEngine.createCsvImport(
     rows: List<List<String>>,
     fileChecksum: String,
     fileLastModified: Instant,
+    sqlite: SqliteImportFile? = null,
 ): CsvImportId =
     requireNotNull(
         import(
             ImportBatch(
-                csvImportMutations = listOf(CsvImportMutation.Create(fileName, fileName, headers, rows, fileChecksum, fileLastModified)),
+                csvImportMutations =
+                    listOf(
+                        CsvImportMutation.Create(fileName, fileName, headers, rows, fileChecksum, fileLastModified, sqlite = sqlite),
+                    ),
             ),
         ).createdCsvImportIds[fileName],
     )

@@ -375,6 +375,7 @@ private val kindFilterChips =
         StrategyKind.QIF to "QIF",
         StrategyKind.OFX to "OFX",
         StrategyKind.XLSX to "Excel",
+        StrategyKind.SQLITE to "SQLite",
         StrategyKind.PDF to "PDF",
         StrategyKind.API to "API",
         StrategyKind.PASS_THROUGH to "Pass-through",
@@ -388,6 +389,7 @@ internal fun StrategyKind.displayName(): String =
         StrategyKind.QIF -> "QIF import strategy"
         StrategyKind.OFX -> "OFX import strategy"
         StrategyKind.XLSX -> "Excel import strategy"
+        StrategyKind.SQLITE -> "SQLite reconciliation strategy"
         StrategyKind.PDF -> "PDF import strategy"
         StrategyKind.API -> "API import strategy"
         StrategyKind.PASS_THROUGH -> "Pass-through definition"

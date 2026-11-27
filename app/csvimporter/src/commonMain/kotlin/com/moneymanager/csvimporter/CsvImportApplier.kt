@@ -154,6 +154,7 @@ suspend fun applyStagedCsv(
     // The staged rows must be the ones the strategy reads: an Excel import is initially staged from the workbook's
     // FIRST worksheet, but the strategy may target a different sheet, and a PDF import's rows are whatever its
     // strategy's line rules assemble. Re-stage before reading rows so everything downstream sees those.
+    require(strategy.supportsFile(csvImport.originalFileName)) { "The strategy does not read this file format" }
     val stagedImport = restageForStrategy(csvImport, strategy, csvImportRepository, importEngine)
 
     onProgress?.invoke(Progress("Loading rows"))

@@ -22,12 +22,29 @@ suspend fun restageForStrategy(
     csvImportRepository: CsvImportReadRepository,
     importEngine: ImportEngine,
 ): CsvImport =
-    restagePdfForStrategy(
-        restageXlsxForStrategy(csvImport, strategy, csvImportRepository, importEngine),
-        strategy,
-        csvImportRepository,
-        importEngine,
-    )
+    if (strategy.config.sqliteQuery != null) {
+        planSqliteRestage(csvImport, strategy, csvImportRepository)?.apply(importEngine, csvImportRepository) ?: csvImport
+    } else {
+        restagePdfForStrategy(
+            restageXlsxForStrategy(csvImport, strategy, csvImportRepository, importEngine),
+            strategy,
+            csvImportRepository,
+            importEngine,
+        )
+    }
+
+internal suspend fun planSqliteRestage(
+    staged: CsvImport,
+    strategy: CsvImportStrategy,
+    reads: CsvImportReadRepository,
+): CsvImportMutation.Restage? {
+    val query = strategy.config.sqliteQuery ?: return null
+    val file = requireNotNull(reads.getSqliteFile(staged.id))
+    if (file.stagedQuery == query || staged.lastAppliedAt != null) return null
+    val projection = readSqliteImport(staged.originalFileName, file.bytes, listOf(strategy))
+    require(projection.strategy != null) { "SQLite query does not match the file schema" }
+    return CsvImportMutation.Restage(staged.id, projection.data.headers, projection.data.rows, sqliteQuery = query)
+}
 
 private suspend fun restagePdfForStrategy(
     csvImport: CsvImport,

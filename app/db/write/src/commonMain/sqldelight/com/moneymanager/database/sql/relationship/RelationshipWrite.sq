@@ -29,7 +29,7 @@ WHERE relationship_member.transaction_id IN ?
     WHERE entity_source.entity_type_id = 13
       AND entity_source.entity_id = relationship_member.relationship_id
       AND entity_source.revision_id = 1
-      AND entity_source.source_type_id IN (2, 5)
+      AND entity_source.source_type_id IN (2, 5, 11)
   );
 
 unreserve:

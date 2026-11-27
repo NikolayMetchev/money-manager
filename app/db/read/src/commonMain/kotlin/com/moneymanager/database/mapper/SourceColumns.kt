@@ -8,6 +8,8 @@ import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.model.SourceType
+import com.moneymanager.domain.model.SqliteRowRef
+import kotlinx.serialization.json.Json
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -41,6 +43,7 @@ data class SourceColumns(
     val csvImportId: String? = null,
     val csvRowIndex: Long? = null,
     val csvFileName: String? = null,
+    val sqliteRefs: String? = null,
     val apiSessionId: Long? = null,
     val apiRequestId: Long? = null,
     val apiJsonPath: String? = null,
@@ -112,6 +115,14 @@ private fun SourceColumns.reconstructSource(sourceType: SourceType): Pair<Source
 
         SourceType.RECONCILER -> {
             Source.Reconciler to null
+        }
+
+        SourceType.SQLITE_IMPORT -> {
+            Source.Sqlite(
+                importId = CsvImportId(Uuid.parse(checkNotNull(csvImportId))),
+                rowIndex = csvRowIndex,
+                records = sqliteRefs?.let { Json.decodeFromString<List<SqliteRowRef>>(it) }.orEmpty(),
+            ) to csvFileName
         }
 
         SourceType.CSV_IMPORT -> {

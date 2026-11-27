@@ -79,7 +79,7 @@ data class ObservationKey(
  */
 fun Source.recordKey(rowKey: ImportRowKey): ImportRecordKey? =
     when (this) {
-        is Source.Csv -> {
+        is Source.File -> {
             (rowKey as? ImportRowKey.CsvRow)?.let { ImportRecordKey.CsvRow(importId, it.rowIndex) }
         }
 

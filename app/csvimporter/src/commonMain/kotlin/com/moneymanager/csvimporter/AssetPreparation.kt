@@ -151,7 +151,7 @@ private suspend fun stageForStrategy(
     // Assembling a PDF's rows is the slow part, so only its write waits for the others.
     val sheetStaged = writes.withLock { restageXlsxForStrategy(full, strategy, csvImportRepository, importEngine) }
     val staged =
-        planPdfRestage(sheetStaged, strategy, csvImportRepository)
+        (planSqliteRestage(sheetStaged, strategy, csvImportRepository) ?: planPdfRestage(sheetStaged, strategy, csvImportRepository))
             ?.let { restage -> writes.withLock { restage.apply(importEngine, csvImportRepository) } }
             ?: sheetStaged
     return staged to strategy

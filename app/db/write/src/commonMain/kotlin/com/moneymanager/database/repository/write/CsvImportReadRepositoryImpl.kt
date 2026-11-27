@@ -15,6 +15,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.SqliteRowRef
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.TransactionKind
@@ -25,6 +26,7 @@ import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.PdfImportSource
 import com.moneymanager.domain.model.csv.PdfTextLine
+import com.moneymanager.domain.model.csv.SqliteImportFile
 import com.moneymanager.domain.model.csv.XlsxImportBlob
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import kotlinx.coroutines.Dispatchers
@@ -32,6 +34,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
 import kotlin.coroutines.CoroutineContext
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -186,6 +189,19 @@ class CsvImportReadRepositoryImpl(
                 XlsxImportBlob(fileBytes = blob.file_bytes, worksheetName = blob.worksheet_name)
             }
         }
+
+    override suspend fun getSqliteFile(id: CsvImportId): SqliteImportFile? =
+        csvImportSelectQueries.selectSqliteFile(id.id.toString(), ::SqliteImportFile).awaitAsOneOrNull()
+
+    override suspend fun getSqliteRefs(
+        id: CsvImportId,
+        rowIndex: Long,
+    ): List<SqliteRowRef> =
+        csvImportSelectQueries
+            .selectSqliteRefs(id.id.toString(), rowIndex)
+            .awaitAsOneOrNull()
+            ?.let { Json.decodeFromString<List<SqliteRowRef>>(it) }
+            .orEmpty()
 
     override suspend fun getPdfSource(id: CsvImportId): PdfImportSource? =
         withContext(coroutineContext) {

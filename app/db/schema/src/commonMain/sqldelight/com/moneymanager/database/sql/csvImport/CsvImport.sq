@@ -90,3 +90,20 @@ CREATE TABLE pdf_import_line (
     PRIMARY KEY (csv_import_id, page, line),
     FOREIGN KEY (csv_import_id) REFERENCES csv_import_metadata(id) ON DELETE CASCADE
 );
+
+CREATE TABLE import_sqlite_file (
+    csv_import_id TEXT PRIMARY KEY NOT NULL REFERENCES csv_import_metadata(id) ON DELETE CASCADE,
+    file_bytes BLOB NOT NULL
+);
+
+CREATE TABLE import_sqlite_projection (
+    csv_import_id TEXT PRIMARY KEY NOT NULL REFERENCES import_sqlite_file(csv_import_id) ON DELETE CASCADE,
+    staged_query TEXT NOT NULL
+);
+
+CREATE TABLE import_sqlite_row (
+    csv_import_id TEXT NOT NULL REFERENCES import_sqlite_file(csv_import_id) ON DELETE CASCADE,
+    row_index INTEGER NOT NULL,
+    refs_json TEXT NOT NULL,
+    PRIMARY KEY (csv_import_id, row_index)
+);

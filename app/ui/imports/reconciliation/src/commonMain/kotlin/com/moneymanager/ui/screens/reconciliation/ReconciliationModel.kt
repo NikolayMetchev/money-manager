@@ -8,6 +8,7 @@ import com.moneymanager.domain.model.reconciliation.ReconciliationLeg
 import com.moneymanager.domain.model.reconciliation.reconciliationMonth
 import com.moneymanager.reconciliation.LegMatch
 import com.moneymanager.reconciliation.ReconciliationResult
+import com.moneymanager.reconciliation.UnmatchedRealLeg
 import com.moneymanager.reconciliation.UnmatchedSourceLeg
 import kotlin.time.Duration
 import kotlin.time.Instant
@@ -63,6 +64,28 @@ fun ReconciliationResult.countsByWallet(hideUnknownAssets: Boolean): Map<Account
     return (mm.keys + source.keys).associateWith { WalletCounts(mm[it] ?: 0, source[it] ?: 0) }
 }
 
+internal class ReconciliationGroups(
+    result: ReconciliationResult,
+    hideUnknownAssets: Boolean,
+    walletName: (AccountId) -> String,
+) {
+    private val nearMatches = result.nearMatches
+    val nearCount = nearMatches.size
+    val unstoredNear = nearMatches.filter { it.matchId == null }
+    val near = groupByWalletAndMonth(nearMatches, { it.sourceLeg.accountId }, { it.sourceLeg.timestamp }, walletName)
+    val onlyInSource = result.missingInMm.filter { !hideUnknownAssets || !it.assetUnknownToMm }
+    val source = groupByWalletAndMonth(onlyInSource, { it.walletAccountId }, { it.leg.timestamp }, walletName)
+    val real: List<WalletGroup<UnmatchedRealLeg>> =
+        groupByWalletAndMonth(result.missingInSource, { it.walletAccountId }, { it.leg.timestamp }, walletName)
+    val unlinked = groupByWalletAndMonth(result.unlinkedLegs, { it.accountId }, { it.timestamp }, walletName)
+    val accepted = result.matched.filter { it.matchId != null }
+    val notAccepted = result.matched.filter { it.matchId == null }
+    val acceptedGroups = groupByWalletAndMonth(accepted, { it.sourceLeg.accountId }, { it.sourceLeg.timestamp }, walletName)
+    val notAcceptedGroups = groupByWalletAndMonth(notAccepted, { it.sourceLeg.accountId }, { it.sourceLeg.timestamp }, walletName)
+    val ignored = groupByWalletAndMonth(result.ignored, { it.walletAccountId }, { it.leg.timestamp }, walletName)
+    val counts = result.countsByWallet(hideUnknownAssets)
+}
+
 /** The source legs of [leg]'s movement (a row and, say, its fee) still unmatched on its wallet: what one hand match covers. */
 fun ReconciliationResult.movementOf(leg: UnmatchedSourceLeg): List<ReconciliationLeg> =
     missingInMm
@@ -71,31 +94,10 @@ fun ReconciliationResult.movementOf(leg: UnmatchedSourceLeg): List<Reconciliatio
         .ifEmpty { listOf(leg.leg) }
 
 /** The source legs of every movement in [legs], each movement once: what a bulk ignore covers. */
-fun ReconciliationResult.movementsOf(legs: List<UnmatchedSourceLeg>): List<ReconciliationLeg> = legs.flatMap { movementOf(it) }.distinct()
-
-/**
- * The matches the matcher found that nobody has stored yet (exact and near alike), on [wallet] and in [month] when
- * given: what an "Accept all" stores, so a re-import can't change them.
- */
-fun ReconciliationResult.unstoredMatches(
-    wallet: AccountId? = null,
-    month: String? = null,
-): List<LegMatch> =
-    matches.filter {
-        it.matchId == null &&
-            (wallet == null || it.sourceLeg.accountId == wallet) &&
-            (month == null || monthKey(it.sourceLeg.timestamp) == month)
-    }
-
-/**
- * The near matches (see [ReconciliationResult.nearMatches]) nobody has stored yet, on [wallet] and in [month] when given.
- * A section that lists only near matches must count only these: an exact match is settled, listed under Matched, and
- * stored from there.
- */
-fun ReconciliationResult.unstoredNearMatches(
-    wallet: AccountId? = null,
-    month: String? = null,
-): List<LegMatch> = unstoredMatches(wallet, month).filterNot { it.settled }
+fun ReconciliationResult.movementsOf(legs: List<UnmatchedSourceLeg>): List<ReconciliationLeg> {
+    val movements = legs.mapTo(mutableSetOf()) { it.walletAccountId to it.leg.movementKey }
+    return (missingInMm.filter { (it.walletAccountId to it.leg.movementKey) in movements } + legs).map { it.leg }.distinct()
+}
 
 /** Every transaction a near match spans, each once: the members of its `reconciliation-match` relationship. */
 fun LegMatch.memberTransactions(): List<TransactionId> = (sourceLegs + realLegs).map { it.transactionRef }.distinct()

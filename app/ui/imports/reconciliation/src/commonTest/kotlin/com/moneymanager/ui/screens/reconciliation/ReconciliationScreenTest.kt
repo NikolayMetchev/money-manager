@@ -4,6 +4,7 @@ package com.moneymanager.ui.screens.reconciliation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.test.ComposeUiTest
@@ -24,6 +25,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTextReplacement
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
@@ -82,6 +84,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
@@ -176,9 +179,155 @@ class ReconciliationScreenTest {
                 }
             }
 
+            val heading = "Needs attention: 1 Koinly wallet(s) not linked to an account"
+            val suggestion = "Link to suggested account \"Crypto.com\""
+            waitUntil(timeoutMillis = LOAD_TIMEOUT_MS) { reveal(hasText(heading)) }
+            onNodeWithText(heading).assertIsDisplayed()
+            waitUntil(timeoutMillis = LOAD_TIMEOUT_MS) { reveal(hasText(suggestion)) }
+            onNodeWithText(suggestion).assertIsDisplayed()
+        }
+    }
+
+    @Test
+    fun moneyManagerSourceHasDistinctSectionsForTheImportedAndLocalLedgers() {
+        runMoneyManagerComposeUiTest {
+            val source = ReconciliationSource("Money Manager", listOf("Money Manager"), "Money Manager · ")
+            val bank = Account(id = AccountId(1), name = "Checking", openingDate = epoch)
+            val wallet = ShadowAccount(AccountId(100), "Money Manager · Checking", source.name)
+            val link = ReconciliationLink(wallet.accountId, bank.id)
+            val repo =
+                reconciliationRepository(listOf(source), listOf(wallet), flowOf(listOf(link))) { ids ->
+                    listOf(leg(10, wallet.accountId, "5", t0), leg(20, bank.id, "8", t0)).filter { it.accountId in ids }
+                }
+            setContent {
+                provideScreenScopes {
+                    ReconciliationScreen(
+                        reconciliationRepository = repo,
+                        accountRepository = accountRepository(listOf(bank)),
+                        categoryRepository = categoryRepository,
+                        personRepository = personRepository,
+                        transactionRepository = transactionRepository,
+                        onOpenLeg = {},
+                    )
+                }
+            }
+
+            waitUntil(timeoutMillis = LOAD_TIMEOUT_MS) { reveal(hasText("Only in imported Money Manager (1)")) }
+            assertTrue(reveal(hasText("Only in Money Manager (1)")))
+        }
+    }
+
+    @Test
+    fun tabsShowOnlyWalletsWithOrWithoutASuggestion() {
+        runMoneyManagerComposeUiTest {
+            val suggested = ShadowAccount(AccountId(100), "Koinly · Santander Savings", "Koinly")
+            val unmapped = ShadowAccount(AccountId(101), "Koinly · Hardware Vault", "Koinly")
+            val bank = Account(id = AccountId(1), name = "Santander", openingDate = epoch)
+            setContent {
+                provideScreenScopes {
+                    ReconciliationScreen(
+                        reconciliationRepository = reconciliationRepository(listOf(koinly), listOf(suggested, unmapped)),
+                        accountRepository = accountRepository(listOf(bank)),
+                        categoryRepository = categoryRepository,
+                        personRepository = personRepository,
+                        transactionRepository = transactionRepository,
+                        onOpenLeg = {},
+                    )
+                }
+            }
+
+            waitUntil(timeoutMillis = LOAD_TIMEOUT_MS) { reveal(hasText("Santander Savings")) }
+            onNodeWithText("Link all (1)").assertIsDisplayed()
+            onNodeWithText("Hardware Vault").assertDoesNotExist()
+
+            clickText("Without suggestion (1)")
+            onNodeWithText("Hardware Vault").assertIsDisplayed()
+            onNodeWithText("Santander Savings").assertDoesNotExist()
+            onNodeWithText("Link all (1)").assertDoesNotExist()
+            onNodeWithText("Create all (1)").assertIsDisplayed()
+
+            clickText("With suggestion (1)")
+            onNodeWithText("Santander Savings").assertIsDisplayed()
+            onNodeWithText("Hardware Vault").assertDoesNotExist()
+        }
+    }
+
+    @Test
+    fun searchesUnlinkedWalletNamesAndLinkedAccountNames() {
+        runMoneyManagerComposeUiTest {
+            val cash = ShadowAccount(AccountId(100), "Koinly · Cash wallet", "Koinly")
+            val spare = ShadowAccount(AccountId(101), "Koinly · Spare wallet", "Koinly")
+            val exchange = ShadowAccount(AccountId(102), "Koinly · Exchange", "Koinly")
+            val savings = Account(id = AccountId(1), name = "Savings account", openingDate = epoch)
+            setContent {
+                provideScreenScopes {
+                    ReconciliationScreen(
+                        reconciliationRepository =
+                            reconciliationRepository(
+                                listOf(koinly),
+                                listOf(cash, spare, exchange),
+                                flowOf(listOf(ReconciliationLink(exchange.accountId, savings.id))),
+                            ),
+                        accountRepository = accountRepository(listOf(savings)),
+                        categoryRepository = categoryRepository,
+                        personRepository = personRepository,
+                        transactionRepository = transactionRepository,
+                        onOpenLeg = {},
+                    )
+                }
+            }
+
+            val search = onNode(hasSetTextAction() and hasText("Search accounts"))
+            search.performTextReplacement(" CASH ")
+            onNodeWithText("Cash wallet").assertIsDisplayed()
+            onNodeWithText("Spare wallet").assertDoesNotExist()
+            onNodeWithText("Create all (1)").assertIsDisplayed()
+
+            search.performTextReplacement("savings")
+            onNodeWithText("Savings account", substring = true).assertIsDisplayed()
+            onNodeWithText("Cash wallet").assertDoesNotExist()
+
+            search.performTextReplacement("unknown")
+            onNodeWithText("No accounts match your search").assertIsDisplayed()
+
+            search.performTextReplacement("")
+            onNodeWithText("Needs attention: 2 Koinly wallet(s) not linked to an account").assertIsDisplayed()
+        }
+    }
+
+    @Test
+    fun reusesWalletPlansAfterReopeningTheScreen() {
+        runMoneyManagerComposeUiTest {
+            val wallet = ShadowAccount(AccountId(100), "Koinly · Santander Savings", "Koinly")
+            val bank = Account(id = AccountId(2), name = "Santander", openingDate = epoch)
+            val inputs = WalletLinkInputs(koinly, listOf(wallet), emptyList(), listOf(bank), listOf(bank))
+            val cache = ReconciliationCache()
+            val visible = mutableStateOf(true)
+            val reconciliation = reconciliationRepository(listOf(koinly), listOf(wallet))
+            val accounts = accountRepository(listOf(bank))
+            setContent {
+                if (visible.value) {
+                    provideScreenScopes {
+                        ReconciliationScreen(
+                            reconciliationRepository = reconciliation,
+                            accountRepository = accounts,
+                            categoryRepository = categoryRepository,
+                            personRepository = personRepository,
+                            transactionRepository = transactionRepository,
+                            onOpenLeg = {},
+                            cache = cache,
+                        )
+                    }
+                }
+            }
+
+            waitUntil(timeoutMillis = LOAD_TIMEOUT_MS) { reveal(hasText("Link all (1)")) }
+            val initial = checkNotNull(cache.getWalletPlans(inputs))
+            runOnIdle { visible.value = false }
             waitForIdle()
-            onNodeWithText("Needs attention: 1 Koinly wallet(s) not linked to an account").assertIsDisplayed()
-            onNodeWithText("Link to suggested account \"Crypto.com\"").assertIsDisplayed()
+            runOnIdle { visible.value = true }
+            waitUntil(timeoutMillis = LOAD_TIMEOUT_MS) { reveal(hasText("Link all (1)")) }
+            assertSame(initial, cache.getWalletPlans(inputs))
         }
     }
 
@@ -220,6 +369,7 @@ class ReconciliationScreenTest {
             }
 
             waitForIdle()
+            clickText("Without suggestion (1)")
             onNodeWithText("Create all (1)").performClick()
             waitForIdle()
 
@@ -409,6 +559,7 @@ class ReconciliationScreenTest {
 
     /** Opens every collapsed wallet and month group of the visible tab. */
     private fun ComposeUiTest.expandAll() {
+        waitUntil(timeoutMillis = LOAD_TIMEOUT_MS) { reveal(hasText("Unmatched")) }
         val collapsed = hasText("▸", substring = true) and !hasText("Linked wallets", substring = true)
         repeat(MAX_GROUPS) {
             if (!reveal(collapsed)) return
@@ -575,7 +726,7 @@ class ReconciliationScreenTest {
                 List(51) { leg(200L + it, binance, "${it + 1}", t0 + 1.hours) },
                 onLoadLegs = { loads.value++ },
             )
-            reveal(hasText("Near matches (51)"))
+            waitUntil(timeoutMillis = LOAD_TIMEOUT_MS) { reveal(hasText("Near matches (51)")) }
             val initialLoads = loads.value
 
             try {
@@ -648,6 +799,64 @@ class ReconciliationScreenTest {
             onAllNodesWithText("Accept all (1)")[0].assertIsNotEnabled()
             gate.complete(Unit)
             waitUntil(timeoutMillis = 10_000) { batches.isNotEmpty() }
+        }
+    }
+
+    @Test
+    fun showsUnlinkedEntriesAndLinksOnlyUnambiguousSuggestions() {
+        runMoneyManagerComposeUiTest {
+            val bank = ShadowAccount(AccountId(101), "Koinly · Santander Savings", "Koinly")
+            val first = ShadowAccount(AccountId(102), "Koinly · Coinbase One", "Koinly")
+            val second = ShadowAccount(AccountId(103), "Koinly · Coinbase Two", "Koinly")
+            val linked = MutableStateFlow(listOf(ReconciliationLink(wallet.accountId, binance)))
+            val proposed = ReconciliationLinkMutation.SetLinks(bank.accountId, setOf(AccountId(2)))
+            val batches = mutableListOf<ImportBatch>()
+            val gate = CompletableDeferred<Unit>()
+            val engine =
+                importEngine { batch ->
+                    batches += batch
+                    gate.await()
+                    linked.value += ReconciliationLink(bank.accountId, AccountId(2))
+                    ImportResult()
+                }
+            val repo =
+                reconciliationRepository(listOf(koinly), listOf(wallet, bank, first, second), linked) { ids ->
+                    listOf(leg(10, wallet.accountId, "5", t0), leg(11, bank.accountId, "6", t0), leg(20, binance, "8", t0))
+                        .filter { it.accountId in ids }
+                }
+            val accounts =
+                listOf(
+                    Account(id = binance, name = "Binance", openingDate = epoch),
+                    Account(id = AccountId(2), name = "Santander", openingDate = epoch),
+                    Account(id = AccountId(3), name = "Coinbase", openingDate = epoch),
+                )
+            setContent {
+                provideScreenScopes {
+                    CompositionLocalProvider(LocalImportEngine provides engine) {
+                        ReconciliationScreen(
+                            reconciliationRepository = repo,
+                            accountRepository = accountRepository(accounts),
+                            categoryRepository = categoryRepository,
+                            personRepository = personRepository,
+                            transactionRepository = transactionRepository,
+                            onOpenLeg = {},
+                        )
+                    }
+                }
+            }
+
+            waitUntil(timeoutMillis = LOAD_TIMEOUT_MS) { reveal(hasText("Unlinked accounts (1)")) }
+            assertTrue(reveal(hasText("Linked accounts")))
+            assertTrue(reveal(hasText("Only in Koinly (1)")))
+            clickText("Unlinked accounts (1)")
+            assertTrue(reveal(hasText("▸ Santander Savings (1)")))
+            assertTrue(!reveal(hasText("Only in Koinly (1)")))
+            clickText("Link all (1)")
+            onNodeWithText("Linking suggested accounts").assertIsDisplayed()
+            waitUntil(timeoutMillis = LOAD_TIMEOUT_MS) { batches.isNotEmpty() }
+            assertEquals(listOf(proposed), batches.single().reconciliationLinkMutations)
+            gate.complete(Unit)
+            waitUntil(timeoutMillis = LOAD_TIMEOUT_MS) { reveal(hasText("Unlinked accounts (0)")) }
         }
     }
 

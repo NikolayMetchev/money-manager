@@ -304,6 +304,7 @@ class ImportDirectoryService(
                                     importDirectoryRepository = importDirectoryRepository,
                                     csvImportRepository = csvImportRepository,
                                     importEngine = importEngine,
+                                    sqliteStrategies = { csvImportStrategyRepository.getAllStrategies().first() },
                                     unimport = unimport,
                                     onProgress = { done, total -> report(Progress.counted("$done / $total files", done, total)) },
                                 )

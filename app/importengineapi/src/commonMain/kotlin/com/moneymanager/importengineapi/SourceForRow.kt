@@ -11,6 +11,10 @@ import com.moneymanager.domain.model.Source
  */
 fun Source.forRow(rowKey: ImportRowKey): Source =
     when (this) {
+        is Source.Sqlite -> {
+            copy(rowIndex = (rowKey as ImportRowKey.CsvRow).rowIndex, records = emptyList())
+        }
+
         is Source.Csv -> {
             copy(rowIndex = (rowKey as ImportRowKey.CsvRow).rowIndex)
         }

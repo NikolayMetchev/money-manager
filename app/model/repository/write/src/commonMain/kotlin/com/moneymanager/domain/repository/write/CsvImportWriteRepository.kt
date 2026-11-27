@@ -6,6 +6,7 @@ import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.csv.CsvRowLink
 import com.moneymanager.domain.model.csv.PdfImportSource
+import com.moneymanager.domain.model.csv.SqliteImportFile
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import kotlin.time.Instant
 
@@ -31,6 +32,7 @@ interface CsvImportWriteRepository : CsvImportReadRepository {
         xlsxBytes: ByteArray? = null,
         xlsxWorksheetName: String? = null,
         pdf: PdfImportSource? = null,
+        sqlite: SqliteImportFile? = null,
     ): CsvImportId
 
     /**
@@ -49,6 +51,7 @@ interface CsvImportWriteRepository : CsvImportReadRepository {
         rows: List<List<String>>,
         worksheetName: String? = null,
         pdfRulesHash: String? = null,
+        sqliteQuery: String? = null,
     )
 
     /**
@@ -71,6 +74,7 @@ interface CsvImportWriteRepository : CsvImportReadRepository {
         rowIndexRemap: Map<Long, Long>,
         xlsxBytes: ByteArray?,
         pdf: PdfImportSource? = null,
+        sqlite: SqliteImportFile? = null,
     )
 
     /**

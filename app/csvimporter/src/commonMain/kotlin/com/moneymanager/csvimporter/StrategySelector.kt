@@ -1,5 +1,6 @@
 package com.moneymanager.csvimporter
 
+import com.moneymanager.domain.model.ImportFileKind
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csv.CsvImport
@@ -76,13 +77,15 @@ fun List<CsvImportStrategy>.selectForCsv(
     // fewer): the file's columns must all still be known to the strategy (a subset of its identification and
     // optional columns). The filename/content ranking below then disambiguates as usual, so a genuinely different
     // file (disjoint or extra columns) still resolves to null rather than being misrouted.
+    val eligible = filter { it.supportsFile(fileName) }
     val candidates =
-        filter { it.matchesColumns(headings) }
+        eligible
+            .filter { it.matchesColumns(headings) }
             .ifEmpty {
                 if (headings.isEmpty()) {
                     emptyList()
                 } else {
-                    filter {
+                    eligible.filter {
                         (it.config.identificationColumns + it.config.optionalColumns).containsAll(
                             headings,
                         )
@@ -115,6 +118,14 @@ fun List<CsvImportStrategy>.selectForCsv(
         .minWithOrNull(compareBy({ it.name }, { it.id.toString() }))
 }
 
+/** SQLite snapshots can only be applied with a shadow strategy for their file format. */
+fun CsvImportStrategy.supportsFile(fileName: String): Boolean =
+    if (importFileKind(fileName) == ImportFileKind.SQLITE) {
+        config.sqliteQuery != null && (config.fileNamePattern.isNullOrBlank() || matchesFileName(fileName))
+    } else {
+        config.sqliteQuery == null
+    }
+
 private fun CsvImportStrategy.matchesFileName(fileName: String): Boolean {
     val pattern = config.fileNamePattern?.takeIf { it.isNotBlank() } ?: return false
     // A malformed user-entered pattern must not break selection for every other strategy.
@@ -132,6 +143,14 @@ suspend fun List<CsvImportStrategy>.selectForImport(
     csvImport: CsvImport,
     csvImportRepository: CsvImportReadRepository,
 ): CsvImportStrategy? {
+    if (importFileKind(csvImport.originalFileName) == ImportFileKind.SQLITE) {
+        val file = csvImportRepository.getSqliteFile(csvImport.id) ?: return null
+        singleOrNull {
+            it.config.sqliteQuery != null && it.config.sqliteQuery == file.stagedQuery &&
+                it.supportsFile(csvImport.originalFileName)
+        }?.let { return it }
+        return readSqliteImport(csvImport.originalFileName, file.bytes, this, headersOnly = true).strategy
+    }
     val pdfLines = csvImportRepository.getPdfLines(csvImport.id)
     if (pdfLines != null) {
         val staged = PdfRowAssembler.rawLines(pdfLines)

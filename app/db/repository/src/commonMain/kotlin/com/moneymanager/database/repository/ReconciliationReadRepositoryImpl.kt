@@ -17,6 +17,7 @@ import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
 import com.moneymanager.domain.repository.ReconciliationReadRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
@@ -30,8 +31,14 @@ class ReconciliationReadRepositoryImpl(
     private val queries = database.reconciliationSelectQueries
 
     override fun getSources(): Flow<List<ReconciliationSource>> =
-        csvImportStrategyRepository.getAllStrategies().map { strategies ->
+        combine(
+            csvImportStrategyRepository.getAllStrategies(),
+            queries.selectAppliedSqliteStrategyIds().asFlow().mapToList(coroutineContext),
+        ) { strategies, appliedSqliteStrategyIds ->
+            val applied = appliedSqliteStrategyIds.toSet()
             strategies
+                .asSequence()
+                .filter { it.config.sqliteQuery == null || it.id.id.toString() in applied }
                 .mapNotNull { strategy -> strategy.config.reconciliation?.let { it to strategy.name } }
                 .groupBy { it.first.sourceName }
                 .map { (source, entries) ->

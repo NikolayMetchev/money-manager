@@ -40,6 +40,7 @@ kmp_library(
         "//app/ui/components",
         "//app/ui/foundation",
         "@maven_kmp//:androidx_compose_runtime",
+        "@maven_kmp//:androidx_compose_runtime_runtime_saveable",
         "@maven_kmp//:compose_foundation",
         "@maven_kmp//:compose_ui",
         "@maven_kmp//:kotlinx_coroutines_core",

@@ -170,6 +170,7 @@ fun planFrom(
 /** The record itself, without which account's statement it was read as (a mapping change can move that). */
 private fun Source.record(): Source =
     when (this) {
+        is Source.Sqlite -> copy(statementAccountId = null)
         is Source.Csv -> copy(statementAccountId = null)
         is Source.Api -> copy(statementAccountId = null)
         else -> this
