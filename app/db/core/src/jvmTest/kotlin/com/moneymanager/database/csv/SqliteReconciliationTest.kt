@@ -16,6 +16,7 @@ import java.util.Properties
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -78,6 +79,12 @@ class SqliteReconciliationTest : DbTest() {
                 )
             assertEquals(1, result.transfersCreated, result.files.toString())
             assertEquals(setOf("GnuCash"), sources.first().map { it.name }.toSet() intersect sqliteSourceNames)
+            val projection = assertNotNull(reads.getSqliteFile(id)).stagedQuery
+            assertNotNull(projection)
+            assertFailsWith<IllegalArgumentException> {
+                reads.restageImport(id, listOf("other"), listOf(listOf("row")), sqliteQuery = "SELECT 'row' AS other")
+            }
+            assertEquals(projection, reads.getSqliteFile(id)?.stagedQuery)
             val accounts = repositories.accountRepository.getAllAccounts().first()
             assertEquals(setOf("GnuCash · Cash", "GnuCash · Food"), accounts.map { it.name }.toSet())
             assertEquals(

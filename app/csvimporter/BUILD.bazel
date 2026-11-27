@@ -1,5 +1,6 @@
 # gazelle:kmp_generate true
 # gazelle:kmp_targets android linuxArm64 linuxX64 macosArm64 mingwX64 web
+# gazelle:kmp_keep_dep @maven_kmp//:androidx_test_runner androidDeviceTest
 # gazelle:kmp_forbid_deps //app/db/core //app/di/core //app/ui/core
 # gazelle:kmp_export //app/importengineapi
 # gazelle:kmp_export //app/importfilesource/core
@@ -32,6 +33,7 @@ kmp_library(
         "//app/di/core",
         "//app/ui/core",
     ],
+    jvm_android_srcs = glob(["src/jvmAndroidMain/kotlin/**/*.kt"]),
     jvm_deps = [
         "@maven_kmp//:cryptography_provider_jdk",
         "@maven_kmp//:org_xerial_sqlite_jdbc",
@@ -95,6 +97,12 @@ kmp_test(
     android = True,
     associate = ":csvimporter",
     common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    device_deps = [
+        "//bazel/kmp/deps:kotlin_test",
+        "@maven_kmp//:androidx_test_runner",
+        "@maven_kmp//:kotlinx_coroutines_test",
+    ],
+    device_srcs = glob(["src/androidDeviceTest/kotlin/**/*.kt"]),
     forbidden_deps = [
         "//app/db/core",
         "//app/di/core",
@@ -102,6 +110,7 @@ kmp_test(
     ],
     jvm_deps = ["//app/importfilesource/core"],
     jvm_srcs = glob(["src/jvmTest/kotlin/**/*.kt"]),
+    keep_deps = ["@maven_kmp//:androidx_test_runner"],
     native_targets = [
         "linuxArm64",
         "linuxX64",

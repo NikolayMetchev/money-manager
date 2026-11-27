@@ -355,6 +355,7 @@ class Reimports(
                 when {
                     file.lastAppliedAt == null -> null
                     strategy == null -> "its strategy no longer exists"
+                    !strategy.supportsFile(file.originalFileName) -> "its strategy no longer reads this file format"
                     strategy.needsSourceAccountOverride() && settings.accountId == null -> "nothing says which account it imports onto"
                     strategy.needsCurrencyOverride() && settings.currencyId == null -> "nothing says which currency it imports in"
                     else -> null

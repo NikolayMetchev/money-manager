@@ -33,6 +33,7 @@ import com.moneymanager.csvimporter.Reimports
 import com.moneymanager.csvimporter.restageForStrategy
 import com.moneymanager.csvimporter.selectForCsv
 import com.moneymanager.csvimporter.selectForImport
+import com.moneymanager.csvimporter.supportsFile
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.ImportFileKind
@@ -132,12 +133,22 @@ fun CsvImportDetailScreen(
         csvImportStrategyRepository.getAllStrategies()
     }
 
+    val canApplyStrategy =
+        import?.let { file ->
+            if (importFileKind(file.originalFileName) == ImportFileKind.SQLITE) {
+                strategies.any { it.supportsFile(file.originalFileName) }
+            } else {
+                rows.isNotEmpty() && hasMatchingStrategy
+            }
+        } == true
+
     // Check if there's a matching strategy for this import (filename/content-aware selection).
     // Re-runs when the import, the strategies list, or the loaded rows change.
-    LaunchedEffect(import, strategies, rows) {
+    LaunchedEffect(import, strategies, rows, showApplyStrategyDialog) {
         import?.let { csvImport ->
             val matchingStrategy =
                 if (importFileKind(csvImport.originalFileName) == ImportFileKind.SQLITE) {
+                    if (showApplyStrategyDialog) return@LaunchedEffect
                     try {
                         sqliteError = null
                         strategies.selectForImport(csvImport, csvImportRepository)?.also {
@@ -231,12 +242,12 @@ fun CsvImportDetailScreen(
                 Spacer(modifier = Modifier.width(8.dp))
                 TextButton(
                     onClick = { showApplyStrategyDialog = true },
-                    enabled = !isDeleting && import != null && rows.isNotEmpty() && hasMatchingStrategy,
+                    enabled = !isDeleting && canApplyStrategy,
                 ) {
                     Text(
                         text = "Apply Strategy",
                         color =
-                            if (hasMatchingStrategy) {
+                            if (canApplyStrategy) {
                                 MaterialTheme.colorScheme.primary
                             } else {
                                 MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)

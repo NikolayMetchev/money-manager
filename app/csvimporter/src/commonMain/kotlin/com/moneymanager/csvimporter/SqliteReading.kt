@@ -40,10 +40,28 @@ internal suspend fun readSqliteImport(
     return SqliteProjection(strategy, result)
 }
 
+@Suppress("UNUSED_PARAMETER")
 internal expect fun querySqlite(
     bytes: ByteArray,
     queries: Map<String, String>,
 ): Pair<String, CsvParseResult>?
+
+/** Finds the one projection whose SELECT can be prepared against the snapshot's schema. */
+internal fun matchSqliteProjection(
+    queries: Map<String, String>,
+    canRead: (String) -> Boolean,
+): Pair<String, String>? {
+    val matches =
+        queries.mapNotNull { (name, query) ->
+            val sql = "SELECT * FROM (\n${query.trim().removeSuffix(";")}\n)"
+            if (canRead("$sql LIMIT 0")) name to sql else null
+        }
+    require(matches.size <= 1) { "Multiple SQLite strategies read this file. Set a filename pattern: ${matches.joinToString { it.first }}" }
+    return matches.singleOrNull()
+}
+
+internal fun isSchemaMismatch(message: String?): Boolean =
+    message?.contains("no such table") == true || message?.contains("no such column") == true
 
 /** Executes a sample of the editable SELECT against the stored file. */
 suspend fun previewSqliteQuery(
@@ -58,7 +76,7 @@ private suspend fun readTable(
     withContext(ioDispatcher) { requireNotNull(querySqlite(bytes, mapOf("Table" to query))) { "Cannot read the requested table" }.second }
 
 suspend fun sqliteTables(bytes: ByteArray): List<String> =
-    readTable(bytes, "SELECT name FROM main.sqlite_schema WHERE type='table' AND name NOT GLOB 'sqlite_*' ORDER BY name").rows.map {
+    readTable(bytes, "SELECT name FROM main.sqlite_master WHERE type='table' AND name NOT GLOB 'sqlite_*' ORDER BY name").rows.map {
         it.single()
     }
 

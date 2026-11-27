@@ -189,7 +189,7 @@ fun SourceInfoSection(
                     if (rowIndex != null) {
                         CsvSourceLinkRow(
                             label = "Row",
-                            value = (origin as? Source.Sqlite)?.records?.joinToString { it.label } ?: rowIndex.toString(),
+                            value = (origin as? Source.Sqlite)?.records?.joinToString { it.label }?.ifEmpty { null } ?: rowIndex.toString(),
                             importId = origin.importId,
                             rowIndex = rowIndex,
                             onCsvSourceClick = onCsvSourceClick,

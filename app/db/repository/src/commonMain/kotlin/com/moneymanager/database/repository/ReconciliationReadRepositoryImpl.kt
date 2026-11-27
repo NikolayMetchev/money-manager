@@ -37,6 +37,7 @@ class ReconciliationReadRepositoryImpl(
         ) { strategies, appliedSqliteStrategyIds ->
             val applied = appliedSqliteStrategyIds.toSet()
             strategies
+                .asSequence()
                 .filter { it.config.sqliteQuery == null || it.id.id.toString() in applied }
                 .mapNotNull { strategy -> strategy.config.reconciliation?.let { it to strategy.name } }
                 .groupBy { it.first.sourceName }

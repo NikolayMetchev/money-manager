@@ -31,6 +31,7 @@ import com.moneymanager.csvimporter.buildPendingAccountMappings
 import com.moneymanager.csvimporter.crossFileLegRows
 import com.moneymanager.csvimporter.ensureCryptoAssets
 import com.moneymanager.csvimporter.hasBlankNewAccountNames
+import com.moneymanager.csvimporter.restageForStrategy
 import com.moneymanager.csvimporter.runCsvImport
 import com.moneymanager.csvimporter.selectForCsv
 import com.moneymanager.csvimporter.supportsFile
@@ -38,6 +39,7 @@ import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CryptoAsset
+import com.moneymanager.domain.model.ImportFileKind
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvRow
@@ -99,11 +101,8 @@ fun ApplyStrategyDialog(
     val allStrategies by csvImportStrategyRepository
         .getAllStrategies()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val strategies =
-        allStrategies.filter {
-            it.supportsFile(csvImport.originalFileName) &&
-                (it.config.sqliteQuery == null || it.matchesColumns(csvImport.columns.map { column -> column.originalName }.toSet()))
-        }
+    val isSqlite = importFileKind(csvImport.originalFileName) == ImportFileKind.SQLITE
+    val strategies = allStrategies.filter { it.supportsFile(csvImport.originalFileName) }
     val allAccounts by accountRepository
         .getAllAccounts()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
@@ -125,8 +124,8 @@ fun ApplyStrategyDialog(
     }
     val accounts = if (selectedStrategy?.config?.reconciliation == null) allAccounts else shadowAccounts
     var selectedSourceAccountId by remember { mutableStateOf<AccountId?>(null) }
-    var baseImportPreparation by remember { mutableStateOf<ImportPreparation?>(null) }
-    var importPreparation by remember { mutableStateOf<ImportPreparation?>(null) }
+    var baseImportPreparation by remember(selectedStrategy, csvImport.id) { mutableStateOf<ImportPreparation?>(null) }
+    var importPreparation by remember(selectedStrategy, csvImport.id) { mutableStateOf<ImportPreparation?>(null) }
     var accountMappings by remember { mutableStateOf<List<AccountMapping>>(emptyList()) }
     var historicalAccountNames by remember { mutableStateOf<Map<String, AccountId>>(emptyMap()) }
     var selectedExistingAccounts by remember { mutableStateOf<Map<String, AccountId>>(emptyMap()) }
@@ -176,18 +175,43 @@ fun ApplyStrategyDialog(
     LaunchedEffect(strategies, csvImport.columns, rows) {
         if (selectedStrategy == null && strategies.isNotEmpty()) {
             val matching =
-                strategies.selectForCsv(
-                    csvImport.originalFileName,
-                    csvImport.columns,
-                    rows,
-                    wholeDocument = importFileKind(csvImport.originalFileName)?.isDocument == true,
-                )
+                if (isSqlite) {
+                    val stagedQuery = csvImportRepository.getSqliteFile(csvImport.id)?.stagedQuery
+                    strategies.firstOrNull { it.config.sqliteQuery == stagedQuery }
+                } else {
+                    strategies.selectForCsv(
+                        csvImport.originalFileName,
+                        csvImport.columns,
+                        rows,
+                        wholeDocument = importFileKind(csvImport.originalFileName)?.isDocument == true,
+                    )
+                }
             selectedStrategy = matching ?: strategies.firstOrNull()
         }
     }
 
+    var sqlitePreview by remember(selectedStrategy, csvImport.id, csvImport.fileChecksum) {
+        mutableStateOf<Pair<CsvImport, List<CsvRow>>?>(null)
+    }
+    LaunchedEffect(selectedStrategy, csvImport.id, csvImport.fileChecksum) {
+        val strategy = selectedStrategy?.takeIf { it.config.sqliteQuery != null } ?: return@LaunchedEffect
+        errorMessage = null
+        try {
+            val current = csvImportRepository.getImport(csvImport.id).first() ?: return@LaunchedEffect
+            val staged = restageForStrategy(current, strategy, csvImportRepository, importEngine)
+            val stagedRows = csvImportRepository.getImportRows(staged.id, limit = staged.rowCount.coerceAtLeast(1), offset = 0)
+            requireSqliteQuery(staged, strategy, csvImportRepository)
+            sqlitePreview = staged to stagedRows
+        } catch (failure: IllegalArgumentException) {
+            logger.e(failure) { "SQLite preview failed: ${failure.message}" }
+            errorMessage = "SQLite preview failed: ${failure.message}"
+        }
+    }
+    val activeImport = sqlitePreview?.first ?: csvImport
+    val activeRows = if (isSqlite) sqlitePreview?.second.orEmpty() else rows
+
     // Filter to only show rows that will be processed: ERROR status or no status (never processed)
-    val rowsToProcess = rows.filter { row -> row.importStatus == null || row.importStatus == ImportStatus.ERROR }
+    val rowsToProcess = activeRows.filter { row -> row.importStatus == null || row.importStatus == ImportStatus.ERROR }
 
     // Prepare baseline import preview from persisted mappings only.
     LaunchedEffect(
@@ -212,8 +236,8 @@ fun ApplyStrategyDialog(
                     val mapper =
                         TransferMapper(
                             strategy = strategy,
-                            columns = csvImport.columns,
-                            fileName = csvImport.originalFileName,
+                            columns = activeImport.columns,
+                            fileName = activeImport.originalFileName,
                             existingAccounts = accountsByName,
                             existingCurrencies = currenciesById,
                             existingCurrenciesByCode = currenciesByCode,
@@ -241,7 +265,7 @@ fun ApplyStrategyDialog(
                     baseImportPreparation = null
                     importPreparation = null
                 }
-            } else if (rowsToProcess.isEmpty() && rows.isNotEmpty()) {
+            } else if (rowsToProcess.isEmpty() && activeRows.isNotEmpty()) {
                 // All rows already processed successfully
                 errorMessage = "All rows have already been imported successfully."
                 baseImportPreparation = null
@@ -280,8 +304,8 @@ fun ApplyStrategyDialog(
                     val mapper =
                         TransferMapper(
                             strategy = strategy,
-                            columns = csvImport.columns,
-                            fileName = csvImport.originalFileName,
+                            columns = activeImport.columns,
+                            fileName = activeImport.originalFileName,
                             existingAccounts = accountsByName,
                             existingCurrencies = currenciesById,
                             existingCurrenciesByCode = currenciesByCode,
@@ -317,7 +341,7 @@ fun ApplyStrategyDialog(
                     strategies = strategies,
                     selectedStrategy = selectedStrategy,
                     onStrategySelected = { selectedStrategy = it },
-                    csvColumns = csvImport.columns,
+                    csvColumns = activeImport.columns,
                     enabled = !isImporting,
                 )
 
@@ -403,6 +427,7 @@ fun ApplyStrategyDialog(
 
                     scope.launch {
                         try {
+                            if (isSqlite) requireSqliteQuery(activeImport, strategy, csvImportRepository)
                             // Create a crypto asset for every non-fiat ticker in the strategy's currency
                             // column before mapping, so crypto rows resolve instead of failing with
                             // "Currency not found" (upsert is idempotent). Same step the bulk/re-import
@@ -410,8 +435,8 @@ fun ApplyStrategyDialog(
                             val resolvedCrypto =
                                 ensureCryptoAssets(
                                     strategy = strategy,
-                                    columns = csvImport.columns,
-                                    fileName = csvImport.originalFileName,
+                                    columns = activeImport.columns,
+                                    fileName = activeImport.originalFileName,
                                     rows = rowsToProcess,
                                     currencies = currencies,
                                     importEngine = importEngine,
@@ -421,9 +446,9 @@ fun ApplyStrategyDialog(
                             cryptoAssets = resolvedCrypto
                             val result =
                                 runCsvImport(
-                                    csvImport = csvImport,
+                                    csvImport = activeImport,
                                     rows = rowsToProcess,
-                                    columns = csvImport.columns,
+                                    columns = activeImport.columns,
                                     strategy = strategy,
                                     basePrep =
                                         if (resolvedCrypto == cryptoAssetsAtPreview) {
@@ -431,7 +456,7 @@ fun ApplyStrategyDialog(
                                         } else {
                                             buildCsvMapper(
                                                 strategy,
-                                                csvImport.columns,
+                                                activeImport.columns,
                                                 accounts,
                                                 currencies,
                                                 accountMappings,
@@ -440,10 +465,10 @@ fun ApplyStrategyDialog(
                                                 historicalAccountNames,
                                                 resolvedCrypto,
                                                 assetAliases = cryptoRepository.assetAliasMap(),
-                                                fileName = csvImport.originalFileName,
+                                                fileName = activeImport.originalFileName,
                                             ).prepareImport(rowsToProcess)
                                         },
-                                    foreignFiles = crossFileLegRows(csvImport, strategy, csvImportRepository),
+                                    foreignFiles = crossFileLegRows(activeImport, strategy, csvImportRepository),
                                     tradeRepository = tradeRepository,
                                     selectedExistingAccounts = selectedExistingAccounts,
                                     selectedNewAccountNames = selectedNewAccountNames,
@@ -472,6 +497,7 @@ fun ApplyStrategyDialog(
                 enabled =
                     !isImporting &&
                         selectedStrategy != null &&
+                        (!isSqlite || sqlitePreview != null) &&
                         (selectedSourceAccountId != null || strategyHasPerRowSource) &&
                         importPreparation != null &&
                         !hasBlankNewAccountNames(
@@ -495,4 +521,19 @@ fun ApplyStrategyDialog(
             }
         },
     )
+}
+
+/** Keep the preview and its row indexes paired with the SELECT that was staged. */
+private suspend fun requireSqliteQuery(
+    file: CsvImport,
+    strategy: CsvImportStrategy,
+    reads: CsvImportReadRepository,
+) {
+    require(reads.getSqliteFile(file.id)?.stagedQuery == strategy.config.sqliteQuery) {
+        "The SQLite file has a different staged query. Reopen the import, or unimport it first if already applied."
+    }
+    val current = reads.getImport(file.id).first()
+    require(current != null && current.fileChecksum == file.fileChecksum && current.columns == file.columns) {
+        "The staging changed. Reopen Apply Strategy to refresh the preview."
+    }
 }

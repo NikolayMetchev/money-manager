@@ -103,6 +103,9 @@ class CsvImportWriteRepositoryImpl(
                 val import =
                     csvImportSelectQueries.selectImportById(id.id.toString()).awaitAsOneOrNull()
                         ?: return@transaction
+                require(sqliteQuery == null || import.last_applied_at == null) {
+                    "This SQLite file was already imported. Unimport it before changing its query."
+                }
                 val columnCount = headers.size
 
                 // Recreate the dynamic table with the new column shape and rows. The row_index sequence

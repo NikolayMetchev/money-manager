@@ -92,7 +92,7 @@ internal object SqliteStrategies {
             FROM accounts a JOIN paths p ON p.guid = a.parent_guid
         ), legs AS (
             SELECT s.guid, s.tx_guid, 'GnuCash · ' || p.path AS wallet, c.mnemonic AS asset,
-                   decimal_ratio(s.quantity_num, s.quantity_denom) AS quantity, s.quantity_num AS signed_num,
+                   decimal_ratio(s.quantity_num || '/' || s.quantity_denom) AS quantity, s.quantity_num AS signed_num,
                    count(*) OVER (PARTITION BY s.tx_guid) AS leg_count
             FROM splits s JOIN paths p ON p.guid = s.account_guid
             JOIN accounts a ON a.guid = s.account_guid JOIN commodities c ON c.guid = a.commodity_guid
@@ -106,17 +106,17 @@ internal object SqliteStrategies {
                   (d.asset <> r.asset OR (d.wallet <> r.wallet AND substr(d.quantity, 2) = r.quantity))
         ), movements AS (
             SELECT tx_guid AS gnucash_id, tx_guid, source, target, amount, asset, received, to_asset,
-                   json_array(json_object('table','transactions','key',json_object('guid',tx_guid)),
-                              json_object('table','splits','key',json_object('guid',debit_guid)),
-                              json_object('table','splits','key',json_object('guid',credit_guid))) AS source_rows
+                   '[' || '{"table":"transactions","key":{"guid":' || sqlite_json_quote(tx_guid) || '}},'
+                       || '{"table":"splits","key":{"guid":' || sqlite_json_quote(debit_guid) || '}},'
+                       || '{"table":"splits","key":{"guid":' || sqlite_json_quote(credit_guid) || '}}]' AS source_rows
             FROM pairs
             UNION ALL
             SELECT l.guid, l.tx_guid,
                    CASE WHEN l.signed_num < 0 THEN l.wallet ELSE 'GnuCash: Split clearing' END,
                    CASE WHEN l.signed_num < 0 THEN 'GnuCash: Split clearing' ELSE l.wallet END,
                    ltrim(l.quantity, '-'), l.asset, NULL, NULL,
-                   json_array(json_object('table','splits','key',json_object('guid',l.guid)),
-                              json_object('table','transactions','key',json_object('guid',l.tx_guid)))
+                   '[' || '{"table":"splits","key":{"guid":' || sqlite_json_quote(l.guid) || '}},'
+                       || '{"table":"transactions","key":{"guid":' || sqlite_json_quote(l.tx_guid) || '}}]'
             FROM legs l WHERE NOT EXISTS (SELECT 1 FROM pairs p WHERE p.tx_guid = l.tx_guid)
         )
         SELECT m.gnucash_id, strftime('%Y-%m-%d %H:%M:%f', t.post_date) AS posted, t.description,
@@ -138,11 +138,11 @@ internal object SqliteStrategies {
         )
         SELECT m.id AS mm_id, strftime('%Y-%m-%d %H:%M:%f', m.timestamp / 1000.0, 'unixepoch') AS posted,
                m.description, 'Money Manager · ' || s.name AS source, 'Money Manager · ' || t.name AS target,
-               decimal_ratio(m.amount, a.scale_factor) AS amount, a.code AS asset,
-               CASE WHEN b.id IS NOT NULL THEN decimal_ratio(m.received, b.scale_factor) END AS received,
+               decimal_ratio(m.amount || '/' || a.scale_factor) AS amount, a.code AS asset,
+               CASE WHEN b.id IS NOT NULL THEN decimal_ratio(m.received || '/' || b.scale_factor) END AS received,
                b.code AS to_asset, m.excluded,
-               json_array(json_object('table', CASE WHEN b.id IS NULL THEN 'transfer' ELSE 'trade' END,
-                                      'key', json_object('id', cast(m.id AS text)))) AS source_rows
+               '[{"table":' || CASE WHEN b.id IS NULL THEN '"transfer"' ELSE '"trade"' END
+                   || ',"key":{"id":' || sqlite_json_quote(CAST(m.id AS TEXT)) || '}}]' AS source_rows
         FROM movements m JOIN account s ON s.id = m.source_account_id JOIN account t ON t.id = m.target_account_id
         JOIN asset_details a ON a.id = m.asset_id LEFT JOIN asset_details b ON b.id = m.to_asset_id
         ORDER BY m.timestamp, m.id

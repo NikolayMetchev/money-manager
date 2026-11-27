@@ -66,6 +66,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.uuid.Uuid
 
 /**
@@ -197,16 +198,20 @@ fun CsvStrategyEditorScreen(
     val state = rememberCsvStrategyEditorState(editKey, existingStrategy, availableColumnNames, pdf = previewer != null)
     val pdfPreview = previewer?.let { remember(it, state.pdfLineRules) { it.preview(state.pdfLineRules.orEmpty()) } }
     var sqliteSample by remember(editKey) { mutableStateOf<CsvParseResult?>(null) }
+    var sqliteColumnsSeeded by remember(editKey) { mutableStateOf(false) }
     LaunchedEffect(csvImportId, state.sqliteQuery) {
         sqliteSample = null
         val query = state.sqliteQuery
         if (csvImportId == null || query.isBlank()) return@LaunchedEffect
-        delay(400)
+        delay(400.milliseconds)
         val snapshot = csvImportRepository.getSqliteFile(csvImportId) ?: return@LaunchedEffect
         try {
             val sample = previewSqliteQuery(snapshot.bytes, query)
             sqliteSample = sample
-            if (!isEditMode) state.identificationColumns = sample.headers.toSet()
+            if (!isEditMode && !sqliteColumnsSeeded) {
+                state.identificationColumns = sample.headers.toSet()
+                sqliteColumnsSeeded = true
+            }
             state.errorMessage = null
         } catch (cancelled: CancellationException) {
             throw cancelled

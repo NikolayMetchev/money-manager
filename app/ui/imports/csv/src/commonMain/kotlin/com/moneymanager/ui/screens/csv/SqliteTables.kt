@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -62,7 +61,12 @@ internal fun SqliteTables(
         }
         if (table == null) {
             Text("Tables in main")
-            LazyColumn { items(tables) { name -> TextButton(onClick = { table = name }) { Text(name) } } }
+            LazyColumn {
+                items(tables.size, key = { tables[it] }) { index ->
+                    val name = tables[index]
+                    TextButton(onClick = { table = name }) { Text(name) }
+                }
+            }
         } else {
             Row {
                 TextButton(onClick = {

@@ -204,13 +204,13 @@ private fun SourceReconciliation(
     val importEngine = LocalImportEngine.current
     val writeVersion by importEngine.writeVersion.collectAsState()
     val scope = rememberSchemaAwareCoroutineScope()
-    val loadedShadows by rememberFlowAsStateWithSchemaErrorHandling<List<ShadowAccount>?>(initial = null) {
+    val loadedShadows by rememberFlowAsStateWithSchemaErrorHandling(initial = null) {
         reconciliationRepository.getShadowAccounts()
     }
-    val loadedLinks by rememberFlowAsStateWithSchemaErrorHandling<List<ReconciliationLink>?>(initial = null) {
+    val loadedLinks by rememberFlowAsStateWithSchemaErrorHandling(initial = null) {
         reconciliationRepository.getLinks()
     }
-    val loadedAccounts by rememberFlowAsStateWithSchemaErrorHandling<List<Account>?>(initial = null) {
+    val loadedAccounts by rememberFlowAsStateWithSchemaErrorHandling(initial = null) {
         accountRepository.getAllAccounts()
     }
     val allShadowAccounts = loadedShadows.orEmpty()
@@ -288,9 +288,12 @@ private fun SourceReconciliation(
     var walletPlans by remember(cache, linkInputs, walletRefreshKey) {
         mutableStateOf(linkInputs?.let(cache::getWalletPlans))
     }
-    LaunchedEffect(cache, linkInputs, walletRefreshKey, writing) {
+    var pendingAutomatic by remember(cache, linkInputs, walletRefreshKey) {
+        mutableStateOf<Map<AccountId, AccountId>?>(null)
+    }
+    LaunchedEffect(cache, linkInputs, walletRefreshKey) {
         val inputs = linkInputs ?: return@LaunchedEffect
-        if (writing || walletPlans != null) return@LaunchedEffect
+        if (walletPlans != null) return@LaunchedEffect
         val (automatic, prepared) =
             withContext(Dispatchers.Default) {
                 val automatic = planAutoLinks(source, shadowAccounts, links, real)
@@ -307,9 +310,17 @@ private fun SourceReconciliation(
                     )
             }
         walletPlans = prepared
+        if (automatic.isEmpty()) cache.putWalletPlans(inputs, prepared) else pendingAutomatic = automatic
+    }
+    LaunchedEffect(cache, linkInputs, walletRefreshKey, writing, pendingAutomatic) {
+        val inputs = linkInputs ?: return@LaunchedEffect
+        val automatic = pendingAutomatic ?: return@LaunchedEffect
+        val prepared = walletPlans ?: return@LaunchedEffect
+        if (writing) return@LaunchedEffect
         runCatchingUnlessCancelled { importEngine.applyAutoLinks(automatic) }
             .onSuccess { cache.putWalletPlans(inputs, prepared) }
             .onFailure { error = "Automatic linking failed: ${it.message}" }
+        pendingAutomatic = null
     }
     val unlinked = walletPlans?.unlinked.orEmpty()
     val createPlan = walletPlans?.creation.orEmpty()
@@ -361,10 +372,11 @@ private fun SourceReconciliation(
     // The movement a link named stays marked, as the CSV screen marks the row it was sent to.
     var highlightedLeaf by remember(source) { mutableStateOf<Long?>(null) }
     // The movement a link named: found among the comparison's lists, its tab and tree opened down to it, then scrolled to.
-    LaunchedEffect(focus.request, source, result, resultFor, shadowIds, links) {
+    LaunchedEffect(focus.request, source, result, resultFor, shadowIds, links, groups) {
         val request = focus.request ?: return@LaunchedEffect
         if (request.sourceName != source.name) return@LaunchedEffect
         val comparison = result ?: return@LaunchedEffect
+        if (groups == null) return@LaunchedEffect
         // Wait for a comparison of the wallets and links as loaded: finding the movement in one made too soon would fail and give up.
         if (shadowIds.isEmpty() || resultFor != (shadowIds to links)) return@LaunchedEffect
         val at = locateLeaf(comparison, request.transactionId, hideUnknownAssets)
@@ -389,7 +401,7 @@ private fun SourceReconciliation(
         focus.clear()
     }
     // The list is rebuilt for the new tab and tree a frame or two later, so wait until the row has an index.
-    LaunchedEffect(scrollToLeaf) {
+    LaunchedEffect(scrollToLeaf, groups) {
         val transactionId = scrollToLeaf ?: return@LaunchedEffect
         repeat(SCROLL_ATTEMPTS) {
             val index = indexByKey.entries.firstOrNull { leafHolds(it.key, transactionId) }?.value
