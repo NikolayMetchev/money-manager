@@ -40,17 +40,10 @@ internal suspend fun readSqliteImport(
     return SqliteProjection(strategy, result)
 }
 
-internal typealias SqliteReader = (bytes: ByteArray, queries: Map<String, String>) -> Pair<String, CsvParseResult>?
-
-internal expect fun sqliteReader(): SqliteReader?
-
-private fun querySqlite(
+internal expect fun querySqlite(
     bytes: ByteArray,
     queries: Map<String, String>,
-): Pair<String, CsvParseResult>? {
-    val reader = sqliteReader() ?: throw SqliteReadException("SQLite file imports are available on desktop and Android")
-    return reader(bytes, queries)
-}
+): Pair<String, CsvParseResult>?
 
 /** Finds the one projection whose SELECT can be prepared against the snapshot's schema. */
 internal fun matchSqliteProjection(
@@ -79,9 +72,7 @@ private suspend fun readTable(
     bytes: ByteArray,
     query: String,
 ): CsvParseResult =
-    withContext(ioDispatcher) {
-        querySqlite(bytes, mapOf("Table" to query))?.second ?: throw SqliteReadException("Cannot read the requested table")
-    }
+    withContext(ioDispatcher) { requireNotNull(querySqlite(bytes, mapOf("Table" to query))) { "Cannot read the requested table" }.second }
 
 suspend fun sqliteTables(bytes: ByteArray): List<String> =
     readTable(bytes, "SELECT name FROM main.sqlite_master WHERE type='table' AND name NOT GLOB 'sqlite_*' ORDER BY name").rows.map {

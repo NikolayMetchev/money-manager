@@ -420,6 +420,9 @@ exclude:
   # "unused parameter".
   - name: unused
     paths:
+      # The expect's arguments are read by the JVM and Android readers. The unsupported actual ignores both.
+      - app/csvimporter/src/commonMain/kotlin/com/moneymanager/csvimporter/SqliteReading.kt
+      - app/csvimporter/src/nonJvmMain/kotlin/com/moneymanager/csvimporter/SqliteReading.nonJvm.kt
       # [5] — Android's openInSystemBrowser actual ignores the URL it can't open.
       - utils/browser/src/androidMain/kotlin/com/moneymanager/browser/OpenInSystemBrowser.android.kt
       # [5] — native actuals that ignore the AppComponentParams their expect takes (Android's need its Context).
@@ -505,6 +508,7 @@ exclude:
       - app/cryptodata/src/commonMain/kotlin/com/moneymanager/cryptodata/HttpCryptoCatalogRefresher.kt
       - utils/archive/src/commonMain/kotlin/com/moneymanager/archive/ArchiveCodec.kt
       # [5] — native and nonJvm actuals of common expects, and the browser rules' JVM fixture, which no JVM module links.
+      - app/csvimporter/src/nonJvmMain/kotlin/com/moneymanager/csvimporter/SqliteReading.nonJvm.kt
       - app/importfilesource/di/src/nativeMain/kotlin/com/moneymanager/importfilesource/di/CreateImportFileSourceFactory.native.kt
       - app/main/cli/src/nativeMain/kotlin/com/moneymanager/cli/CliServices.native.kt
       - utils/localsettings/di/src/nativeMain/kotlin/com/moneymanager/localsettings/di/CreateLocalSettings.native.kt
