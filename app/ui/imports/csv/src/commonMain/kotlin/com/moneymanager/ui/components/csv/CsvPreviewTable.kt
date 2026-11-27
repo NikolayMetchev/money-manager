@@ -80,6 +80,7 @@ fun CsvPreviewTable(
     initialColumnFilter: Map<String, Set<String>> = emptyMap(),
     onDuplicateSourceClick: ((TransferId, Boolean) -> Unit)? = null,
     onTransferClick: ((TransferId, Boolean) -> Unit)? = null,
+    showImportColumns: Boolean = true,
 ) {
     val horizontalScrollState = rememberScrollState()
     val lazyListState = rememberLazyListState()
@@ -156,18 +157,21 @@ fun CsvPreviewTable(
         // Filter row: one value menu above each filterable column
         Row(modifier = Modifier.fillMaxWidth().horizontalScroll(horizontalScrollState)) {
             Spacer(Modifier.width(ROW_INDEX_COLUMN_WIDTH))
-            MultiSelectFilterDropdown(
-                items = statuses,
-                selectedKeys = filter.statuses,
-                itemKey = { it },
-                itemLabel = { it.label() },
-                itemNoun = "status",
-                itemNounPlural = "statuses",
-                fieldLabel = "Status",
-                onSelectionChange = { filter = filter.copy(statuses = it) },
-                modifier = Modifier.width(STATUS_COLUMN_WIDTH),
-            )
-            Spacer(Modifier.width(TRANSFER_COLUMN_WIDTH))
+            if (showImportColumns) {
+                MultiSelectFilterDropdown(
+                    items = statuses,
+                    selectedKeys = filter.statuses,
+                    itemKey = { it },
+                    itemLabel = { it.label() },
+                    itemNoun = "status",
+                    itemNounPlural = "statuses",
+                    fieldLabel = "Status",
+                    onSelectionChange = { filter = filter.copy(statuses = it) },
+                    modifier = Modifier.width(STATUS_COLUMN_WIDTH),
+                )
+                Spacer(Modifier.width(TRANSFER_COLUMN_WIDTH))
+            }
+
             sortedColumns.forEach { column ->
                 MultiSelectFilterDropdown(
                     items = distinctValues[column.columnIndex].orEmpty(),
@@ -209,33 +213,35 @@ fun CsvPreviewTable(
                 width = ROW_INDEX_COLUMN_WIDTH,
             )
 
-            // Status column header
-            SortableColumnHeader(
-                text = "Status",
-                sortKey = SortKey.Status,
-                activeSortKey = activeSortKey,
-                sortDirection = sortDirection,
-                onHeaderClick = onHeaderClick,
-                width = STATUS_COLUMN_WIDTH,
-            )
-
-            // Transaction navigation column header (not sortable)
-            Box(
-                modifier =
-                    Modifier
-                        .width(TRANSFER_COLUMN_WIDTH)
-                        .border(
-                            width = 1.dp,
-                            color = MaterialTheme.colorScheme.outline,
-                        ).padding(8.dp),
-            ) {
-                SelectableText(
-                    text = "Transaction",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+            if (showImportColumns) {
+                // Status column header
+                SortableColumnHeader(
+                    text = "Status",
+                    sortKey = SortKey.Status,
+                    activeSortKey = activeSortKey,
+                    sortDirection = sortDirection,
+                    onHeaderClick = onHeaderClick,
+                    width = STATUS_COLUMN_WIDTH,
                 )
+
+                // Transaction navigation column header (not sortable)
+                Box(
+                    modifier =
+                        Modifier
+                            .width(TRANSFER_COLUMN_WIDTH)
+                            .border(
+                                width = 1.dp,
+                                color = MaterialTheme.colorScheme.outline,
+                            ).padding(8.dp),
+                ) {
+                    SelectableText(
+                        text = "Transaction",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
 
             // CSV columns
@@ -297,52 +303,54 @@ fun CsvPreviewTable(
                                 )
                             }
 
-                            // Status cell
-                            Box(
-                                modifier =
-                                    Modifier
-                                        .width(STATUS_COLUMN_WIDTH)
-                                        .border(
-                                            width = 1.dp,
-                                            color = MaterialTheme.colorScheme.outlineVariant,
-                                        ).padding(8.dp),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                row.importStatus?.let { status ->
-                                    val statusText = status.label()
-                                    val statusColor =
-                                        when (status) {
-                                            ImportStatus.IMPORTED -> MaterialTheme.colorScheme.primary
-                                            ImportStatus.DUPLICATE -> MaterialTheme.colorScheme.secondary
-                                            ImportStatus.UPDATED -> MaterialTheme.colorScheme.tertiary
-                                            ImportStatus.ERROR -> MaterialTheme.colorScheme.error
-                                            ImportStatus.SKIPPED -> MaterialTheme.colorScheme.outline
-                                        }
-                                    SelectableText(
-                                        text = statusText,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = statusColor,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
+                            if (showImportColumns) {
+                                // Status cell
+                                Box(
+                                    modifier =
+                                        Modifier
+                                            .width(STATUS_COLUMN_WIDTH)
+                                            .border(
+                                                width = 1.dp,
+                                                color = MaterialTheme.colorScheme.outlineVariant,
+                                            ).padding(8.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    row.importStatus?.let { status ->
+                                        val statusText = status.label()
+                                        val statusColor =
+                                            when (status) {
+                                                ImportStatus.IMPORTED -> MaterialTheme.colorScheme.primary
+                                                ImportStatus.DUPLICATE -> MaterialTheme.colorScheme.secondary
+                                                ImportStatus.UPDATED -> MaterialTheme.colorScheme.tertiary
+                                                ImportStatus.ERROR -> MaterialTheme.colorScheme.error
+                                                ImportStatus.SKIPPED -> MaterialTheme.colorScheme.outline
+                                            }
+                                        SelectableText(
+                                            text = statusText,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = statusColor,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    }
                                 }
-                            }
 
-                            val isPositiveAmount =
-                                isRowAmountPositive(
-                                    row = row,
-                                    amountColumnIndex = amountColumnIndex,
+                                val isPositiveAmount =
+                                    isRowAmountPositive(
+                                        row = row,
+                                        amountColumnIndex = amountColumnIndex,
+                                    )
+
+                                // Transfer ID cell
+                                TransferIdCell(
+                                    importStatus = row.importStatus,
+                                    transferId = row.transferId,
+                                    isPositiveAmount = isPositiveAmount,
+                                    onDuplicateSourceClick = onDuplicateSourceClick,
+                                    onClick = onTransferClick,
                                 )
-
-                            // Transfer ID cell
-                            TransferIdCell(
-                                importStatus = row.importStatus,
-                                transferId = row.transferId,
-                                isPositiveAmount = isPositiveAmount,
-                                onDuplicateSourceClick = onDuplicateSourceClick,
-                                onClick = onTransferClick,
-                            )
+                            }
 
                             // CSV data cells
                             row.values.forEachIndexed { index, value ->

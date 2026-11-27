@@ -56,6 +56,35 @@ class AutoLinkerTest {
     }
 
     @Test
+    fun `a unique leaf of a hierarchical account name links automatically`() {
+        val wallet = shadow(100, "Koinly · Assets:Current Assets:Santander")
+        val bank = real(1, "Santander")
+        val path = real(2, "Assets:Current Assets:Santander")
+
+        assertEquals(mapOf(wallet.accountId to bank.id), planAutoLinks(source, listOf(wallet), emptyList(), listOf(bank)))
+        assertEquals(mapOf(wallet.accountId to path.id), planAutoLinks(source, listOf(wallet), emptyList(), listOf(bank, path)))
+        assertEquals(emptyMap(), planAccountCreation(source, listOf(wallet), listOf(bank)))
+    }
+
+    @Test
+    fun `paths that reach the same account still need confirmation`() {
+        val wallets = listOf(shadow(100, "Koinly · Assets:Santander"), shadow(101, "Koinly · Bank:Santander"))
+        val bank = real(1, "Santander")
+
+        assertEquals(emptyMap(), planAutoLinks(source, wallets, emptyList(), listOf(bank)))
+        assertEquals(listOf(bank, bank), unlinkedWallets(source, wallets, emptyList(), listOf(bank)).map { it.suggestion })
+    }
+
+    @Test
+    fun `interior substring and near leaf matches are suggestions`() {
+        val bank = real(1, "Santander")
+        val wallets = listOf(shadow(100, "Koinly · Assets:My Santander account"), shadow(101, "Koinly · Assets:Santader"))
+
+        assertEquals(emptyMap(), planAutoLinks(source, wallets, emptyList(), listOf(bank)))
+        assertEquals(listOf(bank, bank), unlinkedWallets(source, wallets, emptyList(), listOf(bank)).map { it.suggestion })
+    }
+
+    @Test
     fun `already linked wallets and already claimed accounts are left alone`() {
         val shadows = listOf(shadow(100, "Koinly · Binance"), shadow(101, "Koinly · Coinbase"))
         val links = listOf(ReconciliationLink(AccountId(100), AccountId(4)))

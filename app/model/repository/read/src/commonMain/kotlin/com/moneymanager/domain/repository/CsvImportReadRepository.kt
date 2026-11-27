@@ -2,6 +2,7 @@ package com.moneymanager.domain.repository
 
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportId
+import com.moneymanager.domain.model.SqliteRowRef
 import com.moneymanager.domain.model.TradeId
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.TransferId
@@ -9,6 +10,7 @@ import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.PdfImportSource
 import com.moneymanager.domain.model.csv.PdfTextLine
+import com.moneymanager.domain.model.csv.SqliteImportFile
 import com.moneymanager.domain.model.csv.XlsxImportBlob
 import kotlinx.coroutines.flow.Flow
 
@@ -82,6 +84,13 @@ interface CsvImportReadRepository {
     suspend fun getXlsxBlob(id: CsvImportId): XlsxImportBlob?
 
     /** The file and its text lines for a PDF-backed import, or null for any other. */
+    suspend fun getSqliteFile(id: CsvImportId): SqliteImportFile?
+
+    suspend fun getSqliteRefs(
+        id: CsvImportId,
+        rowIndex: Long,
+    ): List<SqliteRowRef>
+
     suspend fun getPdfSource(id: CsvImportId): PdfImportSource?
 
     /**

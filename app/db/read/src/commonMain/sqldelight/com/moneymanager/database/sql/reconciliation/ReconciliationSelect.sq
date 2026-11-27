@@ -169,3 +169,10 @@ selectLegsForAccounts:
     FROM trade td
     JOIN asset_details ad ON ad.id = td.from_asset_id
     WHERE td.from_account_id IN :accountIds;
+
+-- SQLite strategies become reconciliation sources after an original database has been applied.
+selectAppliedSqliteStrategyIds:
+SELECT DISTINCT application.strategy_id
+FROM csv_import_application application
+JOIN import_sqlite_file file ON file.csv_import_id = application.csv_import_id
+WHERE application.strategy_id IS NOT NULL;

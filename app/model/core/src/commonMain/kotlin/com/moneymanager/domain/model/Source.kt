@@ -44,11 +44,24 @@ sealed interface Source {
      * known. [statementAccountId] is the account whose statement the row is (see [Source.statementAccountId]), which the
      * engine sets from the transfer's `statementAccount`.
      */
+    sealed interface File : Source {
+        val importId: CsvImportId
+        val rowIndex: Long?
+        val statementAccountId: AccountId?
+    }
+
     data class Csv(
-        val importId: CsvImportId,
-        val rowIndex: Long? = null,
-        val statementAccountId: AccountId? = null,
-    ) : Source
+        override val importId: CsvImportId,
+        override val rowIndex: Long? = null,
+        override val statementAccountId: AccountId? = null,
+    ) : File
+
+    data class Sqlite(
+        override val importId: CsvImportId,
+        override val rowIndex: Long? = null,
+        val records: List<SqliteRowRef> = emptyList(),
+        override val statementAccountId: AccountId? = null,
+    ) : File
 
     /**
      * Created during an API import. [requestId]/[jsonPath] pinpoint the originating response node when
@@ -77,6 +90,7 @@ fun Source.toSourceType(): SourceType =
         Source.Unmerge -> SourceType.MERGE_UNDO
         Source.Reconciliation -> SourceType.RECONCILIATION
         Source.Reconciler -> SourceType.RECONCILER
+        is Source.Sqlite -> SourceType.SQLITE_IMPORT
         is Source.Csv -> SourceType.CSV_IMPORT
         is Source.Api -> SourceType.API
     }
@@ -90,7 +104,7 @@ fun Source.toSourceType(): SourceType =
 val Source.statementAccountId: AccountId?
     get() =
         when (this) {
-            is Source.Csv -> statementAccountId
+            is Source.File -> statementAccountId
             is Source.Api -> statementAccountId
             else -> null
         }
@@ -98,6 +112,7 @@ val Source.statementAccountId: AccountId?
 /** This source with [account] as its [statementAccountId]; only an import's sources carry one. */
 fun Source.withStatementAccount(account: AccountId): Source =
     when (this) {
+        is Source.Sqlite -> copy(statementAccountId = account)
         is Source.Csv -> copy(statementAccountId = account)
         is Source.Api -> copy(statementAccountId = account)
         else -> this

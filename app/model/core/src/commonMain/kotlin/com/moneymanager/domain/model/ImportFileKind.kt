@@ -15,10 +15,11 @@ enum class ImportFileKind(
     OFX("OFX"),
     XLSX("Excel"),
     PDF("PDF"),
+    SQLITE("SQLite"),
     ;
 
-    /** Excel and PDF are read as bytes; decoding them as text would corrupt them. */
-    val isBinary: Boolean get() = this == XLSX || this == PDF
+    /** Binary formats are stored or checksummed as bytes. */
+    val isBinary: Boolean get() = this == XLSX || this == PDF || this == SQLITE
 
     /**
      * QIF and OFX are documents: parsed into a fixed column set (one row per transaction) and matched to a strategy
@@ -34,6 +35,7 @@ fun importFileKind(fileName: String): ImportFileKind? =
         "qif" -> ImportFileKind.QIF
         "ofx" -> ImportFileKind.OFX
         "xlsx" -> ImportFileKind.XLSX
+        "sqlite", "sqlite3", "db", "gnucash" -> ImportFileKind.SQLITE
         "pdf" -> ImportFileKind.PDF
         else -> null
     }

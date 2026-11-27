@@ -18,6 +18,7 @@ import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.calendar.HolidayCalendar
 import com.moneymanager.domain.model.csv.CsvRowLink
 import com.moneymanager.domain.model.csv.PdfImportSource
+import com.moneymanager.domain.model.csv.SqliteImportFile
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.observation.ObservationId
@@ -226,6 +227,7 @@ sealed interface CsvImportMutation {
         val xlsxWorksheetName: String? = null,
         // Non-null only for a PDF import: the file and the text lines [rows] were staged from.
         val pdf: PdfImportSource? = null,
+        val sqlite: SqliteImportFile? = null,
     ) : CsvImportMutation {
         // ByteArray uses reference equality by default; override with structural (contentEquals)
         // comparison so this mutation compares correctly in tests/state diffing.
@@ -241,7 +243,7 @@ sealed interface CsvImportMutation {
                         fileLastModified == other.fileLastModified &&
                         xlsxBytes.contentEquals(other.xlsxBytes) &&
                         xlsxWorksheetName == other.xlsxWorksheetName &&
-                        pdf == other.pdf
+                        pdf == other.pdf && sqlite == other.sqlite
                 )
 
         override fun hashCode(): Int {
@@ -254,6 +256,7 @@ sealed interface CsvImportMutation {
             result = 31 * result + (xlsxBytes?.contentHashCode() ?: 0)
             result = 31 * result + xlsxWorksheetName.hashCode()
             result = 31 * result + pdf.hashCode()
+            result = 31 * result + sqlite.hashCode()
             return result
         }
     }
@@ -274,6 +277,7 @@ sealed interface CsvImportMutation {
         val rows: List<List<String>>,
         val worksheetName: String? = null,
         val pdfRulesHash: String? = null,
+        val sqliteQuery: String? = null,
     ) : CsvImportMutation
 
     /**
@@ -291,6 +295,7 @@ sealed interface CsvImportMutation {
         val rowIndexRemap: Map<Long, Long> = emptyMap(),
         val xlsxBytes: ByteArray? = null,
         val pdf: PdfImportSource? = null,
+        val sqlite: SqliteImportFile? = null,
     ) : CsvImportMutation
 
     /** Toggles the "ignored" flag; ignored files are hidden from the actionable lists. */

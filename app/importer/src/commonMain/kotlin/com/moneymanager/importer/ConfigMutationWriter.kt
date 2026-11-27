@@ -254,13 +254,14 @@ internal class ConfigMutationWriter(
                             m.xlsxBytes,
                             m.xlsxWorksheetName,
                             m.pdf,
+                            m.sqlite,
                         ),
                         "CsvImport",
                     )
                 }
 
                 is CsvImportMutation.Restage -> {
-                    csvImportRepository.restageImport(m.id, m.headers, m.rows, m.worksheetName, m.pdfRulesHash)
+                    csvImportRepository.restageImport(m.id, m.headers, m.rows, m.worksheetName, m.pdfRulesHash, m.sqliteQuery)
                 }
 
                 is CsvImportMutation.Repopulate -> {
@@ -274,6 +275,7 @@ internal class ConfigMutationWriter(
                         m.rowIndexRemap,
                         m.xlsxBytes,
                         m.pdf,
+                        m.sqlite,
                     )
                 }
 

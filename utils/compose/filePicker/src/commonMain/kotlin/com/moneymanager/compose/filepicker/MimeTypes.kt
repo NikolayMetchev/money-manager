@@ -15,6 +15,7 @@ internal fun mimeTypesToExtensions(mimeTypes: List<String>): List<String> =
                 "text/tab-separated-values" -> listOf(".tsv")
                 "application/vnd.ms-excel" -> listOf(".csv", ".xls")
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" -> listOf(".xlsx")
+                "application/vnd.sqlite3" -> listOf(".sqlite", ".sqlite3", ".db", ".gnucash")
                 "application/pdf" -> listOf(".pdf")
                 "application/x-pem-file" -> listOf(".pem", ".key")
                 else -> emptyList()

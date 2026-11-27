@@ -76,6 +76,8 @@ data class ReconciliationResult(
     val unclaimedReal: List<UnmatchedRealLeg> = emptyList(),
     /** Each linked wallet's link group (see [linkGroups]); a real leg's [UnmatchedRealLeg.walletAccountId] is its group. */
     val groupOfWallet: Map<AccountId, AccountId> = emptyMap(),
+    /** Movements on linkable wallets that lack a comparison account. */
+    val unlinkedLegs: List<ReconciliationLeg> = emptyList(),
 ) {
     /** Whether [a] and [b] are wallets of one link group, so a real leg either can be matched to belongs to both. */
     fun sameGroup(

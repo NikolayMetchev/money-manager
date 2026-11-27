@@ -180,6 +180,7 @@ internal fun buildStrategyFromEditorState(
                         ?.takeIf { it.isNotBlank() }
                         ?.let { AttributeAccountMatch(column = it, attributeTypeName = state.fundingMatchAttributeTypeName) },
                 legGroups = state.legGroups,
+                sqliteQuery = state.sqliteQuery.trim().takeIf { it.isNotEmpty() },
                 pdfLines = state.pdfLineRules?.let { PdfLineConfig(it) },
                 reconciliation =
                     state.reconciliationSourceName.trim().takeIf { it.isNotEmpty() }?.let { source ->

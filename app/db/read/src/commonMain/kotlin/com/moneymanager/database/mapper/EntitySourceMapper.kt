@@ -30,6 +30,7 @@ fun SelectEntitySources.toSourceRecord(entityType: EntityType): SourceRecord? =
             csvImportId = csv_import_id,
             csvRowIndex = csv_row_index,
             csvFileName = csv_file_name,
+            sqliteRefs = refs_json,
             apiSessionId = api_session_id,
             apiRequestId = api_request_id,
             apiJsonPath = api_json_path,

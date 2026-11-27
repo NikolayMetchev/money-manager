@@ -86,6 +86,19 @@ internal fun GeneralTab(
         )
 
         Spacer(modifier = Modifier.height(16.dp))
+        OutlinedTextField(
+            value = state.sqliteQuery,
+            onValueChange = { state.sqliteQuery = it },
+            label = { Text("SQLite SELECT query (optional)") },
+            supportingText = {
+                Text(
+                    "Return the import columns and source_rows, a JSON array of {table, key} references. Set the shadow source under Advanced.",
+                )
+            },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = enabled,
+        )
+        Spacer(modifier = Modifier.height(16.dp))
         Text("Description Column", style = MaterialTheme.typography.titleSmall)
         ColumnDropdown(
             columns = csvColumns,

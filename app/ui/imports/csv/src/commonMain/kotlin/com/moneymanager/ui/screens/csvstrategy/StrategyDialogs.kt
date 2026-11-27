@@ -122,11 +122,12 @@ fun DeleteCsvStrategyDialog(
 }
 
 /** The kind of staged file a strategy reads, and so the sample files its editor offers. */
-enum class SampleFileKind { CSV, PDF, QIF, OFX }
+enum class SampleFileKind { CSV, PDF, QIF, OFX, SQLITE }
 
 /** The sample files a strategy reading [documentKind] (QIF or OFX) is edited against; null for any other strategy. */
 fun sampleFileKindOf(documentKind: ImportFileKind?): SampleFileKind? =
     when (documentKind) {
+        ImportFileKind.SQLITE -> SampleFileKind.SQLITE
         ImportFileKind.QIF -> SampleFileKind.QIF
         ImportFileKind.OFX -> SampleFileKind.OFX
         ImportFileKind.CSV, ImportFileKind.XLSX, ImportFileKind.PDF, null -> null

@@ -9,6 +9,7 @@ import com.moneymanager.csvimporter.BulkFileOutcome
 import com.moneymanager.csvimporter.BulkFileStatus
 import com.moneymanager.csvimporter.BulkReimportResult
 import com.moneymanager.csvimporter.DirectoryRedownloadResult
+import com.moneymanager.domain.model.ImportFileKind
 import com.moneymanager.domain.model.importFileKind
 import com.moneymanager.importdirectory.ImportAllResult
 import com.moneymanager.importengineapi.ImportPlan
@@ -264,7 +265,7 @@ private fun BulkFileOutcome.toJson() =
     FileImportJson(
         id = fileId,
         file = fileName,
-        format = importFileKind(fileName)?.takeIf { it.isDocument }?.name?.lowercase() ?: "csv",
+        format = importFileKind(fileName)?.takeIf { it.isDocument || it == ImportFileKind.SQLITE }?.name?.lowercase() ?: "csv",
         status =
             when (status) {
                 BulkFileStatus.IMPORTED -> "imported"

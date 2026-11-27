@@ -2,6 +2,7 @@ package com.moneymanager.csvimporter
 
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.ImportFileKind
+import com.moneymanager.domain.model.csv.SqliteImportFile
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.createCsvImport
@@ -52,6 +53,11 @@ suspend fun ImportEngine.stageImportFile(
 
             ImportFileKind.XLSX -> {
                 stageXlsx(fileName, bytes, checksum, lastModified)
+            }
+
+            ImportFileKind.SQLITE -> {
+                sqliteTables(bytes)
+                createCsvImport(fileName, emptyList(), emptyList(), checksum, lastModified, SqliteImportFile(bytes, null))
             }
 
             ImportFileKind.PDF -> {

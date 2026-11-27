@@ -42,7 +42,7 @@ class TransferSourceReadRepositoryImpl(
     override suspend fun getTransfersCreatedBy(importSource: Source): Map<TransferId, Source> =
         withContext(Dispatchers.Default) {
             when (importSource) {
-                is Source.Csv -> {
+                is Source.File -> {
                     queries
                         .selectCreatedTransferRowsByCsvImport(importSource.importId.id.toString())
                         .awaitAsList()
@@ -69,7 +69,7 @@ class TransferSourceReadRepositoryImpl(
         withContext(Dispatchers.Default) {
             val records =
                 when (importSource) {
-                    is Source.Csv -> {
+                    is Source.File -> {
                         queries
                             .selectCreatedTradeRowsByCsvImport(importSource.importId.id.toString())
                             .awaitAsList()

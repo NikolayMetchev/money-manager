@@ -24,14 +24,18 @@ import com.moneymanager.csvimporter.AttributeAccountMatcher
 import com.moneymanager.csvimporter.CsvImportResult
 import com.moneymanager.csvimporter.ImportPreparation
 import com.moneymanager.csvimporter.TransferMapper
+import com.moneymanager.csvimporter.accountsVisibleTo
 import com.moneymanager.csvimporter.buildCreatedAccountNameOverrides
+import com.moneymanager.csvimporter.buildCsvMapper
 import com.moneymanager.csvimporter.buildPendingAccountMappings
 import com.moneymanager.csvimporter.crossFileLegRows
 import com.moneymanager.csvimporter.ensureCryptoAssets
 import com.moneymanager.csvimporter.hasBlankNewAccountNames
 import com.moneymanager.csvimporter.runCsvImport
 import com.moneymanager.csvimporter.selectForCsv
+import com.moneymanager.csvimporter.supportsFile
 import com.moneymanager.domain.Maintenance
+import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CryptoAsset
 import com.moneymanager.domain.model.accountmapping.AccountMapping
@@ -92,10 +96,15 @@ fun ApplyStrategyDialog(
     onImportComplete: (CsvImportResult) -> Unit,
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
-    val strategies by csvImportStrategyRepository
+    val allStrategies by csvImportStrategyRepository
         .getAllStrategies()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val accounts by accountRepository
+    val strategies =
+        allStrategies.filter {
+            it.supportsFile(csvImport.originalFileName) &&
+                (it.config.sqliteQuery == null || it.matchesColumns(csvImport.columns.map { column -> column.originalName }.toSet()))
+        }
+    val allAccounts by accountRepository
         .getAllAccounts()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     val currencies by currencyRepository
@@ -110,6 +119,11 @@ fun ApplyStrategyDialog(
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
     var selectedStrategy by remember { mutableStateOf<CsvImportStrategy?>(null) }
+    var shadowAccounts by remember(selectedStrategy) { mutableStateOf(emptyList<Account>()) }
+    LaunchedEffect(selectedStrategy, allAccounts) {
+        selectedStrategy?.takeIf { it.config.reconciliation != null }?.let { shadowAccounts = accountRepository.accountsVisibleTo(it) }
+    }
+    val accounts = if (selectedStrategy?.config?.reconciliation == null) allAccounts else shadowAccounts
     var selectedSourceAccountId by remember { mutableStateOf<AccountId?>(null) }
     var baseImportPreparation by remember { mutableStateOf<ImportPreparation?>(null) }
     var importPreparation by remember { mutableStateOf<ImportPreparation?>(null) }
@@ -403,6 +417,7 @@ fun ApplyStrategyDialog(
                                     importEngine = importEngine,
                                     cryptoRepository = cryptoRepository,
                                 )
+                            val cryptoAssetsAtPreview = cryptoAssets
                             cryptoAssets = resolvedCrypto
                             val result =
                                 runCsvImport(
@@ -410,7 +425,24 @@ fun ApplyStrategyDialog(
                                     rows = rowsToProcess,
                                     columns = csvImport.columns,
                                     strategy = strategy,
-                                    basePrep = basePrep,
+                                    basePrep =
+                                        if (resolvedCrypto == cryptoAssetsAtPreview) {
+                                            basePrep
+                                        } else {
+                                            buildCsvMapper(
+                                                strategy,
+                                                csvImport.columns,
+                                                accounts,
+                                                currencies,
+                                                accountMappings,
+                                                selectedSourceAccountId,
+                                                passThroughAccounts,
+                                                historicalAccountNames,
+                                                resolvedCrypto,
+                                                assetAliases = cryptoRepository.assetAliasMap(),
+                                                fileName = csvImport.originalFileName,
+                                            ).prepareImport(rowsToProcess)
+                                        },
                                     foreignFiles = crossFileLegRows(csvImport, strategy, csvImportRepository),
                                     tradeRepository = tradeRepository,
                                     selectedExistingAccounts = selectedExistingAccounts,

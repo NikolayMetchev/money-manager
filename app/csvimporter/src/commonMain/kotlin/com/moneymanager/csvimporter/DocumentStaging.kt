@@ -18,7 +18,7 @@ fun parseDocumentAsCsv(
     when (kind) {
         ImportFileKind.QIF -> parseQifAsCsv(bytes.decodeToString())
         ImportFileKind.OFX -> parseOfxAsCsv(bytes)
-        ImportFileKind.CSV, ImportFileKind.XLSX, ImportFileKind.PDF -> null
+        ImportFileKind.CSV, ImportFileKind.XLSX, ImportFileKind.PDF, ImportFileKind.SQLITE -> null
     }
 
 /**

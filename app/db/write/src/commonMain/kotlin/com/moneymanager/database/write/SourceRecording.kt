@@ -26,13 +26,17 @@ suspend fun MoneyManagerDatabaseWrapper.recordSource(
 ) {
     // INSERT OR IGNORE: a source for this (entity, revision) may already exist (e.g. re-runs); keep it.
     val existed = entitySourceSelectQueries.selectEntitySourceForRevision(entityType.id, entityId, revisionId).awaitAsOneOrNull() != null
-    entitySourceWriteQueries.insertSource(
-        entity_type_id = entityType.id,
-        entity_id = entityId,
-        revision_id = revisionId,
-        source_type_id = source.toSourceType().id.toLong(),
-        device_id = deviceId.id,
-    )
+    if (source is Source.File) {
+        entitySourceWriteQueries.insertFileEntitySource(entityType.id, entityId, revisionId, source.importId.id.toString(), deviceId.id)
+    } else {
+        entitySourceWriteQueries.insertSource(
+            entity_type_id = entityType.id,
+            entity_id = entityId,
+            revision_id = revisionId,
+            source_type_id = source.toSourceType().id.toLong(),
+            device_id = deviceId.id,
+        )
+    }
     // Only on the row this call wrote: a kept row is an earlier writer's, and its statement account (or none) is its own.
     val statementAccount = source.statementAccountId
     if (!existed && statementAccount != null) {
@@ -46,9 +50,11 @@ suspend fun MoneyManagerDatabaseWrapper.recordSource(
         // category derived from the import as a whole (the row/record index stays null). Guard on the
         // persisted source type (mirroring the API branch): INSERT OR IGNORE above keeps any pre-existing
         // row for this (entity, revision), so only attach CSV detail when that row is actually CSV.
-        is Source.Csv -> {
+        is Source.File -> {
             val entitySource = entitySourceSelectQueries.selectEntitySourceForRevision(entityType.id, entityId, revisionId).awaitAsOne()
-            if (entitySource.source_type_id == SourceType.CSV_IMPORT.id.toLong()) {
+            if (entitySource.source_type_id == SourceType.CSV_IMPORT.id.toLong() ||
+                entitySource.source_type_id == SourceType.SQLITE_IMPORT.id.toLong()
+            ) {
                 entitySourceWriteQueries.insertCsvSource(
                     id = entitySource.id,
                     csv_import_id = source.importId.id.toString(),

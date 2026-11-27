@@ -118,6 +118,7 @@ SELECT
     csv_entity_source.csv_import_id,
     csv_entity_source.csv_row_index,
     csv_import_metadata.original_file_name AS csv_file_name,
+    import_sqlite_row.refs_json,
     api_entity_source.api_session_id,
     api_entity_source.api_request_id,
     api_entity_source.json_path AS api_json_path
@@ -125,6 +126,8 @@ FROM entity_source
 JOIN source_type ON entity_source.source_type_id = source_type.id
 JOIN device_view ON entity_source.device_id = device_view.id
 LEFT JOIN csv_entity_source ON entity_source.id = csv_entity_source.id
+LEFT JOIN import_sqlite_row ON import_sqlite_row.csv_import_id = csv_entity_source.csv_import_id
+    AND import_sqlite_row.row_index = csv_entity_source.csv_row_index
 LEFT JOIN csv_import_metadata ON csv_entity_source.csv_import_id = csv_import_metadata.id
 LEFT JOIN api_entity_source ON entity_source.id = api_entity_source.id
 WHERE entity_source.entity_type_id = :entityTypeId AND entity_source.entity_id = :entityId

@@ -106,7 +106,7 @@ class StrategyLibraryService(
         json: String,
     ): StrategyParseResult =
         when (key.kind) {
-            StrategyKind.CSV, StrategyKind.QIF, StrategyKind.OFX, StrategyKind.XLSX, StrategyKind.PDF -> {
+            StrategyKind.CSV, StrategyKind.QIF, StrategyKind.OFX, StrategyKind.XLSX, StrategyKind.PDF, StrategyKind.SQLITE -> {
                 val export = CsvStrategyExportCodec.decode(json)
                 val refs = csvStrategyExportService.parseExport(export).unresolvedReferences
                 StrategyParseResult(key, refs)
@@ -143,7 +143,7 @@ class StrategyLibraryService(
         resolutions: Map<CsvUnresolvedReference, CsvResolution>,
     ) {
         when (key.kind) {
-            StrategyKind.CSV, StrategyKind.QIF, StrategyKind.OFX, StrategyKind.XLSX, StrategyKind.PDF -> {
+            StrategyKind.CSV, StrategyKind.QIF, StrategyKind.OFX, StrategyKind.XLSX, StrategyKind.PDF, StrategyKind.SQLITE -> {
                 applyCsv(
                     key.name,
                     json,

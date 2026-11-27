@@ -33,6 +33,8 @@ enum class SourceType(
 
     /** Written by the observation matcher: the exclusion links of shape-changing matches */
     RECONCILER(10),
+
+    SQLITE_IMPORT(11),
     ;
 
     companion object {

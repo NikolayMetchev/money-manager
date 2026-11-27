@@ -26,10 +26,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.csv.CsvParseResult
+import com.moneymanager.csvimporter.previewSqliteQuery
 import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.accountmapping.AccountMapping
 import com.moneymanager.domain.model.csv.CsvColumn
+import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.PdfTextLine
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
@@ -58,6 +61,7 @@ import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.screens.accountmapping.AccountMappingEditorDialog
 import com.moneymanager.ui.screens.csvstrategy.ColumnDetector
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -192,8 +196,35 @@ fun CsvStrategyEditorScreen(
     val editKey = strategyId?.toString() ?: "create:${csvImportId?.toString() ?: "external"}"
     val state = rememberCsvStrategyEditorState(editKey, existingStrategy, availableColumnNames, pdf = previewer != null)
     val pdfPreview = previewer?.let { remember(it, state.pdfLineRules) { it.preview(state.pdfLineRules.orEmpty()) } }
-    val csvColumns = pdfPreview?.columns ?: importColumns
-    val rows = pdfPreview?.rows ?: importRows
+    var sqliteSample by remember(editKey) { mutableStateOf<CsvParseResult?>(null) }
+    LaunchedEffect(csvImportId, state.sqliteQuery) {
+        sqliteSample = null
+        val query = state.sqliteQuery
+        if (csvImportId == null || query.isBlank()) return@LaunchedEffect
+        delay(400)
+        val snapshot = csvImportRepository.getSqliteFile(csvImportId) ?: return@LaunchedEffect
+        try {
+            val sample = previewSqliteQuery(snapshot.bytes, query)
+            sqliteSample = sample
+            if (!isEditMode) state.identificationColumns = sample.headers.toSet()
+            state.errorMessage = null
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: IllegalArgumentException) {
+            state.errorMessage = failure.message
+        }
+    }
+    val sample = sqliteSample
+    val csvColumns =
+        remember(sample, pdfPreview, importColumns) {
+            sample?.headers?.mapIndexed { i, name -> CsvColumn(CsvColumnId(Uuid.random()), i, name) } ?: pdfPreview?.columns
+                ?: importColumns
+        }
+    val rows =
+        remember(sample, pdfPreview, importRows) {
+            sample?.rows?.mapIndexed { i, row -> CsvRow(i + 1L, row) } ?: pdfPreview?.rows
+                ?: importRows
+        }
 
     val firstRow = rows.firstOrNull()
 

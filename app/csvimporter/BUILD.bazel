@@ -25,13 +25,18 @@ kmp_library(
     name = "csvimporter",
     android = True,
     android_deps = ["@maven_kmp//:cryptography_provider_jdk"],
+    android_srcs = glob(["src/androidMain/kotlin/**/*.kt"]),
     common_srcs = glob(["src/commonMain/kotlin/**/*.kt"]),
     forbidden_deps = [
         "//app/db/core",
         "//app/di/core",
         "//app/ui/core",
     ],
-    jvm_deps = ["@maven_kmp//:cryptography_provider_jdk"],
+    jvm_deps = [
+        "@maven_kmp//:cryptography_provider_jdk",
+        "@maven_kmp//:org_xerial_sqlite_jdbc",
+    ],
+    jvm_srcs = glob(["src/jvmMain/kotlin/**/*.kt"]),
     keep_deps = [
         "@maven_kmp//:cryptography_provider_jdk",
         "@maven_kmp//:cryptography_provider_openssl3_prebuilt",
@@ -44,6 +49,7 @@ kmp_library(
         "macosArm64",
         "mingwX64",
     ],
+    non_jvm_srcs = glob(["src/nonJvmMain/kotlin/**/*.kt"]),
     visibility = ["//visibility:public"],
     web_deps = ["@maven_kmp//:cryptography_provider_webcrypto"],
     web_targets = [

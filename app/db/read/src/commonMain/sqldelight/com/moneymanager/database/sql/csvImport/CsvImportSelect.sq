@@ -166,3 +166,12 @@ SELECT COUNT(*) FROM pdf_import_blob WHERE csv_import_id = ?;
 
 selectPdfLines:
 SELECT page, line, text FROM pdf_import_line WHERE csv_import_id = ? ORDER BY page, line;
+
+selectSqliteFile:
+SELECT import_sqlite_file.file_bytes, import_sqlite_projection.staged_query
+FROM import_sqlite_file
+LEFT JOIN import_sqlite_projection USING (csv_import_id)
+WHERE import_sqlite_file.csv_import_id = ?;
+
+selectSqliteRefs:
+SELECT refs_json FROM import_sqlite_row WHERE csv_import_id = ? AND row_index = ?;

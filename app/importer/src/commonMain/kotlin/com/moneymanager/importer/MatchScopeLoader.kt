@@ -66,7 +66,7 @@ class MatchScopeLoader(
     /** The strategy family of an incoming record, using the same provenance as stored observations. */
     suspend fun familyOf(source: Source): String? =
         when (source) {
-            is Source.Csv -> csvFamily(source.importId)
+            is Source.File -> csvFamily(source.importId)
             is Source.Api -> apiFamily(source.sessionId)
             else -> null
         }

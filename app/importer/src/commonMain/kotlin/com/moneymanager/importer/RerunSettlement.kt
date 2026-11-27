@@ -237,7 +237,7 @@ internal class RerunSettlement(
         deletingSources: Set<Source>,
     ): Set<TransactionId> {
         val observations = observationRepository
-        val csvImports = deletingSources.filterIsInstance<Source.Csv>().mapTo(mutableSetOf()) { it.importId }
+        val csvImports = deletingSources.filterIsInstance<Source.File>().mapTo(mutableSetOf()) { it.importId }
         val apiSessions = deletingSources.filterIsInstance<Source.Api>().mapTo(mutableSetOf()) { it.sessionId }
         return observations.getTransactionsObservedByOtherRecords(ids, csvImports, apiSessions)
     }
@@ -320,4 +320,4 @@ internal class RerunSettlement(
     }
 }
 
-private fun Source.isImport(): Boolean = this is Source.Csv || this is Source.Api
+private fun Source.isImport(): Boolean = this is Source.File || this is Source.Api

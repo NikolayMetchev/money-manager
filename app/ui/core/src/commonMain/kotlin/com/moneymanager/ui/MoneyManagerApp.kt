@@ -461,7 +461,7 @@ fun MoneyManagerApp(
                             // Opens what a source names: its file row, its API item, or the file or session as a whole.
                             val onSourceClick: (Source) -> Unit = { source ->
                                 when (source) {
-                                    is Source.Csv -> {
+                                    is Source.File -> {
                                         val rowIndex = source.rowIndex
                                         if (rowIndex != null) {
                                             onCsvSourceClick(source.importId, rowIndex)
@@ -789,7 +789,7 @@ fun MoneyManagerApp(
                                                                 }
                                                             }.sortedBy { it.revisionId }.map { it.source }
                                                         (
-                                                            sources.firstOrNull { it is Source.Csv }
+                                                            sources.firstOrNull { it is Source.File }
                                                                 ?: sources.firstOrNull { it is Source.Api }
                                                         )?.let(onSourceClick)
                                                     }

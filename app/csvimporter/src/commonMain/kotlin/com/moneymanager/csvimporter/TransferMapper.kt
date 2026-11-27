@@ -190,6 +190,8 @@ class TransferMapper(
                 passThrough?.let { accounts.resolveExistingAccountId(it.conduitName) ?: UNRESOLVED_ACCOUNT_ID } ?: sides.counterpartyId
             val effectiveSourceAccountId = if (flipAccounts) otherAccount else sides.ownId
             val effectiveTargetAccountId = if (flipAccounts) sides.ownId else otherAccount
+            accounts.requireVisible(effectiveSourceAccountId)
+            accounts.requireVisible(effectiveTargetAccountId)
             // Single-account trades and uncreated accounts can legitimately share an ID.
             val tradeLegOfOneAccount = legDetection?.leg?.let { strategy.config.legGroups[it.ruleIndex].isCrossFileTrade() } == true
             if (tradeTo == null &&

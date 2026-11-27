@@ -25,6 +25,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.InputChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
@@ -36,6 +37,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -76,6 +78,7 @@ import com.moneymanager.reconciliation.createAndLinkAccounts
 import com.moneymanager.reconciliation.planAccountCreation
 import com.moneymanager.reconciliation.planAutoLinks
 import com.moneymanager.reconciliation.planCopy
+import com.moneymanager.reconciliation.planSuggestedLinks
 import com.moneymanager.reconciliation.realAccounts
 import com.moneymanager.reconciliation.reconcile
 import com.moneymanager.reconciliation.unlinkedWallets
@@ -90,6 +93,7 @@ import com.moneymanager.ui.util.displayDateTime
 import com.moneymanager.ui.util.formatAmount
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -200,11 +204,18 @@ private fun SourceReconciliation(
     val importEngine = LocalImportEngine.current
     val writeVersion by importEngine.writeVersion.collectAsState()
     val scope = rememberSchemaAwareCoroutineScope()
-    val allShadowAccounts by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
+    val loadedShadows by rememberFlowAsStateWithSchemaErrorHandling<List<ShadowAccount>?>(initial = null) {
         reconciliationRepository.getShadowAccounts()
     }
-    val allLinks by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) { reconciliationRepository.getLinks() }
-    val accounts by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) { accountRepository.getAllAccounts() }
+    val loadedLinks by rememberFlowAsStateWithSchemaErrorHandling<List<ReconciliationLink>?>(initial = null) {
+        reconciliationRepository.getLinks()
+    }
+    val loadedAccounts by rememberFlowAsStateWithSchemaErrorHandling<List<Account>?>(initial = null) {
+        accountRepository.getAllAccounts()
+    }
+    val allShadowAccounts = loadedShadows.orEmpty()
+    val allLinks = loadedLinks.orEmpty()
+    val accounts = loadedAccounts.orEmpty()
 
     val shadowAccounts = remember(allShadowAccounts, source) { allShadowAccounts.filter { it.sourceName == source.name } }
     val shadowIds = remember(shadowAccounts) { shadowAccounts.mapTo(mutableSetOf()) { it.accountId } }
@@ -215,14 +226,6 @@ private fun SourceReconciliation(
     val existingNames = remember(accounts) { accounts.mapTo(mutableSetOf()) { it.name } }
     var error by remember { mutableStateOf<String?>(null) }
 
-    // Link whatever can be linked with certainty as soon as new wallets or real accounts appear.
-    LaunchedEffect(source, shadowAccounts, links, real) {
-        val plan = planAutoLinks(source, shadowAccounts, links, real)
-        if (plan.isNotEmpty()) {
-            runCatchingUnlessCancelled { importEngine.applyAutoLinks(plan) }.onFailure { error = "Automatic linking failed: ${it.message}" }
-        }
-    }
-
     val taskManager = LocalTaskManager.current
     val tasks by taskManager.tasks.collectAsState()
     val bulkKey = "reconciliation-bulk-${source.name}"
@@ -231,7 +234,15 @@ private fun SourceReconciliation(
     val bulkTask = tasks.firstOrNull { it.key == bulkKey && it.isRunning }
     val bulkRunning = bulkSubmitted || bulkTask != null
 
+    var linkingAll by remember(source) { mutableStateOf(false) }
+    val writing = bulkRunning || linkingAll
+    val linkableIds =
+        remember(source, shadowAccounts) {
+            shadowAccounts.filter(source::isLinkable).mapTo(mutableSetOf()) { it.accountId }
+        }
+
     var refreshKey by remember { mutableStateOf(0) }
+    var walletRefreshKey by remember { mutableStateOf(0) }
 
     fun refresh() {
         cache.invalidate(source.name)
@@ -241,40 +252,107 @@ private fun SourceReconciliation(
     // The wallets and links the result was made for: the one shown at first may be a kept result for inputs not loaded yet.
     var resultFor by remember { mutableStateOf<Pair<Set<AccountId>, List<ReconciliationLink>>?>(null) }
     var progress by remember { mutableStateOf<Progress?>(null) }
-    LaunchedEffect(source, shadowIds, links, refreshKey, writeVersion, bulkRunning) {
+    val comparisonInputsLoaded = loadedShadows != null && loadedLinks != null
+    LaunchedEffect(source, shadowIds, links, refreshKey, writeVersion, writing, linkableIds, comparisonInputsLoaded) {
         // Each chunk bumps writeVersion. Reload once the bulk task has finished.
-        if (bulkRunning) return@LaunchedEffect
+        if (writing || !comparisonInputsLoaded) return@LaunchedEffect
         cache.get(source.name, shadowIds, links, writeVersion)?.let {
             result = it
             resultFor = shadowIds to links
             return@LaunchedEffect
-        }
-        // The flows above start empty, so these inputs may just not have loaded; keep what was shown until they do.
-        if (shadowIds.isEmpty() && links.isEmpty()) {
-            cache.peek(source.name, writeVersion)?.let {
-                result = it
-                return@LaunchedEffect
-            }
         }
         result = null
         progress = Progress("Loading ${source.name} transactions")
         val sourceLegs = reconciliationRepository.getLegs(shadowIds)
         progress = Progress("Loading Money Manager transactions")
         val realLegs = reconciliationRepository.getLegs(links.map { it.realAccountId }.toSet())
-        val computed = withContext(Dispatchers.Default) { reconcile(sourceLegs, links, realLegs, onProgress = { progress = it }) }
+        val computed =
+            withContext(Dispatchers.Default) {
+                val unlinkedIds = linkableIds - links.map { it.shadowAccountId }.toSet()
+                reconcile(sourceLegs, links, realLegs, onProgress = {
+                    ensureActive()
+                    progress = it
+                }).copy(unlinkedLegs = sourceLegs.filter { it.accountId in unlinkedIds && !it.isExcluded })
+            }
         cache.put(source.name, shadowIds, links, writeVersion, computed)
         result = computed
         resultFor = shadowIds to links
     }
 
-    val unlinked = remember(source, shadowAccounts, links, real) { unlinkedWallets(source, shadowAccounts, links, real) }
-    // One new real account per wallet still needing attention, named after the wallet.
-    val createPlan =
-        remember(source, unlinked, accounts) {
-            planAccountCreation(source, unlinked.filterNot { it.wallet.autoLinkDeclined }.map { it.wallet }, accounts)
+    val linkInputs =
+        if (loadedShadows == null || loadedLinks == null || loadedAccounts == null) {
+            null
+        } else {
+            WalletLinkInputs(source, shadowAccounts, links, real, accounts)
         }
+    var walletPlans by remember(cache, linkInputs, walletRefreshKey) {
+        mutableStateOf(linkInputs?.let(cache::getWalletPlans))
+    }
+    LaunchedEffect(cache, linkInputs, walletRefreshKey, writing) {
+        val inputs = linkInputs ?: return@LaunchedEffect
+        if (writing || walletPlans != null) return@LaunchedEffect
+        val (automatic, prepared) =
+            withContext(Dispatchers.Default) {
+                val automatic = planAutoLinks(source, shadowAccounts, links, real)
+                val unlinked = unlinkedWallets(source, shadowAccounts, links, real)
+                val creation = planAccountCreation(source, unlinked.filterNot { it.wallet.autoLinkDeclined }.map { it.wallet }, accounts)
+                automatic to
+                    WalletPlans(
+                        unlinked,
+                        creation,
+                        planSuggestedLinks(
+                            unlinked,
+                            links.mapTo(mutableSetOf()) { it.realAccountId } + automatic.values,
+                        ),
+                    )
+            }
+        walletPlans = prepared
+        runCatchingUnlessCancelled { importEngine.applyAutoLinks(automatic) }
+            .onSuccess { cache.putWalletPlans(inputs, prepared) }
+            .onFailure { error = "Automatic linking failed: ${it.message}" }
+    }
+    val unlinked = walletPlans?.unlinked.orEmpty()
+    val createPlan = walletPlans?.creation.orEmpty()
+    var accountSearch by rememberSaveable(source.name) { mutableStateOf("") }
+    val accountQuery = accountSearch.trim()
+    val linksByWallet = remember(links) { links.groupBy({ it.shadowAccountId }, { it.realAccountId }) }
+    val visibleUnlinked =
+        remember(unlinked, accountQuery) {
+            unlinked.filter { it.wallet.name.contains(accountQuery, ignoreCase = true) }
+        }
+    val visibleLinked =
+        remember(shadowAccounts, linksByWallet, accountNames, accountQuery) {
+            shadowAccounts
+                .filter { wallet ->
+                    val realIds = linksByWallet[wallet.accountId] ?: return@filter false
+                    wallet.name.contains(accountQuery, ignoreCase = true) ||
+                        realIds.any { accountNames[it]?.contains(accountQuery, ignoreCase = true) == true }
+                }.sortedBy { it.name.lowercase() }
+        }
+    val (withSuggestion, withoutSuggestion) = remember(visibleUnlinked) { visibleUnlinked.partition { it.suggestion != null } }
+    var suggestionTab by rememberSaveable(source.name) { mutableStateOf<Boolean?>(null) }
+    val showSuggestions = suggestionTab ?: unlinked.any { it.suggestion != null }
+    val walletsInTab = if (showSuggestions) withSuggestion else withoutSuggestion
+    val walletIdsInTab = remember(walletsInTab) { walletsInTab.mapTo(mutableSetOf()) { it.wallet.accountId } }
+    val visibleCreatePlan = remember(createPlan, walletIdsInTab) { createPlan.filterKeys { it in walletIdsInTab } }
+    val suggestedLinks = walletPlans?.suggested.orEmpty()
+    val visibleLinkPlan = remember(suggestedLinks, walletIdsInTab) { suggestedLinks.filterKeys { it in walletIdsInTab } }
     var hideUnknownAssets by rememberPersistedState("reconciliation.hideUnknownAssets", Boolean.serializer()) { true }
     var tab by rememberPersistedState("reconciliation.tab", ResultTab.serializer()) { ResultTab.UNMATCHED }
+    val walletNames =
+        remember(source, shadowAccounts, accountNames) {
+            accountNames + shadowAccounts.associate { it.accountId to source.walletName(it) }
+        }
+    var groups by remember(result, hideUnknownAssets, walletNames) { mutableStateOf<ReconciliationGroups?>(null) }
+    LaunchedEffect(result, hideUnknownAssets, walletNames) {
+        val comparison = result ?: return@LaunchedEffect
+        groups =
+            withContext(Dispatchers.Default) {
+                ReconciliationGroups(comparison, hideUnknownAssets) { walletNames[it].orEmpty() }
+            }
+    }
+    var showUnlinked by rememberSaveable(source.name) { mutableStateOf(false) }
+    var linkedOpen by remember(source, accountQuery.isNotEmpty()) { mutableStateOf(accountQuery.isNotEmpty()) }
     val expanded = remember(source) { mutableStateMapOf<String, Boolean>() }
     val listState = rememberLazyListState()
     // Where each row of the list is, as the list was last built, to scroll to the one a link named.
@@ -292,6 +370,7 @@ private fun SourceReconciliation(
         val at = locateLeaf(comparison, request.transactionId, hideUnknownAssets)
         if (at != null) {
             tab = at.tab
+            showUnlinked = at.prefix == "unlinked-source"
             val wallet = "${at.prefix}-${at.wallet.id}"
             expanded[wallet] = true
             expanded["$wallet-${at.month}"] = true
@@ -300,7 +379,8 @@ private fun SourceReconciliation(
         } else {
             // Not in any list (hidden, or not compared): at least open the wallet and month it belongs to.
             tab = ResultTab.UNMATCHED
-            listOf("near", "source-only", "mm-only", "accepted", "not-accepted", "ignored").forEach { prefix ->
+            showUnlinked = request.walletAccountId !in linksByWallet
+            listOf("near", "source-only", "unlinked-source", "mm-only", "accepted", "not-accepted", "ignored").forEach { prefix ->
                 val wallet = "$prefix-${request.walletAccountId.id}"
                 expanded[wallet] = true
                 expanded["$wallet-${request.month}"] = true
@@ -388,7 +468,7 @@ private fun SourceReconciliation(
         items: List<T>,
         apply: suspend (List<T>) -> Unit,
     ) {
-        if (bulkRunning) return
+        if (writing) return
         bulkSubmitted = true
         val id =
             taskManager.start(bulkKey, title, "Starting") {
@@ -427,16 +507,76 @@ private fun SourceReconciliation(
         }
     }
 
-    if (bulkRunning) ReconciliationProgress(bulkTask?.progress ?: Progress("Starting"))
+    fun linkAll() {
+        linkingAll = true
+        scope.launch {
+            try {
+                runCatchingUnlessCancelled { importEngine.applyAutoLinks(visibleLinkPlan) }
+                    .onSuccess { error = null }
+                    .onFailure { error = "Linking accounts failed: ${it.message}" }
+            } finally {
+                linkingAll = false
+            }
+        }
+    }
+
+    when {
+        bulkRunning -> ReconciliationProgress(bulkTask?.progress ?: Progress("Starting"))
+        linkingAll -> ReconciliationProgress(Progress("Linking suggested accounts"))
+        walletPlans == null -> ReconciliationProgress(Progress("Finding account links"))
+        result == null -> ReconciliationProgress(progress ?: Progress("Loading transactions"))
+        groups == null -> ReconciliationProgress(Progress("Grouping reconciliation results"))
+    }
 
     LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         IndexingScope(this, indexByKey).run {
-            item { SummaryHeader(source, result, hideUnknownAssets, onRefresh = { refresh() }) }
+            item {
+                SummaryHeader(source, result, hideUnknownAssets, onRefresh = {
+                    cache.invalidateWalletPlans(source.name)
+                    walletRefreshKey++
+                    refresh()
+                })
+            }
             error?.let { message ->
                 item { Text(message, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(vertical = 4.dp)) }
             }
+            if (unlinked.isNotEmpty() || linksByWallet.isNotEmpty() || accountSearch.isNotEmpty()) {
+                item(key = "account-search") {
+                    OutlinedTextField(
+                        value = accountSearch,
+                        onValueChange = { accountSearch = it },
+                        label = { Text("Search accounts") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    )
+                }
+                if (visibleUnlinked.isEmpty() && visibleLinked.isEmpty() && accountQuery.isNotEmpty()) {
+                    item { Text("No accounts match your search", modifier = Modifier.padding(vertical = 12.dp)) }
+                }
+            }
+            if (unlinked.isNotEmpty()) {
+                item(key = "wallet-suggestion-tabs") {
+                    SecondaryTabRow(selectedTabIndex = if (showSuggestions) 0 else 1, modifier = Modifier.padding(top = 8.dp)) {
+                        Tab(
+                            selected = showSuggestions,
+                            onClick = { suggestionTab = true },
+                            text = { Text("With suggestion (${withSuggestion.size})") },
+                        )
+                        Tab(
+                            selected = !showSuggestions,
+                            onClick = { suggestionTab = false },
+                            text = { Text("Without suggestion (${withoutSuggestion.size})") },
+                        )
+                    }
+                }
+                if (walletsInTab.isEmpty() && (accountQuery.isEmpty() || visibleUnlinked.isNotEmpty() || visibleLinked.isNotEmpty())) {
+                    item {
+                        Text("No wallets in this tab", modifier = Modifier.padding(vertical = 12.dp))
+                    }
+                }
+            }
             // Wallets the user deliberately unlinked aren't a problem to fix, just not compared.
-            val (declined, needsAttention) = unlinked.partition { it.wallet.autoLinkDeclined }
+            val (declined, needsAttention) = walletsInTab.partition { it.wallet.autoLinkDeclined }
             listOf(
                 needsAttention to "Needs attention: ${needsAttention.size} ${source.name} wallet(s) not linked to an account",
                 declined to "Not compared: ${declined.size} wallet(s) whose links you removed",
@@ -457,9 +597,17 @@ private fun SourceReconciliation(
                                 },
                             modifier = Modifier.weight(1f),
                         )
+                        if (wallets === needsAttention && visibleLinkPlan.isNotEmpty()) {
+                            TextButton(onClick = ::linkAll, enabled = !creatingAll && !writing) {
+                                Text("Link all (${visibleLinkPlan.size})")
+                            }
+                        }
                         if (wallets === needsAttention) {
-                            TextButton(onClick = { createAll(createPlan) }, enabled = createPlan.isNotEmpty() && !creatingAll) {
-                                Text("Create all (${createPlan.size})")
+                            TextButton(
+                                onClick = { createAll(visibleCreatePlan) },
+                                enabled = visibleCreatePlan.isNotEmpty() && !creatingAll && !writing,
+                            ) {
+                                Text("Create all (${visibleCreatePlan.size})")
                             }
                         }
                     }
@@ -473,33 +621,31 @@ private fun SourceReconciliation(
                         personRepository = personRepository,
                         existingNames = existingNames,
                         // "Create all" links in a second batch that would overwrite a link made meanwhile.
-                        enabled = !creatingAll,
+                        enabled = !creatingAll && !writing,
                         isReal = { it.id !in allShadowIds },
                         linkError = linkErrors[wallet.wallet.accountId],
                         onLink = { realId -> setLinks(wallet.wallet.accountId, setOf(realId)) },
                     )
                 }
             }
-            item {
-                LinkedWallets(
-                    source = source,
-                    shadowAccounts = shadowAccounts,
-                    links = links,
-                    accountNames = accountNames,
-                    counts = result?.countsByWallet(hideUnknownAssets).orEmpty(),
-                    accountRepository = accountRepository,
-                    categoryRepository = categoryRepository,
-                    personRepository = personRepository,
-                    isReal = { it.id !in allShadowIds },
-                    linkErrors = linkErrors,
-                    onSetLinks = ::setLinks,
-                )
-            }
-            val loaded = result
-            if (loaded == null) {
-                if (!bulkRunning) item { ReconciliationProgress(progress) }
-                return@run
-            }
+            linkedWallets(
+                source = source,
+                linked = visibleLinked,
+                linksByWallet = linksByWallet,
+                open = linkedOpen,
+                onToggle = { linkedOpen = !linkedOpen },
+                enabled = !creatingAll && !writing,
+                accountNames = accountNames,
+                counts = groups?.counts.orEmpty(),
+                accountRepository = accountRepository,
+                categoryRepository = categoryRepository,
+                personRepository = personRepository,
+                isReal = { it.id !in allShadowIds },
+                linkErrors = linkErrors,
+                onSetLinks = ::setLinks,
+            )
+            val loaded = result ?: return@run
+            val prepared = groups ?: return@run
             item {
                 SecondaryTabRow(selectedTabIndex = tab.ordinal, modifier = Modifier.padding(top = 12.dp)) {
                     ResultTab.entries.forEach { entry ->
@@ -507,122 +653,135 @@ private fun SourceReconciliation(
                     }
                 }
             }
-            val walletName: (AccountId) -> String = { id ->
-                shadowAccounts.firstOrNull { it.accountId == id }?.let(source::walletName) ?: accountNames[id].orEmpty()
-            }
             when (tab) {
                 ResultTab.UNMATCHED -> {
-                    sectionHeading("Near matches (${loaded.nearMatches.size})") {
-                        loaded.unstoredNearMatches().let { BulkButton("Accept all", it.size, enabled = !bulkRunning) { storeMatches(it) } }
-                    }
-                    legGroups(
-                        prefix = "near",
-                        groups =
-                            groupByWalletAndMonth(
-                                loaded.nearMatches,
-                                { it.sourceLeg.accountId },
-                                { it.sourceLeg.timestamp },
-                                walletName,
-                            ),
-                        expanded = expanded,
-                        leafIds = { match -> match.sourceLegs.map { it.transactionId } },
-                        highlight = highlightedLeaf,
-                        empty = "No near matches: every match agrees to the second.",
-                        headerAction = { _, wallet, month ->
-                            loaded
-                                .unstoredNearMatches(
-                                    wallet,
-                                    month,
-                                ).let { BulkButton("Accept all", it.size, enabled = !bulkRunning) { storeMatches(it) } }
-                        },
-                    ) { match ->
-                        MatchRow(match, accountNames, onOpenLeg) {
-                            TextButton(
-                                onClick = {
-                                    write(
-                                        "Matching",
-                                    ) { importEngine.acceptMatches(listOf(match.memberTransactions())) }
-                                },
-                                enabled = !bulkRunning,
-                            ) { Text("Accept") }
-                        }
-                    }
-                    val onlyInSource = loaded.missingInMm.filter { !hideUnknownAssets || !it.assetUnknownToMm }
-                    sectionHeading("Only in ${source.name} (${onlyInSource.size})") {
-                        BulkButton("Ignore all", onlyInSource.size, enabled = !bulkRunning) { ignoreAll(loaded.movementsOf(onlyInSource)) }
-                    }
                     item {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(checked = hideUnknownAssets, onCheckedChange = { hideUnknownAssets = it })
-                            Text("Hide assets Money Manager has never seen on the linked accounts (e.g. spam airdrops)")
+                        SecondaryTabRow(selectedTabIndex = if (showUnlinked) 1 else 0, modifier = Modifier.padding(top = 4.dp)) {
+                            Tab(
+                                selected = !showUnlinked,
+                                onClick = { showUnlinked = false },
+                                text = { Text("Linked accounts") },
+                            )
+                            Tab(
+                                selected = showUnlinked,
+                                onClick = { showUnlinked = true },
+                                text = { Text("Unlinked accounts (${loaded.unlinkedLegs.size})") },
+                            )
                         }
                     }
-                    legGroups(
-                        prefix = "source-only",
-                        groups = groupByWalletAndMonth(onlyInSource, { it.walletAccountId }, { it.leg.timestamp }, walletName),
-                        expanded = expanded,
-                        leafIds = { listOf(it.leg.transactionId) },
-                        highlight = highlightedLeaf,
-                        empty = "Everything ${source.name} has on the linked wallets is in Money Manager.",
-                        headerAction = {
-                            rows,
-                            _,
-                            _,
-                            ->
-                            BulkButton("Ignore all", rows.size, enabled = !bulkRunning) { ignoreAll(loaded.movementsOf(rows)) }
-                        },
-                    ) { unmatched ->
-                        LegRow(unmatched.leg, accountNames, onOpenLeg) {
-                            TextButton(
-                                onClick = { setIgnored(loaded.movementOf(unmatched), ignored = true) },
-                                enabled = !bulkRunning,
-                            ) { Text("Ignore") }
-                            TextButton(
-                                onClick = { pickerState.open(unmatched.pickerKey) },
-                                enabled = !bulkRunning,
-                            ) { Text("Select matching transactions…") }
+                    if (showUnlinked) {
+                        legGroups(
+                            prefix = "unlinked-source",
+                            groups = prepared.unlinked,
+                            expanded = expanded,
+                            leafIds = { listOf(it.transactionId) },
+                            highlight = highlightedLeaf,
+                            empty = "No transactions on unlinked wallets.",
+                        ) { LegRow(it, accountNames, onOpenLeg) }
+                    } else {
+                        sectionHeading("near", "Near matches (${prepared.nearCount})") {
+                            prepared.unstoredNear.let { BulkButton("Accept all", it.size, enabled = !writing) { storeMatches(it) } }
                         }
+                        legGroups(
+                            prefix = "near",
+                            groups = prepared.near,
+                            expanded = expanded,
+                            leafIds = { match -> match.sourceLegs.map { it.transactionId } },
+                            highlight = highlightedLeaf,
+                            empty = "No near matches: every match agrees to the second.",
+                            headerAction = { matches, _, _ ->
+                                val pending = remember(matches) { matches.filter { it.matchId == null } }
+                                BulkButton("Accept all", pending.size, enabled = !writing) { storeMatches(pending) }
+                            },
+                        ) { match ->
+                            MatchRow(match, accountNames, onOpenLeg) {
+                                TextButton(
+                                    onClick = {
+                                        write(
+                                            "Matching",
+                                        ) { importEngine.acceptMatches(listOf(match.memberTransactions())) }
+                                    },
+                                    enabled = !writing,
+                                ) { Text("Accept") }
+                            }
+                        }
+                        val onlyInSource = prepared.onlyInSource
+                        sectionHeading("source-only", "Only in ${source.comparisonLabel} (${onlyInSource.size})") {
+                            BulkButton("Ignore all", onlyInSource.size, enabled = !writing) { ignoreAll(loaded.movementsOf(onlyInSource)) }
+                        }
+                        item {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(checked = hideUnknownAssets, onCheckedChange = { hideUnknownAssets = it })
+                                Text("Hide assets Money Manager has never seen on the linked accounts (e.g. spam airdrops)")
+                            }
+                        }
+                        legGroups(
+                            prefix = "source-only",
+                            groups = prepared.source,
+                            expanded = expanded,
+                            leafIds = { listOf(it.leg.transactionId) },
+                            highlight = highlightedLeaf,
+                            empty = "Everything ${source.name} has on the linked wallets is in Money Manager.",
+                            headerAction = {
+                                rows,
+                                _,
+                                _,
+                                ->
+                                BulkButton("Ignore all", rows.size, enabled = !writing) { ignoreAll(loaded.movementsOf(rows)) }
+                            },
+                        ) { unmatched ->
+                            LegRow(unmatched.leg, accountNames, onOpenLeg) {
+                                TextButton(
+                                    onClick = { setIgnored(loaded.movementOf(unmatched), ignored = true) },
+                                    enabled = !writing,
+                                ) { Text("Ignore") }
+                                TextButton(
+                                    onClick = { pickerState.open(unmatched.pickerKey) },
+                                    enabled = !writing,
+                                ) { Text("Select matching transactions…") }
+                            }
+                        }
+                        sectionHeading("money-manager-only", "Only in Money Manager (${loaded.missingInSource.size})")
+                        legGroups(
+                            prefix = "mm-only",
+                            groups = prepared.real,
+                            expanded = expanded,
+                            leafIds = { listOf(it.leg.transactionId) },
+                            highlight = highlightedLeaf,
+                            empty = "Everything on the linked accounts in ${source.name}'s date range is in ${source.name}.",
+                        ) { LegRow(it.leg, accountNames, onOpenLeg) }
                     }
-                    sectionHeading("Only in Money Manager (${loaded.missingInSource.size})")
-                    legGroups(
-                        prefix = "mm-only",
-                        groups = groupByWalletAndMonth(loaded.missingInSource, { it.walletAccountId }, { it.leg.timestamp }, walletName),
-                        expanded = expanded,
-                        leafIds = { listOf(it.leg.transactionId) },
-                        highlight = highlightedLeaf,
-                        empty = "Everything on the linked accounts in ${source.name}'s date range is in ${source.name}.",
-                    ) { LegRow(it.leg, accountNames, onOpenLeg) }
                 }
 
                 ResultTab.MATCHED -> {
                     // Accepted and not-yet-accepted apart, so "Accept all" covers exactly the rows listed beneath it.
-                    val accepted = loaded.matched.filter { it.matchId != null }
-                    val notAccepted = loaded.matched.filter { it.matchId == null }
-                    sectionHeading("Not accepted (${notAccepted.size})") {
-                        BulkButton("Accept all", notAccepted.size, enabled = !bulkRunning) { storeMatches(notAccepted) }
+                    val accepted = prepared.accepted
+                    val notAccepted = prepared.notAccepted
+                    sectionHeading("not-accepted", "Not accepted (${notAccepted.size})") {
+                        BulkButton("Accept all", notAccepted.size, enabled = !writing) { storeMatches(notAccepted) }
                     }
                     legGroups(
                         prefix = "not-accepted",
-                        groups = groupByWalletAndMonth(notAccepted, { it.sourceLeg.accountId }, { it.sourceLeg.timestamp }, walletName),
+                        groups = prepared.notAcceptedGroups,
                         expanded = expanded,
                         leafIds = { match -> match.sourceLegs.map { it.transactionId } },
                         highlight = highlightedLeaf,
                         empty = "Nothing waiting to be accepted.",
                         headerAction = { items, _, _ ->
-                            BulkButton("Accept all", items.size, enabled = !bulkRunning) { storeMatches(items) }
+                            BulkButton("Accept all", items.size, enabled = !writing) { storeMatches(items) }
                         },
                     ) { match ->
                         MatchRow(match, accountNames, onOpenLeg) {
                             TextButton(
                                 onClick = { write("Matching") { importEngine.acceptMatches(listOf(match.memberTransactions())) } },
-                                enabled = !bulkRunning,
+                                enabled = !writing,
                             ) { Text("Accept") }
                         }
                     }
-                    sectionHeading("Accepted (${accepted.size})")
+                    sectionHeading("accepted", "Accepted (${accepted.size})")
                     legGroups(
                         prefix = "accepted",
-                        groups = groupByWalletAndMonth(accepted, { it.sourceLeg.accountId }, { it.sourceLeg.timestamp }, walletName),
+                        groups = prepared.acceptedGroups,
                         expanded = expanded,
                         leafIds = { match -> match.sourceLegs.map { it.transactionId } },
                         highlight = highlightedLeaf,
@@ -632,14 +791,14 @@ private fun SourceReconciliation(
                         MatchRow(match, accountNames, onOpenLeg) {
                             TextButton(
                                 onClick = { write("Unmatching") { importEngine.deleteRelationship(RelationshipId(matchId)) } },
-                                enabled = !bulkRunning,
+                                enabled = !writing,
                             ) { Text("Unmatch") }
                         }
                     }
-                    sectionHeading("Ignored (${loaded.ignored.size})")
+                    sectionHeading("ignored", "Ignored (${loaded.ignored.size})")
                     legGroups(
                         prefix = "ignored",
-                        groups = groupByWalletAndMonth(loaded.ignored, { it.walletAccountId }, { it.leg.timestamp }, walletName),
+                        groups = prepared.ignored,
                         expanded = expanded,
                         leafIds = { listOf(it.leg.transactionId) },
                         highlight = highlightedLeaf,
@@ -648,7 +807,7 @@ private fun SourceReconciliation(
                         LegRow(ignored.leg, accountNames, onOpenLeg) {
                             TextButton(
                                 onClick = { setIgnored(listOf(ignored.leg), ignored = false) },
-                                enabled = !bulkRunning,
+                                enabled = !writing,
                             ) { Text("Un-ignore") }
                         }
                     }
@@ -699,11 +858,15 @@ private fun SourceReconciliation(
     }
 }
 
+private val ReconciliationSource.comparisonLabel: String
+    get() = if (name == "Money Manager") "imported Money Manager" else name
+
 private fun LazyListScope.sectionHeading(
+    key: String,
     text: String,
     action: (@Composable () -> Unit)? = null,
 ) {
-    item(key = "heading-$text".substringBefore(" (")) {
+    item(key = "heading-$key") {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)) {
             Text(text, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
             action?.invoke()
@@ -745,7 +908,7 @@ private fun SummaryHeader(
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
                 AssistChip(onClick = {}, label = { Text("Matched: ${result.matched.size}") })
                 AssistChip(onClick = {}, label = { Text("Near matches: ${result.nearMatches.size}") })
-                AssistChip(onClick = {}, label = { Text("Only in ${source.name}: $missingInMm") })
+                AssistChip(onClick = {}, label = { Text("Only in ${source.comparisonLabel}: $missingInMm") })
                 AssistChip(onClick = {}, label = { Text("Only in Money Manager: ${result.missingInSource.size}") })
                 AssistChip(onClick = {}, label = { Text("Ignored: ${result.ignored.size}") })
             }
@@ -817,11 +980,13 @@ private fun UnlinkedWalletCard(
     }
 }
 
-@Composable
-private fun LinkedWallets(
+private fun LazyListScope.linkedWallets(
     source: ReconciliationSource,
-    shadowAccounts: List<ShadowAccount>,
-    links: List<ReconciliationLink>,
+    linked: List<ShadowAccount>,
+    linksByWallet: Map<AccountId, List<AccountId>>,
+    open: Boolean,
+    onToggle: () -> Unit,
+    enabled: Boolean,
     accountNames: Map<AccountId, String>,
     counts: Map<AccountId, WalletCounts>,
     accountRepository: AccountReadRepository,
@@ -831,53 +996,52 @@ private fun LinkedWallets(
     linkErrors: Map<AccountId, String>,
     onSetLinks: (AccountId, Set<AccountId>) -> Unit,
 ) {
-    val linksByWallet = links.groupBy({ it.shadowAccountId }, { it.realAccountId })
-    val linked = shadowAccounts.filter { it.accountId in linksByWallet }.sortedBy { it.name.lowercase() }
     if (linked.isEmpty()) return
-    var open by remember { mutableStateOf(false) }
-    Column(modifier = Modifier.padding(top = 12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { open = !open }) {
+    item(key = "linked-wallets-heading") {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 12.dp).clickable(onClick = onToggle)) {
             Text(
                 "${if (open) "▾" else "▸"} Linked wallets (${linked.size})",
                 style = MaterialTheme.typography.titleSmall,
             )
         }
-        if (!open) return@Column
-        linked.forEach { wallet ->
-            val realIds = linksByWallet[wallet.accountId].orEmpty().toSet()
-            val count = counts[wallet.accountId]
-            Column(modifier = Modifier.padding(vertical = 6.dp)) {
-                Text(
-                    source.walletName(wallet) +
-                        (
-                            count?.let {
-                                " — ${it.missingInMm} to import into Money Manager, ${it.missingInSource} into ${source.name}"
-                            } ?: ""
-                        ),
-                    fontWeight = FontWeight.Medium,
-                )
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    realIds.forEach { realId ->
-                        InputChip(
-                            selected = false,
-                            onClick = { onSetLinks(wallet.accountId, realIds - realId) },
-                            label = { Text("${accountNames[realId] ?: realId}  ✕") },
-                        )
-                    }
-                }
-                Row(modifier = Modifier.width(360.dp)) {
-                    AccountPicker(
-                        selectedAccountId = null,
-                        onAccountSelected = { onSetLinks(wallet.accountId, realIds + it) },
-                        label = "Also compare with…",
-                        accountRepository = accountRepository,
-                        categoryRepository = categoryRepository,
-                        personRepository = personRepository,
-                        accountFilter = { isReal(it) && it.id !in realIds },
+    }
+    if (!open) return
+    items(linked, key = { "linked-wallet-${it.accountId.id}" }) { wallet ->
+        val realIds = linksByWallet[wallet.accountId].orEmpty().toSet()
+        val count = counts[wallet.accountId]
+        Column(modifier = Modifier.padding(vertical = 6.dp)) {
+            Text(
+                source.walletName(wallet) +
+                    (
+                        count?.let {
+                            " — ${it.missingInMm} to import into Money Manager, ${it.missingInSource} into ${source.name}"
+                        } ?: ""
+                    ),
+                fontWeight = FontWeight.Medium,
+            )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                realIds.forEach { realId ->
+                    InputChip(
+                        selected = false,
+                        enabled = enabled,
+                        onClick = { onSetLinks(wallet.accountId, realIds - realId) },
+                        label = { Text("${accountNames[realId] ?: realId}  ✕") },
                     )
                 }
-                linkErrors[wallet.accountId]?.let { LinkError(it) }
             }
+            Row(modifier = Modifier.width(360.dp)) {
+                AccountPicker(
+                    selectedAccountId = null,
+                    onAccountSelected = { onSetLinks(wallet.accountId, realIds + it) },
+                    label = "Also compare with…",
+                    accountRepository = accountRepository,
+                    categoryRepository = categoryRepository,
+                    personRepository = personRepository,
+                    accountFilter = { isReal(it) && it.id !in realIds },
+                    enabled = enabled,
+                )
+            }
+            linkErrors[wallet.accountId]?.let { LinkError(it) }
         }
     }
 }
@@ -1059,6 +1223,8 @@ private fun locateLeaf(
         LeafLocation(ResultTab.UNMATCHED, "near", it.sourceLeg.accountId, monthKey(it.sourceLeg.timestamp))
     } ?: result.missingInMm.firstOrNull { it.holds() && (!hideUnknownAssets || !it.assetUnknownToMm) }?.let {
         LeafLocation(ResultTab.UNMATCHED, "source-only", it.walletAccountId, monthKey(it.leg.timestamp))
+    } ?: result.unlinkedLegs.firstOrNull { it.transactionId == transactionId }?.let {
+        LeafLocation(ResultTab.UNMATCHED, "unlinked-source", it.accountId, monthKey(it.timestamp))
     } ?: result.matched.firstOrNull { it.holds() }?.let {
         val prefix = if (it.matchId == null) "not-accepted" else "accepted"
         LeafLocation(ResultTab.MATCHED, prefix, it.sourceLeg.accountId, monthKey(it.sourceLeg.timestamp))

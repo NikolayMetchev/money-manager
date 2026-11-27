@@ -122,3 +122,20 @@ DELETE FROM import_record WHERE id IN (SELECT record_id FROM csv_import_record W
 -- A re-import keeps its file's records (#1430), but until its run completes none may say it is up to date.
 unhashImportRecords:
 UPDATE import_record SET content_hash = ? WHERE id IN (SELECT record_id FROM csv_import_record WHERE csv_import_id = ?);
+
+storeSqliteFile:
+INSERT INTO import_sqlite_file(csv_import_id, file_bytes) VALUES (?, ?)
+ON CONFLICT(csv_import_id) DO UPDATE SET file_bytes = excluded.file_bytes;
+
+clearSqliteRefs:
+DELETE FROM import_sqlite_row WHERE csv_import_id = ?;
+
+insertSqliteRefs:
+INSERT INTO import_sqlite_row(csv_import_id, row_index, refs_json) VALUES (?, ?, ?);
+
+updateSqliteQuery:
+INSERT INTO import_sqlite_projection(staged_query, csv_import_id) VALUES (?, ?)
+ON CONFLICT(csv_import_id) DO UPDATE SET staged_query = excluded.staged_query;
+
+clearSqliteQuery:
+DELETE FROM import_sqlite_projection WHERE csv_import_id = ?;

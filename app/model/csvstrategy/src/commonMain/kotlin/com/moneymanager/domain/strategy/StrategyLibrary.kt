@@ -26,6 +26,7 @@ enum class StrategyKind {
     OFX,
     XLSX,
     PDF,
+    SQLITE,
     API,
     GLOBAL_MAPPINGS,
     PASS_THROUGH,
@@ -37,6 +38,7 @@ enum class StrategyKind {
 /** Which of the CSV engine's kinds this strategy's library file is. */
 fun CsvImportStrategy.libraryKind(): StrategyKind =
     when {
+        config.sqliteQuery != null -> StrategyKind.SQLITE
         isPdfStrategy() -> StrategyKind.PDF
         documentKind() == ImportFileKind.QIF -> StrategyKind.QIF
         documentKind() == ImportFileKind.OFX -> StrategyKind.OFX
@@ -91,6 +93,7 @@ object StrategyFileNaming {
     private const val QIF_INFIX = ".qif"
     private const val OFX_INFIX = ".ofx"
     private const val XLSX_INFIX = ".xlsx"
+    private const val SQLITE_INFIX = ".sqlite"
     private const val PDF_INFIX = ".pdf"
     private const val API_INFIX = ".api"
     private const val PASS_THROUGH_INFIX = ".passthrough"
@@ -103,6 +106,7 @@ object StrategyFileNaming {
             StrategyKind.QIF -> "${key.name}$QIF_INFIX$SUFFIX"
             StrategyKind.OFX -> "${key.name}$OFX_INFIX$SUFFIX"
             StrategyKind.XLSX -> "${key.name}$XLSX_INFIX$SUFFIX"
+            StrategyKind.SQLITE -> "${key.name}$SQLITE_INFIX$SUFFIX"
             StrategyKind.PDF -> "${key.name}$PDF_INFIX$SUFFIX"
             StrategyKind.API -> "${key.name}$API_INFIX$SUFFIX"
             StrategyKind.GLOBAL_MAPPINGS -> "$GLOBAL_MAPPINGS_NAME$SUFFIX"
@@ -123,6 +127,10 @@ object StrategyFileNaming {
         return when {
             stem.endsWith(XLSX_INFIX) -> {
                 StrategyKey(StrategyKind.XLSX, stem.removeSuffix(XLSX_INFIX))
+            }
+
+            stem.endsWith(SQLITE_INFIX) -> {
+                StrategyKey(StrategyKind.SQLITE, stem.removeSuffix(SQLITE_INFIX))
             }
 
             stem.endsWith(PDF_INFIX) -> {

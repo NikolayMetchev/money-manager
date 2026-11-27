@@ -62,6 +62,7 @@ kmp_library(
         "//utils/compose/filePicker",
         "//utils/compose/scrollbar",
         "//utils/humanreadable",
+        "//utils/parsers/csv",
         "//utils/regex",
         "@maven_kmp//:androidx_compose_runtime",
         "@maven_kmp//:androidx_compose_runtime_runtime_saveable",

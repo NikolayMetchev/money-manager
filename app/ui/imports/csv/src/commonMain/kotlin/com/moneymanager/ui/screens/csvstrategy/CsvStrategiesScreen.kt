@@ -284,6 +284,7 @@ fun CsvStrategiesScreen(
             csvImportRepository = csvImportRepository,
             kind =
                 when {
+                    editingStrategy.config.sqliteQuery != null -> SampleFileKind.SQLITE
                     editingStrategy.isPdfStrategy() -> SampleFileKind.PDF
                     else -> sampleFileKindOf(editingStrategy.documentKind()) ?: SampleFileKind.CSV
                 },

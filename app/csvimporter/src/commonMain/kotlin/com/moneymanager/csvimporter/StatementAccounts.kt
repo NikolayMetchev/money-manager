@@ -68,6 +68,12 @@ internal class StatementAccounts(
     // times per row — memoizing collapses an O(rows x mappings) regex scan to one pass per value.
     private val persistedMappingCache = HashMap<String, AccountId?>()
 
+    fun requireVisible(id: AccountId) {
+        require(!isReconciliationSource || id == UNRESOLVED_ACCOUNT_ID || id == OWN_FEE_ACCOUNT_ID || id in visibleAccountIds) {
+            "A reconciliation strategy can only use accounts from its shadow source"
+        }
+    }
+
     /** The first of the rules' [side] candidates that applies to the row. */
     fun resolveAccount(
         side: AccountSide,

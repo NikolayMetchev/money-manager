@@ -64,11 +64,11 @@ internal class ExistingTransferLoader(
     ): Set<TransferId> {
         val ownFiles =
             transfers
-                .mapNotNullTo(mutableSetOf()) { (it.source as? Source.Csv)?.importId }
+                .mapNotNullTo(mutableSetOf()) { (it.source as? Source.File)?.importId }
                 .flatMapTo(mutableSetOf()) { csvImportRepository.getTransferIdsCreatedByImport(it) }
         val statementLines =
             transfers.mapNotNullTo(mutableSetOf()) { transfer ->
-                (transfer.source as? Source.Csv)?.statementAccountId?.let { StatementLine(it, transfer.timestamp, transfer.amount) }
+                (transfer.source as? Source.File)?.statementAccountId?.let { StatementLine(it, transfer.timestamp, transfer.amount) }
             }
         val identified = existing.filter { it.uniqueKey.isNotEmpty() }.associateBy { it.transferId }
         if (statementLines.isEmpty() || identified.isEmpty()) return ownFiles
@@ -263,7 +263,7 @@ internal class ExistingTransferLoader(
                 .mapNotNull {
                     when {
                         strategyId == null -> loader.familyOf(it.source)
-                        it.source is Source.Csv -> MatchScopeLoader.csvFamily(strategyId)
+                        it.source is Source.File -> MatchScopeLoader.csvFamily(strategyId)
                         it.source is Source.Api -> MatchScopeLoader.apiFamily(strategyId)
                         else -> null
                     }

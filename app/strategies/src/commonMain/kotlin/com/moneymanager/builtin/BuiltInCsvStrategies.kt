@@ -32,6 +32,8 @@ object BuiltInCsvStrategies {
             BinanceStrategies.buildBinanceCsvStrategy(now),
             KoinlyStrategies.buildKoinlyCsvStrategy(now),
             AccointingStrategies.buildAccointingCsvStrategy(now),
+            SqliteStrategies.gnucash(now),
+            SqliteStrategies.moneyManager(now),
             CelsiusStrategies.buildCelsiusCsvStrategy(now),
             FreetradeStrategies.buildFreetradeCsvStrategy(now),
             BybitStrategies.buildBybitSpotCsvStrategy(now),

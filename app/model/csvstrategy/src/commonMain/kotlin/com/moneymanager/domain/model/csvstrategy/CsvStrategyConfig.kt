@@ -122,11 +122,20 @@ data class CsvStrategyConfig<out M>(
     // NEVER-encoded when null, same rationale.
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val pdfLines: PdfLineConfig? = null,
+    /** A read-only SELECT whose named columns feed this reconciliation strategy. */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val sqliteQuery: String? = null,
     // NEVER-encoded when empty, same rationale.
     @Serializable(with = SortedStringSetSerializer::class)
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val optionalColumns: Set<String> = emptySet(),
 ) {
+    init {
+        require(sqliteQuery == null || (sqliteQuery.isNotBlank() && reconciliation != null)) {
+            "A SQLite strategy needs a query and a reconciliation source"
+        }
+    }
+
     /**
      * The columns the rules set (`RuleAction.SetValue`), in rule order. A file that lacks one still has it once the
      * rules have run, so a mapping can read a value that sits under a different column in each export.
@@ -153,6 +162,7 @@ data class CsvStrategyConfig<out M>(
             reconciliation = reconciliation,
             assetCodes = assetCodes,
             pdfLines = pdfLines,
+            sqliteQuery = sqliteQuery,
         )
 }
 

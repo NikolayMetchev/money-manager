@@ -8,12 +8,15 @@ import com.moneymanager.domain.model.CsvImportId
 import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DeviceId
+import com.moneymanager.domain.model.SqliteRowRef
 import com.moneymanager.domain.model.csv.CsvRowLink
 import com.moneymanager.domain.model.csv.PdfImportSource
+import com.moneymanager.domain.model.csv.SqliteImportFile
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.write.CsvImportWriteRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
 import kotlin.coroutines.CoroutineContext
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -39,6 +42,7 @@ class CsvImportWriteRepositoryImpl(
         xlsxBytes: ByteArray?,
         xlsxWorksheetName: String?,
         pdf: PdfImportSource?,
+        sqlite: SqliteImportFile?,
     ): CsvImportId =
         withContext(coroutineContext) {
             database.transactionWithResult {
@@ -79,6 +83,7 @@ class CsvImportWriteRepositoryImpl(
                         worksheet_name = xlsxWorksheetName,
                     )
                 }
+                sqlite?.let { storeSqlite(importId.id.toString(), it, headers, rows) }
                 pdf?.let { storePdf(importId.id.toString(), it) }
 
                 importId
@@ -91,6 +96,7 @@ class CsvImportWriteRepositoryImpl(
         rows: List<List<String>>,
         worksheetName: String?,
         pdfRulesHash: String?,
+        sqliteQuery: String?,
     ): Unit =
         withContext(coroutineContext) {
             database.transaction {
@@ -124,6 +130,10 @@ class CsvImportWriteRepositoryImpl(
                 worksheetName?.let {
                     csvImportWriteQueries.updateXlsxBlobWorksheet(worksheet_name = it, csv_import_id = id.id.toString())
                 }
+                sqliteQuery?.let {
+                    csvImportWriteQueries.updateSqliteQuery(it, id.id.toString())
+                    storeSqliteRefs(id.id.toString(), headers, rows)
+                }
                 csvImportWriteQueries.updatePdfStagedRulesHash(pdfRulesHash, id.id.toString())
             }
         }
@@ -138,6 +148,7 @@ class CsvImportWriteRepositoryImpl(
         rowIndexRemap: Map<Long, Long>,
         xlsxBytes: ByteArray?,
         pdf: PdfImportSource?,
+        sqlite: SqliteImportFile?,
     ): Unit =
         withContext(coroutineContext) {
             database.transaction {
@@ -186,9 +197,42 @@ class CsvImportWriteRepositoryImpl(
                 csvImportWriteQueries.deleteParkedRecords(importId)
 
                 xlsxBytes?.let { csvImportWriteQueries.updateXlsxBlobBytes(it, importId) }
+                sqlite?.let { storeSqlite(importId, it, headers, rows) }
                 pdf?.let { storePdf(importId, it) }
             }
         }
+
+    private suspend fun storeSqlite(
+        id: String,
+        file: SqliteImportFile,
+        headers: List<String>,
+        rows: List<List<String>>,
+    ) {
+        csvImportWriteQueries.storeSqliteFile(id, file.bytes)
+        val query = file.stagedQuery
+        if (query == null) {
+            csvImportWriteQueries.clearSqliteQuery(id)
+        } else {
+            csvImportWriteQueries.updateSqliteQuery(query, id)
+        }
+        storeSqliteRefs(id, headers, rows)
+    }
+
+    private suspend fun storeSqliteRefs(
+        id: String,
+        headers: List<String>,
+        rows: List<List<String>>,
+    ) {
+        csvImportWriteQueries.clearSqliteRefs(id)
+        val index = headers.indexOf(SqliteRowRef.COLUMN)
+        rows.forEachIndexed { i, row ->
+            val json = row[index]
+            require(Json.decodeFromString<List<SqliteRowRef>>(json).isNotEmpty()) {
+                "SQLite result row ${i + 1} has no source row"
+            }
+            csvImportWriteQueries.insertSqliteRefs(id, i + 1L, json)
+        }
+    }
 
     private suspend fun storePdf(
         importId: String,

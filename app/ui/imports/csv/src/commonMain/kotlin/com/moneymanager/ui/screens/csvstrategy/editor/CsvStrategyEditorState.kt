@@ -158,6 +158,7 @@ internal class CsvStrategyEditorState(
     // lacks, and dropping it would silently change what the strategy imports.
     var rules by mutableStateOf(config?.rules.orEmpty())
 
+    var sqliteQuery by mutableStateOf(config?.sqliteQuery.orEmpty())
     var fileNamePattern by mutableStateOf(config?.fileNamePattern.orEmpty())
 
     // Set only on Excel strategies, which target a worksheet instead of a file. Carried verbatim:
@@ -326,6 +327,7 @@ internal class CsvStrategyEditorState(
     val isValid: Boolean
         get() =
             name.isNotBlank() &&
+                (sqliteQuery.isBlank() || reconciliationSourceName.isNotBlank()) &&
                 identificationColumns.isNotEmpty() &&
                 targetAccountValid &&
                 sourceAccountValid &&
