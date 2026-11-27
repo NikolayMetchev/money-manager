@@ -15,6 +15,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import co.touchlab.kermit.Logger
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
@@ -237,6 +239,7 @@ fun AccountsScreen(
                             category = categoriesById[account.categoryId],
                             balances = entry.balances,
                             owners = entry.owners,
+                            isReconciliationAccount = entry.isShadow,
                             accountRepository = accountRepository,
                             maintenance = maintenance,
                             onClick = { onAccountClick(account) },
@@ -285,6 +288,7 @@ fun AccountCard(
     category: Category?,
     balances: List<Money>,
     owners: List<Person>,
+    isReconciliationAccount: Boolean,
     accountRepository: AccountReadRepository,
     maintenance: Maintenance,
     onClick: () -> Unit,
@@ -300,6 +304,12 @@ fun AccountCard(
                 .testTag("account-card-${account.id.id}")
                 .clickable(onClick = onClick),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors =
+            if (isReconciliationAccount) {
+                CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+            } else {
+                CardDefaults.cardColors()
+            },
     ) {
         Column(
             modifier =
@@ -313,10 +323,26 @@ fun AccountCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = account.name,
-                        style = MaterialTheme.typography.titleMedium,
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = account.name,
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        if (isReconciliationAccount) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            TooltipBox(
+                                positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+                                tooltip = { PlainTooltip { Text("Reconciliation account") } },
+                                state = rememberTooltipState(),
+                            ) {
+                                Text(
+                                    text = "🔄",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.semantics { contentDescription = "Reconciliation account" },
+                                )
+                            }
+                        }
+                    }
                     if (category != null && category.id != -1L) {
                         Text(
                             text = category.name,
