@@ -179,9 +179,12 @@ class ReconciliationScreenTest {
                 }
             }
 
-            waitForIdle()
-            onNodeWithText("Needs attention: 1 Koinly wallet(s) not linked to an account").assertIsDisplayed()
-            onNodeWithText("Link to suggested account \"Crypto.com\"").assertIsDisplayed()
+            val heading = "Needs attention: 1 Koinly wallet(s) not linked to an account"
+            val suggestion = "Link to suggested account \"Crypto.com\""
+            waitUntil(timeoutMillis = LOAD_TIMEOUT_MS) { reveal(hasText(heading)) }
+            onNodeWithText(heading).assertIsDisplayed()
+            waitUntil(timeoutMillis = LOAD_TIMEOUT_MS) { reveal(hasText(suggestion)) }
+            onNodeWithText(suggestion).assertIsDisplayed()
         }
     }
 
