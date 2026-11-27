@@ -6,7 +6,7 @@ import android.database.sqlite.SQLiteException
 import com.moneymanager.csv.CsvParseResult
 import java.io.IOException
 
-internal actual val querySqlite: SqliteReader = ::querySnapshot
+internal actual fun sqliteReader(): SqliteReader? = ::querySnapshot
 
 private fun querySnapshot(
     bytes: ByteArray,

@@ -99,20 +99,6 @@ fun ReconciliationResult.movementsOf(legs: List<UnmatchedSourceLeg>): List<Recon
     return (missingInMm.filter { (it.walletAccountId to it.leg.movementKey) in movements } + legs).map { it.leg }.distinct()
 }
 
-/**
- * The matches the matcher found that nobody has stored yet (exact and near alike), on [wallet] and in [month] when
- * given: what an "Accept all" stores, so a re-import can't change them.
- */
-fun ReconciliationResult.unstoredMatches(
-    wallet: AccountId? = null,
-    month: String? = null,
-): List<LegMatch> =
-    matches.filter {
-        it.matchId == null &&
-            (wallet == null || it.sourceLeg.accountId == wallet) &&
-            (month == null || monthKey(it.sourceLeg.timestamp) == month)
-    }
-
 /** Every transaction a near match spans, each once: the members of its `reconciliation-match` relationship. */
 fun LegMatch.memberTransactions(): List<TransactionId> = (sourceLegs + realLegs).map { it.transactionRef }.distinct()
 
