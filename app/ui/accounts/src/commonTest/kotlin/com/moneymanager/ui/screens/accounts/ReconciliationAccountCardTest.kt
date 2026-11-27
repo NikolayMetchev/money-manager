@@ -63,7 +63,7 @@ class ReconciliationAccountCardTest {
                     personRepository = people,
                     personAccountOwnershipRepository = ownerships,
                     maintenance = maintenance,
-                    scrollToAccountId = null,
+                    scrollToAccountId = account.id,
                     onAccountClick = {},
                 )
             }
