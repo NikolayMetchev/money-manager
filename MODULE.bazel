@@ -689,7 +689,7 @@ maven.install(
 maven.install(
     name = "r8",
     artifacts = [
-        "com.android.tools:r8:9.5.33",
+        "com.android.tools:r8:9.5.34",
         "org.jetbrains.compose:compose-gradle-plugin:1.12.2",
     ],
     # Optional in the plugin's POM, and Gradle-only.
