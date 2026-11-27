@@ -327,6 +327,7 @@ fun AccountCard(
                         Text(
                             text = account.name,
                             style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.weight(1f, fill = false),
                         )
                         if (isReconciliationAccount) {
                             Spacer(modifier = Modifier.width(8.dp))
