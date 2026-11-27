@@ -72,7 +72,7 @@
       "kermit-core": "co.touchlab:kermit-core:2.2.0",
       "kotlin-compose-compiler-plugin-embeddable": "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable:2.4.21",
       "kotlin-serialization-compiler-plugin-embeddable": "org.jetbrains.kotlin:kotlin-serialization-compiler-plugin-embeddable:2.4.21",
-      "kotlinx-browser": "org.jetbrains.kotlinx:kotlinx-browser:0.5.0",
+      "kotlinx-browser": "org.jetbrains.kotlinx:kotlinx-browser:0.6.1",
       "kotlinx-coroutines-android": "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0",
       "kotlinx-coroutines-core": "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0",
       "kotlinx-coroutines-swing": "org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.11.0",
@@ -20762,12 +20762,12 @@
     },
     "org.jetbrains.kotlinx:kotlinx-browser": {
       "js": {
-        "version": "0.5.0",
+        "version": "0.6.1",
         "files": [
           {
-            "name": "kotlinx-browser-js-0.5.0.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-browser-js/0.5.0/kotlinx-browser-js-0.5.0.klib",
-            "sha256": "e794f4e1b4d40507c3d9e01ef411151bd537b9981b00d34f57483f04890646bd"
+            "name": "kotlinx-browser-js-0.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-browser-js/0.6.1/kotlinx-browser-js-0.6.1.klib",
+            "sha256": "811e1feee206a5df212d8a0307b5bbc939f90e6f19fcd0f53c575e9de11dd955"
           }
         ],
         "deps": [
@@ -20775,12 +20775,12 @@
         ]
       },
       "metadataWeb": {
-        "version": "0.5.0",
+        "version": "0.6.1",
         "files": [
           {
-            "name": "kotlinx-browser-metadata-0.5.0.jar",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-browser/0.5.0/kotlinx-browser-0.5.0.jar",
-            "sha256": "a59afe6bcb25b30914b0a2d0ae9ed9ba7adcfaf9911b7324a5a5bd98150af102"
+            "name": "kotlinx-browser-metadata-0.6.1.jar",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-browser/0.6.1/kotlinx-browser-0.6.1.jar",
+            "sha256": "5631b6c97022271a7b20e39c5aa18b0f28c608e525ef3020e899834c22890fb3"
           }
         ],
         "source_sets": [
@@ -20788,12 +20788,12 @@
         ]
       },
       "wasmJs": {
-        "version": "0.5.0",
+        "version": "0.6.1",
         "files": [
           {
-            "name": "kotlinx-browser-wasm-js-0.5.0.klib",
-            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-browser-wasm-js/0.5.0/kotlinx-browser-wasm-js-0.5.0.klib",
-            "sha256": "00d542206fff41458574ab7341e80f13629743af68621dd5d3750cd836ca70e5"
+            "name": "kotlinx-browser-wasm-js-0.6.1.klib",
+            "url": "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-browser-wasm-js/0.6.1/kotlinx-browser-wasm-js-0.6.1.klib",
+            "sha256": "77a0d5d0481d80d1119158678b37011eebc974b1e7c541c67e8c917f8c2f73d7"
           }
         ]
       }
