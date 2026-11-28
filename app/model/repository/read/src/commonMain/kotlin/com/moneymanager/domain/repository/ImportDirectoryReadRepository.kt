@@ -27,6 +27,12 @@ interface ImportDirectoryReadRepository {
     suspend fun getTrackedFilesForCsvImport(id: CsvImportId): List<ImportDirectoryFile>
 
     /**
+     * Staged tracked files, in any directory, whose server content hash is [remoteContentHash], newest first: a file
+     * moved or copied between folders is recognised by it without downloading it again.
+     */
+    suspend fun getStagedFilesByRemoteContentHash(remoteContentHash: String): List<ImportDirectoryFile>
+
+    /**
      * The effective account (the file's own directory account, else its parent's) for every staged CSV
      * import whose directory (or that directory's parent) has one set. Used to resolve a bulk import
      * run's per-file source account in one query instead of N+1 (see [ImportDirectory.accountId]).

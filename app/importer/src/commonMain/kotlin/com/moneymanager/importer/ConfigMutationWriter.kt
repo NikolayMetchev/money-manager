@@ -359,6 +359,10 @@ internal class ConfigMutationWriter(
                         m.importedAt,
                     )
                 }
+
+                is ImportDirectoryMutation.ForgetFile -> {
+                    importDirectoryRepository.forgetFile(m.directoryId, m.fileRef)
+                }
             }
         }
 

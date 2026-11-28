@@ -606,4 +606,11 @@ suspend fun ImportEngine.recordDirectoryFileImported(
     )
 }
 
+suspend fun ImportEngine.forgetDirectoryFile(
+    directoryId: ImportDirectoryId,
+    fileRef: String,
+) {
+    import(ImportBatch(importDirectoryMutations = listOf(ImportDirectoryMutation.ForgetFile(directoryId, fileRef))))
+}
+
 // endregion

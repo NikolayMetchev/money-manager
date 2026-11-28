@@ -7,5 +7,7 @@ data class ScanResult(
     /** Files skipped because their type isn't supported for import (e.g. .pdf). */
     val filesSkipped: Int,
     val filesFailed: Int,
+    /** Tracked files the folder no longer lists, now forgotten. */
+    val filesRemoved: Int,
     val failures: List<String>,
 )

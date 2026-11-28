@@ -55,3 +55,12 @@ selectCsvImportDirectories:
 SELECT c.csv_import_id, f.directory_id
 FROM import_directory_file f
 JOIN import_directory_file_csv_import c ON c.file_id = f.id;
+
+-- Tracked files, in any directory, whose server content hash is this one and whose content is staged:
+-- a file moved or copied between folders is recognised by it without downloading it again.
+selectStagedFilesByRemoteContentHash:
+SELECT f.*, c.csv_import_id
+FROM import_directory_file f
+JOIN import_directory_file_csv_import c ON c.file_id = f.id
+WHERE f.remote_content_hash = ? AND f.checksum IS NOT NULL
+ORDER BY f.imported_at DESC;

@@ -4,15 +4,18 @@ import co.touchlab.kermit.Logger
 import com.moneymanager.coroutines.ioDispatcher
 import com.moneymanager.domain.model.importFileKind
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
+import com.moneymanager.domain.model.importdirectory.ImportDirectoryFile
 import com.moneymanager.domain.repository.CsvImportReadRepository
 import com.moneymanager.domain.repository.ImportDirectoryReadRepository
 import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.forgetDirectoryFile
 import com.moneymanager.importengineapi.recordDirectoryFileImported
 import com.moneymanager.importfilesource.ImportFileEntry
 import com.moneymanager.importfilesource.ImportFileSource
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.coroutines.cancellation.CancellationException
@@ -31,8 +34,11 @@ internal fun isSupportedImportFile(fileName: String): Boolean = importFileKind(f
  * (Apache POI) and PDF (pdfium) parsing are JVM-only; elsewhere such a file is recorded as a per-file scan
  * failure rather than crashing the scan. It does NOT apply a strategy — the user runs the existing "Import All".
  * Change detection: a matching server-provided content hash (e.g. Drive md5Checksum) skips the download
- * entirely; otherwise the file is downloaded and sha256-confirmed. A changed file produces a fresh
- * staging row; a bad file is recorded as a failure and does not abort the scan.
+ * entirely, including for a file moved, copied or renamed from another tracked folder; otherwise the file is
+ * downloaded and sha256-confirmed. A changed file produces a fresh staging row; a bad file is recorded as a failure and does not abort the scan.
+ *
+ * A file the folder no longer lists is forgotten, unless it is the only tracked copy of an import that has been
+ * applied: that import keeps reading its account from this folder (see [ImportDirectory.accountId]) for a re-import.
  *
  * Every file is scanned in its own coroutine on [ioDispatcher], so downloads run concurrently. The
  * engine doesn't serialize writes itself, so every database step holds [dbLock]; callers scanning
@@ -65,12 +71,14 @@ suspend fun scanImportDirectory(
                 }.awaitAll()
         }
 
+    val removed = context.forgetVanishedFiles(entries.mapTo(mutableSetOf()) { it.ref })
     val failures = outcomes.filterIsInstance<FileOutcome.Failed>().map { it.message }
     return ScanResult(
         filesDownloaded = outcomes.count { it == FileOutcome.Downloaded },
         filesUnchanged = outcomes.count { it == FileOutcome.Unchanged },
         filesSkipped = outcomes.count { it == FileOutcome.Skipped },
         filesFailed = failures.size,
+        filesRemoved = removed,
         failures = failures,
     )
 }
@@ -124,6 +132,25 @@ private suspend fun ScanContext.scanFile(entry: ImportFileEntry): FileOutcome {
                     )
                     return FileOutcome.Unchanged
                 }
+                // A file this folder hasn't tracked whose bytes another tracked file already staged: it was moved
+                // or copied here, so it points at that import rather than being downloaded and staged again.
+                val copy =
+                    remoteContentHash
+                        ?.takeIf { tracked == null }
+                        ?.let { importDirectoryRepository.getStagedFilesByRemoteContentHash(it).firstOrNull() }
+                if (copy != null) {
+                    importEngine.recordDirectoryFileImported(
+                        directoryId = directory.id,
+                        fileRef = entry.ref,
+                        fileName = entry.name,
+                        lastModified = lastModified,
+                        checksum = copy.checksum,
+                        remoteContentHash = remoteContentHash,
+                        csvImportId = copy.csvImportId,
+                        importedAt = Clock.System.now(),
+                    )
+                    return FileOutcome.Unchanged
+                }
                 tracked
             }
 
@@ -169,6 +196,23 @@ private suspend fun ScanContext.scanFile(entry: ImportFileEntry): FileOutcome {
         scanLogger.e(expected) { "Scan failed for ${entry.name} in '${directory.name}': ${expected.message}" }
         FileOutcome.Failed("${entry.name}: ${expected.message}")
     }
+}
+
+/** Forgets the tracked files [listedRefs] lacks, and returns how many it forgot. */
+private suspend fun ScanContext.forgetVanishedFiles(listedRefs: Set<String>): Int =
+    dbLock.withLock {
+        importDirectoryRepository
+            .getTrackedFiles(directory.id)
+            .first()
+            .filter { it.fileRef !in listedRefs && !isOnlyCopyOfAppliedImport(it) }
+            .onEach { importEngine.forgetDirectoryFile(directory.id, it.fileRef) }
+            .size
+    }
+
+private suspend fun ScanContext.isOnlyCopyOfAppliedImport(file: ImportDirectoryFile): Boolean {
+    val csvImportId = file.csvImportId ?: return false
+    val applied = (csvImportRepository.getImport(csvImportId).first()?.applicationCount ?: 0) > 0
+    return applied && importDirectoryRepository.getTrackedFilesForCsvImport(csvImportId).size == 1
 }
 
 private fun ImportFileEntry.lastModifiedInstant(): Instant = lastModifiedEpochMs?.let(Instant::fromEpochMilliseconds) ?: Clock.System.now()

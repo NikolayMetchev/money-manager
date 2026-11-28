@@ -394,6 +394,12 @@ sealed interface ImportDirectoryMutation {
         val csvImportId: CsvImportId?,
         val importedAt: Instant,
     ) : ImportDirectoryMutation
+
+    /** Forget a file the directory no longer lists; the import it staged into stays. */
+    data class ForgetFile(
+        val directoryId: ImportDirectoryId,
+        val fileRef: String,
+    ) : ImportDirectoryMutation
 }
 
 /** Settings writes; non-null fields are applied. */

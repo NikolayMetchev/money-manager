@@ -1,11 +1,16 @@
 package com.moneymanager.database.csv
 
 import com.moneymanager.csvimporter.scanImportDirectory
+import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.ImportDirectoryId
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.CsvStrategyConfig
 import com.moneymanager.domain.model.importdirectory.ImportDirectory
 import com.moneymanager.domain.model.importdirectory.ImportDirectoryProvider
+import com.moneymanager.importengineapi.CsvImportMutation
 import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.applyCsvImportMutations
 import com.moneymanager.importengineapi.createImportDirectory
 import com.moneymanager.importengineapi.deleteCsvImport
 import com.moneymanager.importfilesource.ImportFileEntry
@@ -30,6 +35,8 @@ private class FileSpec(
     var lastModifiedEpochMs: Long,
     // A server-provided content hash (e.g. Drive md5Checksum); null models a local file with none.
     var remoteContentHash: String? = null,
+    // The id the source knows the file by: Drive keeps it across a rename or a move.
+    val ref: String = name,
 )
 
 /** A controllable [ImportFileSource] over an in-memory set of files. */
@@ -48,7 +55,7 @@ private class FakeFileSource(
     override suspend fun list(): List<ImportFileEntry> =
         files.map {
             ImportFileEntry(
-                ref = it.name,
+                ref = it.ref,
                 name = it.name,
                 lastModifiedEpochMs = it.lastModifiedEpochMs,
                 remoteContentHash = it.remoteContentHash,
@@ -59,7 +66,7 @@ private class FakeFileSource(
 
     override suspend fun download(fileRef: String): ByteArray {
         onDownload(countLock.withLock { ++downloadCount })
-        return files.first { it.name == fileRef }.content.encodeToByteArray()
+        return files.first { it.ref == fileRef }.content.encodeToByteArray()
     }
 }
 
@@ -71,12 +78,15 @@ class ImportDirectoryScannerTest : DbTest() {
         02/01/2024,Lunch,12.00
         """.trimIndent()
 
-    private suspend fun newDirectory(engine: ImportEngine): ImportDirectory {
+    private suspend fun newDirectory(
+        engine: ImportEngine,
+        name: String = "Bank exports",
+    ): ImportDirectory {
         val id =
             engine.createImportDirectory(
                 ImportDirectory(
                     id = ImportDirectoryId(Uuid.random()),
-                    name = "Bank exports",
+                    name = name,
                     provider = ImportDirectoryProvider.LOCAL,
                     folderRef = "/fake",
                     deviceId = repositories.deviceId,
@@ -257,5 +267,74 @@ class ImportDirectoryScannerTest : DbTest() {
 
             val secondStaging = repositories.importDirectoryRepository.getTrackedFile(directory.id, "jan.csv")!!.csvImportId
             assertEquals(false, firstStaging == secondStaging, "re-stage should create a fresh staging row")
+        }
+
+    @Test
+    fun `a file moved and renamed into another folder is recognised by its content hash`() =
+        runDbTest {
+            val engine = repositories.importEngine
+            val statements = newDirectory(engine, "Statements")
+            val archive = newDirectory(engine, "Archive")
+            val original = FileSpec("jan.csv", csvV1, 1_000, remoteContentHash = "md5-aaa", ref = "drive-1")
+            scan(engine, statements, FakeFileSource(listOf(original)))
+            val staged = assertNotNull(repositories.importDirectoryRepository.getTrackedFile(statements.id, "drive-1")?.csvImportId)
+
+            val moved = FakeFileSource(listOf(FileSpec("2024-01-01 jan.csv", csvV1, 2_000, remoteContentHash = "md5-aaa", ref = "drive-1")))
+            val arrived = scan(engine, archive, moved)
+            val left = scan(engine, statements, FakeFileSource(emptyList()))
+
+            assertEquals(0, moved.downloadCount, "the moved file is not downloaded again")
+            assertEquals(1, arrived.filesUnchanged)
+            val tracked = assertNotNull(repositories.importDirectoryRepository.getTrackedFile(archive.id, "drive-1"))
+            assertEquals(staged, tracked.csvImportId, "the new folder points at the import already staged")
+            assertEquals("2024-01-01 jan.csv", tracked.fileName)
+            assertEquals(1, left.filesRemoved, "the old folder forgets it")
+            assertEquals(
+                listOf(archive.id),
+                repositories.importDirectoryRepository.getTrackedFilesForCsvImport(staged).map { it.directoryId },
+            )
+        }
+
+    @Test
+    fun `a file the folder no longer lists is forgotten but its staged import stays`() =
+        runDbTest {
+            val engine = repositories.importEngine
+            val directory = newDirectory(engine)
+            scan(engine, directory, FakeFileSource(listOf(FileSpec("jan.csv", csvV1, 1_000))))
+            val staged = assertNotNull(repositories.importDirectoryRepository.getTrackedFile(directory.id, "jan.csv")?.csvImportId)
+
+            val result = scan(engine, directory, FakeFileSource(emptyList()))
+
+            assertEquals(1, result.filesRemoved)
+            assertEquals(null, repositories.importDirectoryRepository.getTrackedFile(directory.id, "jan.csv"))
+            assertNotNull(repositories.csvImportRepository.getImport(staged).first(), "the staged import is kept")
+        }
+
+    @Test
+    fun `the only tracked copy of an applied import is kept when its file goes`() =
+        runDbTest {
+            val engine = repositories.importEngine
+            val directory = newDirectory(engine)
+            scan(engine, directory, FakeFileSource(listOf(FileSpec("jan.csv", csvV1, 1_000))))
+            val staged = assertNotNull(repositories.importDirectoryRepository.getTrackedFile(directory.id, "jan.csv")?.csvImportId)
+            val strategyId = CsvImportStrategyId(Uuid.random())
+            repositories.csvImportStrategyRepository.createStrategy(
+                CsvImportStrategy(
+                    id = strategyId,
+                    name = "Bank",
+                    config = CsvStrategyConfig(identificationColumns = setOf("Date"), fieldMappings = emptyMap()),
+                    createdAt = Clock.System.now(),
+                    updatedAt = Clock.System.now(),
+                ),
+                Source.Manual,
+            )
+            engine.applyCsvImportMutations(
+                listOf(CsvImportMutation.RecordApplication(staged, strategyId, "Bank", Clock.System.now())),
+            )
+
+            val result = scan(engine, directory, FakeFileSource(emptyList()))
+
+            assertEquals(0, result.filesRemoved, "a re-import still reads its account from this folder")
+            assertNotNull(repositories.importDirectoryRepository.getTrackedFile(directory.id, "jan.csv"))
         }
 }
