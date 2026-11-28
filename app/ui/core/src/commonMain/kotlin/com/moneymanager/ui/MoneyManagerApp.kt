@@ -88,9 +88,12 @@ import com.moneymanager.ui.screens.ImportsScreen
 import com.moneymanager.ui.screens.accounts.AccountAuditScreen
 import com.moneymanager.ui.screens.accounts.AccountsScreen
 import com.moneymanager.ui.screens.apistrategy.ApiConnectionsScreen
+import com.moneymanager.ui.screens.apistrategy.ApiImportStrategyAuditScreen
 import com.moneymanager.ui.screens.apistrategy.ApiSessionTrafficScreen
 import com.moneymanager.ui.screens.categories.CategoriesScreen
 import com.moneymanager.ui.screens.categories.CategoryAuditScreen
+import com.moneymanager.ui.screens.csv.CsvImportDetailScreen
+import com.moneymanager.ui.screens.csvstrategy.CsvImportStrategyAuditScreen
 import com.moneymanager.ui.screens.currencies.AssetsScreen
 import com.moneymanager.ui.screens.currencies.CurrencyAuditScreen
 import com.moneymanager.ui.screens.importdirectory.ImportDirectoryAuditScreen
@@ -842,11 +845,41 @@ fun MoneyManagerApp(
                                             strategyCatalogController = strategyCatalogController,
                                             navigationHistory = navigationHistory,
                                             offerStrategyReimport = offerStrategyReimport,
-                                            reimports = importDirectoryService.reimports,
                                             resetViewedIds = resetViewedIds,
-                                            onCsvSourceClick = onCsvSourceClick,
-                                            onTransferClick = ::navigateToTransferAccount,
                                         )
+                                        entry<Screen.CsvImportDetail>(
+                                            clazzContentKey = { "CsvImportDetail:${it.importId}" },
+                                        ) { screen ->
+                                            CsvImportDetailScreen(
+                                                importId = screen.importId,
+                                                scrollToRowIndex = screen.scrollToRowIndex,
+                                                columnFilter = screen.columnFilter,
+                                                csvImportRepository = services.imports.csvImportRepository,
+                                                csvImportStrategyRepository = services.imports.csvImportStrategyRepository,
+                                                accountMappingRepository = services.imports.accountMappingRepository,
+                                                accountRepository = services.accounts.accountRepository,
+                                                accountAttributeRepository = services.accounts.accountAttributeRepository,
+                                                categoryRepository = services.accounts.categoryRepository,
+                                                currencyRepository = services.accounts.currencyRepository,
+                                                personRepository = services.people.personRepository,
+                                                passThroughAccountRepository = services.imports.passThroughAccountRepository,
+                                                cryptoRepository = services.accounts.cryptoRepository,
+                                                importDirectoryRepository = services.imports.importDirectoryRepository,
+                                                maintenance = services.imports.maintenance,
+                                                transferSourceRepository = services.transactions.transferSourceRepository,
+                                                tradeRepository = services.transactions.tradeRepository,
+                                                auditRepository = services.audit.auditRepository,
+                                                importEngine = services.transactions.importEngine,
+                                                reimports = importDirectoryService.reimports,
+                                                onBack = { navigationHistory.navigateBack() },
+                                                onDeleted = { navigationHistory.navigateTo(Screen.Imports(ImportTab.FILES)) },
+                                                onCreateStrategy = { importId ->
+                                                    navigationHistory.navigateTo(Screen.CsvStrategyEditor(importId))
+                                                },
+                                                onCsvSourceClick = onCsvSourceClick,
+                                                onTransferClick = ::navigateToTransferAccount,
+                                            )
+                                        }
                                         entry<Screen.AuditHistory> { screen ->
                                             TransactionAuditScreen(
                                                 transferId = screen.transferId,
@@ -911,6 +944,22 @@ fun MoneyManagerApp(
                                                 categoryId = screen.categoryId,
                                                 auditRepository = services.audit.auditRepository,
                                                 categoryRepository = services.accounts.categoryRepository,
+                                                onBack = { navigationHistory.navigateBack() },
+                                            )
+                                        }
+                                        entry<Screen.ApiStrategyAuditHistory> { screen ->
+                                            ApiImportStrategyAuditScreen(
+                                                strategyId = screen.strategyId,
+                                                auditRepository = services.audit.auditRepository,
+                                                apiImportStrategyRepository = services.imports.apiImportStrategyRepository,
+                                                onBack = { navigationHistory.navigateBack() },
+                                            )
+                                        }
+                                        entry<Screen.CsvStrategyAuditHistory> { screen ->
+                                            CsvImportStrategyAuditScreen(
+                                                strategyId = screen.strategyId,
+                                                auditRepository = services.audit.auditRepository,
+                                                csvImportStrategyRepository = services.imports.csvImportStrategyRepository,
                                                 onBack = { navigationHistory.navigateBack() },
                                             )
                                         }

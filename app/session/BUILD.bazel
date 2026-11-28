@@ -85,6 +85,7 @@ kmp_test(
         "//app/model/core",
         "//app/model/csv",
         "//app/model/csvstrategy",
+        "//app/model/rules",
         "//app/remotestorage/core",
         "//app/remotestorage/sync",
         "//app/tasks",
