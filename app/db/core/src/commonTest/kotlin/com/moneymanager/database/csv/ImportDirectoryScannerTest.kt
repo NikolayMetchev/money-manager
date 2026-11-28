@@ -296,7 +296,7 @@ class ImportDirectoryScannerTest : DbTest() {
         }
 
     @Test
-    fun `a file the folder no longer lists is forgotten but its staged import stays`() =
+    fun `a file the folder no longer lists is forgotten with its import when nothing applied it`() =
         runDbTest {
             val engine = repositories.importEngine
             val directory = newDirectory(engine)
@@ -307,7 +307,7 @@ class ImportDirectoryScannerTest : DbTest() {
 
             assertEquals(1, result.filesRemoved)
             assertEquals(null, repositories.importDirectoryRepository.getTrackedFile(directory.id, "jan.csv"))
-            assertNotNull(repositories.csvImportRepository.getImport(staged).first(), "the staged import is kept")
+            assertEquals(null, repositories.csvImportRepository.getImport(staged).first(), "the never-applied import goes with it")
         }
 
     @Test
@@ -336,5 +336,31 @@ class ImportDirectoryScannerTest : DbTest() {
 
             assertEquals(0, result.filesRemoved, "a re-import still reads its account from this folder")
             assertNotNull(repositories.importDirectoryRepository.getTrackedFile(directory.id, "jan.csv"))
+        }
+
+    @Test
+    fun `a file renamed in place gives its import the new name without a download`() =
+        runDbTest {
+            val engine = repositories.importEngine
+            val directory = newDirectory(engine)
+            val file = FileSpec("jan.csv", csvV1, 1_000, remoteContentHash = "md5-aaa", ref = "drive-1")
+            scan(engine, directory, FakeFileSource(listOf(file)))
+            val staged = assertNotNull(repositories.importDirectoryRepository.getTrackedFile(directory.id, "drive-1")?.csvImportId)
+
+            val renamed =
+                FakeFileSource(
+                    listOf(FileSpec("2024-01-01_2024-01-02 jan.csv", csvV1, 2_000, remoteContentHash = "md5-aaa", ref = "drive-1")),
+                )
+            val result = scan(engine, directory, renamed)
+
+            assertEquals(0, renamed.downloadCount)
+            assertEquals(1, result.filesUnchanged)
+            assertEquals(
+                "2024-01-01_2024-01-02 jan.csv",
+                repositories.csvImportRepository
+                    .getImport(staged)
+                    .first()
+                    ?.originalFileName,
+            )
         }
 }

@@ -287,6 +287,10 @@ internal class ConfigMutationWriter(
                     csvImportRepository.setImportIgnored(m.id, m.ignored)
                 }
 
+                is CsvImportMutation.Rename -> {
+                    csvImportRepository.setOriginalFileName(m.id, m.fileName)
+                }
+
                 is CsvImportMutation.ResetToUnimported -> {
                     csvImportRepository.resetToUnimported(m.id)
                 }

@@ -304,6 +304,12 @@ sealed interface CsvImportMutation {
         val ignored: Boolean,
     ) : CsvImportMutation
 
+    /** The import's file was renamed at its source: rules read the new name as the file name from now on. */
+    data class Rename(
+        val id: CsvImportId,
+        val fileName: String,
+    ) : CsvImportMutation
+
     /**
      * Returns the file to the never-applied state (rows reset, errors and applications cleared) after
      * an unimport deleted the transactions it created.

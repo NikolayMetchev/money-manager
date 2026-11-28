@@ -295,6 +295,14 @@ class CsvImportWriteRepositoryImpl(
             csvImportWriteQueries.setImportIgnored(if (ignored) 1L else 0L, id.id.toString())
         }
 
+    override suspend fun setOriginalFileName(
+        id: CsvImportId,
+        fileName: String,
+    ): Unit =
+        withContext(coroutineContext) {
+            csvImportWriteQueries.setOriginalFileName(fileName, id.id.toString())
+        }
+
     override suspend fun updateRowStatusesBatch(
         id: CsvImportId,
         status: String,

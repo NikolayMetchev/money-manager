@@ -348,6 +348,9 @@ exclude:
       # calls are generated at compile time, so the linter sees nothing but test fixtures' constants.
       - app/model/core/src/commonMain/kotlin/com/moneymanager/domain/model/AccountAuditEntry.kt
       - app/model/core/src/commonMain/kotlin/com/moneymanager/domain/model/PersonAccountOwnershipAuditEntry.kt
+      # RecordApplication's strategyName is each applied strategy's own name (CsvImportApplier, in app/csvimporter); in
+      # pull request mode only the changed files' constant test callers are seen.
+      - app/importengineapi/src/commonMain/kotlin/com/moneymanager/importengineapi/ImportConfigIntents.kt
 
   # [4] — platform capability methods and an interface default that intentionally return a
   # constant (both platforms support every provider; non-token backends return null), plus test

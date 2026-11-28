@@ -425,6 +425,13 @@ suspend fun ImportEngine.deleteCsvImport(id: CsvImportId) {
     import(ImportBatch(csvImportMutations = listOf(CsvImportMutation.Delete(id))))
 }
 
+suspend fun ImportEngine.renameCsvImport(
+    id: CsvImportId,
+    fileName: String,
+) {
+    import(ImportBatch(csvImportMutations = listOf(CsvImportMutation.Rename(id, fileName))))
+}
+
 suspend fun ImportEngine.setCsvImportIgnored(
     id: CsvImportId,
     ignored: Boolean,
