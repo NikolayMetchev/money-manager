@@ -38,6 +38,7 @@ internal class ReimportOffers(
 private data class PendingReimport(
     val reimport: StrategyReimport,
     val capturedAccounts: List<String> = emptyList(),
+    val strategiesUpdated: Boolean = false,
 )
 
 /** Hosts the offers above navigation so saving in an editor can still return to the screen it came from. */
@@ -80,6 +81,7 @@ internal fun rememberReimportOffers(
                                     sessions = previous?.reimport?.sessions.orEmpty() + found.reimport.sessions,
                                 ),
                             capturedAccounts = (previous?.capturedAccounts.orEmpty() + found.capturedAccounts).distinct(),
+                            strategiesUpdated = previous?.strategiesUpdated == true || found.strategiesUpdated,
                         )
                 } catch (cancelled: CancellationException) {
                     throw cancelled
@@ -90,7 +92,13 @@ internal fun rememberReimportOffers(
         }
         ReimportOffers(
             onStrategiesUpdated = { keys ->
-                offer { imports.findStrategyReimports(keys).takeUnless { it.isEmpty }?.let(::PendingReimport) }
+                offer {
+                    imports
+                        .findStrategyReimports(
+                            keys,
+                        ).takeUnless { it.isEmpty }
+                        ?.let { PendingReimport(it, strategiesUpdated = true) }
+                }
             },
             onAccountMappingSaved = { pattern, accountId, strategyId ->
                 offer {
@@ -128,9 +136,14 @@ private fun ReimportOfferDialog(
                     Text("Apply the updated strategies to $sources already imported?")
                 } else {
                     val count = offer.capturedAccounts.size
+                    val takesOver = "The mapping takes over $count existing account${if (count == 1) "" else "s"}."
                     Text(
-                        "The mapping takes over $count existing account${if (count == 1) "" else "s"}. " +
-                            "Re-import the $sources that booked onto them to move their rows to the mapped account?",
+                        if (offer.strategiesUpdated) {
+                            "$takesOver Re-import the $sources that booked onto them or use an updated strategy, " +
+                                "to move their rows to the mapped account and apply the updated strategies?"
+                        } else {
+                            "$takesOver Re-import the $sources that booked onto them to move their rows to the mapped account?"
+                        },
                     )
                     Column(
                         modifier = Modifier.heightIn(max = 200.dp).verticalScroll(rememberScrollState()),

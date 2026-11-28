@@ -30,9 +30,9 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -324,24 +324,41 @@ private fun rememberCapturedAccounts(
     targetAccountId: AccountId?,
 ): List<Account> {
     val accounts by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) { accountRepository.getAllAccounts() }
-    val previousNames by produceState(emptyMap(), accounts) { value = accountRepository.getPreviousAccountNames() }
-    val shadowAccountIds by produceState(emptySet(), accounts) {
-        value = accountRepository.getAccountIdsByAttribute(WellKnownIds.ACCOUNT_RECONCILIATION_SOURCE_ATTR_TYPE_ID)
+    // Null until loaded: an unloaded shadow set would class a reconciliation target as ordinary for a moment.
+    var lookups by remember(accountRepository) { mutableStateOf<CaptureLookups?>(null) }
+    val scope = rememberSchemaAwareCoroutineScope()
+    DisposableEffect(accountRepository, accounts) {
+        val load =
+            scope.launch {
+                lookups =
+                    CaptureLookups(
+                        previousNames = accountRepository.getPreviousAccountNames(),
+                        shadowAccountIds =
+                            accountRepository.getAccountIdsByAttribute(WellKnownIds.ACCOUNT_RECONCILIATION_SOURCE_ATTR_TYPE_ID),
+                    )
+            }
+        onDispose { load.cancel() }
     }
-    return remember(accounts, previousNames, shadowAccountIds, patternText, targetAccountId) {
+    return remember(accounts, lookups, patternText, targetAccountId) {
+        val loaded = lookups
         val pattern =
             try {
                 compileRegex(patternText, RegexOption.IGNORE_CASE)
             } catch (_: IllegalArgumentException) {
                 null
             }
-        if (pattern == null || targetAccountId == null) {
+        if (loaded == null || pattern == null || targetAccountId == null) {
             emptyList()
         } else {
-            accountsCapturedByMapping(pattern, targetAccountId, accounts, previousNames, shadowAccountIds)
+            accountsCapturedByMapping(pattern, targetAccountId, accounts, loaded.previousNames, loaded.shadowAccountIds)
         }
     }
 }
+
+private class CaptureLookups(
+    val previousNames: Map<String, AccountId>,
+    val shadowAccountIds: Set<AccountId>,
+)
 
 @Composable
 private fun CapturedAccountsPreview(accounts: List<Account>) {
