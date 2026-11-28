@@ -258,7 +258,8 @@ fun MoneyManagerApp(
                 LocalImportEngine provides services.transactions.importEngine,
                 LocalAttributeGroupMover provides attributeGroupMover,
             ) {
-                val offerStrategyReimport = rememberStrategyReimportOffer(sessionImports, taskManager)
+                val reimportOffers = rememberReimportOffers(sessionImports, taskManager)
+                val offerStrategyReimport = reimportOffers.onStrategiesUpdated
                 if (showSetupWizard) {
                     SetupWizardScreen(
                         onStrategiesUpdated = offerStrategyReimport,
@@ -729,6 +730,7 @@ fun MoneyManagerApp(
                                                 csvImportStrategyRepository = services.imports.csvImportStrategyRepository,
                                                 accountMappingRepository = services.imports.accountMappingRepository,
                                                 accountMappingExportService = services.imports.accountMappingExportService,
+                                                onAccountMappingSaved = reimportOffers.onAccountMappingSaved,
                                                 appVersion = appVersion,
                                                 passThroughAccountRepository = services.imports.passThroughAccountRepository,
                                                 categoryRepository = services.accounts.categoryRepository,
@@ -846,6 +848,7 @@ fun MoneyManagerApp(
                                             strategyCatalogController = strategyCatalogController,
                                             navigationHistory = navigationHistory,
                                             offerStrategyReimport = offerStrategyReimport,
+                                            onAccountMappingSaved = reimportOffers.onAccountMappingSaved,
                                             resetViewedIds = resetViewedIds,
                                         )
                                         entry<Screen.CsvImportDetail>(

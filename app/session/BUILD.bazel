@@ -54,10 +54,12 @@ kmp_library(
     deps = [
         "//app/apiimporter",
         "//app/csvimporter",
+        "//app/model/accountmapping",
         "//app/model/csv",
         "//app/model/csvstrategy",
         "//app/query",
         "//utils/coroutines",
+        "//utils/regex",
         "@maven_kmp//:kermit",
     ],
 )
@@ -96,6 +98,7 @@ kmp_test(
         "//utils/bigdecimal",
         "//utils/credentialvault",
         "//utils/localsettings",
+        "//utils/regex",
         "@maven_kmp//:kotlinx_coroutines_core",
         "@maven_kmp//:kotlinx_coroutines_test",
     ],

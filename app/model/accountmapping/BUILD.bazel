@@ -4,7 +4,7 @@
 # gazelle:kmp_export //app/model/core
 # gazelle:kmp_export @maven_kmp//:kotlinx_serialization_core jvmMain
 
-load("//bazel/kmp:defs.bzl", "kmp_library")
+load("//bazel/kmp:defs.bzl", "kmp_library", "kmp_test")
 
 kmp_library(
     name = "accountmapping",
@@ -27,4 +27,27 @@ kmp_library(
         "@maven_kmp//:kotlinx_serialization_core",
     ],
     deps = ["//utils/regex"],
+)
+
+kmp_test(
+    name = "test",
+    android = True,
+    associate = ":accountmapping",
+    common_srcs = glob(["src/commonTest/kotlin/**/*.kt"]),
+    native_targets = [
+        "linuxArm64",
+        "linuxX64",
+        "macosArm64",
+        "mingwX64",
+    ],
+    plugins = ["serialization"],
+    web_targets = [
+        "wasmJs",
+        "js",
+    ],
+    deps = [
+        "//app/model/core",
+        "//bazel/kmp/deps:kotlin_test",
+        "//utils/regex",
+    ],
 )

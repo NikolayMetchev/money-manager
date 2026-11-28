@@ -59,6 +59,7 @@ import com.moneymanager.presenter.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.foundation.LocalImportEngine
 import com.moneymanager.ui.screens.accountmapping.AccountMappingEditorDialog
+import com.moneymanager.ui.screens.accountmapping.OnAccountMappingSaved
 import com.moneymanager.ui.screens.csvstrategy.ColumnDetector
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -97,6 +98,7 @@ fun CsvStrategyEditorScreen(
     personRepository: PersonReadRepository,
     onBack: () -> Unit,
     onStrategyUpdated: (String) -> Unit = {},
+    onAccountMappingSaved: OnAccountMappingSaved = { _, _, _ -> },
 ) {
     val isEditMode = strategyId != null
     val importEngine = LocalImportEngine.current
@@ -429,26 +431,28 @@ fun CsvStrategyEditorScreen(
     editingAccountMapping?.let { mapping ->
         AccountMappingEditorDialog(
             existingMapping = mapping,
-            accounts = accounts,
+            accountRepository = accountRepository,
             strategyId = strategyId,
             onDismiss = { editingAccountMapping = null },
             csvColumns = csvColumns,
             sampleRows = rows,
             categoryRepository = categoryRepository,
             personRepository = personRepository,
+            onSaved = onAccountMappingSaved,
         )
     }
 
     if (showAddAccountMappingDialog && strategyId != null) {
         AccountMappingEditorDialog(
             existingMapping = null,
-            accounts = accounts,
+            accountRepository = accountRepository,
             strategyId = strategyId,
             onDismiss = { showAddAccountMappingDialog = false },
             csvColumns = csvColumns,
             sampleRows = rows,
             categoryRepository = categoryRepository,
             personRepository = personRepository,
+            onSaved = onAccountMappingSaved,
         )
     }
 }
