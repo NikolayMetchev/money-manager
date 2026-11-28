@@ -56,6 +56,7 @@ fun ApiStrategiesScreen(
     onCreateStrategy: () -> Unit = {},
     onEditStrategy: (ApiImportStrategyId) -> Unit = {},
     onAuditHistoryClick: ((ApiImportStrategy) -> Unit)? = null,
+    onStrategyUpdated: (String) -> Unit = {},
 ) {
     val importEngine = LocalImportEngine.current
     val strategies by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
@@ -190,7 +191,9 @@ fun ApiStrategiesScreen(
                         scope.launch {
                             @Suppress("TooGenericExceptionCaught")
                             try {
+                                val before = apiImportStrategyRepository.getStrategyById(updated.id).first()
                                 importEngine.updateApiStrategy(updated)
+                                if (before != null && before.config != updated.config) onStrategyUpdated(updated.name)
                                 importError = null
                             } catch (cancelled: CancellationException) {
                                 throw cancelled

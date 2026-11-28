@@ -39,6 +39,7 @@ import com.moneymanager.domain.strategy.CsvUnresolvedReference
 import com.moneymanager.domain.strategy.StrategyKey
 import com.moneymanager.domain.strategy.StrategyKind
 import com.moneymanager.domain.strategy.StrategyLibrary
+import com.moneymanager.domain.strategy.reportInstalledUpdates
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.remotestorage.RemoteAuthException
 import com.moneymanager.remotestorage.sync.StrategyItem
@@ -80,6 +81,7 @@ fun StrategyCloudCard(
     categoryRepository: CategoryReadRepository,
     currencyRepository: CurrencyReadRepository,
     personRepository: PersonReadRepository,
+    onStrategiesUpdated: (Set<StrategyKey>) -> Unit = {},
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
     val state by controller.state.collectAsState()
@@ -122,14 +124,16 @@ fun StrategyCloudCard(
         scope.launch {
             runCatching {
                 val summary =
-                    controller.syncNow(
-                        library,
-                        appVersion,
-                        selectedToPull = pull,
-                        forceUpload = forceUpload,
-                        resolutions = resolutions,
-                        onProgress = { syncProgress = it },
-                    )
+                    library.reportInstalledUpdates(appVersion, pull, onStrategiesUpdated) {
+                        controller.syncNow(
+                            library,
+                            appVersion,
+                            selectedToPull = pull,
+                            forceUpload = forceUpload,
+                            resolutions = resolutions,
+                            onProgress = { syncProgress = it },
+                        )
+                    }
                 selectedToPull.clear()
                 conflictChoices.clear()
                 message =

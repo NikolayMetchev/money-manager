@@ -9,6 +9,7 @@ import com.moneymanager.domain.strategy.StrategyKey
 import com.moneymanager.domain.strategy.StrategyKind
 import com.moneymanager.domain.strategy.StrategyLibrary
 import com.moneymanager.domain.strategy.StrategyParseResult
+import com.moneymanager.domain.strategy.reportInstalledUpdates
 import com.moneymanager.localsettings.LocalSettings
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -210,6 +211,25 @@ class StrategyCatalogControllerTest {
                 controller.state.value.items
                     .all { it.status == CatalogItemStatus.INSTALLED },
             )
+        }
+
+    @Test
+    fun reportsOnlyChangedPreviouslyInstalledStrategies() =
+        runTest {
+            val library = FakeLibrary()
+            val controller = controller()
+            val keys = setOf(monzoKey, curveKey)
+            val updates = mutableListOf<Set<StrategyKey>>()
+            library.installed[monzoKey] = "previous-json"
+            controller.refresh(library, version)
+
+            repeat(2) {
+                library.reportInstalledUpdates(version, keys, { updates += it }) {
+                    controller.install(library, version, keys)
+                }
+            }
+
+            assertEquals(listOf(setOf(monzoKey)), updates)
         }
 
     @Test

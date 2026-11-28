@@ -96,6 +96,7 @@ fun CsvStrategyEditorScreen(
     attributeTypeRepository: AttributeTypeReadRepository,
     personRepository: PersonReadRepository,
     onBack: () -> Unit,
+    onStrategyUpdated: (String) -> Unit = {},
 ) {
     val isEditMode = strategyId != null
     val importEngine = LocalImportEngine.current
@@ -302,8 +303,11 @@ fun CsvStrategyEditorScreen(
                         createdAt = existingStrategy?.createdAt ?: now,
                         updatedAt = now,
                     )
-                if (isEditMode) {
+                if (existingStrategy != null) {
                     importEngine.updateCsvStrategy(strategy)
+                    if (strategy.copy(updatedAt = existingStrategy.updatedAt) != existingStrategy) {
+                        onStrategyUpdated(strategy.name)
+                    }
                 } else {
                     importEngine.createCsvStrategy(strategy)
                 }

@@ -63,6 +63,7 @@ fun ApiStrategyEditorScreen(
     categoryRepository: CategoryReadRepository,
     personRepository: PersonReadRepository,
     onBack: () -> Unit,
+    onStrategyUpdated: (String) -> Unit = {},
 ) {
     val isEditMode = strategyId != null
     val importEngine = LocalImportEngine.current
@@ -170,8 +171,11 @@ fun ApiStrategyEditorScreen(
                         createdAt = existingStrategy?.createdAt ?: now,
                         updatedAt = now,
                     )
-                if (isEditMode) {
+                if (existingStrategy != null) {
                     importEngine.updateApiStrategy(strategy)
+                    if (strategy.config != existingStrategy.config || strategy.name != existingStrategy.name) {
+                        onStrategyUpdated(strategy.name)
+                    }
                 } else {
                     importEngine.createApiStrategy(strategy)
                 }

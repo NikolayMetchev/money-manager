@@ -21,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.database.json.CsvStrategyExportCodec
+import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.CsvImportStrategyReadRepository
@@ -33,6 +34,7 @@ import com.moneymanager.domain.strategy.CsvUnresolvedReference
 import com.moneymanager.domain.strategy.StrategyKey
 import com.moneymanager.domain.strategy.StrategyKind
 import com.moneymanager.domain.strategy.StrategyLibrary
+import com.moneymanager.domain.strategy.reportInstalledUpdates
 import com.moneymanager.presenter.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.components.ReferenceResolutionRow
@@ -57,6 +59,8 @@ fun ImportStrategyDialog(
     personRepository: PersonReadRepository,
     onDismiss: () -> Unit,
     onImportSuccess: () -> Unit,
+    appVersion: AppVersion,
+    onStrategyUpdated: (String) -> Unit,
 ) {
     val accounts by accountRepository
         .getAllAccounts()
@@ -197,11 +201,14 @@ fun ImportStrategyDialog(
                             // strategy and its per-strategy mappings as one engine batch. The key
                             // carries the (possibly renamed) target name; CSV and QIF strategy files
                             // share the same artifact format and apply path.
-                            strategyLibrary.applyIncoming(
-                                key = StrategyKey(StrategyKind.CSV, strategyName),
-                                json = CsvStrategyExportCodec.encode(parseResult.export.copy(name = strategyName)),
-                                resolutions = resolutions,
-                            )
+                            val key = StrategyKey(StrategyKind.CSV, strategyName)
+                            strategyLibrary.reportInstalledUpdates(appVersion, setOf(key), { onStrategyUpdated(key.name) }) {
+                                strategyLibrary.applyIncoming(
+                                    key = key,
+                                    json = CsvStrategyExportCodec.encode(parseResult.export.copy(name = key.name)),
+                                    resolutions = resolutions,
+                                )
+                            }
                             onImportSuccess()
                             onDismiss()
                         } catch (cancelled: CancellationException) {

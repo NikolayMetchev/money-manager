@@ -16,7 +16,11 @@ import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csv.CsvImport
+import com.moneymanager.domain.strategy.StrategyKey
+import com.moneymanager.domain.strategy.StrategyKind
 import com.moneymanager.importengineapi.createApiSession
+import com.moneymanager.importengineapi.ensureApiCredential
+import com.moneymanager.importengineapi.markApiSessionImported
 import com.moneymanager.tasks.TaskManager
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.addAccountAttributes
@@ -174,6 +178,45 @@ class AttributeGroupMoveTest : DbTest() {
                     .first()
                     .size,
             )
+        }
+
+    @Test
+    fun `a strategy update offers only previously applied files and API sessions for the updated strategies`() =
+        runDbTest {
+            account("Marcus account", listOf(numberType(MARCUS_NUMBER)))
+            account("Bank", listOf(numberType(BANK_NUMBER)))
+            val importedFile = stage(listOf(deposit))
+            importFile(importedFile)
+            stage(listOf(deposit, deposit))
+            val strategyName =
+                checkNotNull(
+                    repositories.csvImportRepository
+                        .getImport(importedFile.id)
+                        .first()
+                        ?.lastAppliedStrategyName,
+                )
+
+            val apiStrategies = repositories.apiImportStrategyRepository.getAllStrategies().first()
+            val binance = apiStrategies.single { it.name == "Binance" }
+            val kraken = apiStrategies.single { it.name == "Kraken" }
+            val engine = repositories.importEngine
+            val imports = sessionImports()
+            val deviceId = repositories.toAppServices(engine).deviceId
+            val binanceConnection = engine.ensureApiCredential(binance.id, now)
+            val krakenConnection = engine.ensureApiCredential(kraken.id, now)
+            val importedSession = engine.createApiSession(deviceId, now, binanceConnection)
+            engine.markApiSessionImported(importedSession, binance.revisionId, now)
+            engine.createApiSession(deviceId, now, binanceConnection)
+            val unrelatedSession = engine.createApiSession(deviceId, now, krakenConnection)
+            engine.markApiSessionImported(unrelatedSession, kraken.revisionId, now)
+
+            val offer =
+                imports.findStrategyReimports(
+                    setOf(StrategyKey(StrategyKind.CSV, strategyName), StrategyKey(StrategyKind.API, binance.name)),
+                )
+            assertEquals(listOf(importedFile.id), offer.files.map { it.id })
+            assertEquals(setOf(importedSession), offer.sessions)
+            assertTrue(imports.findStrategyReimports(setOf(StrategyKey(StrategyKind.API, "Missing"))).isEmpty)
         }
 
     @Test

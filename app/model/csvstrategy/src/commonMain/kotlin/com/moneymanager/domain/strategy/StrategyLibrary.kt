@@ -209,3 +209,35 @@ interface StrategyLibrary {
         resolutions: Map<CsvUnresolvedReference, CsvResolution>,
     )
 }
+
+/** The document formats that share one namespace and import history in the file importer. */
+val StrategyKind.isFileStrategy: Boolean
+    get() = this in fileStrategyKinds
+
+private val fileStrategyKinds =
+    setOf(StrategyKind.CSV, StrategyKind.QIF, StrategyKind.OFX, StrategyKind.XLSX, StrategyKind.PDF, StrategyKind.SQLITE)
+
+/** Reports changes to existing import strategies around an explicit install or pull, including partial batches. */
+suspend fun <T> StrategyLibrary.reportInstalledUpdates(
+    appVersion: AppVersion,
+    keys: Set<StrategyKey>,
+    onUpdated: (Set<StrategyKey>) -> Unit,
+    apply: suspend () -> T,
+): T {
+    val targets = keys.filter { it.kind.isFileStrategy || it.kind == StrategyKind.API }.mapTo(mutableSetOf()) { it.storageKey() }
+    if (targets.isEmpty()) return apply()
+    val previous = listLocal(appVersion).filter { it.key.storageKey() in targets }.associate { it.key.storageKey() to it.contentHash }
+    if (previous.isEmpty()) return apply()
+    try {
+        return apply()
+    } finally {
+        val changed =
+            listLocal(appVersion).mapNotNullTo(mutableSetOf()) { entry ->
+                val before = previous[entry.key.storageKey()]
+                entry.key.takeIf { before != null && before != entry.contentHash }
+            }
+        if (changed.isNotEmpty()) onUpdated(changed)
+    }
+}
+
+private fun StrategyKey.storageKey(): StrategyKey = if (kind.isFileStrategy) copy(kind = StrategyKind.CSV) else this
