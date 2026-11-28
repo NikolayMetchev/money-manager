@@ -76,6 +76,7 @@ fun AccountMappingsScreen(
     appVersion: AppVersion,
     // Null when embedded (e.g. as the Imports → Misc sub-tab) so no dead back arrow is shown.
     onBack: (() -> Unit)? = null,
+    onAccountMappingSaved: OnAccountMappingSaved = { _, _, _ -> },
 ) {
     val importEngine = LocalImportEngine.current
     val scope = rememberSchemaAwareCoroutineScope()
@@ -224,22 +225,24 @@ fun AccountMappingsScreen(
     editingMapping?.let { mapping ->
         AccountMappingEditorDialog(
             existingMapping = mapping,
-            accounts = accounts,
+            accountRepository = accountRepository,
             strategyId = null,
             onDismiss = { editingMapping = null },
             categoryRepository = categoryRepository,
             personRepository = personRepository,
+            onSaved = onAccountMappingSaved,
         )
     }
 
     if (showAddDialog) {
         AccountMappingEditorDialog(
             existingMapping = null,
-            accounts = accounts,
+            accountRepository = accountRepository,
             strategyId = null,
             onDismiss = { showAddDialog = false },
             categoryRepository = categoryRepository,
             personRepository = personRepository,
+            onSaved = onAccountMappingSaved,
         )
     }
 

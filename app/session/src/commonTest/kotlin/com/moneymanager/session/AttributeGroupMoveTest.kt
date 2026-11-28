@@ -13,6 +13,7 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.AttributeTypeId
+import com.moneymanager.domain.model.CsvImportStrategyId
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csv.CsvImport
@@ -20,10 +21,13 @@ import com.moneymanager.domain.model.rules.RuleAction
 import com.moneymanager.domain.model.rules.StrategyRule
 import com.moneymanager.domain.strategy.StrategyKey
 import com.moneymanager.domain.strategy.StrategyKind
+import com.moneymanager.importengineapi.createAccountMapping
 import com.moneymanager.importengineapi.createApiSession
 import com.moneymanager.importengineapi.ensureApiCredential
 import com.moneymanager.importengineapi.markApiSessionImported
 import com.moneymanager.importengineapi.updateCsvStrategy
+import com.moneymanager.regex.compileRegex
+import com.moneymanager.regex.escapeRegex
 import com.moneymanager.tasks.TaskManager
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.addAccountAttributes
@@ -39,6 +43,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration
+import kotlin.uuid.Uuid
 
 /**
  * Moving a sort code and account number from one account to another re-imports the files that named the old one,
@@ -268,6 +273,42 @@ class AttributeGroupMoveTest : DbTest() {
 
             assertEquals(0, result.sessionsReimported)
             assertEquals(listOf(sessionId), result.failures.map { it.sessionId })
+        }
+
+    @Test
+    fun `a saved account mapping offers the files that booked onto the accounts it takes over`() =
+        runDbTest {
+            val marcus = account("Marcus account", listOf(numberType(MARCUS_NUMBER)))
+            val file = stage(listOf(deposit))
+            importFile(file)
+            val created =
+                repositories.accountRepository
+                    .getAllAccounts()
+                    .first()
+                    .single { it.id != marcus }
+            val savings = account("Savings")
+            val pattern = compileRegex(escapeRegex(created.name), RegexOption.IGNORE_CASE)
+            val imports = sessionImports()
+
+            val offer = imports.findAccountMappingReimport(pattern, savings, strategyId = null)
+            assertEquals(listOf(created.id), offer.accounts.map { it.id })
+            assertEquals(listOf(file.id), offer.reimport.files.map { it.id })
+            val otherStrategy = CsvImportStrategyId(Uuid.random())
+            assertTrue(imports.findAccountMappingReimport(pattern, savings, otherStrategy).isEmpty)
+            assertTrue(imports.findAccountMappingReimport(pattern, created.id, strategyId = null).isEmpty)
+
+            repositories.importEngine.createAccountMapping(pattern, savings)
+            val result = CompletableDeferred<String>()
+            TaskManager(backgroundScope, dispatcher = Dispatchers.Default).start("rerun", "Re-import", "Preparing") {
+                try {
+                    imports.reimportUpdatedStrategies(offer.reimport, this).also { result.complete(it) }
+                } catch (expected: Exception) {
+                    result.completeExceptionally(expected)
+                    throw expected
+                }
+            }
+            assertTrue(result.await().startsWith("Re-imported 1 file"))
+            assertEquals(mapOf("Marcus account" to "22.5", "Savings" to "-22.5"), balances())
         }
 
     @Test

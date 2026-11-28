@@ -1,4 +1,3 @@
-@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package com.moneymanager.ui.screens.accountmapping
 
@@ -10,7 +9,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -21,10 +23,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExposedDropdownMenuAnchorType
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -32,6 +30,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,18 +42,21 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CsvImportStrategyId
+import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.accountmapping.AccountMapping
+import com.moneymanager.domain.model.accountmapping.accountsCapturedByMapping
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
+import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.CategoryReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.importengineapi.createAccountMapping
 import com.moneymanager.importengineapi.updateAccountMapping
+import com.moneymanager.presenter.error.rememberFlowAsStateWithSchemaErrorHandling
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.regex.compileRegex
-import com.moneymanager.ui.components.CreateAccountDialog
+import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.foundation.LocalImportEngine
-import com.moneymanager.ui.util.ExposedDropdownMenu
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
@@ -176,19 +178,20 @@ internal fun AccountMappingRow(
  *
  * When editing inside a strategy editor, [csvColumns]/[sampleRows] supply the CSV context: the pattern
  * is previewed against the sample rows (same semantics as import: case-insensitive containsMatchIn).
- * The target account can always be created inline via [categoryRepository]/[personRepository].
+ * The target account is picked with the shared searchable [AccountPicker], which can also create one inline.
  */
 @Suppress("LongParameterList")
 @Composable
 internal fun AccountMappingEditorDialog(
     existingMapping: AccountMapping?,
-    accounts: List<Account>,
+    accountRepository: AccountReadRepository,
     strategyId: CsvImportStrategyId?,
     onDismiss: () -> Unit,
     categoryRepository: CategoryReadRepository,
     personRepository: PersonReadRepository,
     csvColumns: List<CsvColumn>? = null,
     sampleRows: List<CsvRow> = emptyList(),
+    onSaved: OnAccountMappingSaved = { _, _, _ -> },
 ) {
     val importEngine = LocalImportEngine.current
     val isEditMode = existingMapping != null
@@ -196,10 +199,10 @@ internal fun AccountMappingEditorDialog(
     var selectedAccountId by remember { mutableStateOf(existingMapping?.accountId) }
     var isSaving by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var showCreateAccountDialog by remember { mutableStateOf(false) }
     val scope = rememberSchemaAwareCoroutineScope()
 
     val isFormValid = patternText.isNotBlank() && selectedAccountId != null
+    val capturedAccounts = rememberCapturedAccounts(accountRepository, patternText, selectedAccountId)
 
     AlertDialog(
         onDismissRequest = { if (!isSaving) onDismiss() },
@@ -220,26 +223,20 @@ internal fun AccountMappingEditorDialog(
                     },
                 )
 
-                Text("Target Account", style = MaterialTheme.typography.bodyMedium)
-                AccountDropdown(
-                    accounts = accounts,
+                AccountPicker(
                     selectedAccountId = selectedAccountId,
                     onAccountSelected = { selectedAccountId = it },
+                    label = "Target Account",
+                    accountRepository = accountRepository,
+                    categoryRepository = categoryRepository,
+                    personRepository = personRepository,
                     enabled = !isSaving,
-                    onCreateAccount = { showCreateAccountDialog = true },
                 )
+
+                CapturedAccountsPreview(capturedAccounts)
 
                 errorMessage?.let {
                     Text(text = it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                }
-
-                if (showCreateAccountDialog) {
-                    CreateAccountDialog(
-                        categoryRepository = categoryRepository,
-                        personRepository = personRepository,
-                        onDismiss = { showCreateAccountDialog = false },
-                        onAccountCreated = { accountId -> selectedAccountId = accountId },
-                    )
                 }
             }
         },
@@ -267,6 +264,7 @@ internal fun AccountMappingEditorDialog(
                                         strategyId = strategyId,
                                     )
                                 }
+                                onSaved(pattern, accountId, existingMapping?.strategyId ?: strategyId)
                                 onDismiss()
                             } catch (expected: IllegalArgumentException) {
                                 errorMessage = "Invalid pattern: ${expected.message}"
@@ -318,48 +316,67 @@ private fun matchPreview(
     return "Matches $matches of ${sampleRows.size} rows"
 }
 
-/**
- * Simple dropdown for selecting an account, with an inline "Create new account…" entry.
- */
+/** The existing accounts the mapping being edited would take over, as [accountsCapturedByMapping] decides. */
 @Composable
-internal fun AccountDropdown(
-    accounts: List<Account>,
-    selectedAccountId: AccountId?,
-    onAccountSelected: (AccountId) -> Unit,
-    enabled: Boolean,
-    onCreateAccount: () -> Unit,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val selectedAccount = accounts.find { it.id == selectedAccountId }
+private fun rememberCapturedAccounts(
+    accountRepository: AccountReadRepository,
+    patternText: String,
+    targetAccountId: AccountId?,
+): List<Account> {
+    val accounts by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) { accountRepository.getAllAccounts() }
+    // Null until loaded: an unloaded shadow set would class a reconciliation target as ordinary for a moment.
+    var lookups by remember(accountRepository) { mutableStateOf<CaptureLookups?>(null) }
+    val scope = rememberSchemaAwareCoroutineScope()
+    DisposableEffect(accountRepository, accounts) {
+        val load =
+            scope.launch {
+                lookups =
+                    CaptureLookups(
+                        previousNames = accountRepository.getPreviousAccountNames(),
+                        shadowAccountIds =
+                            accountRepository.getAccountIdsByAttribute(WellKnownIds.ACCOUNT_RECONCILIATION_SOURCE_ATTR_TYPE_ID),
+                    )
+            }
+        onDispose { load.cancel() }
+    }
+    return remember(accounts, lookups, patternText, targetAccountId) {
+        val loaded = lookups
+        val pattern =
+            try {
+                compileRegex(patternText, RegexOption.IGNORE_CASE)
+            } catch (_: IllegalArgumentException) {
+                null
+            }
+        if (loaded == null || pattern == null || targetAccountId == null) {
+            emptyList()
+        } else {
+            accountsCapturedByMapping(pattern, targetAccountId, accounts, loaded.previousNames, loaded.shadowAccountIds)
+        }
+    }
+}
 
-    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { if (enabled) expanded = it }) {
-        OutlinedTextField(
-            value = selectedAccount?.name ?: "Select account...",
-            onValueChange = {},
-            readOnly = true,
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
-            enabled = enabled,
+private class CaptureLookups(
+    val previousNames: Map<String, AccountId>,
+    val shadowAccountIds: Set<AccountId>,
+)
+
+@Composable
+private fun CapturedAccountsPreview(accounts: List<Account>) {
+    if (accounts.isEmpty()) return
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text =
+                "Takes over ${accounts.size} existing account${if (accounts.size == 1) "" else "s"}" +
+                    " (once saved, you can re-import the files that booked onto them):",
+            style = MaterialTheme.typography.bodySmall,
         )
-        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            DropdownMenuItem(
-                text = { Text("Create new account…", color = MaterialTheme.colorScheme.primary) },
-                onClick = {
-                    onCreateAccount()
-                    expanded = false
-                },
-            )
-            accounts.sortedBy { it.name }.forEach { account ->
-                DropdownMenuItem(
-                    text = { Text(account.name) },
-                    onClick = {
-                        onAccountSelected(account.id)
-                        expanded = false
-                    },
+        Column(modifier = Modifier.heightIn(max = 120.dp).verticalScroll(rememberScrollState())) {
+            accounts.forEach { account ->
+                Text(
+                    text = "• ${account.name}",
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }

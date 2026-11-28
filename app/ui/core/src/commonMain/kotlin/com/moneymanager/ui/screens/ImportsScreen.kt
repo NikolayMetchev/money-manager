@@ -57,6 +57,7 @@ import com.moneymanager.ui.foundation.rememberPersistedState
 import com.moneymanager.ui.navigation.ImportTab
 import com.moneymanager.ui.navigation.ReconciliationSubTab
 import com.moneymanager.ui.screens.accountmapping.AccountMappingsScreen
+import com.moneymanager.ui.screens.accountmapping.OnAccountMappingSaved
 import com.moneymanager.ui.screens.apistrategy.ApiSessionsScreen
 import com.moneymanager.ui.screens.csv.ImportFilesScreen
 import com.moneymanager.ui.screens.importdirectory.ImportDirectoriesSection
@@ -118,6 +119,7 @@ fun ImportsScreen(
     onImportDirectoryAuditClick: (ImportDirectory) -> Unit,
     onTransactionsImported: () -> Unit,
     onBrowsePassThroughCatalog: () -> Unit = {},
+    onAccountMappingSaved: OnAccountMappingSaved = { _, _, _ -> },
     onReconciliationLegClick: (ReconciliationLeg) -> Unit = {},
     onReconciliationSourceClick: (ReconciliationLeg) -> Unit = {},
     onSourceClick: (Source) -> Unit = {},
@@ -225,6 +227,7 @@ fun ImportsScreen(
                     accountMappingExportService = accountMappingExportService,
                     appVersion = appVersion,
                     importEngine = importEngine,
+                    onAccountMappingSaved = onAccountMappingSaved,
                     onBrowsePassThroughCatalog = onBrowsePassThroughCatalog,
                 )
             }
@@ -364,6 +367,7 @@ private fun MiscImportsTab(
     appVersion: AppVersion,
     importEngine: ImportEngine,
     onBrowsePassThroughCatalog: () -> Unit,
+    onAccountMappingSaved: OnAccountMappingSaved,
 ) {
     var subTab by rememberPersistedState("imports.miscSubTab", Int.serializer()) { 0 }
     Column(modifier = Modifier.fillMaxSize()) {
@@ -389,6 +393,7 @@ private fun MiscImportsTab(
                     personRepository = personRepository,
                     accountMappingExportService = accountMappingExportService,
                     appVersion = appVersion,
+                    onAccountMappingSaved = onAccountMappingSaved,
                 )
             }
         }

@@ -230,6 +230,7 @@ kmp_modules(
         "//app/importengineapi:test_module",
         "//tools/android-device-test:android-device-test_module",
         "//tools/android-device-test:test_module",
+        "//app/model/accountmapping:test_module",
     ],
     visibility = ["//visibility:public"],
 )

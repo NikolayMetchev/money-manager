@@ -11,6 +11,7 @@ import com.moneymanager.domain.strategy.StrategyKind
 import com.moneymanager.strategycatalog.StrategyCatalogController
 import com.moneymanager.ui.navigation.NavigationHistory
 import com.moneymanager.ui.navigation.Screen
+import com.moneymanager.ui.screens.accountmapping.OnAccountMappingSaved
 import com.moneymanager.ui.screens.apistrategy.ApiStrategiesScreen
 import com.moneymanager.ui.screens.apistrategy.editor.ApiStrategyEditorScreen
 import com.moneymanager.ui.screens.csvstrategy.CsvStrategiesScreen
@@ -24,6 +25,7 @@ internal fun importStrategyEntries(
     strategyCatalogController: StrategyCatalogController?,
     navigationHistory: NavigationHistory,
     offerStrategyReimport: (Set<StrategyKey>) -> Unit,
+    onAccountMappingSaved: OnAccountMappingSaved,
     resetViewedIds: @Composable () -> Unit,
 ) {
     entries.entry<Screen.StrategyCatalog> { screen ->
@@ -109,6 +111,7 @@ internal fun importStrategyEntries(
     }
     entries.entry<Screen.CsvStrategyEditor> { screen ->
         CsvStrategyEditorScreen(
+            onAccountMappingSaved = onAccountMappingSaved,
             onStrategyUpdated = { offerStrategyReimport(setOf(StrategyKey(StrategyKind.CSV, it))) },
             csvImportId = screen.csvImportId,
             strategyId = screen.strategyId,
