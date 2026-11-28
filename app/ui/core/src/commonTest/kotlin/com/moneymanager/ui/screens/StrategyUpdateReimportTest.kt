@@ -47,7 +47,7 @@ class StrategyUpdateReimportTest : DbTest() {
     fun openDatabase() = runTest { openTestDatabase() }
 
     @Test
-    fun editorAndCatalogUpdatesOfferToReimportOnlyPreviouslyImportedSessions() =
+    fun editorAndCatalogUpdatesOfferToReimportOnlyPreviouslyImportedSessions() {
         runMoneyManagerComposeUiTest {
             val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
             val engine = repositories.importEngine
@@ -157,4 +157,5 @@ class StrategyUpdateReimportTest : DbTest() {
             )
             waitForIdle()
         }
+    }
 }

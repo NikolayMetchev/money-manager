@@ -840,6 +840,7 @@ fun MoneyManagerApp(
                                             )
                                         }
                                         importStrategyEntries(
+                                            entries = this,
                                             services = services,
                                             appVersion = appVersion,
                                             strategyCatalogController = strategyCatalogController,

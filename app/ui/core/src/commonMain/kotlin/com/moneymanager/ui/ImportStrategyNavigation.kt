@@ -17,7 +17,8 @@ import com.moneymanager.ui.screens.csvstrategy.CsvStrategiesScreen
 import com.moneymanager.ui.screens.csvstrategy.editor.CsvStrategyEditorScreen
 import com.moneymanager.ui.screens.settings.StrategyCatalogScreen
 
-internal fun EntryProviderScope<NavKey>.importStrategyEntries(
+internal fun importStrategyEntries(
+    entries: EntryProviderScope<NavKey>,
     services: AppServices,
     appVersion: AppVersion,
     strategyCatalogController: StrategyCatalogController?,
@@ -25,7 +26,7 @@ internal fun EntryProviderScope<NavKey>.importStrategyEntries(
     offerStrategyReimport: (Set<StrategyKey>) -> Unit,
     resetViewedIds: @Composable () -> Unit,
 ) {
-    entry<Screen.StrategyCatalog> { screen ->
+    entries.entry<Screen.StrategyCatalog> { screen ->
         resetViewedIds()
         if (strategyCatalogController != null) {
             StrategyCatalogScreen(
@@ -44,7 +45,7 @@ internal fun EntryProviderScope<NavKey>.importStrategyEntries(
             LaunchedEffect(Unit) { navigationHistory.navigateBack() }
         }
     }
-    entry<Screen.ApiStrategies> {
+    entries.entry<Screen.ApiStrategies> {
         resetViewedIds()
         ApiStrategiesScreen(
             onStrategyUpdated = { offerStrategyReimport(setOf(StrategyKey(StrategyKind.API, it))) },
@@ -66,7 +67,7 @@ internal fun EntryProviderScope<NavKey>.importStrategyEntries(
             },
         )
     }
-    entry<Screen.ApiStrategyEditor> { screen ->
+    entries.entry<Screen.ApiStrategyEditor> { screen ->
         resetViewedIds()
         ApiStrategyEditorScreen(
             onStrategyUpdated = { offerStrategyReimport(setOf(StrategyKey(StrategyKind.API, it))) },
@@ -79,7 +80,7 @@ internal fun EntryProviderScope<NavKey>.importStrategyEntries(
             onBack = { navigationHistory.navigateBack() },
         )
     }
-    entry<Screen.CsvStrategies> {
+    entries.entry<Screen.CsvStrategies> {
         resetViewedIds()
         CsvStrategiesScreen(
             onStrategyUpdated = { offerStrategyReimport(setOf(StrategyKey(StrategyKind.CSV, it))) },
@@ -106,7 +107,7 @@ internal fun EntryProviderScope<NavKey>.importStrategyEntries(
             },
         )
     }
-    entry<Screen.CsvStrategyEditor> { screen ->
+    entries.entry<Screen.CsvStrategyEditor> { screen ->
         CsvStrategyEditorScreen(
             onStrategyUpdated = { offerStrategyReimport(setOf(StrategyKey(StrategyKind.CSV, it))) },
             csvImportId = screen.csvImportId,
