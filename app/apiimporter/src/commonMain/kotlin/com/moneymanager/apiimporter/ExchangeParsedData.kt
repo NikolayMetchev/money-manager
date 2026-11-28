@@ -139,6 +139,14 @@ internal data class ParsedReportedBalance(
     val amount: BigDecimal,
     val requestId: ApiRequestId,
     val jsonPath: String,
+    val isSnapshot: Boolean = false,
+)
+
+/** A successfully parsed, complete response that can also report zero by omission. */
+internal data class CompleteBalanceSnapshot(
+    val requestId: ApiRequestId,
+    val timestamp: Instant,
+    val balances: List<ParsedReportedBalance>,
 )
 
 /** Accumulator for parsed items across all of a session's responses. */
@@ -149,4 +157,5 @@ internal class ParsedExchangeData {
     val enrichments = mutableListOf<ParsedEnrichment>()
     val ledgerTradeLegs = mutableListOf<ParsedLedgerTradeLeg>()
     val balances = mutableListOf<ParsedReportedBalance>()
+    val completeBalanceSnapshots = mutableListOf<CompleteBalanceSnapshot>()
 }

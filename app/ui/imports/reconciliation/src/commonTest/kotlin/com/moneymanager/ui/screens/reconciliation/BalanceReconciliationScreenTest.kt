@@ -81,12 +81,13 @@ class BalanceReconciliationScreenTest {
     private fun runScreen(
         onOpenLeg: (ReconciliationLeg) -> Unit = {},
         onOpenSource: (Source) -> Unit = {},
+        statementBalances: List<ReportedBalance> = reported,
         assertions: ComposeUiTest.() -> Unit,
     ) {
         val balances: ReportedBalanceReadRepository =
             mock {
                 every { getSeries() } returns flowOf(listOf(ReportedBalanceSeries(account, "Revolut", coin, 2, t0 + 1.days)))
-                everySuspend { getBalances(any(), any()) } returns reported
+                everySuspend { getBalances(any(), any()) } returns statementBalances
                 everySuspend { getTransactionBalanceTimes(any(), any()) } returns emptyMap()
                 everySuspend { getSources(any()) } returns
                     listOf(
@@ -134,6 +135,15 @@ class BalanceReconciliationScreenTest {
             waitForIdle()
         }
         assertEquals(listOf(3L), opened)
+    }
+
+    @Test
+    fun aSingleDiscrepancyAppearsUnderNotReconciled() {
+        runScreen(statementBalances = listOf(balance(11, "70", 1))) {
+            waitUntilAtLeastOneExists(hasText("Balance differs"))
+            onNodeWithText("Not reconciled (1)").assertExists()
+            onNodeWithText("Reported minus Money Manager:", substring = true).assertExists()
+        }
     }
 
     @Test

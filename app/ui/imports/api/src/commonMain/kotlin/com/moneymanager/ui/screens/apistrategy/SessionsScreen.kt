@@ -179,6 +179,7 @@ fun ApiSessionsScreen(
             cryptoRepository = cryptoRepository,
             importRecordRepository = importRecordRepository,
             accountMappingRepository = accountMappingRepository,
+            transactionRepository = apiImportService.transactionRepository,
         )
 
     fun refresh() {

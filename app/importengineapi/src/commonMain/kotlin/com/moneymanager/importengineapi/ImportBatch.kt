@@ -10,6 +10,7 @@ import com.moneymanager.domain.model.CryptoAsset
 import com.moneymanager.domain.model.CryptoId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.MergeId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
@@ -755,4 +756,6 @@ data class ImportReportedBalance(
     val account: AccountRef,
     val timestamp: Instant,
     val amount: Money,
+    /** For a balance implied by the response rather than an individual item. */
+    val sourceJsonPath: JsonPath? = null,
 )

@@ -78,6 +78,9 @@ class BalanceCheckCache {
 private const val RECONCILED_NODE = "reconciled"
 private const val NOT_RECONCILED_NODE = "not-reconciled"
 
+private val BalanceCheckResult.isReconciled: Boolean
+    get() = breaks.isEmpty() && latest?.difference?.isZero() == true
+
 /**
  * The balances statements report (a strategy's `Balance` rule action) against the running balance Money Manager
  * computes from the account's legs, one account and asset at a time. Where the two stop differing by the same amount,
@@ -98,8 +101,7 @@ fun BalanceReconciliationScreen(
     val loaded = series ?: return
     if (loaded.isEmpty()) {
         Text(
-            "No statement balances yet. A strategy reports them with a \"Statement balance\" rule (Revolut and Marcus " +
-                "do); import a statement it covers on the Files tab.",
+            "No reported balances yet. Import a statement or API session with a strategy that reports balances.",
             modifier = Modifier.padding(16.dp),
         )
         return
@@ -131,8 +133,7 @@ fun BalanceReconciliationScreen(
     }
 
     // A series not checked yet counts as not reconciled until its check lands.
-    val reconciled = loaded.filter { checks[it.key]?.breaks?.isEmpty() == true }
-    val notReconciled = loaded.filter { checks[it.key]?.breaks?.isEmpty() != true }
+    val (reconciled, notReconciled) = loaded.partition { checks[it.key]?.isReconciled == true }
     val tree = BalanceTree(mutableStateMapOf(), checks, selected.key) { selectedKey = it }
 
     Row(modifier = Modifier.fillMaxSize()) {
@@ -257,9 +258,13 @@ private fun AssetLeaf(
         Text("${entry.count} statement balances", style = MaterialTheme.typography.bodySmall)
         if (check != null) {
             Text(
-                if (check.breaks.isEmpty()) "✓ Reconciles" else "${check.breaks.size} breaks",
+                when {
+                    check.isReconciled -> "✓ Reconciles"
+                    check.breaks.isEmpty() -> "Balance differs"
+                    else -> "${check.breaks.size} breaks"
+                },
                 style = MaterialTheme.typography.bodySmall,
-                color = if (check.breaks.isEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                color = if (check.isReconciled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
             )
         }
     }
@@ -288,23 +293,29 @@ private fun BalanceCheckDetail(
                 result.latest?.let { latest ->
                     Text("Latest statement balance ${formatAmount(latest.reportedBalance)} on ${latest.timestamp}")
                     Text("Money Manager has ${formatAmount(latest.computed)}")
+                    if (!latest.difference.isZero()) {
+                        Text("Reported minus Money Manager: ${formatAmount(latest.difference)}")
+                        TextButton(onClick = { openBalance(latest.reported.last { it.amount == latest.reportedBalance }) }) {
+                            Text("View latest balance source")
+                        }
+                    }
                 }
                 result.openingOffset?.let { offset ->
-                    if (!offset.isZero()) {
+                    if (!offset.isZero() && result.checkpoints.size > 1) {
                         Text(
-                            "Opening balance before the first transaction Money Manager has: ${formatAmount(offset)}",
+                            "Difference at the first reported balance: ${formatAmount(offset)}",
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
                 }
-                Text(
-                    if (result.breaks.isEmpty()) {
-                        "Every statement balance agrees with Money Manager's."
-                    } else {
-                        "${result.breaks.size} places where the balance stops agreeing:"
-                    },
-                    modifier = Modifier.padding(top = 8.dp),
-                )
+                val summary =
+                    when {
+                        result.breaks.isNotEmpty() -> "${result.breaks.size} changes in the balance difference:"
+                        result.isReconciled -> "Every statement balance agrees with Money Manager's."
+                        result.checkpoints.size > 1 -> "The balance difference is consistent across the reported balances."
+                        else -> null
+                    }
+                summary?.let { Text(it, modifier = Modifier.padding(top = 8.dp)) }
             }
         }
         result.breaks.forEachIndexed { index, balanceBreak ->

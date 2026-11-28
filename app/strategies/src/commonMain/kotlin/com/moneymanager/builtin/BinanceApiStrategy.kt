@@ -3,6 +3,7 @@ package com.moneymanager.builtin
 import com.moneymanager.domain.model.ApiImportStrategyId
 import com.moneymanager.domain.model.apistrategy.ApiAccountsSource
 import com.moneymanager.domain.model.apistrategy.ApiAmountFormat
+import com.moneymanager.domain.model.apistrategy.ApiBalanceSnapshot
 import com.moneymanager.domain.model.apistrategy.ApiDataEndpoint
 import com.moneymanager.domain.model.apistrategy.ApiDateWindowing
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
@@ -367,7 +368,15 @@ internal object BinanceApiStrategy {
                     accounts = ApiAccountsSource.Single(name = "Binance", externalId = "binance"),
                     valueEndpoints =
                         listOf(
-                            signed("sapi/v3/asset/getUserAsset", "", pagination = null, method = HttpMethodType.POST),
+                            signed("sapi/v3/asset/getUserAsset", "", pagination = null, method = HttpMethodType.POST)
+                                .copy(
+                                    balanceSnapshot =
+                                        ApiBalanceSnapshot(
+                                            assetField = "asset",
+                                            amountFields = listOf("free", "freeze", "ipoable", "locked", "withdrawing"),
+                                            omittedAssetsAreZero = true,
+                                        ),
+                                ),
                             // Public, unsigned and never persisted (~2MB of symbol metadata unrelated to
                             // anything importable) — used only to validate fan-out candidate symbols.
                             ApiEndpointConfig(

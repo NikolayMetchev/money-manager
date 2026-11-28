@@ -11,6 +11,7 @@ import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.ImportRecordReadRepository
+import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.assetAliasMap
 import com.moneymanager.importengineapi.ApiSessionMutation
 import com.moneymanager.importengineapi.ImportBatch
@@ -171,6 +172,7 @@ class ApiImportReads(
     val cryptoRepository: CryptoReadRepository,
     val importRecordRepository: ImportRecordReadRepository,
     val accountMappingRepository: AccountMappingReadRepository,
+    val transactionRepository: TransactionReadRepository? = null,
 )
 
 /**
@@ -227,6 +229,7 @@ internal suspend fun importByShape(
                     importEngine = importEngine,
                     onProgress = onProgress,
                     engineBatchSize = engineBatchSize,
+                    transactionRepository = reads.transactionRepository,
                 )
             ApiSessionImportOutcome(
                 accountCount = 0,

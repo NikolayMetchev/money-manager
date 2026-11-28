@@ -32,4 +32,5 @@ fun AppServices.apiImportService(
         deviceId = deviceId,
         httpEngine = httpEngine,
         writeLock = writeLock,
+        transactionRepository = transactions.transactionRepository,
     )

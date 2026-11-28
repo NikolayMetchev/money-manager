@@ -25,6 +25,7 @@ import com.moneymanager.domain.repository.AccountReadRepository
 import com.moneymanager.domain.repository.ApiSessionReadRepository
 import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
+import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.domain.repository.assetAliasMap
 import com.moneymanager.importengineapi.AccountMatchKey
 import com.moneymanager.importengineapi.AccountRef
@@ -114,6 +115,7 @@ suspend fun importApiSessionExchange(
     importEngine: ImportEngine,
     onProgress: (suspend (Progress) -> Unit)? = null,
     engineBatchSize: Int = Int.MAX_VALUE,
+    transactionRepository: TransactionReadRepository? = null,
 ): ExchangeImportResult {
     val synthetic =
         strategy.config.accounts as? ApiAccountsSource.Single
@@ -181,6 +183,7 @@ suspend fun importApiSessionExchange(
         noteCrypto(t.feeCode)
     }
     for (tx in transfers) noteCrypto(tx.currencyCode)
+    parsed.balances.filter { it.isSnapshot }.forEach { noteCrypto(canonicalAsset(it.currencyCode)) }
 
     for (code in cryptoCodes) {
         importEngine.createCrypto(code, name = CryptoRegistry.nameFor(code), source = source)
@@ -522,7 +525,7 @@ suspend fun importApiSessionExchange(
         }
 
     // A balance is the exchange account's, in the item's own asset as every other code is resolved: a ledger row reports
-    // what the account holds after it, whatever the row itself books. An asset no movement made isn't created for it.
+    // what the account holds after it, whatever the row itself books.
     val reportedBalances =
         parsed.balances.mapNotNull { balance ->
             val balanceAsset = asset(canonicalAsset(balance.currencyCode)) ?: return@mapNotNull null
@@ -532,7 +535,16 @@ suspend fun importApiSessionExchange(
                 timestamp = balance.timestamp,
                 amount = Money.fromDisplayValue(balance.amount, balanceAsset),
             )
-        }
+        } +
+            omittedSnapshotBalances(
+                parsed.completeBalanceSnapshots,
+                sessionId,
+                exchangeRef,
+                transactionRepository,
+                transferIntents,
+                tradeIntents,
+                ::canonicalAsset,
+            )
 
     val result =
         importEngine.import(
@@ -622,3 +634,47 @@ private fun moneyExact(
             e,
         )
     }
+
+/** Adds balances implied by a complete response, using the whole response as their source. */
+private suspend fun omittedSnapshotBalances(
+    snapshots: List<CompleteBalanceSnapshot>,
+    sessionId: ApiSessionId,
+    account: AccountRef.Existing,
+    transactionRepository: TransactionReadRepository?,
+    transfers: List<ImportTransfer>,
+    trades: List<ImportTradeIntent>,
+    canonicalAsset: (String) -> String,
+): List<ImportReportedBalance> {
+    if (snapshots.isEmpty()) return emptyList()
+    val accountId = account.id
+    val ledgerAssets =
+        buildSet {
+            transactionRepository
+                ?.getAccountBalances()
+                ?.first()
+                .orEmpty()
+                .filter { it.accountId == accountId }
+                .forEach { add(it.balance.asset) }
+            for (transfer in transfers) {
+                if (transfer.fromAccount == account || transfer.toAccount == account) transfer.amount?.asset?.let(::add)
+                val fee = transfer.fee
+                if (fee != null && (fee.source == account || fee.target == account)) add(fee.amount.asset)
+            }
+            for (trade in trades) {
+                if (trade.fromAccountId == accountId) trade.fromAmount?.asset?.let(::add)
+                if (trade.toAccountId == accountId) trade.toAmount?.asset?.let(::add)
+            }
+        }
+    return snapshots.flatMap { snapshot ->
+        val reported = snapshot.balances.mapTo(mutableSetOf()) { canonicalAsset(it.currencyCode) }
+        ledgerAssets.filter { it.code.uppercase() !in reported }.map { asset ->
+            ImportReportedBalance(
+                record = ImportRecordKey.ApiItem(sessionId, snapshot.requestId, "$.omittedBalance.${asset.id}"),
+                account = account,
+                timestamp = snapshot.timestamp,
+                amount = Money.zero(asset),
+                sourceJsonPath = JsonPath("$"),
+            )
+        }
+    }
+}

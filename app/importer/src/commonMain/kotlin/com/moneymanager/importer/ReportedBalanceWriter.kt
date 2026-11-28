@@ -31,7 +31,7 @@ internal class ReportedBalanceWriter(
                     accountId = account,
                     timestamp = balance.timestamp,
                     amount = balance.amount,
-                    source = balance.record.source().withStatementAccount(account),
+                    source = balance.record.source(balance.sourceJsonPath).withStatementAccount(account),
                 )
             }
         balances.writeBalances(writes)
@@ -41,8 +41,8 @@ internal class ReportedBalanceWriter(
     suspend fun settle() = balances.deleteReserved()
 }
 
-private fun ImportRecordKey.source(): Source =
+private fun ImportRecordKey.source(jsonPathOverride: JsonPath?): Source =
     when (this) {
         is ImportRecordKey.CsvRow -> Source.Csv(csvImportId, rowIndex)
-        is ImportRecordKey.ApiItem -> Source.Api(sessionId, requestId, JsonPath(jsonPath))
+        is ImportRecordKey.ApiItem -> Source.Api(sessionId, requestId, jsonPathOverride ?: JsonPath(jsonPath))
     }
