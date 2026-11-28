@@ -2,8 +2,10 @@ package com.moneymanager.apiimporter
 
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.model.ApiRequestId
+import com.moneymanager.domain.model.ApiResponse
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.apistrategy.ApiDataEndpoint
+import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiEndpointKind
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiTradeMappings
@@ -440,6 +442,14 @@ internal suspend fun parseSessionResponses(
             )
         }
         val request = requestsById[response.requestId] ?: return@forEachResponse
+        val snapshotEndpoint =
+            strategy.config.valueEndpoints.firstOrNull { endpoint ->
+                endpoint.balanceSnapshot != null && matchesValueEndpoint(request.url, strategy.config.baseUrl, endpoint)
+            }
+        if (snapshotEndpoint != null) {
+            parseBalanceSnapshot(snapshotEndpoint, response, parsed)
+            return@forEachResponse
+        }
         val windowStart = windowStartFromMarker(request.url)
         val windowEnd = windowEndFromMarker(request.url)
         // Prefer the precise "ep=<key>" marker (disambiguates endpoints sharing a path, e.g. Kraken's
@@ -472,4 +482,58 @@ internal suspend fun parseSessionResponses(
         }
     }
     return parsed
+}
+
+private fun matchesValueEndpoint(
+    url: String,
+    baseUrl: String,
+    endpoint: ApiEndpointConfig,
+): Boolean {
+    if (url.substringBefore('?') != buildEndpointUrl(baseUrl, endpoint.path)) return false
+    if ("?ep=" in url) return url.substringAfter("?ep=").substringBefore("&pg=") == endpointDedupeKey(endpoint)
+    return endpoint.queryParams.none { it.value != null }
+}
+
+private fun parseBalanceSnapshot(
+    endpoint: ApiEndpointConfig,
+    response: ApiResponse,
+    parsed: ParsedExchangeData,
+) {
+    val mapping = endpoint.balanceSnapshot ?: return
+    if (mapping.assetField.isBlank() || mapping.amountFields.isEmpty() || !endpoint.storeResponse) return
+    if (!responseCodeOk(response.json, endpoint.successCodeField, endpoint.successCodeOkValue, endpoint.errorArrayField)) return
+    val items =
+        responseItemsWithKeys(
+            response.json,
+            endpoint.responseArrayKey,
+            endpoint.responseObjectValues,
+            endpoint.itemKeyField,
+            endpoint.nestedItemsKey,
+        ) ?: return
+    // Parse all rows before using omission as evidence of zero. A malformed row may be the missing asset.
+    val balances =
+        items.mapIndexedNotNull { index, (key, element) ->
+            val item = element as? JsonObject ?: return@mapIndexedNotNull null
+            val code = item.resolveJsonPath(mapping.assetField.trim())?.trim()?.takeIf { it.isNotEmpty() } ?: return@mapIndexedNotNull null
+            val amounts =
+                mapping.amountFields.map { field ->
+                    val raw = item.resolveJsonPath(field.trim()) ?: return@mapIndexedNotNull null
+                    runCatching { BigDecimal(raw) }.getOrNull() ?: return@mapIndexedNotNull null
+                }
+            val path =
+                key?.let { keyedItemJsonPath(endpoint.responseArrayKey, it) }
+                    ?: arrayItemJsonPath(endpoint.responseArrayKey, index)
+            ParsedReportedBalance(
+                response.respondedAt,
+                code,
+                amounts.reduce(BigDecimal::plus),
+                response.requestId,
+                path.value,
+                isSnapshot = true,
+            )
+        }
+    if (mapping.omittedAssetsAreZero && endpoint.pagination == null && endpoint.nestedItemsKey == null && balances.size == items.size) {
+        parsed.completeBalanceSnapshots += CompleteBalanceSnapshot(response.requestId, response.respondedAt, balances)
+    }
+    parsed.balances += balances
 }

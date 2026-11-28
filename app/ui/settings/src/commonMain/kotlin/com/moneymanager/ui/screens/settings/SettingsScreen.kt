@@ -44,6 +44,7 @@ import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.HolidayCalendarReadRepository
 import com.moneymanager.domain.repository.PersonReadRepository
 import com.moneymanager.domain.repository.SettingsReadRepository
+import com.moneymanager.domain.strategy.StrategyKey
 import com.moneymanager.domain.strategy.StrategyLibrary
 import com.moneymanager.humanreadable.HumanReadable
 import com.moneymanager.importengineapi.setDefaultCurrency
@@ -167,6 +168,7 @@ fun SettingsScreen(
     categoryRepository: CategoryReadRepository? = null,
     personRepository: PersonReadRepository? = null,
     holidayCalendarRepository: HolidayCalendarReadRepository? = null,
+    onStrategiesUpdated: (Set<StrategyKey>) -> Unit = {},
 ) {
     val importEngine = LocalImportEngine.current
     var showWarningDialog by remember { mutableStateOf(false) }
@@ -254,6 +256,7 @@ fun SettingsScreen(
             personRepository != null
         ) {
             StrategyCloudCard(
+                onStrategiesUpdated = onStrategiesUpdated,
                 controller = strategySyncController,
                 library = strategyLibrary,
                 appVersion = appVersion,

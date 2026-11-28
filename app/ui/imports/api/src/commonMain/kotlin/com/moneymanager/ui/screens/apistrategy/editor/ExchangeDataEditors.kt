@@ -545,7 +545,12 @@ internal fun ApiEndpointConfig.isValidForSave(): Boolean {
         (successCodeField == null || !successCodeOkValue.isNullOrBlank()) &&
         // A non-positive limitValue would never advance the offset, looping on the same page forever.
         (pagination?.paging !is ApiPaging.Offset || pagination.limitValue > 0) &&
-        requestCostWeight >= 1
+        requestCostWeight >= 1 &&
+        balanceSnapshot?.let {
+            storeResponse && it.assetField.isNotBlank() &&
+                it.amountFields.isNotEmpty() && it.amountFields.none(String::isBlank) &&
+                (!it.omittedAssetsAreZero || (pagination == null && nestedItemsKey == null))
+        } != false
 }
 
 /** Whether a data-endpoint list is complete enough to save (used for tab validation). */

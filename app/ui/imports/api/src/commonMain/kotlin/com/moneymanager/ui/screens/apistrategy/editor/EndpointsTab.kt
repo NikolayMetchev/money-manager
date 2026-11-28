@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.apistrategy.ApiAccountsSource
+import com.moneymanager.domain.model.apistrategy.ApiBalanceSnapshot
 import com.moneymanager.domain.model.apistrategy.ApiDataEndpoint
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiEndpointKind
@@ -83,6 +84,7 @@ internal fun EndpointsTab(
             endpoints = state.config.valueEndpoints,
             label = "value",
             exchangeDownload = true,
+            allowBalanceSnapshot = accounts is ApiAccountsSource.Single,
             onChange = { v -> state.updateConfig { copy(valueEndpoints = v) } },
             enabled = enabled,
         )
@@ -197,6 +199,7 @@ private fun EndpointListEditor(
     onChange: (List<ApiEndpointConfig>) -> Unit,
     enabled: Boolean,
     exchangeDownload: Boolean = false,
+    allowBalanceSnapshot: Boolean = false,
 ) {
     endpoints.forEachIndexed { index, endpoint ->
         Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), colors = CardDefaults.cardColors()) {
@@ -212,6 +215,9 @@ private fun EndpointListEditor(
                     exchangeDownload = exchangeDownload,
                     enabled = enabled,
                 )
+                if (allowBalanceSnapshot) {
+                    BalanceSnapshotEditor(endpoint, { updated -> onChange(endpoints.replacingAt(index, updated)) }, enabled)
+                }
             }
         }
     }
@@ -223,4 +229,38 @@ private fun EndpointListEditor(
         Spacer(Modifier.width(4.dp))
         Text("Add $label endpoint")
     }
+}
+
+@Composable
+private fun BalanceSnapshotEditor(
+    endpoint: ApiEndpointConfig,
+    onChange: (ApiEndpointConfig) -> Unit,
+    enabled: Boolean,
+) {
+    val mapping = endpoint.balanceSnapshot
+
+    fun update(value: ApiBalanceSnapshot?) = onChange(endpoint.copy(balanceSnapshot = value))
+    ToggleRow("Report wallet balances", mapping != null, { update(if (it) ApiBalanceSnapshot() else null) }, enabled)
+    if (mapping == null) return
+    TextFieldRow(
+        label = "Asset field",
+        value = mapping.assetField,
+        onValueChange = { update(mapping.copy(assetField = it)) },
+        enabled = enabled,
+        isError = mapping.assetField.isBlank(),
+    )
+    TextFieldRow(
+        label = "Amount fields to sum (comma separated)",
+        value = mapping.amountFields.joinToString(","),
+        onValueChange = { value -> update(mapping.copy(amountFields = value.split(','))) },
+        enabled = enabled,
+        isError = mapping.amountFields.isEmpty() || mapping.amountFields.any { it.isBlank() },
+    )
+    if (!endpoint.storeResponse) Text("Enable Store response to report wallet balances.")
+    ToggleRow(
+        label = "Omitted assets have zero balance",
+        checked = mapping.omittedAssetsAreZero,
+        onCheckedChange = { update(mapping.copy(omittedAssetsAreZero = it)) },
+        enabled = enabled && endpoint.pagination == null && endpoint.nestedItemsKey == null,
+    )
 }

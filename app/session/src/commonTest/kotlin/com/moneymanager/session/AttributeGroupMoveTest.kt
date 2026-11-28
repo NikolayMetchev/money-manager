@@ -16,7 +16,14 @@ import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csv.CsvImport
+import com.moneymanager.domain.model.rules.RuleAction
+import com.moneymanager.domain.model.rules.StrategyRule
+import com.moneymanager.domain.strategy.StrategyKey
+import com.moneymanager.domain.strategy.StrategyKind
 import com.moneymanager.importengineapi.createApiSession
+import com.moneymanager.importengineapi.ensureApiCredential
+import com.moneymanager.importengineapi.markApiSessionImported
+import com.moneymanager.importengineapi.updateCsvStrategy
 import com.moneymanager.tasks.TaskManager
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.addAccountAttributes
@@ -174,6 +181,80 @@ class AttributeGroupMoveTest : DbTest() {
                     .first()
                     .size,
             )
+        }
+
+    @Test
+    fun `a strategy update offers only previously applied files and API sessions for the updated strategies`() =
+        runDbTest {
+            account("Marcus account", listOf(numberType(MARCUS_NUMBER)))
+            account("Bank", listOf(numberType(BANK_NUMBER)))
+            val importedFile = stage(listOf(deposit))
+            importFile(importedFile)
+            stage(listOf(deposit, deposit))
+            val strategyName =
+                checkNotNull(
+                    repositories.csvImportRepository
+                        .getImport(importedFile.id)
+                        .first()
+                        ?.lastAppliedStrategyName,
+                )
+
+            val apiStrategies = repositories.apiImportStrategyRepository.getAllStrategies().first()
+            val binance = apiStrategies.single { it.name == "Binance" }
+            val kraken = apiStrategies.single { it.name == "Kraken" }
+            val engine = repositories.importEngine
+            val imports = sessionImports()
+            val deviceId = repositories.toAppServices(engine).deviceId
+            val binanceConnection = engine.ensureApiCredential(binance.id, now)
+            val krakenConnection = engine.ensureApiCredential(kraken.id, now)
+            val importedSession = engine.createApiSession(deviceId, now, binanceConnection)
+            engine.markApiSessionImported(importedSession, binance.revisionId, now)
+            engine.createApiSession(deviceId, now, binanceConnection)
+            val unrelatedSession = engine.createApiSession(deviceId, now, krakenConnection)
+            engine.markApiSessionImported(unrelatedSession, kraken.revisionId, now)
+
+            val offer =
+                imports.findStrategyReimports(
+                    setOf(StrategyKey(StrategyKind.CSV, strategyName), StrategyKey(StrategyKind.API, binance.name)),
+                )
+            assertEquals(listOf(importedFile.id), offer.files.map { it.id })
+            assertEquals(setOf(importedSession), offer.sessions)
+            assertTrue(imports.findStrategyReimports(setOf(StrategyKey(StrategyKind.API, "Missing"))).isEmpty)
+        }
+
+    @Test
+    fun `re-import after a strategy update applies the new rules to the existing file`() =
+        runDbTest {
+            account("Marcus account", listOf(numberType(MARCUS_NUMBER)))
+            account("Bank", listOf(numberType(BANK_NUMBER)))
+            val file = stage(listOf(deposit))
+            importFile(file)
+            assertEquals(mapOf("Marcus account" to "22.5", "Bank" to "-22.5"), balances())
+
+            val name =
+                checkNotNull(
+                    repositories.csvImportRepository
+                        .getImport(file.id)
+                        .first()
+                        ?.lastAppliedStrategyName,
+                )
+            val strategy = checkNotNull(repositories.csvImportStrategyRepository.getStrategyByName(name).first())
+            val skip = StrategyRule(conditions = emptyList(), actions = listOf(RuleAction.Skip))
+            repositories.importEngine.updateCsvStrategy(strategy.copy(config = strategy.config.copy(rules = listOf(skip))))
+            val imports = sessionImports()
+            val offer = imports.findStrategyReimports(setOf(StrategyKey(StrategyKind.CSV, name)))
+
+            val result = CompletableDeferred<String>()
+            TaskManager(backgroundScope, dispatcher = Dispatchers.Default).start("rerun", "Re-import", "Preparing") {
+                try {
+                    imports.reimportUpdatedStrategies(offer, this).also { result.complete(it) }
+                } catch (expected: Exception) {
+                    result.completeExceptionally(expected)
+                    throw expected
+                }
+            }
+            assertTrue(result.await().startsWith("Re-imported 1 file"))
+            assertTrue(balances().isEmpty())
         }
 
     @Test

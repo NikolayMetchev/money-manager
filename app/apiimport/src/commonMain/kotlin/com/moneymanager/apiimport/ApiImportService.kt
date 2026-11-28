@@ -36,6 +36,7 @@ import com.moneymanager.domain.repository.CryptoReadRepository
 import com.moneymanager.domain.repository.CurrencyReadRepository
 import com.moneymanager.domain.repository.ImportRecordReadRepository
 import com.moneymanager.domain.repository.PassThroughAccountReadRepository
+import com.moneymanager.domain.repository.TransactionReadRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.RerunReads
 import com.moneymanager.importengineapi.createApiSession
@@ -206,6 +207,7 @@ class ApiImportService(
     private val httpEngine: HttpClientEngine? = null,
     private val countryCode: () -> String? = ::currentCountryCode,
     private val writeLock: Mutex = Mutex(),
+    val transactionRepository: TransactionReadRepository? = null,
 ) {
     /**
      * The strategy [credential] downloads with. Null for an orphaned credential (its strategy was deleted,
@@ -370,6 +372,7 @@ class ApiImportService(
                     cryptoRepository = cryptoRepository,
                     importRecordRepository = importRecordRepository,
                     accountMappingRepository = accountMappingRepository,
+                    transactionRepository = transactionRepository,
                 )
             val passThroughAccounts = passThroughAccountRepository.getAll().first()
             var result = ApiBulkReimportResult(sessionsReimported = 0)
@@ -427,6 +430,7 @@ class ApiImportService(
                         cryptoRepository = cryptoRepository,
                         importRecordRepository = importRecordRepository,
                         accountMappingRepository = accountMappingRepository,
+                        transactionRepository = transactionRepository,
                     ),
                 sessionId = sessionId,
                 strategy = strategy,

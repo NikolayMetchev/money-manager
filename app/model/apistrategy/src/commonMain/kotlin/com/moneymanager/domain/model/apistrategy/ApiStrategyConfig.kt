@@ -48,8 +48,8 @@ data class ApiStrategyConfig(
     val tokenExchange: ApiTokenExchange? = null,
     /**
      * Endpoints fetched (unpaged loop aside — each still runs its own pagination) before
-     * [dataEndpoints], purely to supply values for an [ApiFanOut] (e.g. Binance `getUserAsset` for held
-     * balances, `exchangeInfo` for the valid symbol universe). Produce no transfers/trades of their own.
+     * [dataEndpoints], to supply values for an [ApiFanOut] (e.g. Binance `getUserAsset` for held
+     * balances, `exchangeInfo` for the valid symbol universe) or to report wallet balance snapshots.
      * Referenced by path from [ApiValueSet.FromValueEndpoint.endpointPath], so list order carries no
      * meaning.
      */

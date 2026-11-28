@@ -22,6 +22,7 @@ import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.calendar.HolidayCalendar
 import com.moneymanager.domain.model.calendar.forCountry
+import com.moneymanager.domain.strategy.StrategyKey
 import com.moneymanager.importdirectory.ImportDirectoryService
 import com.moneymanager.importengineapi.setDefaultCurrency
 import com.moneymanager.importengineapi.setDefaultLocation
@@ -66,6 +67,7 @@ fun SetupWizardScreen(
     driveFolderBrowser: DriveFolderBrowser?,
     includeDatabaseStep: Boolean,
     onFinished: () -> Unit,
+    onStrategiesUpdated: (Set<StrategyKey>) -> Unit = {},
 ) {
     val importEngine = LocalImportEngine.current
     val scope = rememberSchemaAwareCoroutineScope()
@@ -181,6 +183,7 @@ fun SetupWizardScreen(
             appVersion = appVersion,
             strategyCatalogController = strategyCatalogController,
             strategySyncController = strategySyncController,
+            onStrategiesUpdated = onStrategiesUpdated,
             importDirectoryService = importDirectoryService,
             apiImportService = apiImportService,
             driveFolderBrowser = driveFolderBrowser,
@@ -209,6 +212,7 @@ private fun ColumnScope.StepBody(
     calendars: List<HolidayCalendar>,
     selectedLocation: String?,
     onLocationSelected: (String?) -> Unit,
+    onStrategiesUpdated: (Set<StrategyKey>) -> Unit,
 ) {
     when (step) {
         // Chosen before the database existed, so it is never rendered as a body.
@@ -235,6 +239,7 @@ private fun ColumnScope.StepBody(
         SetupWizardStep.STRATEGIES -> {
             if (strategyCatalogController != null) {
                 StrategyCatalogScreen(
+                    onStrategiesUpdated = onStrategiesUpdated,
                     controller = strategyCatalogController,
                     library = services.imports.strategyLibrary,
                     appVersion = appVersion,
@@ -253,6 +258,7 @@ private fun ColumnScope.StepBody(
                 // so it would be clipped on a phone once the list is longer than the step.
                 Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
                     StrategyCloudCard(
+                        onStrategiesUpdated = onStrategiesUpdated,
                         controller = strategySyncController,
                         library = services.imports.strategyLibrary,
                         appVersion = appVersion,

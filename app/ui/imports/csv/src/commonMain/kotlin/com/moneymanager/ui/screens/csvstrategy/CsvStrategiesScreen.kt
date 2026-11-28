@@ -75,6 +75,7 @@ fun CsvStrategiesScreen(
     onBack: () -> Unit = {},
     onEditStrategy: (CsvImportStrategyId, CsvImportId) -> Unit = { _, _ -> },
     onAuditHistoryClick: (CsvImportStrategy) -> Unit = {},
+    onStrategyUpdated: (String) -> Unit = {},
 ) {
     val strategies by rememberFlowAsStateWithSchemaErrorHandling(initial = emptyList()) {
         csvImportStrategyRepository.getAllStrategies()
@@ -300,6 +301,8 @@ fun CsvStrategiesScreen(
     val currentParseResult = importParseResult
     if (currentParseResult != null) {
         ImportStrategyDialog(
+            appVersion = appVersion,
+            onStrategyUpdated = onStrategyUpdated,
             parseResult = currentParseResult,
             csvImportStrategyRepository = csvImportStrategyRepository,
             strategyLibrary = strategyLibrary,

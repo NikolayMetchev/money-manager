@@ -202,6 +202,36 @@ class ApiStrategyEditorStateTest {
             }
         }
 
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `edit and save a wallet balance snapshot mapping`() =
+        runMoneyManagerComposeUiTest {
+            val original = BuiltInApiStrategies.binance(now)
+            val endpoint = original.config.valueEndpoints.single { it.balanceSnapshot != null }
+            val mapping = checkNotNull(endpoint.balanceSnapshot)
+            val expected = original.copy(config = original.config.copy(dataEndpoints = emptyList(), valueEndpoints = listOf(endpoint)))
+            val state = ApiStrategyEditorState(expected)
+            state.updateConfig { copy(valueEndpoints = listOf(endpoint.copy(balanceSnapshot = null))) }
+            setContent {
+                MaterialTheme {
+                    Column(Modifier.verticalScroll(rememberScrollState())) {
+                        EndpointsTab(state, enabled = true)
+                    }
+                }
+            }
+            onNodeWithContentDescription("Report wallet balances").performScrollTo().performClick()
+            runOnIdle { assertFalse(state.isValid) }
+            onNodeWithText("Asset field").performScrollTo().performTextReplacement(mapping.assetField)
+            onNodeWithText("Amount fields to sum (comma separated)")
+                .performScrollTo()
+                .performTextReplacement(mapping.amountFields.joinToString(","))
+            onNodeWithContentDescription("Omitted assets have zero balance").performScrollTo().performClick()
+            onNodeWithContentDescription("Store response").performScrollTo().performClick()
+            runOnIdle { assertFalse(state.isValid) }
+            onNodeWithContentDescription("Store response").performScrollTo().performClick()
+            runOnIdle { assertCanonicalRoundTrip(expected, state) }
+        }
+
     private fun assertCanonicalRoundTrip(
         original: ApiImportStrategy,
         state: ApiStrategyEditorState,

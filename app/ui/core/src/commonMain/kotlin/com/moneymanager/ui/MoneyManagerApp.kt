@@ -90,14 +90,10 @@ import com.moneymanager.ui.screens.accounts.AccountsScreen
 import com.moneymanager.ui.screens.apistrategy.ApiConnectionsScreen
 import com.moneymanager.ui.screens.apistrategy.ApiImportStrategyAuditScreen
 import com.moneymanager.ui.screens.apistrategy.ApiSessionTrafficScreen
-import com.moneymanager.ui.screens.apistrategy.ApiStrategiesScreen
-import com.moneymanager.ui.screens.apistrategy.editor.ApiStrategyEditorScreen
 import com.moneymanager.ui.screens.categories.CategoriesScreen
 import com.moneymanager.ui.screens.categories.CategoryAuditScreen
 import com.moneymanager.ui.screens.csv.CsvImportDetailScreen
 import com.moneymanager.ui.screens.csvstrategy.CsvImportStrategyAuditScreen
-import com.moneymanager.ui.screens.csvstrategy.CsvStrategiesScreen
-import com.moneymanager.ui.screens.csvstrategy.editor.CsvStrategyEditorScreen
 import com.moneymanager.ui.screens.currencies.AssetsScreen
 import com.moneymanager.ui.screens.currencies.CurrencyAuditScreen
 import com.moneymanager.ui.screens.importdirectory.ImportDirectoryAuditScreen
@@ -112,7 +108,6 @@ import com.moneymanager.ui.screens.reconciliation.ReconciliationCache
 import com.moneymanager.ui.screens.settings.DatabaseReplacement
 import com.moneymanager.ui.screens.settings.DatabaseSizeBreakdownScreen
 import com.moneymanager.ui.screens.settings.SettingsScreen
-import com.moneymanager.ui.screens.settings.StrategyCatalogScreen
 import com.moneymanager.ui.screens.setup.SetupWizardScreen
 import com.moneymanager.ui.screens.transactions.AccountTransactionsScreen
 import com.moneymanager.ui.screens.transactions.ManualEntrySuggestionCache
@@ -263,8 +258,10 @@ fun MoneyManagerApp(
                 LocalImportEngine provides services.transactions.importEngine,
                 LocalAttributeGroupMover provides attributeGroupMover,
             ) {
+                val offerStrategyReimport = rememberStrategyReimportOffer(sessionImports, taskManager)
                 if (showSetupWizard) {
                     SetupWizardScreen(
+                        onStrategiesUpdated = offerStrategyReimport,
                         services = services,
                         appVersion = appVersion,
                         strategyCatalogController = strategyCatalogController,
@@ -563,6 +560,7 @@ fun MoneyManagerApp(
                                         entry<Screen.Settings> {
                                             resetViewedIds()
                                             SettingsScreen(
+                                                onStrategiesUpdated = offerStrategyReimport,
                                                 currencyRepository = services.accounts.currencyRepository,
                                                 settingsRepository = services.settings.settingsRepository,
                                                 maintenance = services.imports.maintenance,
@@ -841,57 +839,15 @@ fun MoneyManagerApp(
                                                 },
                                             )
                                         }
-                                        entry<Screen.StrategyCatalog> { screen ->
-                                            resetViewedIds()
-                                            if (strategyCatalogController != null) {
-                                                StrategyCatalogScreen(
-                                                    controller = strategyCatalogController,
-                                                    library = services.imports.strategyLibrary,
-                                                    appVersion = appVersion,
-                                                    accountRepository = services.accounts.accountRepository,
-                                                    categoryRepository = services.accounts.categoryRepository,
-                                                    currencyRepository = services.accounts.currencyRepository,
-                                                    personRepository = services.people.personRepository,
-                                                    initialKindFilter = screen.kindFilter,
-                                                    onBack = { navigationHistory.navigateBack() },
-                                                )
-                                            } else {
-                                                LaunchedEffect(Unit) { navigationHistory.navigateBack() }
-                                            }
-                                        }
-                                        entry<Screen.ApiStrategies> {
-                                            resetViewedIds()
-                                            ApiStrategiesScreen(
-                                                apiImportStrategyRepository = services.imports.apiImportStrategyRepository,
-                                                onBrowseCatalog = {
-                                                    navigationHistory.navigateTo(Screen.StrategyCatalog(StrategyKind.API))
-                                                },
-                                                onBack = { navigationHistory.navigateBack() },
-                                                onCreateStrategy = {
-                                                    navigationHistory.navigateTo(Screen.ApiStrategyEditor())
-                                                },
-                                                onEditStrategy = { strategyId ->
-                                                    navigationHistory.navigateTo(Screen.ApiStrategyEditor(strategyId))
-                                                },
-                                                onAuditHistoryClick = { strategy ->
-                                                    navigationHistory.navigateTo(
-                                                        Screen.ApiStrategyAuditHistory(strategy.id, strategy.name),
-                                                    )
-                                                },
-                                            )
-                                        }
-                                        entry<Screen.ApiStrategyEditor> { screen ->
-                                            resetViewedIds()
-                                            ApiStrategyEditorScreen(
-                                                strategyId = screen.strategyId,
-                                                apiImportStrategyRepository = services.imports.apiImportStrategyRepository,
-                                                apiSessionRepository = services.imports.apiSessionRepository,
-                                                accountRepository = services.accounts.accountRepository,
-                                                categoryRepository = services.accounts.categoryRepository,
-                                                personRepository = services.people.personRepository,
-                                                onBack = { navigationHistory.navigateBack() },
-                                            )
-                                        }
+                                        importStrategyEntries(
+                                            entries = this,
+                                            services = services,
+                                            appVersion = appVersion,
+                                            strategyCatalogController = strategyCatalogController,
+                                            navigationHistory = navigationHistory,
+                                            offerStrategyReimport = offerStrategyReimport,
+                                            resetViewedIds = resetViewedIds,
+                                        )
                                         entry<Screen.CsvImportDetail>(
                                             clazzContentKey = { "CsvImportDetail:${it.importId}" },
                                         ) { screen ->
@@ -923,47 +879,6 @@ fun MoneyManagerApp(
                                                 },
                                                 onCsvSourceClick = onCsvSourceClick,
                                                 onTransferClick = ::navigateToTransferAccount,
-                                            )
-                                        }
-                                        entry<Screen.CsvStrategies> {
-                                            resetViewedIds()
-                                            CsvStrategiesScreen(
-                                                onBrowseCatalog = {
-                                                    navigationHistory.navigateTo(Screen.StrategyCatalog(StrategyKind.CSV))
-                                                },
-                                                csvImportStrategyRepository = services.imports.csvImportStrategyRepository,
-                                                csvImportRepository = services.imports.csvImportRepository,
-                                                accountRepository = services.accounts.accountRepository,
-                                                categoryRepository = services.accounts.categoryRepository,
-                                                currencyRepository = services.accounts.currencyRepository,
-                                                personRepository = services.people.personRepository,
-                                                csvStrategyImportExport = services.imports.csvStrategyImportExport,
-                                                strategyLibrary = services.imports.strategyLibrary,
-                                                appVersion = appVersion,
-                                                onBack = { navigationHistory.navigateBack() },
-                                                onEditStrategy = { strategyId, importId ->
-                                                    navigationHistory.navigateTo(Screen.CsvStrategyEditor(importId, strategyId))
-                                                },
-                                                onAuditHistoryClick = { strategy ->
-                                                    navigationHistory.navigateTo(
-                                                        Screen.CsvStrategyAuditHistory(strategy.id, strategy.name),
-                                                    )
-                                                },
-                                            )
-                                        }
-                                        entry<Screen.CsvStrategyEditor> { screen ->
-                                            CsvStrategyEditorScreen(
-                                                csvImportId = screen.csvImportId,
-                                                strategyId = screen.strategyId,
-                                                csvImportRepository = services.imports.csvImportRepository,
-                                                csvImportStrategyRepository = services.imports.csvImportStrategyRepository,
-                                                accountMappingRepository = services.imports.accountMappingRepository,
-                                                accountRepository = services.accounts.accountRepository,
-                                                categoryRepository = services.accounts.categoryRepository,
-                                                currencyRepository = services.accounts.currencyRepository,
-                                                attributeTypeRepository = services.transactions.attributeTypeRepository,
-                                                personRepository = services.people.personRepository,
-                                                onBack = { navigationHistory.navigateBack() },
                                             )
                                         }
                                         entry<Screen.AuditHistory> { screen ->

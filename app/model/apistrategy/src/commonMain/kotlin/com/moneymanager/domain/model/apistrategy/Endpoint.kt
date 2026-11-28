@@ -110,6 +110,19 @@ data class ApiEndpointConfig(
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     @Serializable(with = SortedStringListSerializer::class)
     val historicalPaths: List<String> = emptyList(),
+    /** Balance snapshots from a stored value endpoint of a single-account strategy. */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val balanceSnapshot: ApiBalanceSnapshot? = null,
+)
+
+/** One wallet's balance at response time. Each item supplies an asset and the components of its total. */
+@Serializable
+data class ApiBalanceSnapshot(
+    val assetField: String = "",
+    @Serializable(with = SortedStringListSerializer::class)
+    val amountFields: List<String> = emptyList(),
+    /** The entire wallet is covered and assets omitted by this unpaged response have zero balance. */
+    val omittedAssetsAreZero: Boolean = false,
 )
 
 @Serializable

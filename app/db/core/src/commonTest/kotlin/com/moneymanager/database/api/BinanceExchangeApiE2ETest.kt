@@ -3,6 +3,7 @@ package com.moneymanager.database.api
 import com.moneymanager.apiimporter.importApiSessionExchange
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.DeviceInfo
+import com.moneymanager.domain.model.Source
 import com.moneymanager.importengineapi.ensureApiCredential
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
@@ -166,7 +167,7 @@ class BinanceExchangeApiE2ETest : DbTest() {
         ],"total":2}
         """.trimIndent()
 
-    private suspend fun stageSessionAndImport(): Int {
+    private suspend fun stageSessionAndImport(balanceJson: String? = null): Int {
         val strategy = repositories.apiImportStrategyRepository.getStrategyByName("Binance").first()
         assertNotNull(strategy, "built-in Binance strategy should be installed")
         val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-os", "test-machine"))
@@ -223,6 +224,8 @@ class BinanceExchangeApiE2ETest : DbTest() {
         stage("api/v3/myTrades?ep=api/v3/myTrades&fv=BTCUSDT", myTradesBtcUsdtJson)
         stage("api/v3/myTrades?ep=api/v3/myTrades&fv=ETHUSDT", myTradesEthUsdtJson)
 
+        balanceJson?.let { stage("sapi/v3/asset/getUserAsset?ep=sapi/v3/asset/getUserAsset", it) }
+
         importApiSessionExchange(
             apiSessionRepository = repositories.apiSessionRepository,
             accountRepository = repositories.accountRepository,
@@ -231,9 +234,41 @@ class BinanceExchangeApiE2ETest : DbTest() {
             sessionId = sessionId,
             strategy = strategy,
             importEngine = repositories.importEngine,
+            transactionRepository = repositories.transactionRepository,
         )
         return sessionId.id.toInt()
     }
+
+    @Test
+    fun reportsSpotSnapshotAndZeroForOmittedLedgerAssets() =
+        runDbTest {
+            stageSessionAndImport(
+                """[{"asset":"BTC","free":"0.2","locked":"0.1","freeze":"0","withdrawing":"0","ipoable":"0"}]""",
+            )
+            val balances = repositories.reportedBalanceRepository
+            val series = balances.getSeries().first()
+            assertEquals(setOf("Binance"), series.map { it.accountName }.toSet())
+            val btc = series.single { it.asset.code == "BTC" }
+            val gbp = series.single { it.asset.code == "GBP" }
+            val reportedBtc = balances.getBalances(btc.accountId, btc.asset).single()
+            val reportedGbp = balances.getBalances(gbp.accountId, gbp.asset).single()
+            assertEquals("0.3", reportedBtc.amount.toDisplayValue().toString())
+            assertTrue(reportedGbp.amount.isZero())
+            val source = balances.getSources(reportedGbp.id).single().source as Source.Api
+            assertEquals("$", source.jsonPath?.value)
+        }
+
+    @Test
+    fun malformedSnapshotDoesNotImplyZeroForLedgerAssets() =
+        runDbTest {
+            stageSessionAndImport("""[{"asset":"BTC","free":"invalid"}]""")
+            assertTrue(
+                repositories.reportedBalanceRepository
+                    .getSeries()
+                    .first()
+                    .isEmpty(),
+            )
+        }
 
     @Test
     fun `imports status-filtered transfers - both fiat_orders endpoints - fixed-side trades and fan-out spot trades - idempotently`() =

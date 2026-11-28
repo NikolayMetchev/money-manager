@@ -45,6 +45,7 @@ import com.moneymanager.domain.strategy.CsvUnresolvedReference
 import com.moneymanager.domain.strategy.StrategyKey
 import com.moneymanager.domain.strategy.StrategyKind
 import com.moneymanager.domain.strategy.StrategyLibrary
+import com.moneymanager.domain.strategy.reportInstalledUpdates
 import com.moneymanager.presenter.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.strategycatalog.CatalogItem
 import com.moneymanager.strategycatalog.CatalogItemStatus
@@ -77,6 +78,7 @@ fun StrategyCatalogScreen(
     // Cleared when the screen is embedded somewhere that owns navigation itself (the setup wizard).
     showBackAction: Boolean = true,
     onBack: () -> Unit = {},
+    onStrategiesUpdated: (Set<StrategyKey>) -> Unit = {},
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
     val state by controller.state.collectAsState()
@@ -110,13 +112,22 @@ fun StrategyCatalogScreen(
 
     val filteredItems = state.items.filter { kindFilter == null || it.entry.kind == kindFilter }
 
+    suspend fun installAndOfferReimport(
+        keys: Set<StrategyKey>,
+        resolutions: Map<StrategyKey, Map<CsvUnresolvedReference, CsvResolution>> = emptyMap(),
+    ) {
+        library.reportInstalledUpdates(appVersion, keys, onStrategiesUpdated) {
+            controller.install(library, appVersion, keys, resolutions)
+        }
+    }
+
     fun runInstall(
         keys: Set<StrategyKey>,
         resolutions: Map<StrategyKey, Map<CsvUnresolvedReference, CsvResolution>>,
     ) {
         scope.launch {
             controller.beginBusy()
-            runCatchingCancellable { controller.install(library, appVersion, keys, resolutions) }
+            runCatchingCancellable { installAndOfferReimport(keys, resolutions) }
         }
     }
 
@@ -133,7 +144,7 @@ fun StrategyCatalogScreen(
                         .associate { it.key to it.unresolvedReferences }
                 val overwrites = state.items.filter { it.entry.key in keys && it.status != CatalogItemStatus.NOT_INSTALLED }
                 if (unresolved.isEmpty() && overwrites.isEmpty()) {
-                    controller.install(library, appVersion, keys)
+                    installAndOfferReimport(keys)
                 } else {
                     pendingInstall = PendingInstall(keys, unresolved, overwrites)
                 }
