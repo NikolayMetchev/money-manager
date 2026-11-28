@@ -98,6 +98,12 @@ interface CsvImportWriteRepository : CsvImportReadRepository {
         ignored: Boolean,
     )
 
+    /** Records the name the import's file now has (a folder scan found it renamed), which rules read as the file name. */
+    suspend fun setOriginalFileName(
+        id: CsvImportId,
+        fileName: String,
+    )
+
     /**
      * Updates the import status for multiple rows in a single database transaction. Which transaction a row
      * stands for is not kept here: it comes from the row's import record and its observations.

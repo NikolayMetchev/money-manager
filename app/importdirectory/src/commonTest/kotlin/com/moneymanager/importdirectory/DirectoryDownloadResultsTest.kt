@@ -25,7 +25,14 @@ class DirectoryDownloadResultsTest {
     private fun scan(
         downloaded: Int,
         failures: List<String> = emptyList(),
-    ) = ScanResult(filesDownloaded = downloaded, filesUnchanged = 0, filesSkipped = 0, filesFailed = failures.size, failures = failures)
+    ) = ScanResult(
+        filesDownloaded = downloaded,
+        filesUnchanged = 0,
+        filesSkipped = 0,
+        filesFailed = failures.size,
+        filesRemoved = 0,
+        failures = failures,
+    )
 
     @Test
     fun `download all summary counts files and folders and prefixes issues with the folder`() {

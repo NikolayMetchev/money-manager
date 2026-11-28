@@ -48,4 +48,10 @@ interface ImportDirectoryWriteRepository : ImportDirectoryReadRepository {
         csvImportId: CsvImportId?,
         importedAt: Instant,
     )
+
+    /** Forgets a file [directoryId] no longer lists. The import it staged into stays. */
+    suspend fun forgetFile(
+        directoryId: ImportDirectoryId,
+        fileRef: String,
+    )
 }

@@ -119,4 +119,12 @@ class ImportDirectoryWriteRepositoryImpl(
                 csvImportId?.let { writeQueries.insertCsvImportForFile(fileId, it.id.toString()) }
             }
         }
+
+    override suspend fun forgetFile(
+        directoryId: ImportDirectoryId,
+        fileRef: String,
+    ): Unit =
+        withContext(coroutineContext) {
+            writeQueries.deleteFile(directoryId.id.toString(), fileRef)
+        }
 }

@@ -32,6 +32,9 @@ UPDATE csv_entity_source SET csv_row_index = NULL WHERE csv_import_id = ? AND cs
 setImportIgnored:
 UPDATE csv_import_metadata SET ignored = ? WHERE id = ?;
 
+setOriginalFileName:
+UPDATE csv_import_metadata SET original_file_name = ? WHERE id = ?;
+
 insertColumn:
 INSERT INTO csv_column_metadata (id, import_id, column_index, original_name)
 VALUES (?, ?, ?, ?);

@@ -35,3 +35,7 @@ DELETE FROM import_directory_file_csv_import WHERE file_id = ?;
 
 insertCsvImportForFile:
 INSERT INTO import_directory_file_csv_import (file_id, csv_import_id) VALUES (?, ?);
+
+-- Forget a file the folder no longer lists (cascades to its import child row; the import itself stays).
+deleteFile:
+DELETE FROM import_directory_file WHERE directory_id = ? AND file_ref = ?;
